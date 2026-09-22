@@ -1,0 +1,46 @@
+# compose.postgres.yml — Local development database
+#
+# Single PostgreSQL 17 instance with pg_stat_statements + pg_cron.
+# Used for local development and testing only.
+#
+# Usage (from repo root):
+#   docker compose -f compose.postgres.yml up -d --build
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    image: postgres-pg-cron:17
+    container_name: app-postgres
+    restart: unless-stopped
+    ports:
+      - "25432:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: localdev123
+      POSTGRES_DB: delivery
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ../scripts/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
+      - ./scripts/setup-pg-cron.sql:/docker-entrypoint-initdb.d/02-pg-cron.sql
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements,pg_cron
+      - -c
+      - cron.database_name=delivery
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - pg_stat_statements.max=10000
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:

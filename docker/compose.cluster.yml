@@ -1,0 +1,281 @@
+x-repmgr-common: &repmgr-common
+  image: docker.io/bitnamilegacy/postgresql-repmgr:17.6.0-debian-12-r2
+  restart: unless-stopped
+  networks:
+    - pg-net
+  healthcheck:
+    test: ["CMD", "pg_isready", "-U", "postgres"]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+
+x-app-migrate: &app-migrate
+  image: app:latest
+  env_file: .env
+  volumes:
+    - uploads_data:/app/uploads
+  environment:
+    RUN_MIGRATIONS: "true"
+  command: sh -c "node_modules/.bin/drizzle-kit push --force"
+  restart: "no"
+  networks:
+    - app-net
+
+services:
+  # ---------------------------------------------------------------------
+  # Infra: Postgres cluster (repmgr) + pgpool + cloudflared + cron
+  # ---------------------------------------------------------------------
+  pg-0:
+    <<: *repmgr-common
+    container_name: app-pg-0
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_0_data:/bitnami/postgresql
+      - ../scripts/init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql
+    env_file:
+      - .env
+    environment:
+      # pg_stat_statements is bundled with the Bitnami image.
+       # To add pg_cron, build a custom image (see docker/Dockerfile.postgres)
+      # and change the image: field above, then uncomment the line below
+      # and remove the cron service (it will no longer be needed):
+      # - POSTGRESQL_APPEND_SHARED_PRELOAD_LIBRARIES=pg_stat_statements,pg_cron
+      - POSTGRESQL_APPEND_SHARED_PRELOAD_LIBRARIES=pg_stat_statements
+      - REPMGR_USERNAME=repmgr
+      - REPMGR_PRIMARY_HOST=pg-0
+      - REPMGR_PRIMARY_PORT=5432
+      - REPMGR_PARTNER_NODES=pg-0,pg-1:5432
+      - REPMGR_NODE_NAME=pg-0
+      - REPMGR_NODE_NETWORK_NAME=pg-0
+      - REPMGR_PORT_NUMBER=5432
+
+  pg-1:
+    <<: *repmgr-common
+    container_name: app-pg-1
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_1_data:/bitnami/postgresql
+      - ../scripts/init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql
+    env_file:
+      - .env
+    environment:
+      - POSTGRESQL_APPEND_SHARED_PRELOAD_LIBRARIES=pg_stat_statements
+      - REPMGR_USERNAME=repmgr
+      - REPMGR_PRIMARY_HOST=pg-0
+      - REPMGR_PRIMARY_PORT=5432
+      - REPMGR_PARTNER_NODES=pg-0,pg-1:5432
+      - REPMGR_NODE_NAME=pg-1
+      - REPMGR_NODE_NETWORK_NAME=pg-1
+      - REPMGR_PORT_NUMBER=5432
+    depends_on:
+      - pg-0
+
+  pgpool:
+    image: docker.io/bitnamilegacy/pgpool:4.6.3-debian-12-r0
+    container_name: app-pgpool
+    restart: unless-stopped
+    networks:
+      - pg-net
+      - app-net
+    ports:
+      - "5434:5432"
+    env_file:
+      - .env
+    environment:
+      - PGPOOL_BACKEND_NODES=0:pg-0:5432,1:pg-1:5432
+      - PGPOOL_SR_CHECK_USER=repmgr
+      - PGPOOL_SR_CHECK_PASSWORD=${REPMGR_PASSWORD}
+      - PGPOOL_POSTGRES_USERNAME=postgres
+      - PGPOOL_POSTGRES_PASSWORD=${POSTGRESQL_POSTGRES_PASSWORD}
+      - PGPOOL_POSTGRES_CUSTOM_USERS=${POSTGRESQL_USERNAME}
+      - PGPOOL_POSTGRES_CUSTOM_PASSWORDS=${POSTGRESQL_PASSWORD}
+      - PGPOOL_ADMIN_USERNAME=admin
+      - PGPOOL_ADMIN_PASSWORD=${PGPOOL_ADMIN_PASSWORD}
+      - PGPOOL_ENABLE_LOAD_BALANCING=yes
+      - PGPOOL_ENABLE_LDAP=no
+    depends_on:
+      pg-0:
+        condition: service_healthy
+      pg-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opt/bitnami/scripts/pgpool/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel run
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    networks:
+      - app-net
+
+  # ── Cron container ──────────────────────────────────────────────────────
+  # Runs HTTP-based cleanup jobs against the dashboard API.
+  # If pg_cron is configured (see pg-0 comment above), this container can
+  # be removed — pg_cron handles cleanup natively inside PostgreSQL.
+  cron:
+    image: alpine:3.20
+    container_name: app-cron
+    restart: unless-stopped
+    env_file: .env
+    command: >
+      sh -c "
+        crontab - 2>/dev/null <<'CRONTAB'
+        0 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-sessions >> /var/log/cron.log 2>&1
+        30 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-audit-logs >> /var/log/cron.log 2>&1
+        0 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-email-logs >> /var/log/cron.log 2>&1
+        CRONTAB
+        crond -f -l 2
+      "
+    networks:
+      - app-net
+
+  # ---------------------------------------------------------------------
+  # Dashboard app
+  # ---------------------------------------------------------------------
+  migrate-dashboard:
+    <<: *app-migrate
+
+  dashboard:
+    image: app:latest
+    container_name: app-dashboard
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - uploads_data:/app/uploads
+    environment:
+      RUN_MIGRATIONS: "false"
+      ALLOWED_ROLE: dashboard
+      NEXT_PUBLIC_SITE_URL: http://localhost:3001
+      BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+    depends_on:
+      migrate-dashboard:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - app-net
+
+  # ---------------------------------------------------------------------
+  # Merchant app
+  # ---------------------------------------------------------------------
+  migrate-merchant:
+    <<: *app-migrate
+
+  merchant:
+    image: app:latest
+    container_name: app-merchant
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    volumes:
+      - uploads_data:/app/uploads
+    environment:
+      RUN_MIGRATIONS: "false"
+      ALLOWED_ROLE: merchant
+      NEXT_PUBLIC_SITE_URL: http://localhost:3002
+      BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+    depends_on:
+      migrate-merchant:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - app-net
+
+  # ---------------------------------------------------------------------
+  # Rider app
+  # ---------------------------------------------------------------------
+  migrate-rider:
+    <<: *app-migrate
+
+  rider:
+    image: app:latest
+    container_name: app-rider
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "3003:3000"
+    volumes:
+      - uploads_data:/app/uploads
+    environment:
+      RUN_MIGRATIONS: "false"
+      ALLOWED_ROLE: rider
+      NEXT_PUBLIC_SITE_URL: http://localhost:3003
+      BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+    depends_on:
+      migrate-rider:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - app-net
+
+  # ---------------------------------------------------------------------
+  # Warehouse app
+  # ---------------------------------------------------------------------
+  migrate-warehouse:
+    <<: *app-migrate
+
+  warehouse:
+    image: app:latest
+    container_name: app-warehouse
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "3004:3000"
+    volumes:
+      - uploads_data:/app/uploads
+    environment:
+      RUN_MIGRATIONS: "false"
+      ALLOWED_ROLE: warehouse
+      NEXT_PUBLIC_SITE_URL: http://localhost:3004
+      BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+    depends_on:
+      migrate-warehouse:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - app-net
+
+networks:
+  pg-net:
+    driver: bridge
+  app-net:
+    driver: bridge
+
+volumes:
+  pg_0_data:
+  pg_1_data:
+  uploads_data:

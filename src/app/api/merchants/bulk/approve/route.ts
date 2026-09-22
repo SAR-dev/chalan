@@ -1,0 +1,50 @@
+import { and, eq, inArray } from "drizzle-orm"
+import { NextResponse } from "next/server"
+import { requireSession } from "@/lib/api-auth"
+import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
+import { logAudit } from "@/lib/audit"
+import { db } from "@/lib/db"
+import { merchant } from "@/lib/db/schema"
+import { idsSchema, parseBody } from "@/lib/validation"
+
+export async function PATCH(req: Request) {
+  const me = await requireSession()
+  if (!me) return unauthorized()
+  if (me.role !== "SUPER_ADMIN") return forbidden()
+
+  const parsed = await parseBody(req, idsSchema)
+  if (parsed.error) return parsed.error
+  const { ids } = parsed.data
+
+  const pendings = await db
+    .select({ id: merchant.id })
+    .from(merchant)
+    .where(and(inArray(merchant.id, ids), eq(merchant.status, "PENDING")))
+
+  if (pendings.length === 0) {
+    return badRequest("No PENDING merchants found for the given IDs.")
+  }
+
+  const pendingIds = pendings.map((m) => m.id)
+  const updated = await db
+    .update(merchant)
+    .set({
+      status: "ACTIVE",
+      approvedBy: me.name,
+      approvedAt: new Date().toISOString(),
+    })
+    .where(inArray(merchant.id, pendingIds))
+    .returning()
+
+  for (const m of updated) {
+    await logAudit({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: "MERCHANT_APPROVED",
+      entityType: "merchant",
+      entityId: m.id,
+      description: `Approved merchant ${m.businessName}`,
+    })
+  }
+
+  return NextResponse.json({ ok: true, count: updated.length })
+}

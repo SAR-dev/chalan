@@ -1,0 +1,48 @@
+import { asc, eq, sql } from "drizzle-orm"
+import { redirect } from "next/navigation"
+import { requireSession } from "@/lib/api-auth"
+import { dbRead } from "@/lib/db"
+import { rider } from "@/lib/db/schema"
+import { WarehouseRidersPageClient } from "./riders-client"
+
+const RIDER_COLUMNS = {
+  id: rider.id,
+  name: rider.name,
+  email: rider.email,
+  phone: rider.phone,
+  zone: rider.zone,
+  address: rider.address,
+  status: rider.status,
+  taskType: rider.taskType,
+  warehouseId: rider.warehouseId,
+  isActive: rider.isActive,
+  nidNumber: rider.nidNumber,
+  createdAt: rider.createdAt,
+  updatedAt: rider.updatedAt,
+}
+
+export default async function WarehouseRidersPage() {
+  const me = await requireSession()
+  if (!me) redirect("/login")
+  if (me.role !== "WAREHOUSE_ADMIN") redirect("/login")
+  if (!me.warehouseId) redirect("/login")
+
+  const limit = 20
+
+  const warehouseScope = eq(rider.warehouseId, me.warehouseId)
+
+  const [[{ total }], rows] = await Promise.all([
+    dbRead
+      .select({ total: sql<number>`count(*)::int` })
+      .from(rider)
+      .where(warehouseScope),
+    dbRead
+      .select(RIDER_COLUMNS)
+      .from(rider)
+      .where(warehouseScope)
+      .orderBy(asc(rider.name))
+      .limit(limit),
+  ])
+
+  return <WarehouseRidersPageClient initialData={rows} initialTotal={total} />
+}

@@ -1,0 +1,75 @@
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm"
+import { redirect } from "next/navigation"
+import { requireSession } from "@/lib/api-auth"
+import { dbRead } from "@/lib/db"
+import { order } from "@/lib/db/schema"
+import { IntakePageClient } from "./intake-client"
+
+export default async function WarehouseIntakePage() {
+  const me = await requireSession()
+  if (!me) redirect("/login")
+  if (me.role !== "WAREHOUSE_ADMIN") redirect("/login")
+  if (!me.warehouseId) redirect("/login")
+
+  const limit = 20
+
+  // Warehouse scope: orders already in this warehouse + picked-up parcels
+  // not yet assigned to any warehouse (incoming candidates).
+  const warehouseScope = or(
+    eq(order.warehouseId, me.warehouseId),
+    and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
+  )
+
+  const [[{ total }], rows] = await Promise.all([
+    dbRead
+      .select({ total: sql<number>`count(*)::int` })
+      .from(order)
+      .where(warehouseScope),
+    dbRead
+      .select({
+        id: order.id,
+        merchantId: order.merchantId,
+        pickupLocationId: order.pickupLocationId,
+        recipientName: order.recipientName,
+        recipientPhone: order.recipientPhone,
+        deliveryAddress: order.deliveryAddress,
+        deliveryCity: order.deliveryCity,
+        deliveryMapLink: order.deliveryMapLink,
+        parcelWeightKg: order.parcelWeightKg,
+        deliveryType: order.deliveryType,
+        productCost: order.productCost,
+        deliveryFee: order.deliveryFee,
+        codFee: order.codFee,
+        merchantEarnings: order.merchantEarnings,
+        status: order.status,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        pickupRiderId: order.pickupRiderId,
+        pickedUpAt: order.pickedUpAt,
+        warehouseId: order.warehouseId,
+        receivedAtWarehouseAt: order.receivedAtWarehouseAt,
+        receivedByWarehouse: order.receivedByWarehouse,
+        deliveryRiderId: order.deliveryRiderId,
+        dispatchedAt: order.dispatchedAt,
+        dispatchedBy: order.dispatchedBy,
+        deliveredAt: order.deliveredAt,
+        deliveryProofRef: order.deliveryProofRef,
+        amountCollected: order.amountCollected,
+        failedAttemptAt: order.failedAttemptAt,
+        failureNote: order.failureNote,
+        deliveryAttempts: order.deliveryAttempts,
+        cancelledAt: order.cancelledAt,
+        cancelledBy: order.cancelledBy,
+        cancelReason: order.cancelReason,
+        codSettledAt: order.codSettledAt,
+        codSettledBy: order.codSettledBy,
+        payoutRequestId: order.payoutRequestId,
+      })
+      .from(order)
+      .where(warehouseScope)
+      .orderBy(desc(order.createdAt))
+      .limit(limit),
+  ])
+
+  return <IntakePageClient initialData={rows} initialTotal={total} />
+}

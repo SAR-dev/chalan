@@ -1,0 +1,413 @@
+"use client"
+
+import {
+  Banknote,
+  CheckCircle2,
+  MapPin,
+  Navigation,
+  PackageCheck,
+  PartyPopper,
+  Phone,
+  Truck,
+} from "lucide-react"
+import Link from "next/link"
+import { useMemo, useState } from "react"
+import { PageHeader } from "@/components/page-header"
+import { StatCardList } from "@/components/stat-card-list"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { pageContent } from "@/config/content"
+import { statCardLabels } from "@/config/stat-card-labels"
+import { useAuth } from "@/features/account/hooks/use-auth"
+import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { DeliveryAttemptDialog } from "@/features/orders/dialogs/delivery-attempt-dialog"
+import { OutForDeliveryDialog } from "@/features/orders/dialogs/out-for-delivery-dialog"
+import { PickupConfirmDialog } from "@/features/orders/dialogs/pickup-confirm-dialog"
+import { useOrders } from "@/features/orders/hooks/use-orders"
+import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { useRiders } from "@/features/riders/hooks/use-riders"
+import { formatTk } from "@/lib/pricing"
+import type { Order } from "@/lib/types"
+
+function isToday(iso?: string | null) {
+  if (!iso) return false
+  const d = new Date(iso)
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  )
+}
+
+function TaskSection({
+  title,
+  count,
+  viewAllHref,
+  children,
+}: {
+  title: string
+  count: number
+  viewAllHref?: string
+  children: React.ReactNode
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="border-border mb-3 flex items-center justify-between border-b px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">{title}</h2>
+            <Badge variant="secondary">{count}</Badge>
+          </div>
+          {viewAllHref ? (
+            <Link
+              href={viewAllHref}
+              className="text-muted-foreground hover:text-foreground text-xs font-medium"
+            >
+              View queue
+            </Link>
+          ) : null}
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function RiderTodoPage() {
+  const { currentUser } = useAuth()
+  const { currentRider } = useRiders()
+  const { orders } = useOrders()
+  const { merchants } = useMerchants()
+  const { pickupLocations } = usePickupLocations()
+
+  const [pickupTarget, setPickupTarget] = useState<Order | null>(null)
+  const [pickupDialogOpen, setPickupDialogOpen] = useState(false)
+  const [deliveryTarget, setDeliveryTarget] = useState<Order | null>(null)
+  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false)
+  const [startTarget, setStartTarget] = useState<Order | null>(null)
+  const [startDialogOpen, setStartDialogOpen] = useState(false)
+
+  const merchant = (id: string) => merchants.find((m) => m.id === id)
+  const merchantName = (id: string) => merchant(id)?.businessName ?? "Merchant"
+  const pickup = (id: string) => pickupLocations.find((p) => p.id === id)
+
+  const myPickups = useMemo(
+    () =>
+      currentRider
+        ? orders.filter((o) => o.pickupRiderId === currentRider.id)
+        : [],
+    [orders, currentRider],
+  )
+  const myDeliveries = useMemo(
+    () =>
+      currentRider
+        ? orders.filter((o) => o.deliveryRiderId === currentRider.id)
+        : [],
+    [orders, currentRider],
+  )
+
+  const toPickup = myPickups.filter((o) => o.status === "APPROVED")
+  const toDeliver = myDeliveries.filter((o) =>
+    ["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(o.status),
+  )
+
+  const deliveredTodayCount = myDeliveries.filter(
+    (o) => o.status === "DELIVERED" && isToday(o.deliveredAt),
+  ).length
+
+  const pickedUpTodayCount = myPickups.filter(
+    (o) => o.status === "PICKED_UP" && isToday(o.pickedUpAt),
+  ).length
+
+  const cashToSubmit = myDeliveries
+    .filter(
+      (o) =>
+        o.status === "DELIVERED" &&
+        !o.codSettledAt &&
+        o.deliveryRiderId === currentRider?.id,
+    )
+    .reduce((sum, o) => sum + o.productCost, 0)
+
+  const cashCollected = myDeliveries.filter(
+    (o) =>
+      o.status === "DELIVERED" &&
+      !o.codSettledAt &&
+      o.deliveryRiderId === currentRider?.id,
+  )
+
+  const totalTasks = toPickup.length + toDeliver.length
+
+  function openPickup(order: Order) {
+    setPickupTarget(order)
+    setPickupDialogOpen(true)
+  }
+
+  function openDelivery(order: Order) {
+    setDeliveryTarget(order)
+    setDeliveryDialogOpen(true)
+  }
+
+  function openStartDelivery(order: Order) {
+    setStartTarget(order)
+    setStartDialogOpen(true)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={pageContent.rider.todo.title(
+          currentUser?.name.split(" ")[0] ?? "Rider",
+        )}
+        description={pageContent.rider.todo.description}
+      />
+
+      <StatCardList
+        columns={3}
+        items={[
+          {
+            label: "Pickup progress",
+            value: `${pickedUpTodayCount} / ${toPickup.length}`,
+            icon: PackageCheck,
+            tone: "bg-chart-1/15 text-chart-1",
+          },
+          {
+            label: "Delivery progress",
+            value: `${deliveredTodayCount} / ${toDeliver.length}`,
+            icon: Truck,
+            tone: "bg-chart-4/15 text-chart-4",
+          },
+          {
+            label: statCardLabels.rider.todo.cashToSubmit.label,
+            value: formatTk(cashToSubmit),
+            icon: Banknote,
+            tone: "bg-chart-3/15 text-chart-3",
+          },
+        ]}
+      />
+
+      {totalTasks === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <PartyPopper className="text-chart-2 size-8" />
+            <p className="font-medium">All caught up</p>
+            <p className="text-muted-foreground max-w-sm text-sm">
+              No pending pickups or deliveries right now. New tasks will show up
+              here as soon as they&apos;re assigned to you.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex flex-col gap-5">
+          <TaskSection
+            title="Pick up from merchant"
+            count={toPickup.length}
+            viewAllHref="/rider/pickup"
+          >
+            <div className="flex flex-col">
+              {toPickup.map((o) => {
+                const p = pickup(o.pickupLocationId)
+                const mapLink = (o as any).pickupLocationMapLink as
+                  | string
+                  | null
+                const phone = (o as any).merchantPhone as string | null
+                return (
+                  <div
+                    key={o.id}
+                    className="flex items-center justify-between gap-3 border-border border-b px-4 py-3 last:border-b-0 sm:px-5"
+                  >
+                    <div className="flex flex-1 flex-col gap-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-medium">
+                          {o.id}
+                        </span>
+                        <span className="text-muted-foreground text-xs">•</span>
+                        <span className="truncate text-sm font-medium">
+                          {merchantName(o.merchantId)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {phone && (
+                          <a
+                            href={`tel:${phone}`}
+                            className="hover:text-foreground inline-flex items-center gap-1"
+                          >
+                            <Phone className="size-3" />
+                            {phone}
+                          </a>
+                        )}
+                        {p?.address && (
+                          <span className="truncate">{p.address}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!mapLink}
+                        onClick={() => {
+                          if (mapLink) window.open(mapLink, "_blank")
+                        }}
+                      >
+                        <MapPin className="size-4" />
+                      </Button>
+                      <Button size="sm" onClick={() => openPickup(o)}>
+                        <PackageCheck className="size-4" />
+                        Picked up
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </TaskSection>
+
+          <TaskSection
+            title="Deliver to recipient"
+            count={toDeliver.length}
+            viewAllHref="/rider/delivery"
+          >
+            <div className="flex flex-col">
+              {toDeliver.map((o) => {
+                const isAssigned = o.deliveryRiderId === currentRider?.id
+                const canStart = o.status === "IN_TRANSIT" && isAssigned
+                const canRecord = o.status === "OUT_FOR_DELIVERY" && isAssigned
+                const mapLink = (o as any).deliveryMapLink as string | null
+                return (
+                  <div
+                    key={o.id}
+                    className="flex items-center justify-between gap-3 border-border border-b px-4 py-3 last:border-b-0 sm:px-5"
+                  >
+                    <div className="flex flex-1 flex-col gap-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-medium">
+                          {o.id}
+                        </span>
+                        <span className="text-muted-foreground text-xs">•</span>
+                        <span className="truncate text-sm font-medium">
+                          {o.recipientName}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {o.recipientPhone && (
+                          <a
+                            href={`tel:${o.recipientPhone}`}
+                            className="hover:text-foreground inline-flex items-center gap-1"
+                          >
+                            <Phone className="size-3" />
+                            {o.recipientPhone}
+                          </a>
+                        )}
+                        {o.deliveryCity && <span>{o.deliveryCity}</span>}
+                        {o.deliveryAddress && (
+                          <span className="truncate">
+                            — {o.deliveryAddress}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-medium tabular-nums">
+                        {formatTk(o.productCost)}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!mapLink}
+                        onClick={() => {
+                          if (mapLink) window.open(mapLink, "_blank")
+                        }}
+                      >
+                        <MapPin className="size-4" />
+                      </Button>
+                      {canStart && (
+                        <Button size="sm" onClick={() => openStartDelivery(o)}>
+                          <Navigation className="size-4" />
+                          Start
+                        </Button>
+                      )}
+                      {canRecord && (
+                        <Button size="sm" onClick={() => openDelivery(o)}>
+                          <CheckCircle2 className="size-4" />
+                          Record
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </TaskSection>
+        </div>
+      )}
+
+      {cashCollected.length > 0 && (
+        <TaskSection title="Cash collected" count={cashCollected.length}>
+          <div className="flex flex-col">
+            {cashCollected.map((o) => (
+              <div
+                key={o.id}
+                className="flex items-center justify-between gap-3 border-border border-b px-4 py-3 last:border-b-0 sm:px-5"
+              >
+                <div className="flex flex-1 flex-col gap-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-medium">
+                      {o.id}
+                    </span>
+                    <span className="text-muted-foreground text-xs">•</span>
+                    <span className="truncate text-sm font-medium">
+                      {o.recipientName}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {o.deliveryCity && <span>{o.deliveryCity}</span>}
+                    {o.deliveryAddress && (
+                      <span className="truncate">— {o.deliveryAddress}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-sm font-medium tabular-nums shrink-0">
+                  {formatTk(o.productCost)}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between border-border border-t px-4 py-3 sm:px-5">
+              <span className="text-sm font-semibold">Total to submit</span>
+              <span className="text-sm font-semibold tabular-nums">
+                {formatTk(cashToSubmit)}
+              </span>
+            </div>
+          </div>
+        </TaskSection>
+      )}
+
+      <PickupConfirmDialog
+        order={pickupTarget}
+        merchantName={
+          pickupTarget
+            ? (merchant(pickupTarget.merchantId)?.businessName ?? "Merchant")
+            : ""
+        }
+        pickupLocation={
+          pickupTarget ? (pickup(pickupTarget.pickupLocationId) ?? null) : null
+        }
+        open={pickupDialogOpen}
+        onOpenChange={setPickupDialogOpen}
+      />
+
+      <OutForDeliveryDialog
+        order={startTarget}
+        open={startDialogOpen}
+        onOpenChange={setStartDialogOpen}
+      />
+
+      <DeliveryAttemptDialog
+        order={deliveryTarget}
+        open={deliveryDialogOpen}
+        onOpenChange={setDeliveryDialogOpen}
+      />
+    </div>
+  )
+}

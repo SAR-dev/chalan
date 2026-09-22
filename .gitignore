@@ -1,0 +1,32 @@
+# v0 sandbox internal files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+.vercel/
+
+# Environment variables
+.env
+.env*
+!.env.docker
+!.env.example
+
+
+# Common ignores
+node_modules
+.next/
+.DS_Store
+.idea/
+.uploads/
+tsconfig.tsbuildinfo
+REPOMIX.md
+NOTE.md
+
+# Playwright auth storage states
+e2e/.auth/
+test-results/
+/dev-err.log
+/dev-out.log
+/playwright-report/
+/html/

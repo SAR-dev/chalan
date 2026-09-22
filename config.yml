@@ -1,0 +1,6 @@
+# config.yml
+tunnel: 987f4aae-37ac-4f40-a774-2cc315d87d3e
+ingress:
+  - hostname: sarn.top
+    service: http://localhost:3000
+  - service: http_status:404

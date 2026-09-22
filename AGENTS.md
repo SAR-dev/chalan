@@ -1,0 +1,335 @@
+# AGENTS.md
+
+Instructions for AI agents working in this codebase.
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Dev server | `pnpm dev` |
+| Type check | `pnpm typecheck` |
+| Lint + format | `pnpm ci:fix` |
+| Check all | `pnpm ci:check` |
+| Unit tests | `pnpm test:unit:run` |
+| E2E tests | `pnpm test:e2e` |
+| Full CI | `pnpm ci:test` |
+
+## Project Stack
+
+- **Framework:** Next.js 16 (App Router, Turbopack)
+- **Language:** TypeScript (strict)
+- **Database:** PostgreSQL + Drizzle ORM
+- **State:** SWR for data fetching
+- **UI:** shadcn/ui + Tailwind CSS v4
+- **Testing:** Vitest (unit) + Playwright (E2E)
+- **Linting:** Biome (not ESLint)
+
+## Folder Structure
+
+### Feature modules
+
+All domain code lives under `src/features/<domain>/`. Each gets only the subdirectories it needs:
+
+```
+src/features/<domain>/
+  components/    ← domain-specific UI (NOT reused across domains)
+  hooks/         ← SWR hooks (use-<plural>.ts)
+  dialogs/       ← feature dialogs (<action>-dialog.tsx or folder/index.tsx)
+```
+
+**12 domains:** account, announcements, audit-logs, email-logs, merchants, orders, payouts, pickup-locations, platform-config, riders, team, warehouses
+
+Not every domain has all three subdirs. Minimal domains (audit-logs, platform-config) may only have `hooks/`.
+
+### Shared code
+
+| Path | Purpose |
+|------|---------|
+| `src/components/ui/*` | shadcn/ui primitives (button, dialog, card, etc.) |
+| `src/components/*.tsx` | Shared non-ui components (data-table, page-header, form-dialog, confirm-dialog, status-badge, etc.) |
+| `src/components/charts/*` | Reusable chart components |
+| `src/components/filters/*` | Shared filter bar, status tabs |
+| `src/components/navigation/*` | Sidebar components per role |
+| `src/lib/hooks/*` | Shared React hooks (fetcher, use-table-filters, use-debounced-value) |
+| `src/lib/db/*` | Database connection, schema, seeds, migrations |
+| `src/lib/storage/*` | File storage abstraction (Supabase, R2, local) |
+| `src/lib/*.ts` | Shared utilities (validation, types, constants, utils, pricing, mailer, audit, auth) |
+
+### API routes
+
+All routes live under `src/app/api/`:
+
+```
+src/app/api/<resource>/route.ts              ← GET (list) + POST (create)
+src/app/api/<resource>/[id]/route.ts         ← GET + PATCH (single)
+src/app/api/<resource>/[id]/<action>/route.ts ← state transitions
+src/app/api/<resource>/bulk/<action>/route.ts ← bulk operations
+```
+
+Examples:
+```
+src/app/api/orders/route.ts
+src/app/api/orders/[id]/route.ts
+src/app/api/orders/[id]/approve/route.ts
+src/app/api/orders/bulk/dispatch/route.ts
+src/app/api/admin/mail-config/route.ts
+src/app/api/admin/mail-config/[id]/activate/route.ts
+```
+
+## Spec File Placement
+
+### Unit tests — colocated next to source
+
+```bash
+src/lib/validation.ts           → src/lib/validation.spec.ts
+src/lib/utils.ts                → src/lib/utils.spec.ts
+src/lib/hooks/fetcher.ts        → src/lib/hooks/fetcher.spec.ts
+src/components/data-table.tsx   → src/components/data-table.spec.tsx  # .tsx for component tests
+```
+
+### API route tests — in the API folder
+
+Named `<resource>.spec.ts` (NOT `route.spec.ts`):
+
+```bash
+src/app/api/orders/route.ts                → src/app/api/orders/orders.spec.ts
+src/app/api/merchants/route.ts             → src/app/api/merchants/merchants.spec.ts
+src/app/api/team/route.ts                  → src/app/api/team/team.spec.ts
+src/app/api/admin/mail-config/route.ts     → src/app/api/admin/mail-config/mail-config.spec.ts
+```
+
+### Feature hooks — NO colocated specs
+
+Feature hooks (`src/features/*/hooks/*.ts`) are NOT unit tested directly. They are tested via API route specs and E2E tests.
+
+### E2E tests — Playwright with data-testid selectors
+
+```bash
+e2e/specs/01-core-flows.spec.ts    # All core scenarios in one file
+e2e/selectors.ts                    # Centralized data-testid selectors
+```
+
+**Run:** `pnpm build` (manual) then `pnpm test:e2e`. Playwright config uses `pnpm start` — build must be done first.
+
+**Credentials (seeded):**
+- Super Admin: `admin01@email.com` / `admin123`
+- Warehouse Admin: `warehouse.admin01@email.com` / `warehouse123`
+- Merchant: `merchant1@app.com` / `merchant123`
+- Rider: `rider1@app.com` / `rider123`
+
+Selectors centralized in `e2e/selectors.ts` using `data-testid` attributes.
+
+## Coding Patterns
+
+### Auth
+
+- Server components: `requireSession()` + `redirect()` for gating
+- API routes: `requireSession()` returns `null` if unauthorized
+- Client components: use `useAuth()` hook
+- Layout shells (`dashboard-shell.tsx`, `warehouse-shell.tsx`) handle async auth init — NOT redundant
+
+### Mutations (3-step error pipeline)
+
+1. **API route:** `parseBody(req, schema)` → returns `{ data, error }`. Validation errors include `issues` array.
+2. **Hook:** Extract `resData`, format with `formatOrderError()` pattern, return `{ ok, error }`.
+3. **UI:** Call hook, show `toast.error(result.error)` on failure.
+
+### Error Response Shape
+
+```ts
+// parseBody validation error
+{ error: "Invalid request body", issues: [{ path: ["field"], message: "msg" }] }
+
+// Business logic error
+{ error: "Inactive merchant" }
+```
+
+### Error Formatter Pattern
+
+Used in hooks to flatten `issues` into a readable string:
+
+```ts
+function formatOrderError(data: {
+  error?: string
+  issues?: Array<{ path: (string | number)[]; message: string }>
+}): string {
+  if (!data.issues || data.issues.length === 0) {
+    return data.error ?? "Failed to create order."
+  }
+  const msgs = data.issues.map((i) => {
+    const field = i.path
+      .filter((p) => typeof p === "string")
+      .join(" ")
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (c) => c.toUpperCase())
+      .trim()
+    return field ? `${field}: ${i.message}` : i.message
+  })
+  return msgs.length > 0
+    ? msgs.join(". ")
+    : (data.error ?? "Validation failed.")
+}
+```
+
+### Database
+
+- Schema: single file `src/lib/db/schema.postgres.ts` (re-exported via `schema.ts`)
+- New tables: `delivery_zone`, `zone_pricing` (N×N pricing matrix), `delivery_city` (with zoneId + warehouseId)
+- Updated: `pickup_location` (cityId instead of warehouseId), `order` (deliveryCityId FK)
+- Queries: **inline in each `route.ts`** — no separate queries file
+- Use `db` for writes, `dbRead` for reads
+- Table names use `"snake_case"` via Drizzle's `"snake_case"` name mapper
+- Migrations: `pnpm db:generate` then `pnpm db:push`
+- Seed: `pnpm db:admin` (interactive menu)
+
+### Validation
+
+- ALL Zod schemas centralized in `src/lib/validation.ts`
+- Use `parseBody(req, schema)` for API route validation
+- Helper: `requiredString(label)` for common string fields
+- Helper: `isValidBdPhone(phone)` for Bangladeshi phone validation
+
+### Hook Naming
+
+- Feature hooks: `use-<plural-domain>.ts` (e.g. `use-orders.ts`, `use-merchants.ts`)
+- Sub-resource hooks: `use-<domain>-<sub>.ts` (e.g. `use-merchant-balance.ts`)
+- Shared hooks: `use-<description>.ts` (e.g. `use-debounced-value.ts`)
+- Non-hook utilities (e.g. `fetcher.ts`) do NOT get `use-` prefix
+
+### Dialog Placement
+
+- Feature dialogs: `src/features/<domain>/dialogs/<action>-dialog.tsx`
+- Complex dialogs: `src/features/<domain>/dialogs/<action>-dialog/index.tsx`
+- Shared base: `src/components/form-dialog.tsx`, `src/components/confirm-dialog.tsx`
+- **Every modal/dialog must be in its own file** — never define dialog components inline in page components
+- **Destructive actions always use a confirmation dialog** — wrap `delete`, `cancel`, `suspend`, `reject` etc. in `ConfirmDialog` or `confirm()` before executing
+
+### Testing
+
+- Mock `fetch()` with `vi.fn()` + `vi.mock("@/lib/hooks/fetcher")`
+- Use `createMockOrder()` helper from `src/app/__tests__/test-utils.tsx`
+- E2E selectors: centralized in `e2e/selectors.ts` (text-based, namespaced exports)
+- Component tests use `.spec.tsx` extension
+
+### Formatting
+
+- Run `biome check --write .` before committing
+- Import order: `@/` aliases before relative imports
+- Biome handles all formatting (no Prettier)
+
+## DataTable Pattern
+
+Every data list page follows this structure:
+
+### Page component
+
+```tsx
+"use client"
+import { DataTable, type DataTableColumn, CellTwoRow, CellContent } from "@/components/data-table"
+import { useOrders } from "@/features/orders/hooks/use-orders"
+
+export function OrdersPageClient({ initialData, initialTotal }) {
+  const {
+    orders, total, setPage, setLimit,
+    query, setQuery,
+    sortId, sortDir, onSortChange,
+    isLoading,
+  } = useOrders({ initialData, initialTotal })
+
+  const columns: DataTableColumn<Order>[] = [
+    {
+      id: "order", header: "Order", sortable: true,
+      sortValue: (o) => o.id,
+      cell: (o) => <CellContent className="font-medium">{o.id}</CellContent>,
+    },
+    {
+      id: "name", header: "Name", sortable: true,
+      sortValue: (u) => u.name,
+      cell: (u) => <CellTwoRow primary={u.name} secondary={u.email} />,
+    },
+    {
+      id: "actions", sticky: true, header: "", align: "right",
+      cell: (row) => <DropdownMenu>...</DropdownMenu>,
+    },
+  ]
+
+  return (
+    <Card><CardContent className="p-0">
+      <DataTable
+        pinnedColumns={["order"]}
+        id="dashboard-orders"
+        searchable
+        searchColumns={["order", "merchant"]}
+        columns={columns}
+        data={orders}
+        getRowKey={(o) => o.id}
+        emptyMessage="No orders match the current filters."
+        loading={isLoading}
+        serverPaginated
+        total={total}
+        query={query}
+        onQueryChange={setQuery}
+        onPageChange={(p, l) => { setPage(p); setLimit(l) }}
+        serverSortId={sortId}
+        serverSortDir={sortDir}
+        onSortChange={onSortChange}
+      />
+    </CardContent></Card>
+  )
+}
+```
+
+### Key conventions
+
+- **`pinnedColumns`**: Always pin the primary key column (e.g. `["order"]`, `["name"]`)
+- **`id`**: Always set — enables column visibility persistence in localStorage
+- **`serverPaginated`**: All list pages use server-side pagination via `useTableFilters`
+- **`serverSortId` / `serverSortDir` / `onSortChange`**: Controlled sort from `useTableFilters`
+- **`query` / `onQueryChange`**: Controlled search from `useTableFilters`
+- **`toolbarLeft`**: Use for `<Tabs>` (status filtering) or `<QuickFilters>` (date/checkbox filters)
+- **`loading`**: Pass `isLoading` from SWR
+- **`getRowKey`**: Always provide a unique key extractor
+
+### Column helpers
+
+- `CellContent` — single-line truncated text with tooltip
+- `CellTwoRow` — primary + secondary text (e.g. name + email)
+- `sticky: true` — right-pinned actions column
+
+### Status tabs pattern
+
+```tsx
+toolbarLeft={
+  <Tabs value={tab} onValueChange={(v) => setTab(v)}>
+    <TabsList>
+      <TabsTrigger value="PENDING">Pending</TabsTrigger>
+      <TabsTrigger value="APPROVED">Approved</TabsTrigger>
+      <TabsTrigger value="ALL">All</TabsTrigger>
+    </TabsList>
+  </Tabs>
+}
+```
+
+Tab changes call `setStatuses(TAB_STATUSES[tab])` + `setPage(1)` in the hook.
+
+### Column definition shape
+
+```ts
+{
+  id: string                    // stable key, also used as sort ID
+  header: React.ReactNode      // column label
+  cell: (row: T) => React.ReactNode
+  sortable?: boolean
+  sortValue?: (row: T) => string | number | boolean | null
+  align?: "left" | "right" | "center"
+  sticky?: boolean             // right-pin during horizontal scroll
+  headClassName?: string       // e.g. "hidden sm:table-cell" for responsive hide
+  cellClassName?: string
+}
+```
+
+## Important
+
+- **Read CONTRIBUTING.md** for full conventions (error handling, hooks, testing, DB, etc.)
+- Never commit secrets or API keys
+- Follow existing patterns — check neighboring files before adding new ones

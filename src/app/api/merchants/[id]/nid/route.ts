@@ -1,0 +1,87 @@
+import { eq } from "drizzle-orm"
+import { NextResponse } from "next/server"
+import { requireSession } from "@/lib/api-auth"
+import {
+  badRequest,
+  forbidden,
+  notFound,
+  unauthorized,
+} from "@/lib/api-response"
+import { db } from "@/lib/db"
+import { merchant } from "@/lib/db/schema"
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const me = await requireSession()
+  if (!me) return unauthorized()
+
+  const { id } = await params
+
+  const [current] = await db
+    .select({
+      id: merchant.id,
+      emailVerifiedAt: merchant.emailVerifiedAt,
+      nidVerifiedAt: merchant.nidVerifiedAt,
+    })
+    .from(merchant)
+    .where(eq(merchant.id, id))
+    .limit(1)
+
+  if (!current) return notFound()
+
+  // Only the merchant themselves or an admin can submit NID
+  const isOwner = me.role === "MERCHANT" && me.merchantId === current.id
+  const isAdmin = me.role === "SUPER_ADMIN"
+  if (!isOwner && !isAdmin) {
+    return forbidden("You can only submit NID for your own account")
+  }
+
+  if (current.nidVerifiedAt) {
+    return badRequest("NID is already verified")
+  }
+
+  if (!current.emailVerifiedAt) {
+    return badRequest("Email must be verified before submitting NID")
+  }
+
+  const body = await req.json().catch(() => null)
+  if (!body?.nidFrontImage) {
+    return badRequest("NID front image is required")
+  }
+  if (!body?.nidBackImage) {
+    return badRequest("NID back image is required")
+  }
+  if (!body?.nidSelfieImage) {
+    return badRequest("NID selfie image is required")
+  }
+
+  const now = new Date().toISOString()
+
+  const [updated] = await db
+    .update(merchant)
+    .set({
+      nidFrontImage: body.nidFrontImage,
+      nidBackImage: body.nidBackImage,
+      nidSelfieImage: body.nidSelfieImage,
+      nidNumber: body.nidNumber ?? null,
+      nidSubmittedAt: now,
+      // Clear any previous verification or rejection
+      nidVerifiedAt: null,
+      nidVerifiedBy: null,
+      nidRejectedAt: null,
+      nidRejectedBy: null,
+      nidRejectionReason: null,
+    })
+    .where(eq(merchant.id, id))
+    .returning()
+
+  return NextResponse.json({
+    nidSubmittedAt: updated.nidSubmittedAt,
+    nidFrontImage: updated.nidFrontImage,
+    nidBackImage: updated.nidBackImage,
+    nidSelfieImage: updated.nidSelfieImage,
+    nidNumber: updated.nidNumber,
+  })
+}

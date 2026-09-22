@@ -1,0 +1,202 @@
+import { describe, expect, it } from "vitest"
+import {
+  merchantApprovedTemplate,
+  merchantRegisteredTemplate,
+  merchantVerifyEmailTemplate,
+  orderApprovedTemplate,
+  orderDeliveredTemplate,
+  orderFailedAttemptTemplate,
+  orderInTransitTemplate,
+  orderInWarehouseTemplate,
+  orderPickedUpTemplate,
+  orderReturnedTemplate,
+  passwordResetTemplate,
+} from "@/lib/mail-templates"
+
+const data = {
+  orderCode: "ORD-001",
+  merchantName: "Test Merchant",
+  recipientName: "John Doe",
+  deliveryAddress: "123 Main St",
+}
+
+describe("orderApprovedTemplate", () => {
+  it("includes order code in subject", async () => {
+    const { subject } = await orderApprovedTemplate(data)
+    expect(subject).toContain("ORD-001")
+  })
+
+  it("includes merchant name in body", async () => {
+    const { html } = await orderApprovedTemplate(data)
+    expect(html).toContain("Test Merchant")
+  })
+
+  it("includes status badge for approved", async () => {
+    const { html } = await orderApprovedTemplate(data)
+    expect(html).toContain("Approved")
+  })
+})
+
+describe("orderPickedUpTemplate", () => {
+  it("includes subject", async () => {
+    const { subject } = await orderPickedUpTemplate(data)
+    expect(subject).toContain("Picked Up")
+  })
+})
+
+describe("orderInWarehouseTemplate", () => {
+  it("includes subject", async () => {
+    const { subject } = await orderInWarehouseTemplate(data)
+    expect(subject).toContain("Received at Warehouse")
+  })
+})
+
+describe("orderInTransitTemplate", () => {
+  it("includes subject", async () => {
+    const { subject } = await orderInTransitTemplate(data)
+    expect(subject).toContain("Dispatched")
+  })
+})
+
+describe("orderDeliveredTemplate", () => {
+  it("includes subject", async () => {
+    const { subject } = await orderDeliveredTemplate(data)
+    expect(subject).toContain("Delivered")
+  })
+})
+
+describe("orderFailedAttemptTemplate", () => {
+  it("includes failure reason", async () => {
+    const { html } = await orderFailedAttemptTemplate({
+      ...data,
+      note: "Recipient not available",
+    })
+    expect(html).toContain("Recipient not available")
+  })
+})
+
+describe("orderReturnedTemplate", () => {
+  it("includes return reason", async () => {
+    const { html } = await orderReturnedTemplate({
+      ...data,
+      reason: "Wrong address",
+    })
+    expect(html).toContain("Wrong address")
+  })
+})
+
+describe("passwordResetTemplate", () => {
+  const resetData = {
+    userName: "Alice",
+    resetUrl: "http://localhost:3000/reset-password?token=abc123",
+  }
+
+  it("includes site name in subject", async () => {
+    const { subject } = await passwordResetTemplate(resetData)
+    expect(subject).toContain("Reset your password")
+  })
+
+  it("includes user name in body", async () => {
+    const { html } = await passwordResetTemplate(resetData)
+    expect(html).toContain("Alice")
+  })
+
+  it("includes reset URL in body", async () => {
+    const { html } = await passwordResetTemplate(resetData)
+    expect(html).toContain(resetData.resetUrl)
+  })
+
+  it("includes expiry footnote", async () => {
+    const { html } = await passwordResetTemplate(resetData)
+    expect(html).toContain("1 hour")
+  })
+
+  it("includes reset URL in plain text", async () => {
+    const { text } = await passwordResetTemplate(resetData)
+    expect(text).toContain(resetData.resetUrl)
+  })
+})
+
+describe("merchantRegisteredTemplate", () => {
+  const merchantData = {
+    ownerName: "Bob Smith",
+    businessName: "Acme Corp",
+    verificationUrl: "http://localhost:3000/verify?token=abc",
+  }
+
+  it("includes business name in subject", async () => {
+    const { subject } = await merchantRegisteredTemplate(merchantData)
+    expect(subject).toContain("Acme Corp")
+  })
+
+  it("includes owner name in body", async () => {
+    const { html } = await merchantRegisteredTemplate(merchantData)
+    expect(html).toContain("Bob Smith")
+  })
+
+  it("includes verification URL", async () => {
+    const { html } = await merchantRegisteredTemplate(merchantData)
+    expect(html).toContain(merchantData.verificationUrl)
+  })
+})
+
+describe("merchantApprovedTemplate", () => {
+  const merchantData = {
+    ownerName: "Bob Smith",
+    businessName: "Acme Corp",
+  }
+
+  it("includes approved status in subject", async () => {
+    const { subject } = await merchantApprovedTemplate(merchantData)
+    expect(subject).toContain("Approved")
+  })
+
+  it("includes business name in body", async () => {
+    const { html } = await merchantApprovedTemplate(merchantData)
+    expect(html).toContain("Acme Corp")
+  })
+})
+
+describe("merchantVerifyEmailTemplate", () => {
+  const merchantData = {
+    ownerName: "Bob Smith",
+    businessName: "Acme Corp",
+    verificationUrl: "http://localhost:3000/verify?token=xyz",
+  }
+
+  it("includes verify subject", async () => {
+    const { subject } = await merchantVerifyEmailTemplate(merchantData)
+    expect(subject).toContain("Verify")
+  })
+
+  it("includes verification URL", async () => {
+    const { html } = await merchantVerifyEmailTemplate(merchantData)
+    expect(html).toContain(merchantData.verificationUrl)
+  })
+})
+
+describe("XSS protection via esc()", () => {
+  const xssData = {
+    orderCode: '<script>alert("xss")</script>',
+    merchantName: "Bob <img src=x onerror=alert(1)>",
+    recipientName: 'John & "Jane"',
+    deliveryAddress: "123 Main St",
+  }
+
+  it("escapes script tags in order code", async () => {
+    const { html } = await orderApprovedTemplate(xssData)
+    expect(html).not.toContain("<script>")
+    expect(html).toContain("&lt;script&gt;")
+  })
+
+  it("escapes img onerror in merchant name", async () => {
+    const { html } = await orderApprovedTemplate(xssData)
+    expect(html).not.toContain("<img ")
+    expect(html).toContain("&lt;img")
+  })
+
+  it("escapes ampersand and quotes in recipient name", async () => {
+    const { html } = await orderApprovedTemplate(xssData)
+    expect(html).toContain("John &amp; &quot;Jane&quot;")
+  })
+})

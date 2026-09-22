@@ -1,0 +1,32 @@
+import { eq } from "drizzle-orm"
+import { headers } from "next/headers"
+import { cache } from "react"
+import { auth } from "@/lib/auth" // ← was missing
+import { db } from "@/lib/db"
+import { profile, user } from "@/lib/db/schema"
+
+export const requireSession = cache(async () => {
+  const hdrs = await headers()
+  const session = await auth.api.getSession({ headers: hdrs }) // ← replaces manual token extraction + DB query
+  if (!session?.user) return null
+
+  const [row] = await db
+    .select({
+      userId: profile.userId,
+      role: profile.role,
+      phone: profile.phone,
+      isActive: profile.isActive,
+      tableRowsPerPage: profile.tableRowsPerPage,
+      warehouseId: profile.warehouseId,
+      merchantId: profile.merchantId,
+      riderId: profile.riderId,
+      createdAt: profile.createdAt,
+      name: user.name,
+    })
+    .from(profile)
+    .innerJoin(user, eq(user.id, profile.userId))
+    .where(eq(profile.userId, session.user.id))
+    .limit(1)
+
+  return row ?? null
+})

@@ -1,0 +1,124 @@
+"use client"
+
+import { Ban, MapPin, Package, Phone, User } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
+import { FormDialog } from "@/components/form-dialog"
+import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
+import { useOrders } from "@/features/orders/hooks/use-orders"
+import { formatTk } from "@/lib/pricing"
+import type { Order } from "@/lib/types"
+
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-muted-foreground text-xs">{label}</p>
+        <p className="text-sm leading-snug font-medium">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+export function CancelOrderDialog({
+  order,
+  open,
+  onOpenChange,
+}: {
+  order: Order | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const { cancelOrder } = useOrders()
+  const [reason, setReason] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [openCount, setOpenCount] = useState(0)
+  const prevOpen = useRef(open)
+  useEffect(() => {
+    if (open && !prevOpen.current) setOpenCount((c) => c + 1)
+    prevOpen.current = open
+  }, [open])
+
+  if (!order) return null
+
+  async function handleSubmit() {
+    setSubmitting(true)
+    try {
+      const result = await cancelOrder(order!.id, reason.trim() || undefined)
+      if (result.ok) {
+        toast.success(`${order!.id} has been cancelled.`)
+        onOpenChange(false)
+      } else {
+        toast.error(result.error ?? "Unable to cancel order.")
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <FormDialog
+      key={`${order.id}-${openCount}`}
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Cancel order — ${order.id}`}
+      description="This action is irreversible. The order will be permanently closed and cannot be reactivated."
+      onConfirm={handleSubmit}
+      submitting={submitting}
+      submittingLabel="Cancelling"
+      submitVariant="destructive"
+      submitLabel="Cancel order"
+      submitIcon={<Ban className="size-4" />}
+    >
+      <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
+        <InfoRow icon={User} label="Recipient" value={order.recipientName} />
+        <InfoRow icon={Phone} label="Phone" value={order.recipientPhone} />
+        <InfoRow
+          icon={MapPin}
+          label="Deliver to"
+          value={
+            <>
+              {order.deliveryCity}
+              <span className="block">{order.deliveryAddress}</span>
+            </>
+          }
+        />
+        <Separator className="my-1" />
+        <InfoRow
+          icon={Package}
+          label="COD amount"
+          value={formatTk(order.productCost)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="cancel-reason">
+          Reason for cancellation{" "}
+          <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Textarea
+          id="cancel-reason"
+          placeholder="e.g. Customer requested cancellation, duplicate order…"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={100}
+          rows={3}
+        />
+        <p className="text-muted-foreground text-xs">
+          {reason.length}/100 characters
+        </p>
+      </div>
+    </FormDialog>
+  )
+}
