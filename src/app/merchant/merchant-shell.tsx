@@ -206,7 +206,12 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
     <div className="bg-background flex min-h-screen">
       <MerchantSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileHeader config={MERCHANT_SIDEBAR} />
+        <MobileHeader
+          config={MERCHANT_SIDEBAR}
+          logoUrl={currentMerchant?.logoUrl ?? undefined}
+          brandColor={currentMerchant?.brandColor ?? undefined}
+          hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}
+        />
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
           <div className="mx-auto w-full max-w-6xl">
             <AnnouncementBanner />

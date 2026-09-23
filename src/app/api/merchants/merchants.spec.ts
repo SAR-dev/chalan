@@ -12,7 +12,7 @@ import { PATCH as reactivateMerchant } from "./[id]/reactivate/route"
 import { GET as getMerchant, PATCH as updateMerchant } from "./[id]/route"
 import { PATCH as suspendMerchant } from "./[id]/suspend/route"
 import { POST as sendVerifyEmail } from "./[id]/verify-email/route"
-import { POST as createMerchant, GET as listMerchants } from "./route"
+import { GET as listMerchants, POST as createMerchant } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
@@ -247,6 +247,73 @@ describe("PATCH /api/merchants/:id", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toBeDefined()
+  })
+
+  it("updates branding fields", async () => {
+    sessionState.value = merchantSession
+    updateResult.push({
+      id: "m_1",
+      logoUrl: "https://example.com/logo.png",
+      brandColor: "#10b981",
+      hidePlatformBranding: true,
+    })
+    const res = await updateMerchant(
+      req("PATCH", undefined, {
+        logoUrl: "https://example.com/logo.png",
+        brandColor: "#10b981",
+        hidePlatformBranding: true,
+      }),
+      ctx(),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({
+      logoUrl: "https://example.com/logo.png",
+      brandColor: "#10b981",
+      hidePlatformBranding: true,
+    })
+  })
+
+  it("updates only brandColor", async () => {
+    sessionState.value = merchantSession
+    updateResult.push({ id: "m_1", brandColor: "#f97316" })
+    const res = await updateMerchant(
+      req("PATCH", undefined, { brandColor: "#f97316" }),
+      ctx(),
+    )
+    expect(res.status).toBe(200)
+    expect(updatePayloads[0]).toMatchObject({ brandColor: "#f97316" })
+  })
+
+  it("updates only hidePlatformBranding", async () => {
+    sessionState.value = merchantSession
+    updateResult.push({ id: "m_1", hidePlatformBranding: true })
+    const res = await updateMerchant(
+      req("PATCH", undefined, { hidePlatformBranding: true }),
+      ctx(),
+    )
+    expect(res.status).toBe(200)
+    expect(updatePayloads[0]).toMatchObject({ hidePlatformBranding: true })
+  })
+
+  it("clears logo by setting null", async () => {
+    sessionState.value = merchantSession
+    updateResult.push({ id: "m_1", logoUrl: null })
+    const res = await updateMerchant(
+      req("PATCH", undefined, { logoUrl: null }),
+      ctx(),
+    )
+    expect(res.status).toBe(200)
+    expect(updatePayloads[0]).toMatchObject({ logoUrl: null })
+  })
+
+  it("rejects invalid hex color", async () => {
+    sessionState.value = merchantSession
+    const res = await updateMerchant(
+      req("PATCH", undefined, { brandColor: "not-a-color" }),
+      ctx(),
+    )
+    expect(res.status).toBe(400)
   })
 })
 

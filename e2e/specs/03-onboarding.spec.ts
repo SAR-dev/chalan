@@ -50,7 +50,9 @@ test.describe("Merchant Onboarding Flow", () => {
     // Verify we're on /merchant — NOT /welcome (onboarding guard) and NOT /login (auth guard)
     expect(page.url()).toMatch(/\/merchant/)
     // Verify the page has merchant content (not an error page)
-    await expect(page.locator("text=Dashboard").first()).toBeVisible({ timeout: 5000 })
+    await expect(page.locator("text=Dashboard").first()).toBeVisible({
+      timeout: 5000,
+    })
   })
 
   test("skip onboarding completes and stays on /merchant without loop", async ({

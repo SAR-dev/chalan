@@ -24,22 +24,45 @@ export function RoleSidebar({
   footerSubtitle,
   fallbackName,
   fallbackInitials = "?",
+  logoUrl,
+  brandColor,
+  hidePlatformBranding = false,
 }: {
   config: SidebarConfig
   footerSubtitle?: string | null
   fallbackName?: string
   fallbackInitials?: string
+  logoUrl?: string
+  brandColor?: string
+  hidePlatformBranding?: boolean
 }) {
   const pathname = usePathname()
   const { currentUser, logout } = useAuth()
   const BrandIcon = config.brandIcon
 
+  const sidebarStyle = brandColor
+    ? ({ "--sidebar-primary": brandColor } as React.CSSProperties)
+    : undefined
+
   return (
-    <aside className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden md:flex">
+    <aside
+      className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden md:flex"
+      style={sidebarStyle}
+    >
       {/* Brand — logo sized with the text, role badge in accent color */}
       <Link href="/" className="flex h-16 items-center gap-2 px-4">
-        <BrandIcon className="size-4 shrink-0" />
-        <p className="text-[13px] font-semibold">{BRAND_NAME}</p>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt=""
+            className="size-4 shrink-0 object-contain"
+          />
+        ) : (
+          <BrandIcon className="size-4 shrink-0" />
+        )}
+        {!hidePlatformBranding && (
+          <p className="text-[13px] font-semibold">{BRAND_NAME}</p>
+        )}
         <span className="bg-sidebar-primary text-sidebar-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
           {config.roleLabel}
         </span>

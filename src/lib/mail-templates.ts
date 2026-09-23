@@ -10,18 +10,21 @@ export interface OrderEmailData {
   merchantName: string
   recipientName: string
   deliveryAddress: string
+  logoUrl?: string
 }
 
 export interface MerchantEmailData {
   ownerName: string
   businessName: string
   verificationUrl?: string
+  logoUrl?: string
 }
 
 export interface MerchantVerifyEmailData {
   ownerName: string
   businessName: string
   verificationUrl: string
+  logoUrl?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -45,8 +48,15 @@ const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? ""
 // MJML wrapper — one plain header, one accent color, no per-status theming
 // ---------------------------------------------------------------------------
 
-async function renderEmail(status: string, body: string): Promise<string> {
+async function renderEmail(
+  status: string,
+  body: string,
+  logoUrl?: string,
+): Promise<string> {
   const brand = esc(siteConfig.name)
+  const logoHtml = logoUrl
+    ? `<img src="${esc(logoUrl)}" alt="${brand}" height="32" style="height:32px" />`
+    : `<mj-text font-size="14px" color="#6b7280">${brand}</mj-text>`
   const result = await mjml(`
 <mjml>
   <mj-head>
@@ -58,7 +68,7 @@ async function renderEmail(status: string, body: string): Promise<string> {
   <mj-body background-color="#ffffff" width="480px">
     <mj-section padding="32px 24px 8px">
       <mj-column>
-        <mj-text font-size="14px" color="#6b7280">${brand}</mj-text>
+        ${logoHtml}
         <mj-text font-size="20px" font-weight="bold" padding-top="4px">${esc(status)}</mj-text>
       </mj-column>
     </mj-section>
@@ -112,6 +122,7 @@ interface EmailTemplate {
   rows?: [string, string][]
   cta?: { href: string; label: string }
   footnote?: string
+  logoUrl?: string
 }
 
 /** One shared builder every template below funnels through — this is what
@@ -128,6 +139,7 @@ async function buildTemplate(t: EmailTemplate) {
     ${t.footnote ? `<mj-text font-size="14px" line-height="1.6" color="#6b7280" padding-top="8px"><p>${esc(t.footnote)}</p></mj-text>` : ""}
     ${t.cta ? ctaButton(t.cta.href, t.cta.label) : ""}
     `,
+    t.logoUrl,
   )
 
   const text = renderText(t.status, [
@@ -154,6 +166,7 @@ export async function merchantRegisteredTemplate(data: MerchantEmailData) {
     cta: data.verificationUrl
       ? { href: data.verificationUrl, label: "Verify email" }
       : { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return { subject: `Registration Received — ${data.businessName}`, html, text }
 }
@@ -164,6 +177,7 @@ export async function merchantApprovedTemplate(data: MerchantEmailData) {
     greetingName: data.ownerName,
     message: `Your business ${data.businessName} has been approved. You can now log in and start creating orders.`,
     cta: { href: siteUrl(), label: `Log in to ${siteConfig.name}` },
+    logoUrl: data.logoUrl,
   })
   return { subject: `Your Merchant Account Has Been Approved`, html, text }
 }
@@ -178,6 +192,7 @@ export async function merchantVerifyEmailTemplate(
     footnote:
       "This link expires in 24 hours. If you didn't register, you can safely ignore this email.",
     cta: { href: data.verificationUrl, label: "Verify email" },
+    logoUrl: data.logoUrl,
   })
   return { subject: `Verify your email — ${data.businessName}`, html, text }
 }
@@ -239,6 +254,7 @@ export async function orderApprovedTemplate(data: OrderEmailData) {
       "Your order has been approved and a pickup rider has been assigned.",
     rows: orderRows(data, [["Delivery Address", data.deliveryAddress]]),
     cta: { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return {
     subject: `Order ${data.orderCode} Approved — Pickup Scheduled`,
@@ -255,6 +271,7 @@ export async function orderPickedUpTemplate(data: OrderEmailData) {
       "Your parcel has been picked up by the rider and is on its way to the warehouse.",
     rows: orderRows(data),
     cta: { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return { subject: `Order ${data.orderCode} Picked Up`, html, text }
 }
@@ -267,6 +284,7 @@ export async function orderInWarehouseTemplate(data: OrderEmailData) {
       "Your parcel is now in the warehouse and will be dispatched for delivery soon.",
     rows: orderRows(data, [["Delivery Address", data.deliveryAddress]]),
     cta: { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return {
     subject: `Order ${data.orderCode} Received at Warehouse`,
@@ -283,6 +301,7 @@ export async function orderInTransitTemplate(data: OrderEmailData) {
       "Your parcel has been dispatched and is heading to the delivery address.",
     rows: orderRows(data, [["Delivery Address", data.deliveryAddress]]),
     cta: { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return {
     subject: `Order ${data.orderCode} Dispatched for Delivery`,
@@ -299,6 +318,7 @@ export async function orderDeliveredTemplate(data: OrderEmailData) {
     rows: orderRows(data, [["Delivered To", data.deliveryAddress]]),
     footnote: "COD will be settled and reflected in your payout shortly.",
     cta: { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return { subject: `Order ${data.orderCode} Delivered`, html, text }
 }
@@ -314,6 +334,7 @@ export async function orderFailedAttemptTemplate(
     footnote:
       "Our team will assess the situation and attempt redelivery or initiate a return.",
     cta: { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return {
     subject: `Order ${data.orderCode} — Delivery Attempt Failed`,
@@ -332,6 +353,7 @@ export async function orderReturnedTemplate(
     rows: orderRows(data, [["Return Reason", data.reason]]),
     footnote: "Please contact support to arrange collection of the parcel.",
     cta: { href: siteUrl(), label: "View dashboard" },
+    logoUrl: data.logoUrl,
   })
   return { subject: `Order ${data.orderCode} — Parcel Returned`, html, text }
 }

@@ -38,6 +38,9 @@ export async function GET(req: Request) {
         nidSubmittedAt: merchant.nidSubmittedAt,
         nidVerifiedAt: merchant.nidVerifiedAt,
         nidRejectedAt: merchant.nidRejectedAt,
+        logoUrl: merchant.logoUrl,
+        brandColor: merchant.brandColor,
+        hidePlatformBranding: merchant.hidePlatformBranding,
         createdAt: merchant.createdAt,
       })
       .from(merchant)

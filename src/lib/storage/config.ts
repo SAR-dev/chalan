@@ -20,6 +20,7 @@ export const UPLOAD_FOLDERS = [
   "delivery-proofs",
   "pickups",
   "nids",
+  "logos",
 ] as const
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[number]
 
@@ -32,4 +33,5 @@ export const UPLOAD_MAX_DIMENSIONS: Record<UploadFolder, number> = {
   "delivery-proofs": 1024,
   pickups: 1024,
   nids: 2048,
+  logos: 256,
 }

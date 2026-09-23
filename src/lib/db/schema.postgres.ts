@@ -348,6 +348,12 @@ export const merchant = pgTable(
     nidRejectedAt: ts("nidRejectedAt"),
     nidRejectedBy: text("nidRejectedBy"),
     nidRejectionReason: text("nidRejectionReason"),
+    // Branding — merchant-specific customizations for white-label display.
+    logoUrl: text("logoUrl"),
+    brandColor: text("brandColor"),
+    hidePlatformBranding: boolean("hidePlatformBranding")
+      .notNull()
+      .default(false),
     createdAt: ts("createdAt").notNull().defaultNow(),
     updatedAt: ts("updatedAt").notNull().defaultNow(),
   },

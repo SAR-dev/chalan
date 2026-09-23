@@ -410,6 +410,16 @@ export const merchantProfileSchema = z.object({
   address: requiredString("Address"),
 })
 
+export const merchantBrandingSchema = z.object({
+  logoUrl: z.string().nullable().optional(),
+  brandColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color (e.g. #f97316)")
+    .nullable()
+    .optional(),
+  hidePlatformBranding: z.boolean().optional(),
+})
+
 export const merchantVerifyEmailSchema = z.object({
   token: requiredString("Verification token"),
 })

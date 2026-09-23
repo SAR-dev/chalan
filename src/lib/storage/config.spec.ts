@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { UploadFolder } from "./config"
-import {
-  ALLOWED_IMAGE_TYPES,
-  MAX_UPLOAD_BYTES,
-  UPLOAD_FOLDERS,
-  UPLOAD_MAX_DIMENSIONS,
-} from "./config"
+import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, UPLOAD_FOLDERS, UPLOAD_MAX_DIMENSIONS } from "./config"
 
 describe("ALLOWED_IMAGE_TYPES", () => {
   it("contains 5 image types", () => {
@@ -38,8 +33,8 @@ describe("MAX_UPLOAD_BYTES", () => {
 })
 
 describe("UPLOAD_FOLDERS", () => {
-  it("contains 4 folders", () => {
-    expect(UPLOAD_FOLDERS).toHaveLength(4)
+  it("contains 5 folders", () => {
+    expect(UPLOAD_FOLDERS).toHaveLength(5)
   })
 
   it("includes expected folder names", () => {
@@ -47,6 +42,7 @@ describe("UPLOAD_FOLDERS", () => {
     expect(UPLOAD_FOLDERS).toContain("delivery-proofs")
     expect(UPLOAD_FOLDERS).toContain("pickups")
     expect(UPLOAD_FOLDERS).toContain("nids")
+    expect(UPLOAD_FOLDERS).toContain("logos")
   })
 })
 
@@ -72,6 +68,10 @@ describe("UPLOAD_MAX_DIMENSIONS", () => {
 
   it("nids are 2048px", () => {
     expect(UPLOAD_MAX_DIMENSIONS.nids).toBe(2048)
+  })
+
+  it("logos are 256px", () => {
+    expect(UPLOAD_MAX_DIMENSIONS.logos).toBe(256)
   })
 
   it("all dimensions are positive", () => {

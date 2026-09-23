@@ -240,6 +240,9 @@ export interface MerchantSeedEntry {
   extraRatePerKg: number
   maxWeightKg: number
   freeWeightKg: number
+  logoUrl?: string | null
+  brandColor?: string | null
+  hidePlatformBranding?: boolean
   approvedBy: string | null
   approvedAt: string | null
   nidFrontImage: string | null
@@ -402,6 +405,8 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     extraRatePerKg: 10,
     maxWeightKg: 10,
     freeWeightKg: 1,
+    brandColor: "#f97316",
+    hidePlatformBranding: false,
     approvedBy: "System",
     approvedAt: "2026-01-01T00:00:00.000Z",
     nidFrontImage: "data:image/png;base64,seed_nid_front",
