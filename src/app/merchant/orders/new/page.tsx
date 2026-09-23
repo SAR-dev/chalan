@@ -18,23 +18,10 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { pageContent } from "@/config/content"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { useOrders } from "@/features/orders/hooks/use-orders"
@@ -50,7 +37,6 @@ interface ParcelState {
   recipientName: string
   recipientPhone: string
   deliveryCityId: string
-  deliveryCity: string
   deliveryAddress: string
   parcelWeightKg: string
   productCost: string
@@ -65,7 +51,6 @@ function emptyParcel(): ParcelState {
     recipientName: "",
     recipientPhone: "",
     deliveryCityId: "",
-    deliveryCity: "",
     deliveryAddress: "",
     parcelWeightKg: "1",
     productCost: "",
@@ -235,7 +220,6 @@ export default function NewOrderPage() {
       pickupLocationId,
       recipientName: p.recipientName.trim(),
       recipientPhone: p.recipientPhone.trim(),
-      deliveryCity: p.deliveryCity.trim(),
       deliveryCityId: p.deliveryCityId.trim(),
       deliveryAddress: p.deliveryAddress.trim(),
       deliveryMapLink: p.deliveryMapLink.trim() || null,
@@ -490,15 +474,7 @@ export default function NewOrderPage() {
                           <Select
                             value={p.deliveryCityId}
                             onValueChange={(v) => {
-                              const city = deliveryCities.find(
-                                (c) => c.id === v,
-                              )
                               updateParcel(p.id, "deliveryCityId", v ?? "")
-                              updateParcel(
-                                p.id,
-                                "deliveryCity",
-                                city?.name ?? "",
-                              )
                             }}
                           >
                             <SelectTrigger id={`city-${p.id}`}>

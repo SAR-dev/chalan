@@ -3,14 +3,14 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
-import { order } from "@/lib/db/schema"
+import { deliveryCity, order } from "@/lib/db/schema"
 import { paginateResponse } from "@/lib/pagination"
 
 const listColumns = {
   id: order.id,
   merchantId: order.merchantId,
   recipientName: order.recipientName,
-  deliveryCity: order.deliveryCity,
+  deliveryCity: deliveryCity.name,
   productCost: order.productCost,
   merchantEarnings: order.merchantEarnings,
   status: order.status,
@@ -55,7 +55,11 @@ export async function GET(req: Request) {
 
   const [[{ count }], rows] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(order).where(where),
-    db.select(listColumns).from(order).where(where),
+    db
+      .select(listColumns)
+      .from(order)
+      .leftJoin(deliveryCity, eq(order.deliveryCityId, deliveryCity.id))
+      .where(where),
   ])
 
   return NextResponse.json(paginateResponse(rows, count))

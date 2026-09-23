@@ -222,7 +222,6 @@ export const orderCreateSchema = z.object({
   recipientName: requiredString("Recipient name"),
   recipientPhone: bdPhone("Recipient phone"),
   deliveryAddress: requiredString("Delivery address"),
-  deliveryCity: requiredString("Delivery city"),
   deliveryCityId: requiredString("Delivery city"),
   deliveryMapLink: z
     .url("Map link must be a valid URL")

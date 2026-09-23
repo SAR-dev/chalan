@@ -33,14 +33,28 @@ async function login(page: any, cred: typeof CREDS.superAdmin) {
       if (submitBtn) (submitBtn as HTMLButtonElement).click()
     }
   })
-  await page.waitForURL(cred.home, { timeout: 15_000 })
+  // Wait for any authenticated page (may land on /welcome for merchants with incomplete onboarding)
+  await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
+    timeout: 15_000,
+  })
   await page.waitForLoadState("networkidle")
+}
+
+/** Skip onboarding if the merchant landed on /welcome */
+async function skipOnboardingIfNeeded(page: any) {
+  if (page.url().includes("/welcome")) {
+    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
+    await page.waitForLoadState("networkidle")
+  }
 }
 
 // ─── S1. Full Order Lifecycle ────────────────────────────────────────────────
 test.describe("S1. Full Order Lifecycle", () => {
   test("merchant creates order → admin views orders", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
+
     await page.goto("/merchant/orders/new")
     await page.waitForLoadState("networkidle")
 
@@ -211,6 +225,7 @@ test.describe("S9. Team Management", () => {
 test.describe("Merchant Dashboard", () => {
   test("merchant can access all sections", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/finance")
     await page.waitForLoadState("networkidle")

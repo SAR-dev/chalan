@@ -80,7 +80,9 @@ export type Merchant = Loosen<typeof merchant.$inferSelect> & {
 }
 export type PickupLocation = Loosen<typeof pickupLocation.$inferSelect>
 export type Rider = Loosen<typeof rider.$inferSelect>
-export type Order = Loosen<typeof order.$inferSelect>
+export type Order = Loosen<typeof order.$inferSelect> & {
+  deliveryCity?: string | null
+}
 export type PayoutRequest = Loosen<typeof payoutRequest.$inferSelect>
 export type EmailLog = Loosen<typeof emailLog.$inferSelect>
 export type AuditLog = Loosen<typeof auditLog.$inferSelect>
@@ -125,7 +127,6 @@ export interface CreateOrderInput {
   recipientName: string
   recipientPhone: string
   deliveryAddress: string
-  deliveryCity?: string | null
   deliveryCityId: string
   deliveryMapLink?: string | null
   parcelWeightKg: number

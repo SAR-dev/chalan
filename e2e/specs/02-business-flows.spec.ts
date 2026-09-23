@@ -25,8 +25,18 @@ async function login(page: any, cred: typeof CREDS.superAdmin) {
   await page.locator("[data-testid='login-email']").fill(cred.email)
   await page.locator("[data-testid='login-password']").fill(cred.password)
   await page.locator("[data-testid='login-password']").press("Enter")
-  await page.waitForURL(cred.home, { timeout: 15_000 })
+  await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
+    timeout: 15_000,
+  })
   await page.waitForLoadState("networkidle")
+}
+
+async function skipOnboardingIfNeeded(page: any) {
+  if (page.url().includes("/welcome")) {
+    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
+    await page.waitForLoadState("networkidle")
+  }
 }
 
 // ─── S2. Merchant Onboarding ─────────────────────────────────────────────────
@@ -43,6 +53,7 @@ test.describe("S2. Merchant Onboarding", () => {
   test("registered merchant sees pending status", async ({ page }) => {
     // Login as a merchant that's already active (seeded)
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
     await page.waitForLoadState("networkidle")
     // Merchant dashboard should load
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -75,6 +86,7 @@ test.describe("S5. Merchant Self-Cancellation", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/orders")
     await page.waitForLoadState("networkidle")
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -110,6 +122,7 @@ test.describe("S11. Payout Rejection", () => {
 test.describe("S13. Zone-Based Order Pricing", () => {
   test("order form loads correctly", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/orders/new")
     await page.waitForLoadState("networkidle")
     // Verify order form page loaded
@@ -159,6 +172,7 @@ test.describe("S20. Announcement Lifecycle", () => {
 
   test("merchant can view announcements inbox", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/announcements")
     await page.waitForLoadState("networkidle")
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -169,6 +183,7 @@ test.describe("S20. Announcement Lifecycle", () => {
 test.describe("S23. Merchant Balance & Payment", () => {
   test("merchant can view finance page", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/finance")
     await page.waitForLoadState("networkidle")
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -206,6 +221,7 @@ test.describe("Warehouse Reconciliation", () => {
 test.describe("Merchant Pricing", () => {
   test("merchant can view pricing page", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/pricing")
     await page.waitForLoadState("networkidle")
     await expect(page.getByRole("heading").first()).toBeVisible()

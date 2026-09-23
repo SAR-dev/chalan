@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
-import { order } from "@/lib/db/schema"
+import { deliveryCity, order } from "@/lib/db/schema"
 import { WarehouseExceptionsPageClient } from "./exceptions-client"
 
 const ORDER_COLUMNS = {
@@ -12,7 +12,7 @@ const ORDER_COLUMNS = {
   recipientName: order.recipientName,
   recipientPhone: order.recipientPhone,
   deliveryAddress: order.deliveryAddress,
-  deliveryCity: order.deliveryCity,
+  deliveryCity: deliveryCity.name,
   deliveryType: order.deliveryType,
   parcelWeightKg: order.parcelWeightKg,
   productCost: order.productCost,
@@ -51,6 +51,7 @@ export default async function WarehouseExceptionsPage() {
     dbRead
       .select(ORDER_COLUMNS)
       .from(order)
+      .leftJoin(deliveryCity, eq(order.deliveryCityId, deliveryCity.id))
       .where(and(warehouseScope, statusFilter))
       .orderBy(desc(order.createdAt))
       .limit(limit),

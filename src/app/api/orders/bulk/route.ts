@@ -1,12 +1,7 @@
 import { eq, inArray, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import {
-  badRequest,
-  forbidden,
-  notFound,
-  unauthorized,
-} from "@/lib/api-response"
+import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
 import {
   balanceTransaction,
@@ -19,11 +14,7 @@ import {
   zonePricing,
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
-import {
-  calcCodFee,
-  calcDeliveryCharge,
-  calcMerchantEarnings,
-} from "@/lib/pricing"
+import { calcCodFee, calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 import { orderBulkCreateSchema, parseBody } from "@/lib/validation"
 
@@ -203,7 +194,6 @@ export async function POST(req: Request) {
         warehouseId: warehouseByPickup[input.pickupLocationId],
         recipientName: input.recipientName,
         recipientPhone: input.recipientPhone,
-        deliveryCity: input.deliveryCity,
         deliveryCityId: input.deliveryCityId ?? null,
         deliveryAddress: input.deliveryAddress,
         deliveryMapLink: mapLink ? mapLink : null,
@@ -227,7 +217,6 @@ export async function POST(req: Request) {
       recipientName: order.recipientName,
       recipientPhone: order.recipientPhone,
       deliveryAddress: order.deliveryAddress,
-      deliveryCity: order.deliveryCity,
       deliveryMapLink: order.deliveryMapLink,
       parcelWeightKg: order.parcelWeightKg,
       deliveryType: order.deliveryType,

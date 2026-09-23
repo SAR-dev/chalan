@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { notFound, unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
-import { order } from "@/lib/db/schema"
+import { deliveryCity, order } from "@/lib/db/schema"
 
 export async function GET(
   _req: Request,
@@ -55,7 +55,7 @@ export async function GET(
       recipientName: order.recipientName,
       recipientPhone: order.recipientPhone,
       deliveryAddress: order.deliveryAddress,
-      deliveryCity: order.deliveryCity,
+      deliveryCity: deliveryCity.name,
       deliveryMapLink: order.deliveryMapLink,
       parcelWeightKg: order.parcelWeightKg,
       deliveryType: order.deliveryType,
@@ -99,6 +99,7 @@ export async function GET(
       payoutRequestId: order.payoutRequestId,
     })
     .from(order)
+    .leftJoin(deliveryCity, eq(order.deliveryCityId, deliveryCity.id))
     .where(and(...conditions))
     .limit(1)
 

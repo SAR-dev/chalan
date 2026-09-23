@@ -309,36 +309,35 @@ describe("deliveryCityUpdateSchema", () => {
 })
 
 // ---------------------------------------------------------------------------
-// orderCreateSchema — deliveryCity required
+// orderCreateSchema — deliveryCityId required
 // ---------------------------------------------------------------------------
 
-describe("orderCreateSchema — deliveryCity", () => {
+describe("orderCreateSchema — deliveryCityId", () => {
   const validOrder = {
     pickupLocationId: "pl_1",
     recipientName: "John",
     recipientPhone: "01712345678",
     deliveryAddress: "Road 11, Banani",
-    deliveryCity: "Dhaka",
     deliveryCityId: "city_1",
     parcelWeightKg: 1,
     productCost: 500,
   }
 
-  it("accepts valid order with deliveryCity", () => {
+  it("accepts valid order with deliveryCityId", () => {
     const result = orderCreateSchema.safeParse(validOrder)
     expect(result.success).toBe(true)
   })
 
-  it("rejects order without deliveryCity", () => {
-    const { deliveryCity, ...withoutCity } = validOrder
-    const result = orderCreateSchema.safeParse(withoutCity)
+  it("rejects order without deliveryCityId", () => {
+    const { deliveryCityId, ...withoutCityId } = validOrder
+    const result = orderCreateSchema.safeParse(withoutCityId)
     expect(result.success).toBe(false)
   })
 
-  it("rejects order with empty deliveryCity", () => {
+  it("rejects order with empty deliveryCityId", () => {
     const result = orderCreateSchema.safeParse({
       ...validOrder,
-      deliveryCity: "",
+      deliveryCityId: "",
     })
     expect(result.success).toBe(false)
   })

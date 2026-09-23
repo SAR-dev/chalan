@@ -2,7 +2,7 @@ import { and, desc, eq, isNull, or, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
-import { order } from "@/lib/db/schema"
+import { deliveryCity, order } from "@/lib/db/schema"
 import { WarehouseOrdersPageClient } from "./orders-client"
 
 const ORDER_COLUMNS = {
@@ -12,7 +12,7 @@ const ORDER_COLUMNS = {
   recipientName: order.recipientName,
   recipientPhone: order.recipientPhone,
   deliveryAddress: order.deliveryAddress,
-  deliveryCity: order.deliveryCity,
+  deliveryCity: deliveryCity.name,
   deliveryMapLink: order.deliveryMapLink,
   parcelWeightKg: order.parcelWeightKg,
   deliveryType: order.deliveryType,
@@ -67,6 +67,7 @@ export default async function WarehouseOrdersPage() {
     dbRead
       .select(ORDER_COLUMNS)
       .from(order)
+      .leftJoin(deliveryCity, eq(order.deliveryCityId, deliveryCity.id))
       .where(warehouseScope)
       .orderBy(desc(order.createdAt))
       .limit(limit),

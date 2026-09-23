@@ -26,14 +26,14 @@ export async function seedUsers() {
     await db
       .update(warehouse)
       .set({ managedBy: rifat.id })
-      .where(eq(warehouse.id, "b5mujkfyyq6qqw5t1unbm8b7"))
+      .where(eq(warehouse.id, "WH-100001E"))
     log("  set Dhaka Central Hub managedBy → Rifat")
   }
   if (maliha) {
     await db
       .update(warehouse)
       .set({ managedBy: maliha.id })
-      .where(eq(warehouse.id, "op3s6e6t0q4oaerl6boqng1r"))
+      .where(eq(warehouse.id, "WH-100002E"))
     log("  set Chattogram Port Hub managedBy → Maliha")
   }
 }

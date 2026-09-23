@@ -582,7 +582,6 @@ export const order = pgTable(
     recipientName: text("recipientName").notNull(),
     recipientPhone: text("recipientPhone").notNull(),
     deliveryAddress: text("deliveryAddress").notNull(),
-    deliveryCity: text("deliveryCity"),
     deliveryCityId: text("deliveryCityId").references(() => deliveryCity.id, {
       onDelete: "set null",
     }),

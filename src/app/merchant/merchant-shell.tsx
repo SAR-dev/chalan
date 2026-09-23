@@ -176,10 +176,7 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
       router.replace("/login")
     } else if (currentUser.role !== "MERCHANT") {
       router.replace("/dashboard")
-    } else if (
-      isMerchantLoading ||
-      !currentMerchant
-    ) {
+    } else if (isMerchantLoading || !currentMerchant) {
       // Wait for merchant data to load before deciding redirect
       return
     } else if (

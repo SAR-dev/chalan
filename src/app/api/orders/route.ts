@@ -1,25 +1,7 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gte,
-  ilike,
-  inArray,
-  isNull,
-  lte,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm"
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, type SQL, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import {
-  badRequest,
-  forbidden,
-  notFound,
-  unauthorized,
-} from "@/lib/api-response"
+import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
 import {
   balanceTransaction,
@@ -32,18 +14,8 @@ import {
   zonePricing,
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
-import {
-  paginateResponse,
-  parseDateRange,
-  parsePagination,
-  parseSort,
-  parseStatusFilter,
-} from "@/lib/pagination"
-import {
-  calcCodFee,
-  calcDeliveryCharge,
-  calcMerchantEarnings,
-} from "@/lib/pricing"
+import { paginateResponse, parseDateRange, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
+import { calcCodFee, calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 import { orderCreateSchema, parseBody } from "@/lib/validation"
 
@@ -129,7 +101,7 @@ export async function GET(req: Request) {
     recipientName: order.recipientName,
     recipientPhone: order.recipientPhone,
     deliveryAddress: order.deliveryAddress,
-    deliveryCity: order.deliveryCity,
+    deliveryCity: deliveryCityTable.name,
     deliveryMapLink: order.deliveryMapLink,
     parcelWeightKg: order.parcelWeightKg,
     deliveryType: order.deliveryType,
@@ -154,6 +126,7 @@ export async function GET(req: Request) {
     .leftJoin(merchant, eq(order.merchantId, merchant.id))
     .leftJoin(warehouse, eq(order.warehouseId, warehouse.id))
     .leftJoin(pickupLocation, eq(order.pickupLocationId, pickupLocation.id))
+    .leftJoin(deliveryCityTable, eq(order.deliveryCityId, deliveryCityTable.id))
     .$dynamic()
   if (where) dbQuery = dbQuery.where(where)
 
@@ -169,7 +142,7 @@ export async function GET(req: Request) {
 
   const sortColumnMap = {
     order: order.id,
-    city: order.deliveryCity,
+    city: deliveryCityTable.name,
     weight: order.parcelWeightKg,
     parcelWeight: order.parcelWeightKg,
     collectible: order.productCost,
@@ -211,7 +184,6 @@ export async function POST(req: Request) {
     pickupLocationId,
     recipientName,
     recipientPhone,
-    deliveryCity,
     deliveryAddress,
     deliveryMapLink,
     parcelWeightKg,
@@ -352,7 +324,6 @@ export async function POST(req: Request) {
         warehouseId: hub.id,
         recipientName,
         recipientPhone,
-        deliveryCity,
         deliveryCityId: destCityId ?? null,
         deliveryAddress,
         deliveryMapLink: normalizedMapLink,
@@ -374,7 +345,6 @@ export async function POST(req: Request) {
         recipientName: order.recipientName,
         recipientPhone: order.recipientPhone,
         deliveryAddress: order.deliveryAddress,
-        deliveryCity: order.deliveryCity,
         deliveryMapLink: order.deliveryMapLink,
         parcelWeightKg: order.parcelWeightKg,
         deliveryType: order.deliveryType,
