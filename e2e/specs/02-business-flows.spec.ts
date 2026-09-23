@@ -21,9 +21,14 @@ const CREDS = {
 }
 
 async function login(page: any, cred: typeof CREDS.superAdmin) {
+  // Ensure a fresh session: a prior login in the same test would otherwise make
+  // the login page redirect an already-authed user away before submission.
+  await page.context().clearCookies()
   await page.goto("/login")
   await page.locator("[data-testid='login-email']").fill(cred.email)
+  await page.waitForTimeout(300)
   await page.locator("[data-testid='login-password']").fill(cred.password)
+  await page.waitForTimeout(300)
   await page.locator("[data-testid='login-password']").press("Enter")
   await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
     timeout: 15_000,

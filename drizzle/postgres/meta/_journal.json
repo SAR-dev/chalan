@@ -12,29 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1790063102913,
-      "tag": "0001_gifted_captain_universe",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1790114806659,
-      "tag": "0002_ancient_thing",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1790129012680,
-      "tag": "0003_sleepy_paibok",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1790137516876,
-      "tag": "0004_silky_micromacro",
+      "when": 1790152187590,
+      "tag": "0001_wealthy_fat_cobra",
       "breakpoints": true
     }
   ]

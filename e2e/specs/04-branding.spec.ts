@@ -21,16 +21,18 @@ const CREDS = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function login(page: any, cred: typeof CREDS.superAdmin) {
+  // Ensure a fresh session: a prior login in the same test would otherwise make
+  // the login page redirect an already-authed user away before submission.
+  await page.context().clearCookies()
   await page.goto("/login")
   await page.locator("[data-testid='login-email']").fill(cred.email)
+  await page.waitForTimeout(300)
   await page.locator("[data-testid='login-password']").fill(cred.password)
-  await page.evaluate(() => {
-    const form = document.querySelector("form")
-    if (form) {
-      const submitBtn = form.querySelector('button[type="submit"]')
-      if (submitBtn) (submitBtn as HTMLButtonElement).click()
-    }
-  })
+  await page.waitForTimeout(300)
+
+  await page.locator("[data-testid='login-password']").press("Enter")
+
+  // Wait for navigation with a longer timeout
   await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
     timeout: 15_000,
   })
@@ -58,7 +60,9 @@ test.describe("Merchant Branding", () => {
 
     // Verify branding section is visible
     await expect(page.getByTestId("branding-section")).toBeVisible()
-    await expect(page.getByText("Branding", { exact: true }).first()).toBeVisible()
+    await expect(
+      page.getByText("Branding", { exact: true }).first(),
+    ).toBeVisible()
     await expect(
       page.getByText("Customize how your business appears"),
     ).toBeVisible()
@@ -132,7 +136,9 @@ test.describe("Merchant Branding", () => {
     // Login as demo merchant
     await page.goto("/login")
     await page.locator("[data-testid='login-email']").fill(CREDS.demo.email)
-    await page.locator("[data-testid='login-password']").fill(CREDS.demo.password)
+    await page
+      .locator("[data-testid='login-password']")
+      .fill(CREDS.demo.password)
     await page.evaluate(() => {
       const form = document.querySelector("form")
       if (form) {

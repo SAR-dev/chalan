@@ -53,6 +53,7 @@ The platform is a fully functional B2B delivery management system with:
 | Add missing shared component tests          | `status-badge.tsx`, `stat-card-list.tsx`, `form-dialog.tsx`, `confirm-dialog.tsx`, `quick-filters.tsx`, `page-header.tsx`, `date-range-picker.tsx`, `image-upload.tsx`                                                                                                                              | M      | ⏳      |
 | Add missing hook tests                      | `use-table-filters.ts`, `use-data-error.ts`                                                                                                                                                                                                                                                         | S      | ⏳      |
 | Remove `ignoreBuildErrors` from next.config | `next.config.mjs:21` — type errors silently ignored during build                                                                                                                                                                                                                                    | S      | ⏳      |
+| Fix test pollution in full suite       | Add mock cleanup to `test-setup.ts`, add vitest config defaults (`clearMocks`, `restoreMocks`), mock chart components in heavy specs, fix DataTable `useLayoutEffect` deps array — tests pass in isolation but timeout in full suite due to resource amplification | M      | ⏳      |
 
 ---
 

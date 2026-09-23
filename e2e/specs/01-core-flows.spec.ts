@@ -22,17 +22,16 @@ const CREDS = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function login(page: any, cred: typeof CREDS.superAdmin) {
+  // Starting a login while a prior session is active makes the login page
+  // redirect an already-authed user away before the form can be submitted
+  // (e.g. S1 logs in as merchant, then as admin).
+  await page.context().clearCookies()
   await page.goto("/login")
   await page.locator("[data-testid='login-email']").fill(cred.email)
+  await page.waitForTimeout(300)
   await page.locator("[data-testid='login-password']").fill(cred.password)
-  // Submit form via JS to avoid DOM detachment
-  await page.evaluate(() => {
-    const form = document.querySelector("form")
-    if (form) {
-      const submitBtn = form.querySelector('button[type="submit"]')
-      if (submitBtn) (submitBtn as HTMLButtonElement).click()
-    }
-  })
+  await page.waitForTimeout(300)
+  await page.locator("[data-testid='login-password']").press("Enter")
   // Wait for any authenticated page (may land on /welcome for merchants with incomplete onboarding)
   await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
     timeout: 15_000,

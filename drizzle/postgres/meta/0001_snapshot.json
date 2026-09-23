@@ -1,5 +1,5 @@
 {
-  "id": "bca5096b-21ca-4d65-959a-9327d317e92c",
+  "id": "c0a09cb6-6ddc-45ad-b8b4-e9279573f844",
   "prevId": "63ac0b4a-c601-4b43-928e-2c106106bda4",
   "version": "7",
   "dialect": "postgresql",
@@ -701,7 +701,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "delivery_city_zone_id_idx": {
+          "name": "delivery_city_zone_id_idx",
+          "columns": [
+            {
+              "expression": "zoneId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "delivery_city_warehouse_id_idx": {
+          "name": "delivery_city_warehouse_id_idx",
+          "columns": [
+            {
+              "expression": "warehouseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "delivery_city_zoneId_delivery_zone_id_fk": {
           "name": "delivery_city_zoneId_delivery_zone_id_fk",
@@ -1154,6 +1185,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "businessType": {
+          "name": "businessType",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Other'"
+        },
+        "onboardingCompletedAt": {
+          "name": "onboardingCompletedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1303,6 +1347,25 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "logoUrl": {
+          "name": "logoUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "brandColor": {
+          "name": "brandColor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidePlatformBranding": {
+          "name": "hidePlatformBranding",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -1587,12 +1650,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "deliveryCity": {
-          "name": "deliveryCity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deliveryCityId": {
           "name": "deliveryCityId",
           "type": "text",
@@ -1854,6 +1911,36 @@
         }
       },
       "indexes": {
+        "order_merchant_id_idx": {
+          "name": "order_merchant_id_idx",
+          "columns": [
+            {
+              "expression": "merchantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "order_warehouse_id_idx": {
+          "name": "order_warehouse_id_idx",
+          "columns": [
+            {
+              "expression": "warehouseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "order_pickup_rider_id_idx": {
           "name": "order_pickup_rider_id_idx",
           "columns": [
