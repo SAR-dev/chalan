@@ -1,25 +1,11 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  or,
-  sql,
-} from "drizzle-orm"
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
-import { merchant, order, payoutRequest } from "@/lib/db/schema"
-import {
-  paginateResponse,
-  parsePagination,
-  parseSort,
-  parseStatusFilter,
-} from "@/lib/pagination"
+import { enumValues } from "@/lib/db-helpers"
+import { merchant, order, payoutRequest, payoutRequestStatuses } from "@/lib/db/schema"
+import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 import { parseBody, payoutCreateSchema } from "@/lib/validation"
 
@@ -48,7 +34,7 @@ export async function GET(req: Request) {
     let where = eq(payoutRequest.merchantId, me.merchantId)
     if (searchClause) where = and(where, searchClause)!
     if (statuses.length > 0)
-      where = and(where, inArray(payoutRequest.status, statuses as any))!
+      where = and(where, inArray(payoutRequest.status, enumValues<(typeof payoutRequestStatuses)[number]>(statuses)))!
 
     let q = dbRead
       .select({
@@ -111,7 +97,7 @@ export async function GET(req: Request) {
     where = where ? and(where, searchClause) : searchClause
   }
   if (statuses.length > 0) {
-    const statusClause = inArray(payoutRequest.status, statuses as any)
+    const statusClause = inArray(payoutRequest.status, enumValues<(typeof payoutRequestStatuses)[number]>(statuses))
     where = where ? and(where, statusClause) : statusClause
   }
 

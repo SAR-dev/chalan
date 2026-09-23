@@ -1,15 +1,11 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import {
-  badRequest,
-  forbidden,
-  notFound,
-  unauthorized,
-} from "@/lib/api-response"
+import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { nidReviewSchema, parseBody } from "@/lib/validation"
 
 export async function PATCH(
   req: Request,
@@ -46,23 +42,19 @@ export async function PATCH(
     return badRequest("NID has already been rejected")
   }
 
-  const body = await req.json().catch(() => null)
-  const action = body?.action as "approve" | "reject" | undefined
+  const { data: body, error: bodyError } = await parseBody(req, nidReviewSchema)
+  if (bodyError) return bodyError
 
-  if (action !== "approve" && action !== "reject") {
-    return badRequest("action must be 'approve' or 'reject'")
+  if (body.action === "reject" && !body.reason) {
+    return badRequest("Rejection reason is required")
   }
 
   const now = new Date().toISOString()
 
-  if (action === "reject" && !body?.reason) {
-    return badRequest("Rejection reason is required")
-  }
-
   const [updated] = await db
     .update(merchant)
     .set(
-      action === "approve"
+      body.action === "approve"
         ? {
             nidVerifiedAt: now,
             nidVerifiedBy: me.name,
@@ -79,11 +71,11 @@ export async function PATCH(
   await logAudit({
     actor: { userId: me.userId, name: me.name, role: me.role },
     action:
-      action === "approve" ? "MERCHANT_NID_VERIFIED" : "MERCHANT_NID_REJECTED",
+      body.action === "approve" ? "MERCHANT_NID_VERIFIED" : "MERCHANT_NID_REJECTED",
     entityType: "merchant",
     entityId: updated.id,
     description:
-      action === "approve"
+      body.action === "approve"
         ? `Verified NID for merchant ${current.businessName}`
         : `Rejected NID for merchant ${current.businessName}: ${body.reason}`,
   })

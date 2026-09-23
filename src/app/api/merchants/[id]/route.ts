@@ -5,7 +5,7 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
-import { merchantBrandingSchema, merchantProfileSchema } from "@/lib/validation"
+import { merchantBrandingSchema, merchantProfileSchema, parseBody } from "@/lib/validation"
 
 export async function GET(
   _req: Request,
@@ -85,7 +85,12 @@ export async function PATCH(
   }
 
   // Try profile schema first (businessName, email, phone, address), then branding schema.
-  const body = await req.json()
+  const { data: body, error: bodyError } = await parseBody(
+    req,
+    merchantProfileSchema.or(merchantBrandingSchema),
+  )
+  if (bodyError) return bodyError
+
   const profileParsed = merchantProfileSchema.safeParse(body)
   const brandingParsed = merchantBrandingSchema.safeParse(body)
 

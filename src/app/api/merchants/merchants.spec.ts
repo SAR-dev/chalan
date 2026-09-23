@@ -755,7 +755,8 @@ describe("PATCH /api/merchants/:id/nid", () => {
     )
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toContain("NID front image is required")
+    expect(json.error).toBe("Invalid request body")
+    expect(json.issues).toBeDefined()
   })
 
   it("400 when missing back image", async () => {
@@ -770,7 +771,8 @@ describe("PATCH /api/merchants/:id/nid", () => {
     )
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toContain("NID back image is required")
+    expect(json.error).toBe("Invalid request body")
+    expect(json.issues).toBeDefined()
   })
 
   it("400 when missing selfie image", async () => {
@@ -785,7 +787,8 @@ describe("PATCH /api/merchants/:id/nid", () => {
     )
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toContain("NID selfie image is required")
+    expect(json.error).toBe("Invalid request body")
+    expect(json.issues).toBeDefined()
   })
 
   it("submits NID as merchant owner", async () => {

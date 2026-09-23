@@ -45,15 +45,17 @@ export async function PATCH(req: Request) {
     .where(and(inArray(order.id, assignableIds), eq(order.status, "APPROVED")))
     .returning()
 
-  for (const o of updated) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "ORDER_ASSIGN_PICKUP_RIDER",
-      entityType: "order",
-      entityId: o.id,
-      description: `Assigned pickup rider for order ${o.id}`,
-    })
-  }
+  await Promise.all(
+    updated.map((o) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "ORDER_ASSIGN_PICKUP_RIDER",
+        entityType: "order",
+        entityId: o.id,
+        description: `Assigned pickup rider for order ${o.id}`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: updated.length })
 }

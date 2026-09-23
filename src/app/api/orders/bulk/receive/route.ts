@@ -49,15 +49,17 @@ export async function PATCH(req: Request) {
     .where(and(...updateConditions))
     .returning()
 
-  for (const o of updated) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "ORDER_RECEIVE",
-      entityType: "order",
-      entityId: o.id,
-      description: `Received order ${o.id} at warehouse`,
-    })
-  }
+  await Promise.all(
+    updated.map((o) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "ORDER_RECEIVE",
+        entityType: "order",
+        entityId: o.id,
+        description: `Received order ${o.id} at warehouse`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: updated.length })
 }

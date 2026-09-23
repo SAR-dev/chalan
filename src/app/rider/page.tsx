@@ -1,15 +1,6 @@
 "use client"
 
-import {
-  Banknote,
-  CheckCircle2,
-  MapPin,
-  Navigation,
-  PackageCheck,
-  PartyPopper,
-  Phone,
-  Truck,
-} from "lucide-react"
+import { Banknote, CheckCircle2, MapPin, Navigation, PackageCheck, PartyPopper, Phone, Truck } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { PageHeader } from "@/components/page-header"
@@ -208,10 +199,8 @@ export default function RiderTodoPage() {
             <div className="flex flex-col">
               {toPickup.map((o) => {
                 const p = pickup(o.pickupLocationId)
-                const mapLink = (o as any).pickupLocationMapLink as
-                  | string
-                  | null
-                const phone = (o as any).merchantPhone as string | null
+                const mapLink = o.pickupLocationMapLink ?? null
+                const phone = o.merchantPhone ?? null
                 return (
                   <div
                     key={o.id}
@@ -274,7 +263,7 @@ export default function RiderTodoPage() {
                 const isAssigned = o.deliveryRiderId === currentRider?.id
                 const canStart = o.status === "IN_TRANSIT" && isAssigned
                 const canRecord = o.status === "OUT_FOR_DELIVERY" && isAssigned
-                const mapLink = (o as any).deliveryMapLink as string | null
+                const mapLink = o.deliveryMapLink ?? null
                 return (
                   <div
                     key={o.id}

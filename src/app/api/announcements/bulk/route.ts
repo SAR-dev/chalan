@@ -32,15 +32,17 @@ export async function DELETE(req: Request) {
     ),
   )
 
-  for (const a of existing) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "ANNOUNCEMENT_DELETED",
-      entityType: "announcement",
-      entityId: a.id,
-      description: `Deleted announcement "${a.title}"`,
-    })
-  }
+  await Promise.all(
+    existing.map((a) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "ANNOUNCEMENT_DELETED",
+        entityType: "announcement",
+        entityId: a.id,
+        description: `Deleted announcement "${a.title}"`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: existing.length })
 }

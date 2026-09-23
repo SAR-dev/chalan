@@ -40,15 +40,17 @@ export async function PATCH(req: Request) {
     })
     .where(inArray(emailLog.id, failedIds))
 
-  for (const l of faileds) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "EMAIL_LOG_MARKED_SENT",
-      entityType: "email_log",
-      entityId: l.id,
-      description: `Marked email to ${l.to} ("${l.subject}") as sent`,
-    })
-  }
+  await Promise.all(
+    faileds.map((l) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "EMAIL_LOG_MARKED_SENT",
+        entityType: "email_log",
+        entityId: l.id,
+        description: `Marked email to ${l.to} ("${l.subject}") as sent`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: faileds.length })
 }

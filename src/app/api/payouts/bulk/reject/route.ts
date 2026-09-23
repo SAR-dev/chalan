@@ -60,15 +60,17 @@ export async function PATCH(req: Request) {
     .set({ payoutRequestId: null })
     .where(inArray(order.payoutRequestId, rejectedIds))
 
-  for (const p of updated) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "PAYOUT_REJECTED",
-      entityType: "payout_request",
-      entityId: p.id,
-      description: `Rejected payout request ${p.id}: ${reason.trim()}`,
-    })
-  }
+  await Promise.all(
+    updated.map((p) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "PAYOUT_REJECTED",
+        entityType: "payout_request",
+        entityId: p.id,
+        description: `Rejected payout request ${p.id}: ${reason.trim()}`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: updated.length })
 }

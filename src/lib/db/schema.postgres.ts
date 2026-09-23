@@ -676,6 +676,8 @@ export const order = pgTable(
   },
   (t) => [
     // Role-scoped list queries (most common access pattern)
+    index("order_merchant_id_idx").on(t.merchantId),
+    index("order_warehouse_id_idx").on(t.warehouseId),
     index("order_pickup_rider_id_idx").on(t.pickupRiderId),
     index("order_delivery_rider_id_idx").on(t.deliveryRiderId),
     index("order_pickup_location_id_idx").on(t.pickupLocationId),
@@ -930,21 +932,28 @@ export const mailConfig = pgTable("mail_config", {
 // Each city belongs to a zone (for pricing) and routes to a warehouse.
 // =============================================================================
 
-export const deliveryCity = pgTable("delivery_city", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  name: text("name").notNull().unique(),
-  zoneId: text("zoneId")
-    .notNull()
-    .references(() => deliveryZone.id, { onDelete: "restrict" }),
-  warehouseId: text("warehouseId")
-    .notNull()
-    .references(() => warehouse.id, { onDelete: "restrict" }),
-  isActive: boolean("isActive").notNull().default(true),
-  createdAt: ts("createdAt").notNull().defaultNow(),
-  updatedAt: ts("updatedAt").notNull().defaultNow(),
-})
+export const deliveryCity = pgTable(
+  "delivery_city",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    name: text("name").notNull().unique(),
+    zoneId: text("zoneId")
+      .notNull()
+      .references(() => deliveryZone.id, { onDelete: "restrict" }),
+    warehouseId: text("warehouseId")
+      .notNull()
+      .references(() => warehouse.id, { onDelete: "restrict" }),
+    isActive: boolean("isActive").notNull().default(true),
+    createdAt: ts("createdAt").notNull().defaultNow(),
+    updatedAt: ts("updatedAt").notNull().defaultNow(),
+  },
+  (t) => [
+    index("delivery_city_zone_id_idx").on(t.zoneId),
+    index("delivery_city_warehouse_id_idx").on(t.warehouseId),
+  ],
+)
 
 // =============================================================================
 // Delivery zones

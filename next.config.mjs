@@ -16,10 +16,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Skip type-check during build — run these separately in CI instead.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   async redirects() {
     return [
       { source: "/merchant/business", destination: "/merchant/settings", permanent: true },
@@ -38,7 +34,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' blob: data: https:",
               "font-src 'self'",

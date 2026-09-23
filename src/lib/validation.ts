@@ -431,6 +431,17 @@ export const nidSubmitSchema = z.object({
   nidNumber: z.string().trim().optional(),
 })
 
+export const nidReviewSchema = z.object({
+  action: z.enum(["approve", "reject"], {
+    error: "action must be 'approve' or 'reject'",
+  }),
+  reason: z
+    .string()
+    .trim()
+    .max(500, "Reason cannot exceed 500 characters")
+    .optional(),
+})
+
 export const teamCreateSchema = z.object({
   name: requiredString("Name"),
   email: z.email("A valid email is required"),

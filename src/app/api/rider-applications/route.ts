@@ -4,13 +4,9 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
-import { profile, rider, warehouse } from "@/lib/db/schema"
-import {
-  paginateResponse,
-  parsePagination,
-  parseSort,
-  parseStatusFilter,
-} from "@/lib/pagination"
+import { enumValues } from "@/lib/db-helpers"
+import { profile, rider, riderStatuses, warehouse } from "@/lib/db/schema"
+import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 import { parseBody, riderApplySchema } from "@/lib/validation"
 
@@ -137,7 +133,7 @@ export async function GET(req: Request) {
 
   const statuses = parseStatusFilter(req)
   if (statuses.length > 0) {
-    const statusClause = inArray(rider.status, statuses as any)
+    const statusClause = inArray(rider.status, enumValues<(typeof riderStatuses)[number]>(statuses))
     where = where ? and(where, statusClause) : statusClause
   }
 

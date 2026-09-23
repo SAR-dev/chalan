@@ -5,7 +5,8 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
-import { merchant, merchantBalance, platformConfig, profile } from "@/lib/db/schema"
+import { enumValues } from "@/lib/db-helpers"
+import { merchant, merchantBalance, merchantStatuses, platformConfig, profile } from "@/lib/db/schema"
 import { merchantRegisteredTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
@@ -62,7 +63,7 @@ export async function GET(req: Request) {
 
   const statuses = parseStatusFilter(req)
   if (statuses.length > 0) {
-    const statusClause = inArray(merchant.status, statuses as any)
+    const statusClause = inArray(merchant.status, enumValues<(typeof merchantStatuses)[number]>(statuses))
     where = where ? and(where, statusClause) : statusClause
   }
 

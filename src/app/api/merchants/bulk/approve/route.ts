@@ -36,15 +36,17 @@ export async function PATCH(req: Request) {
     .where(inArray(merchant.id, pendingIds))
     .returning()
 
-  for (const m of updated) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "MERCHANT_APPROVED",
-      entityType: "merchant",
-      entityId: m.id,
-      description: `Approved merchant ${m.businessName}`,
-    })
-  }
+  await Promise.all(
+    updated.map((m) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "MERCHANT_APPROVED",
+        entityType: "merchant",
+        entityId: m.id,
+        description: `Approved merchant ${m.businessName}`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: updated.length })
 }

@@ -29,16 +29,23 @@ export async function PATCH(req: Request) {
     return badRequest("No PENDING orders found for the given IDs.")
   }
 
+  const uniqueMerchantIds = [
+    ...new Set(pendingOrders.map((o) => o.merchantId)),
+  ]
+  const merchantRows = await db
+    .select({ id: merchant.id, maxWeightKg: merchant.maxWeightKg })
+    .from(merchant)
+    .where(inArray(merchant.id, uniqueMerchantIds))
+  const merchantMap = new Map(
+    merchantRows.map((m) => [m.id, m.maxWeightKg]),
+  )
+
   const now = new Date().toISOString()
   const validIds: string[] = []
 
   for (const o of pendingOrders) {
-    const [merchantRow] = await db
-      .select({ maxWeightKg: merchant.maxWeightKg })
-      .from(merchant)
-      .where(eq(merchant.id, o.merchantId))
-      .limit(1)
-    if (merchantRow && o.parcelWeightKg > merchantRow.maxWeightKg) continue
+    const maxWeightKg = merchantMap.get(o.merchantId)
+    if (maxWeightKg != null && o.parcelWeightKg > maxWeightKg) continue
     validIds.push(o.id)
   }
 
@@ -54,15 +61,17 @@ export async function PATCH(req: Request) {
     .where(and(inArray(order.id, validIds), eq(order.status, "PENDING")))
     .returning()
 
-  for (const o of updated) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "ORDER_APPROVE",
-      entityType: "order",
-      entityId: o.id,
-      description: `Approved order ${o.id}`,
-    })
-  }
+  await Promise.all(
+    updated.map((o) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "ORDER_APPROVE",
+        entityType: "order",
+        entityId: o.id,
+        description: `Approved order ${o.id}`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: updated.length })
 }

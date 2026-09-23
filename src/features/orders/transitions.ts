@@ -469,7 +469,7 @@ export async function applyOrderTransition(
   }
 
   const committed: { order: OrderRow | null } = { order: null }
-  const response = await db.transaction(async (tx: any) => {
+  const response = await db.transaction(async (tx) => {
     const [orderRow] = await tx
       .select()
       .from(order)

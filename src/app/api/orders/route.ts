@@ -3,12 +3,14 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
+import { enumValues } from "@/lib/db-helpers"
 import {
   balanceTransaction,
   deliveryCity as deliveryCityTable,
   merchant,
   merchantBalance,
   order,
+  orderStatuses,
   pickupLocation,
   warehouse,
   zonePricing,
@@ -74,7 +76,7 @@ export async function GET(req: Request) {
 
   const statuses = parseStatusFilter(req)
   if (statuses.length > 0) {
-    const statusClause = inArray(order.status, statuses as any)
+    const statusClause = inArray(order.status, enumValues<(typeof orderStatuses)[number]>(statuses))
     where = where ? and(where, statusClause) : statusClause
   }
 

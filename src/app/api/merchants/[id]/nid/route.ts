@@ -1,14 +1,10 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import {
-  badRequest,
-  forbidden,
-  notFound,
-  unauthorized,
-} from "@/lib/api-response"
+import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { nidSubmitSchema, parseBody } from "@/lib/validation"
 
 export async function PATCH(
   req: Request,
@@ -46,16 +42,8 @@ export async function PATCH(
     return badRequest("Email must be verified before submitting NID")
   }
 
-  const body = await req.json().catch(() => null)
-  if (!body?.nidFrontImage) {
-    return badRequest("NID front image is required")
-  }
-  if (!body?.nidBackImage) {
-    return badRequest("NID back image is required")
-  }
-  if (!body?.nidSelfieImage) {
-    return badRequest("NID selfie image is required")
-  }
+  const { data: body, error: bodyError } = await parseBody(req, nidSubmitSchema)
+  if (bodyError) return bodyError
 
   const now = new Date().toISOString()
 
