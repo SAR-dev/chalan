@@ -182,6 +182,20 @@ export async function merchantVerifyEmailTemplate(
   return { subject: `Verify your email — ${data.businessName}`, html, text }
 }
 
+export async function merchantWelcomeTemplate(
+  data: MerchantEmailData & { dashboardUrl: string },
+) {
+  const { html, text } = await buildTemplate({
+    status: "Welcome to Kikuya!",
+    greetingName: data.ownerName,
+    message: `Your business ${data.businessName} has been activated. You can now start creating orders and managing your deliveries.`,
+    rows: [["Next steps", "Add pickup locations and create your first order"]],
+    cta: { href: data.dashboardUrl, label: "Go to Dashboard" },
+    footnote: "If you have any questions, reply to this email.",
+  })
+  return { subject: `Welcome to Kikuya — ${data.businessName}`, html, text }
+}
+
 // ---------------------------------------------------------------------------
 // Password reset emails
 // ---------------------------------------------------------------------------

@@ -147,6 +147,18 @@ export const merchantRegisterSchema = z.object({
   email: z.email("A valid email is required"),
   phone: bdPhone("Phone"),
   address: requiredString("Address"),
+  businessType: z
+    .enum([
+      "E-commerce",
+      "Restaurant",
+      "Grocery",
+      "Pharmacy",
+      "Fashion",
+      "Electronics",
+      "Other",
+    ])
+    .optional()
+    .transform((v) => v ?? "Other"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 

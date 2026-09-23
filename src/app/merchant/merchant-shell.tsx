@@ -1,13 +1,6 @@
 "use client"
 
-import {
-  AlertTriangle,
-  Clock,
-  FileText,
-  Loader2,
-  PlusIcon,
-  XCircle,
-} from "lucide-react"
+import { AlertTriangle, Clock, FileText, Loader2, PlusIcon, XCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
@@ -41,25 +34,25 @@ function getNidStatus(m: Merchant): NidStatus {
 
 const NID_COLORS = {
   blue: {
-    border: "border-blue-200",
-    bg: "bg-blue-50",
-    icon: "text-blue-600",
-    title: "text-blue-800",
-    desc: "text-blue-600",
+    border: "border-chart-1/25",
+    bg: "bg-chart-1/10",
+    icon: "text-chart-1",
+    title: "text-chart-1",
+    desc: "text-muted-foreground",
   },
   red: {
-    border: "border-red-200",
-    bg: "bg-red-50",
-    icon: "text-red-600",
-    title: "text-red-800",
-    desc: "text-red-600",
+    border: "border-destructive/25",
+    bg: "bg-destructive/10",
+    icon: "text-destructive",
+    title: "text-destructive",
+    desc: "text-muted-foreground",
   },
   amber: {
-    border: "border-amber-200",
-    bg: "bg-amber-50",
-    icon: "text-amber-600",
-    title: "text-amber-800",
-    desc: "text-amber-600",
+    border: "border-chart-3/25",
+    bg: "bg-chart-3/10",
+    icon: "text-chart-3",
+    title: "text-chart-3",
+    desc: "text-muted-foreground",
   },
 } as const
 
@@ -138,7 +131,7 @@ function MerchantNidAlert({ merchant }: { merchant: Merchant }) {
         size="sm"
         render={<Link href="/merchant/verify-nid" />}
         nativeButton={false}
-        className="shrink-0 self-start sm:self-auto"
+        className="shrink-0 self-start sm:self-auto border border-base/20 w-32"
       >
         {CtaIcon && <CtaIcon className="size-4" />}
         {config.cta}
@@ -151,16 +144,17 @@ function MerchantPickupLocationAlert() {
   return (
     <div
       role="alert"
-      className="border-amber-200 bg-amber-50 mb-6 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm"
+      className="border-chart-3/25 bg-chart-3/10 mb-6 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm"
     >
-      <span className="text-amber-800">
-        ⚠️ Add a pickup location to start creating orders.
+      <span className="text-chart-3">
+        Add a pickup location to start creating orders.
       </span>
       <Button
         variant="secondary"
         size="sm"
         render={<Link href="/merchant/settings" />}
         nativeButton={false}
+        className="border border-base/20 w-32"
       >
         <PlusIcon className="size-4" />
         Add
@@ -182,8 +176,21 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
       router.replace("/login")
     } else if (currentUser.role !== "MERCHANT") {
       router.replace("/dashboard")
+    } else if (
+      isMerchantLoading ||
+      !currentMerchant
+    ) {
+      // Wait for merchant data to load before deciding redirect
+      return
+    } else if (
+      !currentMerchant.onboardingCompletedAt &&
+      !window.location.pathname.startsWith("/welcome") &&
+      !window.location.pathname.startsWith("/pickup-locations") &&
+      !window.location.pathname.startsWith("/pricing")
+    ) {
+      router.replace("/welcome")
     }
-  }, [isReady, currentUser, router])
+  }, [isReady, currentUser, currentMerchant, isMerchantLoading, router])
 
   if (!isReady || !currentUser || currentUser.role !== "MERCHANT") {
     return (

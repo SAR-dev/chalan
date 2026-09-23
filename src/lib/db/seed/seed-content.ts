@@ -180,7 +180,7 @@ export const SEED_ADMIN_USERS: AdminUserConfig[] = [
 // Counts for bulk-generated entities
 // ---------------------------------------------------------------------------
 export const SEED_COUNTS = {
-  merchants: 5,
+  merchants: 6,
   riders: 10,
   orders: 100,
   payoutRequests: 2,
@@ -213,7 +213,7 @@ export const ADMIN_USER_NAMES = {
 } as const
 
 // ---------------------------------------------------------------------------
-// Deterministic: Merchants (5)
+// Deterministic: Merchants (6 — including demo)
 // Each entry carries the user password so the seed module can create accounts.
 // ---------------------------------------------------------------------------
 export interface MerchantSeedEntry {
@@ -225,6 +225,15 @@ export interface MerchantSeedEntry {
   phone: string
   address: string
   status: "PENDING" | "ACTIVE" | "SUSPENDED"
+  businessType?:
+    | "E-commerce"
+    | "Restaurant"
+    | "Grocery"
+    | "Pharmacy"
+    | "Fashion"
+    | "Electronics"
+    | "Other"
+  onboardingCompletedAt?: string | null
   emailVerifiedAt: string | null
   phoneVerifiedAt: string | null
   baseRate: number
@@ -247,7 +256,13 @@ export const MERCHANT_IDS = {
   merchant3: "seed_merchant_3",
   merchant4: "seed_merchant_4",
   merchant5: "seed_merchant_5",
+  demo: "demo_merchant",
 } as const
+
+export const SEED_DEMO_CREDENTIALS = {
+  email: "demo@kikuya.com",
+  password: "demo123",
+}
 
 export const SEED_MERCHANTS: MerchantSeedEntry[] = [
   {
@@ -368,6 +383,32 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     nidSelfieImage: "data:image/png;base64,seed_nid_selfie",
     nidSubmittedAt: "2026-07-01T00:00:00.000Z",
     nidVerifiedAt: "2026-07-01T00:00:00.000Z",
+    nidVerifiedBy: "System",
+  },
+  {
+    id: MERCHANT_IDS.demo,
+    businessName: "Kikuya Demo Store",
+    ownerName: "Demo User",
+    email: SEED_DEMO_CREDENTIALS.email,
+    password: SEED_DEMO_CREDENTIALS.password,
+    phone: "+8801700000000",
+    address: "123 Demo Street, Dhaka 1212",
+    status: "ACTIVE",
+    businessType: "E-commerce",
+    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+    emailVerifiedAt: "2026-01-01T00:00:00.000Z",
+    phoneVerifiedAt: "2026-01-01T00:00:00.000Z",
+    baseRate: 50,
+    extraRatePerKg: 10,
+    maxWeightKg: 10,
+    freeWeightKg: 1,
+    approvedBy: "System",
+    approvedAt: "2026-01-01T00:00:00.000Z",
+    nidFrontImage: "data:image/png;base64,seed_nid_front",
+    nidBackImage: "data:image/png;base64,seed_nid_back",
+    nidSelfieImage: "data:image/png;base64,seed_nid_selfie",
+    nidSubmittedAt: "2026-01-01T00:00:00.000Z",
+    nidVerifiedAt: "2026-01-01T00:00:00.000Z",
     nidVerifiedBy: "System",
   },
 ]

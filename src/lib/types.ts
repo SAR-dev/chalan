@@ -41,6 +41,9 @@ type Loosen<T> = Omit<T, NullableKeys<T>> & Partial<Pick<T, NullableKeys<T>>>
 // `enum` option is a Drizzle/TypeScript-only hint, not a runtime check.)
 export type Role = (typeof profile.$inferSelect)["role"]
 export type MerchantStatus = (typeof merchant.$inferSelect)["status"]
+export type MerchantBusinessType = NonNullable<
+  (typeof merchant.$inferSelect)["businessType"]
+>
 export type DeliveryType = (typeof order.$inferSelect)["deliveryType"]
 export type OrderStatus = (typeof order.$inferSelect)["status"]
 export type PayoutRequestStatus = (typeof payoutRequest.$inferSelect)["status"]
@@ -99,6 +102,7 @@ export interface MerchantRegistrationInput {
   email: string
   phone: string
   address: string
+  businessType?: MerchantBusinessType
   password: string
 }
 

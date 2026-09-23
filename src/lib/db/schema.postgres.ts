@@ -300,6 +300,21 @@ export const merchant = pgTable(
     email: text("email").notNull(),
     phone: text("phone").notNull(),
     address: text("address").notNull(),
+    businessType: text("businessType", {
+      enum: [
+        "E-commerce",
+        "Restaurant",
+        "Grocery",
+        "Pharmacy",
+        "Fashion",
+        "Electronics",
+        "Other",
+      ],
+    })
+      .notNull()
+      .default("Other"),
+    // Onboarding — set when merchant completes the setup wizard.
+    onboardingCompletedAt: ts("onboardingCompletedAt"),
     status: text("status", { enum: merchantStatuses })
       .notNull()
       .default("PENDING"),

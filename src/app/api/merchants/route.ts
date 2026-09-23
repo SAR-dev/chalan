@@ -5,20 +5,10 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
-import {
-  merchant,
-  merchantBalance,
-  platformConfig,
-  profile,
-} from "@/lib/db/schema"
+import { merchant, merchantBalance, platformConfig, profile } from "@/lib/db/schema"
 import { merchantRegisteredTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
-import {
-  paginateResponse,
-  parsePagination,
-  parseSort,
-  parseStatusFilter,
-} from "@/lib/pagination"
+import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 import { merchantRegisterSchema, parseBody } from "@/lib/validation"
 
@@ -37,6 +27,8 @@ export async function GET(req: Request) {
         phone: merchant.phone,
         address: merchant.address,
         status: merchant.status,
+        businessType: merchant.businessType,
+        onboardingCompletedAt: merchant.onboardingCompletedAt,
         emailVerifiedAt: merchant.emailVerifiedAt,
         phoneVerifiedAt: merchant.phoneVerifiedAt,
         baseRate: merchant.baseRate,
@@ -167,8 +159,15 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const parsed = await parseBody(req, merchantRegisterSchema)
   if (parsed.error) return parsed.error
-  const { businessName, ownerName, email, phone, address, password } =
-    parsed.data
+  const {
+    businessName,
+    ownerName,
+    email,
+    phone,
+    address,
+    businessType,
+    password,
+  } = parsed.data
 
   const limited = rateLimit(`merchant-register:${getClientIp(req)}`, 3, 60)
   if (limited) return limited
@@ -199,6 +198,7 @@ export async function POST(req: Request) {
       email,
       phone,
       address,
+      businessType,
       status: "PENDING",
       baseRate: config?.defaultBaseRate ?? 0,
       extraRatePerKg: config?.defaultExtraRatePerKg ?? 0,

@@ -31,6 +31,8 @@ export async function GET(
       phone: merchant.phone,
       address: merchant.address,
       status: merchant.status,
+      businessType: merchant.businessType,
+      onboardingCompletedAt: merchant.onboardingCompletedAt,
       emailVerifiedAt: merchant.emailVerifiedAt,
       phoneVerifiedAt: merchant.phoneVerifiedAt,
       baseRate: merchant.baseRate,
