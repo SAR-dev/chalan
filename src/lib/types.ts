@@ -139,3 +139,39 @@ export type Announcement = Loosen<typeof announcement.$inferSelect>
 export type DeliveryCity = typeof deliveryCity.$inferSelect
 export type DeliveryZone = typeof deliveryZone.$inferSelect
 export type ZonePricing = typeof zonePricing.$inferSelect
+
+// --- Analytics types ---------------------------------------------------------
+
+export interface OrdersByDay {
+  date: string
+  count: number
+  revenue: number
+}
+
+export interface OrdersByStatus {
+  status: string
+  count: number
+}
+
+export interface DeliveryPerformance {
+  totalDelivered: number
+  totalFailed: number
+  totalReturned: number
+  successRate: number
+  avgDeliveryTimeHours: number
+}
+
+export interface CodSummary {
+  totalCollected: number
+  totalSettled: number
+  pendingSettlement: number
+  settledCount: number
+  pendingCount: number
+}
+
+export interface OrderAnalytics {
+  ordersByDay: OrdersByDay[]
+  ordersByStatus: OrdersByStatus[]
+  deliveryPerformance: DeliveryPerformance
+  codSummary: CodSummary
+}

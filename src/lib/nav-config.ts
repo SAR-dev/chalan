@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BarChart3,
   Bell,
   Bike,
   FileText,
@@ -12,6 +13,7 @@ import {
   Package,
   PackageCheck,
   PackagePlus,
+  Receipt,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -114,6 +116,18 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       label: "Zone Pricing",
       icon: Wallet,
       group: "Operations",
+    },
+    {
+      href: "/dashboard/delivery-performance",
+      label: "Delivery Performance",
+      icon: BarChart3,
+      group: "Analytics",
+    },
+    {
+      href: "/dashboard/cod-reconciliation",
+      label: "COD Reconciliation",
+      icon: Receipt,
+      group: "Analytics",
     },
     {
       href: "/dashboard/announcements",
