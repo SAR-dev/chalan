@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PATCH as receiverNote } from "./[id]/receiver-note/route"
 import { GET as getOrder } from "./[id]/route"
+import { GET as analytics } from "./analytics/route"
 import { POST as bulkCreate } from "./bulk/route"
 import { GET as orderCounts } from "./counts/route"
 import { GET as payableOrders } from "./payable/route"
@@ -27,14 +28,19 @@ const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
+const whereCalls: unknown[] = []
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
     const chain: Record<string, unknown> = {
       from: () => chain,
-      where: () => chain,
+      where: (clause?: unknown) => {
+        whereCalls.push(clause)
+        return chain
+      },
       innerJoin: () => chain,
       leftJoin: () => chain,
+      groupBy: () => chain,
       limit: () => chain,
       offset: () => chain,
       orderBy: () => chain,
@@ -90,6 +96,7 @@ beforeEach(() => {
   updateResult.length = 0
   updatePayloads.length = 0
   insertResult.length = 0
+  whereCalls.length = 0
   sessionState.value = null
   rateLimited = false
 })
@@ -374,5 +381,177 @@ describe("POST /api/orders/bulk", () => {
     insertResult.push([{ id: "o_bulk" }])
     const res = await bulkCreate(req("POST", undefined, bulkBody))
     expect(res.status).toBe(201)
+  })
+})
+
+describe("GET /api/orders/analytics", () => {
+  function pushEmptyAnalytics() {
+    selectQueue.push([], [], [], [])
+  }
+
+  it("401 when unauthenticated", async () => {
+    const res = await analytics(req("GET"))
+    expect(res.status).toBe(401)
+  })
+
+  it("super admin gets platform-wide analytics (no where clause)", async () => {
+    sessionState.value = admin
+    pushEmptyAnalytics()
+    const res = await analytics(req("GET"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w === undefined)).toBe(true)
+    expect(json).toMatchObject({
+      ordersByDay: [],
+      ordersByStatus: [],
+      deliveryPerformance: {
+        totalDelivered: 0,
+        totalFailed: 0,
+        totalReturned: 0,
+        successRate: 0,
+        avgDeliveryTimeHours: 0,
+      },
+      codSummary: {
+        totalCollected: 0,
+        totalSettled: 0,
+        pendingSettlement: 0,
+        settledCount: 0,
+        pendingCount: 0,
+      },
+    })
+  })
+
+  it("super admin can scope via merchantId param", async () => {
+    sessionState.value = admin
+    pushEmptyAnalytics()
+    const res = await analytics(
+      req("GET", "http://test.local/api/orders/analytics?merchantId=m_1"),
+    )
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
+  })
+
+  it("super admin can scope via warehouseId param", async () => {
+    sessionState.value = admin
+    pushEmptyAnalytics()
+    const res = await analytics(
+      req("GET", "http://test.local/api/orders/analytics?warehouseId=wh_1"),
+    )
+    expect(res.status).toBe(200)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
+  })
+
+  it("merchant is always scoped to own orders", async () => {
+    sessionState.value = merchant
+    pushEmptyAnalytics()
+    const res = await analytics(req("GET"))
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
+  })
+
+  it("rider with riderId is scoped to own deliveries/pickups, never platform-wide", async () => {
+    sessionState.value = rider
+    pushEmptyAnalytics()
+    const res = await analytics(req("GET"))
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
+  })
+
+  it("rider without riderId still never gets platform-wide data", async () => {
+    sessionState.value = { role: "RIDER", name: "No Id", userId: "u5" }
+    pushEmptyAnalytics()
+    const res = await analytics(req("GET"))
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
+  })
+
+  it("warehouse admin is scoped to own warehouse", async () => {
+    sessionState.value = whAdmin
+    pushEmptyAnalytics()
+    const res = await analytics(req("GET"))
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
+  })
+
+  it("applies date range from/to params", async () => {
+    sessionState.value = admin
+    pushEmptyAnalytics()
+    const res = await analytics(
+      req(
+        "GET",
+        "http://test.local/api/orders/analytics?from=2025-01-01&to=2025-01-31",
+      ),
+    )
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
+  })
+
+  it("ignores invalid date range params", async () => {
+    sessionState.value = admin
+    pushEmptyAnalytics()
+    const res = await analytics(
+      req("GET", "http://test.local/api/orders/analytics?from=nope&to=nope"),
+    )
+    expect(res.status).toBe(200)
+    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls.every((w) => w === undefined)).toBe(true)
+  })
+
+  it("computes aggregates from query results", async () => {
+    sessionState.value = admin
+    selectQueue.push(
+      [
+        { date: "2025-01-01", count: 5, revenue: 2500 },
+        { date: "2025-01-02", count: 3, revenue: 1200 },
+      ],
+      [
+        { status: "DELIVERED", count: 8 },
+        { status: "FAILED_ATTEMPT", count: 1 },
+        { status: "RETURNED", count: 1 },
+      ],
+      [
+        {
+          totalDelivered: 8,
+          totalFailed: 1,
+          totalReturned: 1,
+          avgDeliveryTimeHours: 5.56,
+        },
+      ],
+      [
+        {
+          totalCollected: 1000,
+          totalSettled: 400,
+          settledCount: 2,
+          pendingCount: 3,
+        },
+      ],
+    )
+    const res = await analytics(req("GET"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.ordersByDay).toHaveLength(2)
+    expect(json.ordersByDay[0]).toMatchObject({ date: "2025-01-01", count: 5 })
+    expect(json.ordersByStatus).toHaveLength(3)
+    expect(json.deliveryPerformance).toMatchObject({
+      totalDelivered: 8,
+      totalFailed: 1,
+      totalReturned: 1,
+      successRate: 80,
+      avgDeliveryTimeHours: 5.6,
+    })
+    expect(json.codSummary).toMatchObject({
+      totalCollected: 1000,
+      totalSettled: 400,
+      pendingSettlement: 600,
+      settledCount: 2,
+      pendingCount: 3,
+    })
   })
 })

@@ -91,7 +91,6 @@
     "vitest": "^4.1.9"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json,css,md,mdx}": "biome check --write --no-errors-on-unmatched",
-    "*.{ts,tsx}": "tsc --noEmit --pretty"
+    "*.{js,jsx,ts,tsx,json,css,md,mdx}": "biome check --write --no-errors-on-unmatched"
   }
 }

@@ -130,14 +130,14 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 ## Testing
 
-Set these locally when running e2e tests. The Playwright `webServer` sets them
-automatically — you only need them for manual dev server invocations.
+Set these locally when running e2e tests or manual dev-server test runs.
+Playwright's `webServer` sets `AUTH_RATE_LIMIT_DISABLED=1` automatically for
+the suite; the other variables are for manual invocations only.
 
-| Variable                   | Required | Default | Description                                                                      |
-| -------------------------- | -------- | ------- | -------------------------------------------------------------------------------- |
-| `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)               |
-| `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting for the test suite               |
-| `PLAYWRIGHT_BASE_URL`      | No       | —       | Override the base URL for Playwright tests (defaults to `http://localhost:3000`) |
+| Variable                   | Required | Default | Description                                                    |
+| -------------------------- | -------- | ------- | -------------------------------------------------------------- |
+| `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test) |
+| `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting (webServer sets this for the e2e suite; set manually for other test runs) |
 
 ---
 
