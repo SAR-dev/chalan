@@ -5,11 +5,22 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
-import { merchant, merchantBalance, merchantStatuses, platformConfig, profile } from "@/lib/db/schema"
+import {
+  merchant,
+  merchantBalance,
+  merchantStatuses,
+  platformConfig,
+  profile,
+} from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
 import { merchantRegisteredTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
-import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
+import {
+  paginateResponse,
+  parsePagination,
+  parseSort,
+  parseStatusFilter,
+} from "@/lib/pagination"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { merchantRegisterSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"

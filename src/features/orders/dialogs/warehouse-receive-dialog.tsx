@@ -1,6 +1,12 @@
 "use client"
 
-import { Bike, MapPin, Package, Phone, Warehouse as WarehouseIcon } from "lucide-react"
+import {
+  Bike,
+  MapPin,
+  Package,
+  Phone,
+  Warehouse as WarehouseIcon,
+} from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"

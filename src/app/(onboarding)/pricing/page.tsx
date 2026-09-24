@@ -5,7 +5,13 @@ import Link from "next/link"
 import { useState } from "react"
 import { useSWRConfig } from "swr"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 
 export default function OnboardingPricingPage() {

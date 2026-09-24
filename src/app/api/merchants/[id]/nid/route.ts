@@ -1,7 +1,12 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
+import {
+  badRequest,
+  forbidden,
+  notFound,
+  unauthorized,
+} from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { nidSubmitSchema, parseBody } from "@/lib/validation"

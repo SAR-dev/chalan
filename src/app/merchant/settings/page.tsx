@@ -1,6 +1,17 @@
 "use client"
 
-import { Building2, CheckCircle2, FileText, Loader2, MapPin, Palette, Phone, Tag, User, XCircle } from "lucide-react"
+import {
+  Building2,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  MapPin,
+  Palette,
+  Phone,
+  Tag,
+  User,
+  XCircle,
+} from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -9,7 +20,14 @@ import { ImageUpload } from "@/components/image-upload"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"

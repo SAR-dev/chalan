@@ -7,7 +7,14 @@ import { useState } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { BRAND_NAME } from "@/lib/constants"
 import type { SidebarConfig } from "@/lib/nav-config"

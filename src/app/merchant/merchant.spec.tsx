@@ -4,7 +4,13 @@ import { screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { MockOrdersState } from "@/app/__tests__/test-utils"
-import { createMockOrders, makeOrder, makeUser, renderPage, resetIds } from "@/app/__tests__/test-utils"
+import {
+  createMockOrders,
+  makeOrder,
+  makeUser,
+  renderPage,
+  resetIds,
+} from "@/app/__tests__/test-utils"
 
 const mockMerchant = {
   id: "m_1",

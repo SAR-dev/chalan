@@ -13,7 +13,7 @@ import { PATCH as reactivateMerchant } from "./[id]/reactivate/route"
 import { GET as getMerchant, PATCH as updateMerchant } from "./[id]/route"
 import { PATCH as suspendMerchant } from "./[id]/suspend/route"
 import { POST as sendVerifyEmail } from "./[id]/verify-email/route"
-import { GET as listMerchants, POST as createMerchant } from "./route"
+import { POST as createMerchant, GET as listMerchants } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false

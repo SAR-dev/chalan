@@ -4,7 +4,7 @@ import { GET as getOrder } from "./[id]/route"
 import { POST as bulkCreate } from "./bulk/route"
 import { GET as orderCounts } from "./counts/route"
 import { GET as payableOrders } from "./payable/route"
-import { GET as listOrders, POST as createOrder } from "./route"
+import { POST as createOrder, GET as listOrders } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false

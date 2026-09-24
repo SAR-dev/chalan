@@ -6,12 +6,24 @@ import { FormEvent, useState } from "react"
 import { FormErrors } from "@/components/form-errors"
 import { PublicFooter } from "@/components/public-footer"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-import { siteConfig, SiteIcon } from "@/config/site"
+import { SiteIcon, siteConfig } from "@/config/site"
 import { merchantRegisterSchema, validateFormData } from "@/lib/validation"
 
 const BUSINESS_TYPES = [

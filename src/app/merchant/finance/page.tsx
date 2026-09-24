@@ -7,7 +7,13 @@ import { DateRangePicker } from "@/components/date-range-picker"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"

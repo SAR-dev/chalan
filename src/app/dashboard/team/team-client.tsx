@@ -4,7 +4,11 @@ import { Loader2, Warehouse } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { CellTwoRow, DataTable, type DataTableColumn } from "@/components/data-table"
+import {
+  CellTwoRow,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

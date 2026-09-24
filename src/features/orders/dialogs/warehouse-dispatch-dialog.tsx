@@ -5,7 +5,13 @@ import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import type { Order, Rider } from "@/lib/types"

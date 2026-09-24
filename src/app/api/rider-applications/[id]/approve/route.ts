@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import siteData from "@/config/site.json"
 import { requireSession } from "@/lib/api-auth"
-import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
+import {
+  badRequest,
+  forbidden,
+  notFound,
+  unauthorized,
+} from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { profile, rider } from "@/lib/db/schema"
