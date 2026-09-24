@@ -184,6 +184,12 @@ export const platformConfig = pgTable("platform_config", {
   defaultMaxWeightKg: doublePrecision("defaultMaxWeightKg")
     .notNull()
     .default(3),
+  // ROADMAP H4 — when true, SUPER_ADMIN / WAREHOUSE_ADMIN accounts must
+  // enroll in 2FA (TOTP) before they can use the dashboards. Default false so
+  // seeded accounts and existing e2e flows are unaffected.
+  requireAdminTwoFactor: boolean("requireAdminTwoFactor")
+    .notNull()
+    .default(false),
   updatedAt: ts("updatedAt").notNull().defaultNow(),
 })
 

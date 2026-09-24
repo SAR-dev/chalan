@@ -11,7 +11,7 @@ import {
   Table2,
   UserRound,
 } from "lucide-react"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { ImageUpload } from "@/components/image-upload"
 import { PageHeader } from "@/components/page-header"
@@ -28,12 +28,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { TwoFactorSettings } from "@/features/account/components/two-factor-settings"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { authClient } from "@/lib/auth-client"
 import {
   DEFAULT_TABLE_ROWS_PER_PAGE,
   MAX_TABLE_ROWS_PER_PAGE,
 } from "@/lib/constants"
+import { isAdminRole } from "@/lib/two-factor"
 import { initials } from "@/lib/utils"
 
 interface Session {
@@ -92,6 +94,19 @@ export function AccountSettings() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [savingPassword, setSavingPassword] = useState(false)
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+  // The require-2FA gate parks unenrolled admins on ?setup=2fa — land them on
+  // the Security tab so the enrollment card is what they see. Read in an
+  // effect to keep the server-rendered markup identical to the first client
+  // render (no useSearchParams Suspense requirement).
+  const [tab, setTab] = useState("profile")
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("setup") === "2fa") {
+      setTab("security")
+    }
+  }, [])
 
   // ── Rows-per-page state ──────────────────────────────────────────────────
   const [rowsPerPage, setRowsPerPage] = useState(
@@ -291,11 +306,13 @@ export function AccountSettings() {
         description="Manage your personal details and keep your account secure."
       />
 
-      <Tabs defaultValue="profile">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="security" data-testid="account-tab-security">
+            Security
+          </TabsTrigger>
           <TabsTrigger value="sessions" onClick={loadSessions}>
             Sessions
           </TabsTrigger>
@@ -518,79 +535,84 @@ export function AccountSettings() {
 
         {/* ── Security ─────────────────────────────────────────────────── */}
         <TabsContent value="security" className="mt-4">
-          <Card className="max-w-lg">
-            <form onSubmit={handlePasswordSubmit} className="contents">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="size-4" />
-                  Password
-                </CardTitle>
-                <CardDescription>
-                  Use at least 8 characters. Changing it signs you out of other
-                  devices.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="current-password">Current password</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    autoComplete="current-password"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="new-password">New password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    autoComplete="new-password"
-                    aria-invalid={passwordTooShort}
-                  />
-                  {passwordTooShort ? (
-                    <p className="text-destructive text-xs">
-                      Must be at least 8 characters.
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="confirm-password">Confirm new password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                    aria-invalid={passwordMismatch}
-                  />
-                  {passwordMismatch ? (
-                    <p className="text-destructive text-xs">
-                      Passwords do not match.
-                    </p>
-                  ) : null}
-                </div>
-              </CardContent>
-              <CardFooter className="justify-end">
-                <Button
-                  type="submit"
-                  disabled={savingPassword || !passwordFormValid}
-                >
-                  {savingPassword ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Updating
-                    </>
-                  ) : (
-                    "Update password"
-                  )}
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
+          <div className="flex flex-col gap-6">
+            <Card className="max-w-lg">
+              <form onSubmit={handlePasswordSubmit} className="contents">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Lock className="size-4" />
+                    Password
+                  </CardTitle>
+                  <CardDescription>
+                    Use at least 8 characters. Changing it signs you out of
+                    other devices.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="current-password">Current password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="new-password">New password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
+                      aria-invalid={passwordTooShort}
+                    />
+                    {passwordTooShort ? (
+                      <p className="text-destructive text-xs">
+                        Must be at least 8 characters.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="confirm-password">
+                      Confirm new password
+                    </Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                      aria-invalid={passwordMismatch}
+                    />
+                    {passwordMismatch ? (
+                      <p className="text-destructive text-xs">
+                        Passwords do not match.
+                      </p>
+                    ) : null}
+                  </div>
+                </CardContent>
+                <CardFooter className="justify-end">
+                  <Button
+                    type="submit"
+                    disabled={savingPassword || !passwordFormValid}
+                  >
+                    {savingPassword ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Updating
+                      </>
+                    ) : (
+                      "Update password"
+                    )}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+            {isAdminRole(currentUser?.role) ? <TwoFactorSettings /> : null}
+          </div>
         </TabsContent>
 
         {/* ── Sessions ─────────────────────────────────────────────────── */}

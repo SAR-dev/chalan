@@ -3,8 +3,10 @@ import {
   BarChart3,
   Bell,
   Bike,
+  CircleHelp,
   FileText,
   LayoutDashboard,
+  LifeBuoy,
   ListChecks,
   type LucideIcon,
   Mail,
@@ -153,6 +155,13 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       icon: Mail,
       group: "System",
     },
+    {
+      href: "/dashboard/support",
+      label: "Support",
+      icon: LifeBuoy,
+      group: "System",
+    },
+    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
     { href: "/dashboard/team", label: "Admins", icon: Users, group: "System" },
     {
       href: "/dashboard/settings",
@@ -230,6 +239,13 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
       icon: Megaphone,
       exact: true,
     },
+    {
+      href: "/merchant/support",
+      label: "Support",
+      icon: LifeBuoy,
+      exact: true,
+    },
+    { href: "/help", label: "Help", icon: CircleHelp },
   ],
 }
 
@@ -280,6 +296,13 @@ export const WAREHOUSE_SIDEBAR: SidebarConfig = {
       exact: true,
     },
     {
+      href: "/warehouse/support",
+      label: "Support",
+      icon: LifeBuoy,
+      exact: true,
+    },
+    { href: "/help", label: "Help", icon: CircleHelp },
+    {
       href: "/warehouse/account",
       label: "Account",
       icon: UserCog,
@@ -311,6 +334,13 @@ export const RIDER_SIDEBAR: SidebarConfig = {
       icon: Megaphone,
       exact: true,
     },
+    {
+      href: "/rider/support",
+      label: "Support",
+      icon: LifeBuoy,
+      exact: true,
+    },
+    { href: "/help", label: "Help", icon: CircleHelp },
     {
       href: "/rider/account",
       label: "Account",

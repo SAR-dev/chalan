@@ -9,6 +9,35 @@ export const auth = {
   loginPassword: "[data-testid='login-password']",
   loginSubmit: "[data-testid='login-submit']",
   registerForm: "[data-testid='register-form']",
+  logout: "[data-testid='logout']",
+  accountSecurityTab: "[data-testid='account-tab-security']",
+}
+
+// ─── Two-factor authentication (H4) ─────────────────────────────────────────
+export const twoFactor = {
+  status: "[data-testid='two-factor-status']",
+  requireToggle: "[data-testid='two-factor-require-toggle']",
+  enableButton: "[data-testid='two-factor-enable']",
+  passwordInput: "[data-testid='two-factor-password-input']",
+  passwordSubmit: "[data-testid='two-factor-password-submit']",
+  passwordCancel: "[data-testid='two-factor-password-cancel']",
+  secret: "[data-testid='two-factor-secret']",
+  secretCopy: "[data-testid='two-factor-secret-copy']",
+  codeInput: "[data-testid='two-factor-code-input']",
+  verifySubmit: "[data-testid='two-factor-verify-submit']",
+  verifyCancel: "[data-testid='two-factor-verify-cancel']",
+  recoveryCodes: "[data-testid='two-factor-recovery-codes']",
+  recoveryCopy: "[data-testid='two-factor-recovery-copy']",
+  recoveryDone: "[data-testid='two-factor-recovery-done']",
+  regenerateButton: "[data-testid='two-factor-regenerate']",
+  disableButton: "[data-testid='two-factor-disable']",
+  disableInput: "[data-testid='two-factor-disable-input']",
+  disableSubmit: "[data-testid='two-factor-disable-submit']",
+  disableCancel: "[data-testid='two-factor-disable-cancel']",
+  loginInput: "[data-testid='two-factor-login-input']",
+  loginSubmit: "[data-testid='two-factor-login-submit']",
+  loginRecoveryLink: "[data-testid='two-factor-login-recovery']",
+  loginBackLink: "[data-testid='two-factor-login-back']",
 }
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
@@ -138,6 +167,11 @@ export const branding = {
   saveButton: "[data-testid='save-branding']",
 }
 
+// ─── Audit logs ──────────────────────────────────────────────────────────────
+export const auditLogs = {
+  diff: "[data-testid='audit-diff']",
+}
+
 // ─── Dialogs ─────────────────────────────────────────────────────────────────
 export const dialog = {
   confirm: "[data-testid='confirm-dialog']",
@@ -157,4 +191,24 @@ export const shared = {
   addButton: "[data-testid='add-button']",
   submitButton: "[data-testid='submit-button']",
   printButton: "[data-testid='print-button']",
+}
+
+// ─── Help center & FAQ ───────────────────────────────────────────────────────
+export const help = {
+  guideLink: (slug: string) => `[data-testid='help-guide-${slug}']`,
+  faqLink: "[data-testid='help-faq-link']",
+}
+
+// ─── Support tickets ─────────────────────────────────────────────────────────
+export const support = {
+  table: "[data-testid='support-tickets']",
+  row: "[data-testid='support-row']",
+  rowByTableId: (tableId: string) => `[data-testid^='row-${tableId}-']`,
+  newButton: "[data-testid='support-new']",
+  subjectInput: "[data-testid='support-subject']",
+  messageInput: "[data-testid='support-message']",
+  submit: "[data-testid='support-submit']",
+  replyOpen: "[data-testid='support-reply-open']",
+  replyInput: "[data-testid='support-reply-input']",
+  replySubmit: "[data-testid='support-reply-submit']",
 }

@@ -9,6 +9,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import {
   balanceTransaction,
@@ -33,8 +34,12 @@ export const PATCH = withErrorHandler(
 
     // Transaction: lock the request row for the guard + write so a concurrent
     // call can't slip in between the "still APPROVED" check and the write.
-    const committed: { row: typeof payoutRequest.$inferSelect | null } = {
+    const committed: {
+      row: typeof payoutRequest.$inferSelect | null
+      before: Record<string, unknown> | null
+    } = {
       row: null,
+      before: null,
     }
     const response = await db.transaction(async (tx) => {
       const [current] = await tx
@@ -42,6 +47,7 @@ export const PATCH = withErrorHandler(
           status: payoutRequest.status,
           amount: payoutRequest.amount,
           merchantId: payoutRequest.merchantId,
+          paidAt: payoutRequest.paidAt,
         })
         .from(payoutRequest)
         .where(eq(payoutRequest.id, id))
@@ -86,16 +92,22 @@ export const PATCH = withErrorHandler(
         })
 
       committed.row = updated
+      committed.before = current
       return NextResponse.json(updated)
     })
 
     if (committed.row) {
+      const diff = diffEntity(committed.before, committed.row, [
+        "status",
+        "paidAt",
+      ])
       await logAudit({
         actor: { userId: me.userId, name: me.name, role: me.role },
         action: "PAYOUT_PAID",
         entityType: "payout_request",
         entityId: committed.row.id,
         description: `Marked payout request ${committed.row.id} as paid`,
+        metadata: diff ? { diff } : null,
       })
     }
 

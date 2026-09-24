@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { logAudit } from "@/lib/audit"
 import { PATCH as approve } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -8,7 +9,7 @@ vi.mock("@/lib/api-auth", () => ({
 }))
 
 vi.mock("@/lib/audit", () => ({
-  logAudit: () => Promise.resolve(),
+  logAudit: vi.fn(() => Promise.resolve()),
 }))
 
 const selectQueue: unknown[][] = []
@@ -55,6 +56,7 @@ beforeEach(() => {
   updateResult.length = 0
   updatePayloads.length = 0
   sessionState.value = null
+  vi.mocked(logAudit).mockClear()
 })
 
 function req(body?: unknown): Request {
@@ -162,5 +164,16 @@ describe("PATCH /api/orders/bulk/approve", () => {
       approvedBy: "Admin Amy",
     })
     expect(typeof updatePayloads[0].approvedAt).toBe("string")
+    expect(logAudit).toHaveBeenCalledTimes(1)
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "ORDER_APPROVE",
+        entityType: "order",
+        entityId: "o1",
+        metadata: {
+          diff: { status: { from: "PENDING", to: "APPROVED" } },
+        },
+      }),
+    )
   })
 })

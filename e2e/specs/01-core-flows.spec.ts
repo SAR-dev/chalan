@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login } from "../helpers"
+import { help } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
 async function skipOnboardingIfNeeded(page: any) {
@@ -169,6 +170,27 @@ test.describe("S22. Delivery Fee Calculator", () => {
     await page.locator("#calc-cod").fill("1000")
     await expect(page.getByText("Delivery fee", { exact: true })).toBeVisible()
     await expect(page.getByText("Merchant receives")).toBeVisible()
+  })
+})
+
+// ─── S23. FAQ & Help Center ──────────────────────────────────────────────────
+test.describe("S23. FAQ & Help Center", () => {
+  test("faq page renders", async ({ page }) => {
+    await page.goto("/faq")
+    await expect(page.getByRole("heading", { name: /faq/i })).toBeVisible()
+  })
+
+  test("help center opens a guide", async ({ page }) => {
+    await page.goto("/help")
+    await expect(
+      page.getByRole("heading", { name: /help center/i }),
+    ).toBeVisible()
+
+    await page.locator(help.guideLink("merchant")).click()
+    await page.waitForURL(/\/help\/merchant/)
+    await expect(
+      page.getByRole("heading", { name: /merchant guide/i }),
+    ).toBeVisible()
   })
 })
 

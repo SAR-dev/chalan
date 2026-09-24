@@ -1,6 +1,13 @@
 "use client"
 
-import { CheckCircle2, Loader2, Lock, MailCheck, Send } from "lucide-react"
+import {
+  CheckCircle2,
+  Loader2,
+  Lock,
+  MailCheck,
+  Send,
+  ShieldCheck,
+} from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { FormEvent, Suspense, useEffect, useState } from "react"
@@ -26,7 +33,7 @@ const BrandIcon = siteConfig.icon
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { login, currentUser, isReady } = useAuth()
+  const { login, verifyTwoFactor, currentUser, isReady } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +44,11 @@ function LoginForm() {
     "idle",
   )
   const [success, setSuccess] = useState<string | null>(null)
+  const [twoFactorStep, setTwoFactorStep] = useState(false)
+  const [twoFactorCode, setTwoFactorCode] = useState("")
+  const [twoFactorRecovery, setTwoFactorRecovery] = useState(false)
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null)
+  const [verifyingTwoFactor, setVerifyingTwoFactor] = useState(false)
 
   useEffect(() => {
     if (isReady && currentUser) {
@@ -63,6 +75,12 @@ function LoginForm() {
       router.replace(homeForRole(result.user.role))
     } else if (result.ok) {
       router.replace("/dashboard")
+    } else if (result.needsTwoFactor) {
+      // Password accepted — Better Auth is waiting for the second factor.
+      setTwoFactorStep(true)
+      setTwoFactorCode("")
+      setTwoFactorRecovery(false)
+      setSubmitting(false)
     } else if (result.needsActivation && result.activationEmail) {
       setNeedsActivation(true)
       setActivationEmail(result.activationEmail)
@@ -70,6 +88,24 @@ function LoginForm() {
     } else {
       setError(result.error ?? "Unable to sign in.")
       setSubmitting(false)
+    }
+  }
+
+  async function handleTwoFactorSubmit(e: FormEvent) {
+    e.preventDefault()
+    setTwoFactorError(null)
+    setVerifyingTwoFactor(true)
+    const result = await verifyTwoFactor(
+      twoFactorCode,
+      twoFactorRecovery ? "backup" : "totp",
+    )
+    if (result.ok && result.user) {
+      router.replace(homeForRole(result.user.role))
+    } else if (result.ok) {
+      router.replace("/dashboard")
+    } else {
+      setTwoFactorError(result.error ?? "Unable to verify the code.")
+      setVerifyingTwoFactor(false)
     }
   }
 
@@ -139,143 +175,238 @@ function LoginForm() {
 
             <Card className="border-border/70 shadow-sm">
               <CardHeader className="flex flex-col gap-1">
-                <CardTitle className="text-2xl">Welcome back</CardTitle>
+                <CardTitle className="text-2xl">
+                  {twoFactorStep ? "Two-factor verification" : "Welcome back"}
+                </CardTitle>
                 <CardDescription>
-                  Sign in to access your workspace.
+                  {twoFactorStep
+                    ? "Enter the code from your authenticator app to finish signing in."
+                    : "Sign in to access your workspace."}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      data-testid="login-email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder={LOGIN_EMAIL_PLACEHOLDER}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      data-testid="login-password"
-                      type="password"
-                      autoComplete="current-password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Link
-                      href="/forgot-password"
-                      className="text-muted-foreground text-xs hover:underline"
-                    >
-                      Forgot your password?
-                    </Link>
-                  </div>
-
-                  {error && !needsActivation ? (
-                    <p
-                      role="alert"
-                      className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm"
-                    >
-                      {error}
-                    </p>
-                  ) : null}
-
-                  {needsActivation ? (
-                    <div className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 rounded-md border px-4 py-3">
-                      <div className="flex items-start gap-2">
-                        <MailCheck className="text-amber-600 dark:text-amber-400 mt-0.5 size-4 shrink-0" />
-                        <div className="flex flex-col gap-1">
-                          <p className="text-amber-800 dark:text-amber-200 text-sm font-medium">
-                            Please verify your email address
-                          </p>
-                          <p className="text-amber-700 dark:text-amber-300 text-xs">
-                            We sent a verification link to{" "}
-                            <span className="font-medium">
-                              {activationEmail}
-                            </span>
-                            . Check your inbox and click the link to activate
-                            your account.
-                          </p>
-                          {resendStatus === "sent" ? (
-                            <p className="text-amber-600 dark:text-amber-400 mt-1 text-xs font-medium">
-                              Verification email sent! Check your inbox.
-                            </p>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleResendActivation}
-                              disabled={resendStatus === "sending"}
-                              className="text-amber-800 dark:text-amber-200 mt-1 inline-flex items-center gap-1 text-xs font-medium hover:underline disabled:opacity-50"
-                            >
-                              {resendStatus === "sending" ? (
-                                <>
-                                  <Loader2 className="size-3 animate-spin" />
-                                  Sending...
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="size-3" />
-                                  Resend activation email
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                {twoFactorStep ? (
+                  <form
+                    onSubmit={handleTwoFactorSubmit}
+                    className="flex flex-col gap-4"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="two-factor-code">
+                        {twoFactorRecovery
+                          ? "Recovery code"
+                          : "Authentication code"}
+                      </Label>
+                      <Input
+                        id="two-factor-code"
+                        data-testid="two-factor-login-input"
+                        type="text"
+                        inputMode={twoFactorRecovery ? "text" : "numeric"}
+                        autoComplete="one-time-code"
+                        placeholder={
+                          twoFactorRecovery ? "xxxxx-xxxxx" : "123456"
+                        }
+                        value={twoFactorCode}
+                        onChange={(e) => setTwoFactorCode(e.target.value)}
+                        required
+                        autoFocus
+                      />
                     </div>
-                  ) : null}
 
-                  {success ? (
-                    <div className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 rounded-md border px-4 py-3">
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="text-green-600 dark:text-green-400 mt-0.5 size-4 shrink-0" />
-                        <p className="text-green-800 dark:text-green-200 text-sm">
-                          {success}
+                    {twoFactorError ? (
+                      <p
+                        role="alert"
+                        className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm"
+                      >
+                        {twoFactorError}
+                      </p>
+                    ) : null}
+
+                    <Button
+                      type="submit"
+                      data-testid="two-factor-login-submit"
+                      className="w-full"
+                      disabled={verifyingTwoFactor}
+                    >
+                      {verifyingTwoFactor ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          Verifying
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="size-4" />
+                          Verify
+                        </>
+                      )}
+                    </Button>
+
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <button
+                        type="button"
+                        data-testid="two-factor-login-recovery"
+                        onClick={() => {
+                          setTwoFactorRecovery((v) => !v)
+                          setTwoFactorCode("")
+                          setTwoFactorError(null)
+                        }}
+                        className="text-muted-foreground hover:underline"
+                      >
+                        {twoFactorRecovery
+                          ? "Use an authenticator code instead"
+                          : "Use a recovery code"}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="two-factor-login-back"
+                        onClick={() => {
+                          setTwoFactorStep(false)
+                          setTwoFactorCode("")
+                          setTwoFactorError(null)
+                        }}
+                        className="text-muted-foreground hover:underline"
+                      >
+                        Back to sign in
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <form
+                      onSubmit={handleSubmit}
+                      className="flex flex-col gap-4"
+                    >
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          data-testid="login-email"
+                          type="email"
+                          autoComplete="email"
+                          placeholder={LOGIN_EMAIL_PLACEHOLDER}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                          id="password"
+                          data-testid="login-password"
+                          type="password"
+                          autoComplete="current-password"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Link
+                          href="/forgot-password"
+                          className="text-muted-foreground text-xs hover:underline"
+                        >
+                          Forgot your password?
+                        </Link>
+                      </div>
+
+                      {error && !needsActivation ? (
+                        <p
+                          role="alert"
+                          className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm"
+                        >
+                          {error}
                         </p>
-                      </div>
-                    </div>
-                  ) : null}
+                      ) : null}
 
-                  <Button
-                    type="submit"
-                    data-testid="login-submit"
-                    className="w-full"
-                    disabled={submitting}
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Signing in
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="size-4" />
-                        Sign in
-                      </>
-                    )}
-                  </Button>
-                </form>
+                      {needsActivation ? (
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 rounded-md border px-4 py-3">
+                          <div className="flex items-start gap-2">
+                            <MailCheck className="text-amber-600 dark:text-amber-400 mt-0.5 size-4 shrink-0" />
+                            <div className="flex flex-col gap-1">
+                              <p className="text-amber-800 dark:text-amber-200 text-sm font-medium">
+                                Please verify your email address
+                              </p>
+                              <p className="text-amber-700 dark:text-amber-300 text-xs">
+                                We sent a verification link to{" "}
+                                <span className="font-medium">
+                                  {activationEmail}
+                                </span>
+                                . Check your inbox and click the link to
+                                activate your account.
+                              </p>
+                              {resendStatus === "sent" ? (
+                                <p className="text-amber-600 dark:text-amber-400 mt-1 text-xs font-medium">
+                                  Verification email sent! Check your inbox.
+                                </p>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleResendActivation}
+                                  disabled={resendStatus === "sending"}
+                                  className="text-amber-800 dark:text-amber-200 mt-1 inline-flex items-center gap-1 text-xs font-medium hover:underline disabled:opacity-50"
+                                >
+                                  {resendStatus === "sending" ? (
+                                    <>
+                                      <Loader2 className="size-3 animate-spin" />
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="size-3" />
+                                      Resend activation email
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
 
-                <p className="text-muted-foreground mt-6 text-center text-sm">
-                  Are you a merchant?{" "}
-                  <Link
-                    href="/register"
-                    className="text-primary font-medium hover:underline"
-                  >
-                    Create an account
-                  </Link>
-                </p>
+                      {success ? (
+                        <div className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 rounded-md border px-4 py-3">
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="text-green-600 dark:text-green-400 mt-0.5 size-4 shrink-0" />
+                            <p className="text-green-800 dark:text-green-200 text-sm">
+                              {success}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <Button
+                        type="submit"
+                        data-testid="login-submit"
+                        className="w-full"
+                        disabled={submitting}
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Signing in
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="size-4" />
+                            Sign in
+                          </>
+                        )}
+                      </Button>
+                    </form>
+
+                    <p className="text-muted-foreground mt-6 text-center text-sm">
+                      Are you a merchant?{" "}
+                      <Link
+                        href="/register"
+                        className="text-primary font-medium hover:underline"
+                      >
+                        Create an account
+                      </Link>
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>

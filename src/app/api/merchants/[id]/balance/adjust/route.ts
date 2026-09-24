@@ -1,8 +1,9 @@
-import { sql } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
 import { balanceAdjustSchema, parseBody } from "@/lib/validation"
@@ -24,7 +25,20 @@ export const POST = withErrorHandler(
     if (parsed.error) return parsed.error
     const { amount, note } = parsed.data
 
-    const [inserted] = await db.transaction(async (tx) => {
+    const {
+      row: inserted,
+      before: beforeBalance,
+      after: afterBalance,
+    } = await db.transaction(async (tx) => {
+      const [before] = await tx
+        .select({
+          balance: merchantBalance.balance,
+          pendingBalance: merchantBalance.pendingBalance,
+        })
+        .from(merchantBalance)
+        .where(eq(merchantBalance.merchantId, merchantId))
+        .limit(1)
+
       const [row] = await tx
         .insert(balanceTransaction)
         .values({
@@ -48,8 +62,22 @@ export const POST = withErrorHandler(
           },
         })
 
-      return [row]
+      const [after] = await tx
+        .select({
+          balance: merchantBalance.balance,
+          pendingBalance: merchantBalance.pendingBalance,
+        })
+        .from(merchantBalance)
+        .where(eq(merchantBalance.merchantId, merchantId))
+        .limit(1)
+
+      return { row, before, after }
     })
+
+    const diff = diffEntity(beforeBalance, afterBalance, [
+      "balance",
+      "pendingBalance",
+    ])
 
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },
@@ -57,6 +85,7 @@ export const POST = withErrorHandler(
       entityType: "balance_transaction",
       entityId: inserted.id,
       description: `Adjusted merchant ${merchantId} balance by ${amount} Tk: ${note.trim()}`,
+      metadata: diff ? { diff } : null,
     })
 
     return NextResponse.json(inserted, { status: 201 })

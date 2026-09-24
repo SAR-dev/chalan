@@ -82,6 +82,11 @@ export const pageContent = {
       description:
         "Configure default pricing, SMTP mail settings, and platform-wide parameters.",
     },
+    support: {
+      title: "Support tickets",
+      description:
+        "In-app support requests from every role on the platform — reply to a ticket to answer it, then close it once it's resolved.",
+    },
   },
   warehouse: {
     riders: {
@@ -118,6 +123,11 @@ export const pageContent = {
       title: "Inbox",
       description: teamDescription,
     },
+    support: {
+      title: "Support",
+      description:
+        "Send the platform team a request about your warehouse or deliveries and follow the reply here.",
+    },
   },
   rider: {
     todo: {
@@ -138,6 +148,11 @@ export const pageContent = {
     announcements: {
       title: "Inbox",
       description: teamDescription,
+    },
+    support: {
+      title: "Support",
+      description:
+        "Send the platform team a request about your deliveries and follow the reply here.",
     },
   },
   merchant: {
@@ -181,6 +196,11 @@ export const pageContent = {
     announcements: {
       title: "Inbox",
       description: "Active platform announcements.",
+    },
+    support: {
+      title: "Support",
+      description:
+        "Send the platform team a request about your account or deliveries and follow the reply here.",
     },
   },
 } as const

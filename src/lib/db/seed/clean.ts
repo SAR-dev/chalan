@@ -11,7 +11,7 @@ export async function cleanDatabase() {
   log("Cleaning existing data…")
 
   await pool.query(
-    `TRUNCATE TABLE "order", "payout_request", "balance_transaction", "merchant_balance", "profile", "verification", "session", "account", "user", "pickup_location", "merchant", "rider", "warehouse", "audit_log", "email_log", "announcement", "zone_pricing", "delivery_city", "delivery_zone" CASCADE`,
+    `TRUNCATE TABLE "order", "payout_request", "balance_transaction", "merchant_balance", "profile", "verification", "session", "account", "user", "pickup_location", "merchant", "rider", "warehouse", "audit_log", "email_log", "announcement", "zone_pricing", "delivery_city", "delivery_zone", "support_ticket" CASCADE`,
   )
 
   log("Clean complete.\n")

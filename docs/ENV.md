@@ -68,6 +68,14 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 ---
 
+## Security
+
+| Variable             | Required | Default   | Description                                                                                                                                                                                                                                                                                        |
+| -------------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADMIN_IP_ALLOWLIST` | No       | disabled  | Comma-separated IPs/CIDRs allowed to reach the admin portal: paths starting with `/dashboard` and `/api/admin` (e.g. `203.0.113.5,10.0.0.0/8,2001:db8::/32`). Exact IPv4/IPv6 and CIDR ranges are supported; `*` allows any IP. Unset or empty disables the check entirely (default — e2e and dev are unaffected). Invalid entries are ignored (boot fails if none are valid). Requests from other IPs get `403` and are logged. Other admin-gated APIs are not covered — they rely on role authz. |
+
+---
+
 ## Storage
 
 | Variable           | Required | Default | Description                       |

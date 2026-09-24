@@ -31,6 +31,8 @@ export const user = pgTable(
     banned: boolean("banned"),
     banReason: text("banReason"),
     banExpires: ts("banExpires"),
+    // Required by the better-auth two-factor plugin (ROADMAP H4)
+    twoFactorEnabled: boolean("twoFactorEnabled").default(false),
   },
   (t) => [
     index("user_name_trgm_idx").using("gin", sql`${t.name} gin_trgm_ops`),
@@ -48,6 +50,8 @@ export const session = pgTable(
     updatedAt: ts("updatedAt").notNull().defaultNow(),
     ipAddress: text("ipAddress"),
     userAgent: text("userAgent"),
+    // Set when an admin impersonates a user (required by better-auth >=1.7)
+    impersonatedBy: text("impersonatedBy"),
     userId: text("userId")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -94,6 +98,34 @@ export const verification = pgTable(
   (t) => [
     // Better Auth looks up verification records by identifier (email address)
     index("verification_identifier_idx").on(t.identifier),
+  ],
+)
+
+// =============================================================================
+// Two-factor authentication (better-auth twoFactor plugin — ROADMAP H4)
+//
+// One row per user while TOTP is enrolled. `secret` holds the plugin's
+// symmetric-encrypted TOTP secret and `backupCodes` the encrypted recovery
+// codes — neither is ever returned to the client (plugin marks them
+// `returned: false`).
+// =============================================================================
+
+export const twoFactor = pgTable(
+  "twoFactor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backupCodes").notNull(),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").default(true),
+    failedVerificationCount: integer("failedVerificationCount").default(0),
+    lockedUntil: ts("lockedUntil"),
+  },
+  (t) => [
+    index("two_factor_user_id_idx").on(t.userId),
+    index("two_factor_secret_idx").on(t.secret),
   ],
 )
 

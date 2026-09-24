@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
 import { rateLimitByIp } from "@/lib/rate-limit"
@@ -30,8 +31,12 @@ export const PATCH = withErrorHandler(
     const limited = await rateLimitByIp(req, "balance-reject", 20, 60)
     if (limited) return limited
 
-    const committed: { row: typeof balanceTransaction.$inferSelect | null } = {
+    const committed: {
+      row: typeof balanceTransaction.$inferSelect | null
+      before: Record<string, unknown> | null
+    } = {
       row: null,
+      before: null,
     }
 
     const response = await db.transaction(async (tx) => {
@@ -42,6 +47,9 @@ export const PATCH = withErrorHandler(
           type: balanceTransaction.type,
           amount: balanceTransaction.amount,
           status: balanceTransaction.status,
+          reviewedBy: balanceTransaction.reviewedBy,
+          reviewedAt: balanceTransaction.reviewedAt,
+          rejectReason: balanceTransaction.rejectReason,
         })
         .from(balanceTransaction)
         .where(
@@ -85,16 +93,25 @@ export const PATCH = withErrorHandler(
         })
 
       committed.row = updated
+      committed.before = current
       return NextResponse.json(updated)
     })
 
     if (committed.row) {
+      const diff = diffEntity(committed.before, committed.row, [
+        "status",
+        "type",
+        "reviewedBy",
+        "reviewedAt",
+        "rejectReason",
+      ])
       await logAudit({
         actor: { userId: me.userId, name: me.name, role: me.role },
         action: "BALANCE_PAYMENT_REJECTED",
         entityType: "balance_transaction",
         entityId: committed.row.id,
         description: `Rejected payment from merchant ${merchantId}: ${reason.trim()}`,
+        metadata: diff ? { diff } : null,
       })
     }
 

@@ -10,6 +10,7 @@ import type {
   RiderStatus,
   RiderTaskType,
   Role,
+  SupportStatus,
 } from "@/lib/types"
 
 // Re-export value arrays from the DB schema (single source of truth)
@@ -24,6 +25,7 @@ export {
   profileRoles as PROFILE_ROLES,
   riderStatuses as RIDER_STATUSES,
   riderTaskTypes as RIDER_TASK_TYPES,
+  supportStatuses as SUPPORT_STATUSES,
 } from "@/lib/db/schema"
 
 export const BRAND_NAME = siteConfig.name
@@ -200,4 +202,16 @@ export const BALANCE_TX_STATUS_TONES: Record<BalanceTxStatus, BadgeTone> = {
   SETTLED: "success",
   PENDING: "pending",
   REJECTED: "danger",
+}
+
+export const SUPPORT_STATUS_LABELS: Record<SupportStatus, string> = {
+  OPEN: "Open",
+  ANSWERED: "Answered",
+  CLOSED: "Closed",
+}
+
+export const SUPPORT_STATUS_TONES: Record<SupportStatus, BadgeTone> = {
+  OPEN: "pending",
+  ANSWERED: "info",
+  CLOSED: "neutral",
 }

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header"
 import { RoleBadge } from "@/components/role-badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { pageContent } from "@/config/content"
+import { AuditDiffCell } from "@/features/audit-logs/components/audit-diff"
 import { useAuditLogs } from "@/features/audit-logs/hooks/use-audit-logs"
 import type { AuditLog } from "@/lib/types"
 
@@ -92,6 +93,11 @@ export function AuditLogsClient({
       id: "description",
       header: "Description",
       cell: (l) => <span className="text-sm">{l.description}</span>,
+    },
+    {
+      id: "changes",
+      header: "Changes",
+      cell: (l) => <AuditDiffCell metadata={l.metadata} />,
     },
   ]
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -17,6 +18,14 @@ export const PATCH = withErrorHandler(
 
     const { id } = await params
 
+    const [current] = await db
+      .select({ status: merchant.status })
+      .from(merchant)
+      .where(eq(merchant.id, id))
+      .limit(1)
+
+    if (!current) return notFound()
+
     const [updated] = await db
       .update(merchant)
       .set({ status: "ACTIVE" })
@@ -25,12 +34,15 @@ export const PATCH = withErrorHandler(
 
     if (!updated) return notFound()
 
+    const diff = diffEntity(current, updated, ["status"])
+
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: "MERCHANT_REACTIVATED",
       entityType: "merchant",
       entityId: updated.id,
       description: `Reactivated merchant ${updated.businessName}`,
+      metadata: diff ? { diff } : null,
     })
 
     return NextResponse.json(updated)

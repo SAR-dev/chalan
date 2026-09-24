@@ -10,6 +10,10 @@
 //      page request, injected into the Content-Security-Policy response header
 //      AND forwarded to the server via the request headers so Next.js applies
 //      it to the inline scripts it renders (see next.config headers).
+//   4. Admin IP allowlist — when ADMIN_IP_ALLOWLIST is set, requests to the
+//      admin portal (paths starting /dashboard and /api/admin) from IPs
+//      outside the list get a 403. Defense-in-depth for the portal; other
+//      admin-gated APIs rely on role authz. Unset/empty = disabled.
 //
 // Why a nonce instead of a static CSP? Next.js inlines its hydration scripts,
 // which must be signed by a nonce. A static `Content-Security-Policy` in
@@ -18,6 +22,7 @@
 
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { ipAllowed, parseAllowlist } from "@/lib/ip-allowlist"
 
 // ---------------------------------------------------------------------------
 // CSP (Content-Security-Policy)
@@ -103,6 +108,27 @@ function roleGuard(pathname: string, req: NextRequest): NextResponse | null {
 }
 
 // ---------------------------------------------------------------------------
+// Admin IP allowlist — defense-in-depth for the admin portal. Scope: paths
+// starting /dashboard and /api/admin; other admin-gated APIs rely on role
+// authz instead. Disabled (null) when ADMIN_IP_ALLOWLIST is unset or empty.
+// ---------------------------------------------------------------------------
+
+const ADMIN_IP_ALLOWLIST = parseAllowlist(process.env.ADMIN_IP_ALLOWLIST)
+
+function isAdminPath(pathname: string): boolean {
+  return pathname.startsWith("/dashboard") || pathname.startsWith("/api/admin")
+}
+
+function proxyClientIp(req: NextRequest): string | null {
+  const forwarded = req.headers.get("x-forwarded-for")
+  const first = forwarded?.split(",")[0]?.trim()
+  if (first) return first
+  const real = req.headers.get("x-real-ip")?.trim()
+  if (real) return real
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Simple in-process sliding-window rate limiter.
 // Sufficient for single-instance / single-region deployments.
 // Replace with @upstash/ratelimit for multi-instance setups.
@@ -145,11 +171,27 @@ function uploadRateLimit(ip: string): boolean {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // 1. Role-based access guard
+  // 1. Admin IP allowlist — reject non-listed IPs before anything else.
+  //    /api/admin only enters the matcher for this check, so pass allowed
+  //    requests through without the page-route CSP nonce.
+  if (isAdminPath(pathname)) {
+    if (ADMIN_IP_ALLOWLIST) {
+      const ip = proxyClientIp(req)
+      if (!ip || !ipAllowed(ip, ADMIN_IP_ALLOWLIST)) {
+        console.warn(
+          `[proxy] Admin IP allowlist denied ${ip ?? "unknown"} for ${pathname}`,
+        )
+        return new Response("Forbidden", { status: 403 })
+      }
+    }
+    if (pathname.startsWith("/api/admin")) return NextResponse.next()
+  }
+
+  // 2. Role-based access guard
   const guard = roleGuard(pathname, req)
   if (guard) return guard
 
-  // 2. Upload rate limiting
+  // 3. Upload rate limiting
   if (req.method === "POST" && pathname === "/api/uploads") {
     const forwarded = req.headers.get("x-forwarded-for")
     const ip = forwarded?.split(",")[0]?.trim()
@@ -163,7 +205,7 @@ export function proxy(req: NextRequest) {
     }
   }
 
-  // 3. Per-request CSP nonce (page routes only — enforced by the matcher).
+  // 4. Per-request CSP nonce (page routes only — enforced by the matcher).
   const nonce = createNonce()
   const csp = buildCsp(nonce)
 
@@ -183,6 +225,8 @@ export const config = {
    * Every HTML page route needs the nonce'd CSP. API routes, static assets,
    * _next, and uploads are handled specially:
    *   - /api/uploads      → rate-limited above (needs the proxy to run).
+   *   - /api/admin        → IP-allowlisted above, then passed through
+   *                          without a CSP nonce (API response).
    *   - everything else   → matches the negative-lookahead, so page routes
    *                          (dashboard/merchant/rider/warehouse, login,
    *                          register, track, landing, static files) all get
@@ -191,5 +235,6 @@ export const config = {
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
     "/api/uploads",
+    "/api/admin(.*)",
   ],
 }

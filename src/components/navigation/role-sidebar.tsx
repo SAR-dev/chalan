@@ -130,6 +130,7 @@ export function RoleSidebar({
           variant="ghost"
           size="sm"
           onClick={logout}
+          data-testid="logout"
           className="mt-0.5 w-full justify-start gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
         >
           <LogOut className="size-4" />

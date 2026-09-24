@@ -11,6 +11,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 // Imports must come after the vi.mock calls (which are hoisted regardless).
+import { logAudit } from "@/lib/audit"
 import { PATCH as approve } from "./approve/route"
 import { PATCH as cancel } from "./cancel/route"
 import { PATCH as delivered } from "./delivered/route"
@@ -93,7 +94,7 @@ vi.mock("@/lib/api-auth", () => ({
 // logAudit calls db.insert() which the db mock above does not stub — silence
 // it so a successful transition does not throw after the write commits.
 vi.mock("@/lib/audit", () => ({
-  logAudit: () => Promise.resolve(),
+  logAudit: vi.fn(() => Promise.resolve()),
 }))
 
 type Handler = (
@@ -166,6 +167,7 @@ beforeEach(() => {
   dbState.updateResult = []
   dbState.updatePayloads = []
   sessionState.value = null
+  vi.mocked(logAudit).mockClear()
 })
 
 // ---------------------------------------------------------------------------
@@ -225,6 +227,17 @@ describe("PATCH /orders/:id/approve", () => {
       approvedBy: "Admin Amy",
     })
     expect(typeof payload?.approvedAt).toBe("string")
+    expect(logAudit).toHaveBeenCalledTimes(1)
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "ORDER_APPROVE",
+        entityType: "order",
+        entityId: ORDER_ID,
+        metadata: {
+          diff: { status: { from: "PENDING", to: "APPROVED" } },
+        },
+      }),
+    )
   })
 
   it("allows SUPER_ADMIN too", async () => {
@@ -707,11 +720,27 @@ describe("PATCH /orders/:id/settle-cod", () => {
         }),
       ],
     ]
-    dbState.updateResult = [makeOrder({ status: "DELIVERED" })]
+    dbState.updateResult = [
+      makeOrder({
+        status: "DELIVERED",
+        warehouseId: "wh_1",
+        codSettledAt: "2025-01-02T00:00:00Z",
+      }),
+    ]
     const { status, payload } = await call(settleCod)
     expect(status).toBe(200)
     expect(payload).toMatchObject({ codSettledBy: "WH Walt" })
     expect(typeof payload?.codSettledAt).toBe("string")
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "ORDER_SETTLE_COD",
+        metadata: {
+          diff: {
+            codSettledAt: { from: null, to: "2025-01-02T00:00:00Z" },
+          },
+        },
+      }),
+    )
   })
 })
 
@@ -865,12 +894,25 @@ describe("PATCH /orders/:id/cancel", () => {
   it("stores trimmed reason when provided", async () => {
     sessionState.value = admin
     dbState.selectQueue = [[makeOrder({ status: "PENDING" })]]
-    dbState.updateResult = [makeOrder({ status: "CANCELLED" })]
+    dbState.updateResult = [
+      makeOrder({ status: "CANCELLED", cancelReason: "duplicate order" }),
+    ]
     const { status, payload } = await call(cancel, {
       reason: "  duplicate order  ",
     })
     expect(status).toBe(200)
     expect(payload).toMatchObject({ cancelReason: "duplicate order" })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "ORDER_CANCEL",
+        metadata: {
+          diff: {
+            status: { from: "PENDING", to: "CANCELLED" },
+            cancelReason: { from: null, to: "duplicate order" },
+          },
+        },
+      }),
+    )
   })
 
   it("stores null cancelReason when reason is omitted", async () => {

@@ -22,6 +22,7 @@ vi.mock("better-auth", () => ({
 
 vi.mock("better-auth/plugins", () => ({
   admin: vi.fn(() => ({})),
+  twoFactor: vi.fn(() => ({})),
 }))
 
 afterEach(() => {

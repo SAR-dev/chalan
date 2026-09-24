@@ -1,7 +1,7 @@
 "use client"
 
 import { Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { DataErrorBanner } from "@/components/data-error-banner"
 import { MobileHeader } from "@/components/navigation/mobile-header"
@@ -9,6 +9,7 @@ import { Sidebar } from "@/components/navigation/sidebar"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
 import { dashboardSidebarForRole } from "@/lib/nav-config"
+import { twoFactorEnforcementPath } from "@/lib/two-factor"
 
 // Dashboard (Super Admin / Admin) monitors all resources.
 const DASHBOARD_KEYS = [
@@ -25,7 +26,19 @@ const DASHBOARD_KEYS = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
+
+  // ROADMAP H4 — while "require 2FA for admins" is on, admins without an
+  // enrolment are parked on their account page until they set one up.
+  const twoFactorSetupPath = currentUser
+    ? twoFactorEnforcementPath({
+        role: currentUser.role,
+        twoFactorEnabled: currentUser.twoFactorEnabled,
+        twoFactorRequired: currentUser.twoFactorRequired,
+        pathname,
+      })
+    : null
 
   useEffect(() => {
     if (!isReady) return
@@ -33,10 +46,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       router.replace("/login")
     } else if (currentUser.role !== "SUPER_ADMIN") {
       router.replace(homeForRole(currentUser.role))
+    } else if (twoFactorSetupPath) {
+      router.replace(twoFactorSetupPath)
     }
-  }, [isReady, currentUser, router])
+  }, [isReady, currentUser, router, twoFactorSetupPath])
 
-  if (!isReady || !currentUser || currentUser.role !== "SUPER_ADMIN") {
+  if (
+    !isReady ||
+    !currentUser ||
+    currentUser.role !== "SUPER_ADMIN" ||
+    twoFactorSetupPath
+  ) {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
         <Loader2 className="text-muted-foreground size-6 animate-spin" />

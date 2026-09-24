@@ -62,3 +62,7 @@ export const orderStatuses = [
 ] as const
 
 export const emailLogStatuses = ["SENT", "FAILED"] as const
+
+// Support ticket lifecycle: OPEN (submitted) → ANSWERED (admin replied) →
+// CLOSED (either party closed it). Drizzle-only enum hint.
+export const supportStatuses = ["OPEN", "ANSWERED", "CLOSED"] as const

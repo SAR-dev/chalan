@@ -70,6 +70,30 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Advisory gate (H1): blocks on any high/critical vulnerability in the
+      # dependency tree. Moderate/low findings are printed but do not block.
+      # Fixes: bump the package or add an override in pnpm-workspace.yaml.
+      - name: Audit dependencies (fail on high/critical)
+        run: pnpm audit --audit-level=high
+      # Blocks PRs that introduce already-known-vulnerable dependency versions.
+      # continue-on-error: requires GitHub Advanced Security on private repos —
+      # advisory-only until that's confirmed enabled (the audit step above is
+      # the blocking gate either way).
+      - name: Dependency review (PRs)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/dependency-review-action@v4
+
   e2e:
     runs-on: ubuntu-latest
     services:

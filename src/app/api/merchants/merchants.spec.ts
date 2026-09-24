@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { logAudit } from "@/lib/audit"
 import { SEED_IMAGE_PLACEHOLDER } from "@/lib/db/seed/seed-content"
 import { PATCH as approveMerchant } from "./[id]/approve/route"
 import { POST as adjustBalance } from "./[id]/balance/adjust/route"
@@ -23,7 +24,7 @@ vi.mock("@/lib/api-auth", () => ({
 }))
 
 vi.mock("@/lib/audit", () => ({
-  logAudit: () => Promise.resolve(),
+  logAudit: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -112,6 +113,7 @@ beforeEach(() => {
   insertResult.length = 0
   sessionState.value = null
   rateLimited = false
+  vi.mocked(logAudit).mockClear()
 })
 
 function req(method: string, url?: string, body?: unknown): Request {
@@ -387,11 +389,29 @@ describe("PATCH /api/merchants/:id/approve", () => {
       email: "biz@test.com",
       ownerName: "Owner",
       status: "ACTIVE",
+      approvedBy: "Admin Amy",
+      approvedAt: "2025-01-02T00:00:00Z",
     })
     const res = await approveMerchant(req("PATCH"), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "ACTIVE" })
+    expect(logAudit).toHaveBeenCalledTimes(1)
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "MERCHANT_APPROVED",
+        metadata: {
+          diff: {
+            status: { from: "PENDING", to: "ACTIVE" },
+            approvedBy: { from: null, to: "Admin Amy" },
+            approvedAt: {
+              from: null,
+              to: "2025-01-02T00:00:00Z",
+            },
+          },
+        },
+      }),
+    )
   })
 })
 
@@ -412,15 +432,25 @@ describe("PATCH /api/merchants/:id/suspend", () => {
     updateResult.length = 0
     const res = await suspendMerchant(req("PATCH"), ctx())
     expect(res.status).toBe(404)
+    expect(logAudit).not.toHaveBeenCalled()
   })
 
   it("suspends merchant", async () => {
     sessionState.value = admin
+    selectQueue.push([{ status: "ACTIVE" }])
     updateResult.push({ id: "m_1", businessName: "Biz", status: "SUSPENDED" })
     const res = await suspendMerchant(req("PATCH"), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "SUSPENDED" })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "MERCHANT_SUSPENDED",
+        metadata: {
+          diff: { status: { from: "ACTIVE", to: "SUSPENDED" } },
+        },
+      }),
+    )
   })
 })
 
@@ -438,11 +468,20 @@ describe("PATCH /api/merchants/:id/reactivate", () => {
 
   it("reactivates merchant", async () => {
     sessionState.value = admin
+    selectQueue.push([{ status: "SUSPENDED" }])
     updateResult.push({ id: "m_1", businessName: "Biz", status: "ACTIVE" })
     const res = await reactivateMerchant(req("PATCH"), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "ACTIVE" })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "MERCHANT_REACTIVATED",
+        metadata: {
+          diff: { status: { from: "SUSPENDED", to: "ACTIVE" } },
+        },
+      }),
+    )
   })
 })
 
@@ -473,7 +512,17 @@ describe("PATCH /api/merchants/:id/pricing", () => {
 
   it("updates pricing", async () => {
     sessionState.value = superAdmin
-    updateResult.push({ id: "m_1", businessName: "Biz", baseRate: 60 })
+    selectQueue.push([
+      { baseRate: 50, extraRatePerKg: 10, freeWeightKg: 1, maxWeightKg: 3 },
+    ])
+    updateResult.push({
+      id: "m_1",
+      businessName: "Biz",
+      baseRate: 60,
+      extraRatePerKg: 10,
+      freeWeightKg: 1,
+      maxWeightKg: 3,
+    })
     const res = await setMerchantPricing(
       req("PATCH", undefined, validBody),
       ctx(),
@@ -481,6 +530,14 @@ describe("PATCH /api/merchants/:id/pricing", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toBeDefined()
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "MERCHANT_PRICING_UPDATED",
+        metadata: {
+          diff: { baseRate: { from: 50, to: 60 } },
+        },
+      }),
+    )
   })
 })
 
@@ -532,6 +589,10 @@ describe("POST /api/merchants/:id/balance/adjust", () => {
 
   it("adjusts balance", async () => {
     sessionState.value = superAdmin
+    selectQueue.push(
+      [{ balance: 500, pendingBalance: 0 }],
+      [{ balance: 600, pendingBalance: 0 }],
+    )
     insertResult.push({ id: "tx_new", amount: 100 })
     const res = await adjustBalance(
       req("POST", undefined, { amount: 100, note: "Credit" }),
@@ -540,6 +601,14 @@ describe("POST /api/merchants/:id/balance/adjust", () => {
     const json = await res.json()
     expect(res.status).toBe(201)
     expect(json).toMatchObject({ id: "tx_new" })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "BALANCE_ADJUSTED",
+        metadata: {
+          diff: { balance: { from: 500, to: 600 } },
+        },
+      }),
+    )
   })
 })
 
@@ -593,15 +662,34 @@ describe("PATCH /api/merchants/:id/balance/payment/:txId/confirm", () => {
         type: "PAYMENT_PENDING",
         status: "PENDING",
         amount: -500,
+        reviewedBy: null,
+        reviewedAt: null,
+        rejectReason: null,
       },
     ])
     updateResult.push({
       id: "tx_1",
       status: "SETTLED",
       type: "PAYMENT_CONFIRMED",
+      amount: -500,
+      reviewedBy: "Admin Amy",
+      reviewedAt: "2025-01-02T00:00:00Z",
     })
     const res = await confirmPayment(req("PATCH"), ctxBalanceTx())
     expect(res.status).toBe(200)
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "BALANCE_PAYMENT_CONFIRMED",
+        metadata: {
+          diff: {
+            status: { from: "PENDING", to: "SETTLED" },
+            type: { from: "PAYMENT_PENDING", to: "PAYMENT_CONFIRMED" },
+            reviewedBy: { from: null, to: "Admin Amy" },
+            reviewedAt: { from: null, to: "2025-01-02T00:00:00Z" },
+          },
+        },
+      }),
+    )
   })
 })
 
@@ -632,14 +720,38 @@ describe("PATCH /api/merchants/:id/balance/payment/:txId/reject", () => {
         type: "PAYMENT_PENDING",
         status: "PENDING",
         amount: -500,
+        reviewedBy: null,
+        reviewedAt: null,
+        rejectReason: null,
       },
     ])
-    updateResult.push({ id: "tx_1", status: "REJECTED" })
+    updateResult.push({
+      id: "tx_1",
+      status: "REJECTED",
+      type: "PAYMENT_PENDING",
+      amount: -500,
+      reviewedBy: "Admin Amy",
+      reviewedAt: "2025-01-02T00:00:00Z",
+      rejectReason: "Invalid details",
+    })
     const res = await rejectPayment(
       req("PATCH", undefined, { reason: "Invalid details" }),
       ctxBalanceTx(),
     )
     expect(res.status).toBe(200)
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "BALANCE_PAYMENT_REJECTED",
+        metadata: {
+          diff: {
+            status: { from: "PENDING", to: "REJECTED" },
+            reviewedBy: { from: null, to: "Admin Amy" },
+            reviewedAt: { from: null, to: "2025-01-02T00:00:00Z" },
+            rejectReason: { from: null, to: "Invalid details" },
+          },
+        },
+      }),
+    )
   })
 })
 
