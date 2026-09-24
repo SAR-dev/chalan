@@ -3,8 +3,8 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
-import { deliveryCity, order } from "@/lib/db/schema"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
+import { deliveryCity, order } from "@/lib/db/schema"
 import { paginateResponse, parsePagination } from "@/lib/pagination"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -13,9 +13,7 @@ const listColumns = {
   deliveredAt: order.deliveredAt,
 }
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -51,7 +49,8 @@ req: Request
   ]
   const from = url.searchParams.get("from")
   const to = url.searchParams.get("to")
-  if (from) conditions.push(gte(order.deliveredAt, new Date(from).toISOString()))
+  if (from)
+    conditions.push(gte(order.deliveredAt, new Date(from).toISOString()))
   if (to) {
     const end = new Date(to)
     end.setHours(23, 59, 59, 999)

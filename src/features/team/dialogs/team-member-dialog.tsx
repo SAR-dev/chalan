@@ -26,7 +26,10 @@ interface TeamMemberDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onToggleActive: (user: TeamMember) => Promise<void>
-  onUpdateWarehouse: (user: TeamMember, warehouseId: string | null) => Promise<void>
+  onUpdateWarehouse: (
+    user: TeamMember,
+    warehouseId: string | null,
+  ) => Promise<void>
 }
 
 export function TeamMemberDialog({

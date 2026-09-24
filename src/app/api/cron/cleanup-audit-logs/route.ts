@@ -22,9 +22,7 @@ import { db } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   if (!isAuthorizedCron(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -49,4 +47,3 @@ req: Request
   console.log("[cron/cleanup-audit-logs]", result)
   return NextResponse.json(result)
 })
-

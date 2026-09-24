@@ -46,74 +46,68 @@ async function loadOwned(id: string) {
 
 // Merchant updates one of their pickup locations (pickup location name, address, map
 // link).
-export const PATCH = withErrorHandler(async (
+export const PATCH = withErrorHandler(
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const { id } = await params
+    const owned = await loadOwned(id)
+    if (owned.error) return owned.error
 
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const parsed = await parseBody(req, pickupLocationSchema)
+    if (parsed.error) return parsed.error
+    const { label, address, cityId, mapLink } = parsed.data
 
-) => {
-  const { id } = await params
-  const owned = await loadOwned(id)
-  if (owned.error) return owned.error
+    // Validate the city exists and is active.
+    const [city] = await db
+      .select({ id: deliveryCity.id, isActive: deliveryCity.isActive })
+      .from(deliveryCity)
+      .where(eq(deliveryCity.id, cityId))
+      .limit(1)
+    if (!city) {
+      return badRequest("The selected city does not exist.")
+    }
+    if (!city.isActive) {
+      return badRequest(
+        "The selected city is no longer active. Contact support.",
+      )
+    }
 
-  const parsed = await parseBody(req, pickupLocationSchema)
-  if (parsed.error) return parsed.error
-  const { label, address, cityId, mapLink } = parsed.data
+    const [updated] = await db
+      .update(pickupLocation)
+      .set({
+        label: label.trim(),
+        address: address.trim(),
+        cityId,
+        mapLink: mapLink?.trim() ? mapLink.trim() : null,
+      })
+      .where(eq(pickupLocation.id, id))
+      .returning()
 
-  // Validate the city exists and is active.
-  const [city] = await db
-    .select({ id: deliveryCity.id, isActive: deliveryCity.isActive })
-    .from(deliveryCity)
-    .where(eq(deliveryCity.id, cityId))
-    .limit(1)
-  if (!city) {
-    return badRequest("The selected city does not exist.")
-  }
-  if (!city.isActive) {
-    return badRequest("The selected city is no longer active. Contact support.")
-  }
-
-  const [updated] = await db
-    .update(pickupLocation)
-    .set({
-      label: label.trim(),
-      address: address.trim(),
-      cityId,
-      mapLink: mapLink?.trim() ? mapLink.trim() : null,
-    })
-    .where(eq(pickupLocation.id, id))
-    .returning()
-
-  return NextResponse.json(updated)
-})
-
+    return NextResponse.json(updated)
+  },
+)
 
 // Merchant removes one of their pickup locations. Blocked if any order still
 // references it (the order.pickupLocationId FK has no cascade), so the
 // merchant keeps an accurate audit trail.
-export const DELETE = withErrorHandler(async (
+export const DELETE = withErrorHandler(
+  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const { id } = await params
+    const owned = await loadOwned(id)
+    if (owned.error) return owned.error
 
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const [referencing] = await db
+      .select({ id: order.id })
+      .from(order)
+      .where(eq(order.pickupLocationId, id))
+      .limit(1)
 
-) => {
-  const { id } = await params
-  const owned = await loadOwned(id)
-  if (owned.error) return owned.error
+    if (referencing) {
+      return conflict(
+        "This pickup location has orders linked to it and cannot be removed. You can edit its details instead.",
+      )
+    }
 
-  const [referencing] = await db
-    .select({ id: order.id })
-    .from(order)
-    .where(eq(order.pickupLocationId, id))
-    .limit(1)
-
-  if (referencing) {
-    return conflict(
-      "This pickup location has orders linked to it and cannot be removed. You can edit its details instead.",
-    )
-  }
-
-  await db.delete(pickupLocation).where(eq(pickupLocation.id, id))
-  return NextResponse.json({ ok: true })
-})
-
+    await db.delete(pickupLocation).where(eq(pickupLocation.id, id))
+    return NextResponse.json({ ok: true })
+  },
+)

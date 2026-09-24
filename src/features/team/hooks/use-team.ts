@@ -50,19 +50,23 @@ export function useTeam({
     error,
     isLoading,
     mutate,
-  } = useSWR<PaginatedResponse<TeamMember>>(currentUser ? url : null, jsonFetcher, {
-    ...swrOptions,
-    ...(isDefaultQuery && initialData
-      ? {
-          fallbackData: {
-            data: initialData,
-            total: initialTotal ?? initialData.length,
-            limit: filters.limit,
-            offset: 0,
-          },
-        }
-      : {}),
-  })
+  } = useSWR<PaginatedResponse<TeamMember>>(
+    currentUser ? url : null,
+    jsonFetcher,
+    {
+      ...swrOptions,
+      ...(isDefaultQuery && initialData
+        ? {
+            fallbackData: {
+              data: initialData,
+              total: initialTotal ?? initialData.length,
+              limit: filters.limit,
+              offset: 0,
+            },
+          }
+        : {}),
+    },
+  )
 
   const team = response?.data ?? initialData ?? []
   const total = response?.total ?? initialTotal ?? 0

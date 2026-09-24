@@ -15,9 +15,7 @@ import { order } from "@/lib/db/schema"
  * three can never drift apart (which previously 404'd the details dialog for
  * APPROVED/unassigned orders visible in the list).
  */
-export function buildWarehouseOrderScope(
-  warehouseId: string,
-): SQL | undefined {
+export function buildWarehouseOrderScope(warehouseId: string): SQL | undefined {
   return or(
     eq(order.warehouseId, warehouseId),
     and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),

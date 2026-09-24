@@ -27,6 +27,8 @@ export function isAuthorizedCron(req: Request): boolean {
     return false
   }
   const auth = req.headers.get("authorization")
-  const provided = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length) : ""
+  const provided = auth?.startsWith("Bearer ")
+    ? auth.slice("Bearer ".length)
+    : ""
   return safeEqual(secret, provided)
 }

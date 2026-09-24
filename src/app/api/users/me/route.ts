@@ -42,9 +42,7 @@ function serializeUser(
   }
 }
 
-export const GET = withErrorHandler(async (
-
-) => {
+export const GET = withErrorHandler(async () => {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) {
     return unauthorized()
@@ -86,12 +84,9 @@ export const GET = withErrorHandler(async (
   )
 })
 
-
 // Update the signed-in user's own profile: display name, avatar (both on the
 // `user` row), and/or table rows-per-page preference (on `profile`).
-export const PATCH = withErrorHandler(async (
-req: Request
-) => {
+export const PATCH = withErrorHandler(async (req: Request) => {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) {
     return unauthorized()
@@ -179,4 +174,3 @@ req: Request
     ),
   )
 })
-

@@ -9,52 +9,48 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Authenticated endpoint — only the owning merchant can update their note.
 // Locked once the order reaches a terminal status (DELIVERED / RETURNED / CANCELLED).
-export const PATCH = withErrorHandler(async (
+export const PATCH = withErrorHandler(
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
 
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const { id } = await params
 
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
+    const parsed = await parseBody(req, orderMerchantNoteSchema)
+    if (parsed.error) return parsed.error
 
-  const { id } = await params
+    const [orderRow] = await db
+      .select({
+        id: order.id,
+        status: order.status,
+        merchantId: order.merchantId,
+      })
+      .from(order)
+      .where(eq(order.id, id))
+      .limit(1)
 
-  const parsed = await parseBody(req, orderMerchantNoteSchema)
-  if (parsed.error) return parsed.error
+    if (!orderRow) {
+      return notFound("Order not found")
+    }
 
-  const [orderRow] = await db
-    .select({
-      id: order.id,
-      status: order.status,
-      merchantId: order.merchantId,
-    })
-    .from(order)
-    .where(eq(order.id, id))
-    .limit(1)
+    if (me.role !== "SUPER_ADMIN" && orderRow.merchantId !== me.merchantId) {
+      return forbidden("You can only update notes on your own orders.")
+    }
 
-  if (!orderRow) {
-    return notFound("Order not found")
-  }
+    if (
+      orderRow.status === "DELIVERED" ||
+      orderRow.status === "RETURNED" ||
+      orderRow.status === "CANCELLED"
+    ) {
+      return conflict("Cannot update a note on a completed order.")
+    }
 
-  if (me.role !== "SUPER_ADMIN" && orderRow.merchantId !== me.merchantId) {
-    return forbidden("You can only update notes on your own orders.")
-  }
+    const [updated] = await db
+      .update(order)
+      .set({ merchantNote: parsed.data.merchantNote.trim() })
+      .where(eq(order.id, id))
+      .returning()
 
-  if (
-    orderRow.status === "DELIVERED" ||
-    orderRow.status === "RETURNED" ||
-    orderRow.status === "CANCELLED"
-  ) {
-    return conflict("Cannot update a note on a completed order.")
-  }
-
-  const [updated] = await db
-    .update(order)
-    .set({ merchantNote: parsed.data.merchantNote.trim() })
-    .where(eq(order.id, id))
-    .returning()
-
-  return NextResponse.json(updated)
-})
-
+    return NextResponse.json(updated)
+  },
+)

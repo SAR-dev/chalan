@@ -9,9 +9,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // Public endpoint — no session required. The verification link from the email
 // hits this endpoint, which verifies the token and marks the merchant's email
 // as verified. Redirects to the login page with a success/error query param.
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get("token")
 
@@ -85,4 +83,3 @@ req: Request
     new URL("/login?success=email-verified&activated=1", req.url),
   )
 })
-

@@ -25,9 +25,7 @@ function maskPass(row: MailConfigRow) {
   return { ...row, pass: row.pass ? "••••••••" : "" }
 }
 
-export const GET = withErrorHandler(async (
-
-) => {
+export const GET = withErrorHandler(async () => {
   const me = await requireSession()
   if (!me || me.role !== "SUPER_ADMIN") return forbidden()
 
@@ -52,10 +50,7 @@ export const GET = withErrorHandler(async (
   return NextResponse.json(configs.map(maskPass))
 })
 
-
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me || me.role !== "SUPER_ADMIN") return forbidden()
 
@@ -68,4 +63,3 @@ req: Request
     .returning()
   return NextResponse.json(maskPass(created), { status: 201 })
 })
-

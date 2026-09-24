@@ -4,8 +4,8 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
-import { enumValues } from "@/lib/db-helpers"
 import { profile, rider, riderStatuses, warehouse } from "@/lib/db/schema"
+import { enumValues } from "@/lib/db-helpers"
 import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, riderApplySchema } from "@/lib/validation"
@@ -14,9 +14,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // ---------------------------------------------------------------------------
 // POST — public rider application (no auth required)
 // ---------------------------------------------------------------------------
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const limited = await rateLimitByIp(req, "rider-apply", 3, 60)
   if (limited) return limited
 
@@ -112,13 +110,10 @@ req: Request
   )
 })
 
-
 // ---------------------------------------------------------------------------
 // GET — list rider applications (admin only)
 // ---------------------------------------------------------------------------
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -138,7 +133,10 @@ req: Request
 
   const statuses = parseStatusFilter(req, riderStatuses)
   if (statuses.length > 0) {
-    const statusClause = inArray(rider.status, enumValues<(typeof riderStatuses)[number]>(statuses))
+    const statusClause = inArray(
+      rider.status,
+      enumValues<(typeof riderStatuses)[number]>(statuses),
+    )
     where = where ? and(where, statusClause) : statusClause
   }
 
@@ -196,4 +194,3 @@ req: Request
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
 })
-

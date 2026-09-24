@@ -5,16 +5,14 @@ import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
-import { enumValue } from "@/lib/db-helpers"
 import { profile, profileRoles, user, warehouse } from "@/lib/db/schema"
+import { enumValue } from "@/lib/db-helpers"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import type { TeamMember } from "@/lib/types"
 import { parseBody, teamCreateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -102,10 +100,7 @@ req: Request
   return NextResponse.json(paginateResponse(team, count, limit, offset))
 })
 
-
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -186,4 +181,3 @@ req: Request
     { status: 201 },
   )
 })
-

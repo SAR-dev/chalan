@@ -7,50 +7,46 @@ import { db } from "@/lib/db"
 import { profile, user } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const PATCH = withErrorHandler(async (
+export const PATCH = withErrorHandler(
+  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
+    if (me.role !== "SUPER_ADMIN") {
+      return forbidden()
+    }
 
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const { id } = await params
 
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
-  if (me.role !== "SUPER_ADMIN") {
-    return forbidden()
-  }
+    const [current] = await db
+      .select({ isActive: profile.isActive })
+      .from(profile)
+      .where(eq(profile.userId, id))
+      .limit(1)
 
-  const { id } = await params
+    if (!current) return notFound()
 
-  const [current] = await db
-    .select({ isActive: profile.isActive })
-    .from(profile)
-    .where(eq(profile.userId, id))
-    .limit(1)
+    const [updated] = await db
+      .update(profile)
+      .set({ isActive: !current.isActive })
+      .where(eq(profile.userId, id))
+      .returning()
 
-  if (!current) return notFound()
+    const [targetUser] = await db
+      .select({ name: user.name })
+      .from(user)
+      .where(eq(user.id, id))
+      .limit(1)
 
-  const [updated] = await db
-    .update(profile)
-    .set({ isActive: !current.isActive })
-    .where(eq(profile.userId, id))
-    .returning()
+    await logAudit({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: updated.isActive
+        ? "TEAM_MEMBER_ACTIVATED"
+        : "TEAM_MEMBER_DEACTIVATED",
+      entityType: "user",
+      entityId: id,
+      description: `${updated.isActive ? "Activated" : "Deactivated"} account for ${targetUser?.name ?? id}`,
+    })
 
-  const [targetUser] = await db
-    .select({ name: user.name })
-    .from(user)
-    .where(eq(user.id, id))
-    .limit(1)
-
-  await logAudit({
-    actor: { userId: me.userId, name: me.name, role: me.role },
-    action: updated.isActive
-      ? "TEAM_MEMBER_ACTIVATED"
-      : "TEAM_MEMBER_DEACTIVATED",
-    entityType: "user",
-    entityId: id,
-    description: `${updated.isActive ? "Activated" : "Deactivated"} account for ${targetUser?.name ?? id}`,
-  })
-
-  return NextResponse.json(updated)
-})
-
+    return NextResponse.json(updated)
+  },
+)

@@ -17,9 +17,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 //   local — writes to disk, served via app/uploads/[...path]/route.ts
 //   r2    — uploads to Cloudflare R2, served from R2's public URL
 
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   let formData: FormData
   try {
     formData = await req.formData()
@@ -71,4 +69,3 @@ req: Request
     return serverError("Could not upload the image. Please try again.")
   }
 })
-

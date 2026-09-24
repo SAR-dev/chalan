@@ -342,7 +342,11 @@ export default function MerchantSettingsPage() {
                 </div>
               </CardContent>
               <CardFooter className="justify-end">
-                <Button onClick={handleSaveBranding} disabled={savingBranding} data-testid="save-branding">
+                <Button
+                  onClick={handleSaveBranding}
+                  disabled={savingBranding}
+                  data-testid="save-branding"
+                >
                   {savingBranding ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />

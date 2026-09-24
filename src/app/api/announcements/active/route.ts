@@ -12,9 +12,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 //
 // No pagination — active announcements are expected to be small in number.
 // The client is responsible for read/unread state (localStorage).
-export const GET = withErrorHandler(async (
-
-) => {
+export const GET = withErrorHandler(async () => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -58,4 +56,3 @@ export const GET = withErrorHandler(async (
 
   return NextResponse.json(forMe)
 })
-

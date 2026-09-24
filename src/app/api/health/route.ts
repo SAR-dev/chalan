@@ -5,9 +5,6 @@
 import { NextResponse } from "next/server"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-
-) => {
+export const GET = withErrorHandler(async () => {
   return NextResponse.json({ ok: true })
 })
-

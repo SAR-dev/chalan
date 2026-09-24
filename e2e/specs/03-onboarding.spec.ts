@@ -74,11 +74,9 @@ test.describe("Merchant Onboarding Flow", () => {
     })
     expect(regRes.ok()).toBeTruthy()
 
-    // Simulate email verification via API (admin-style approve won't work for unverified)
-    // Instead, directly update the merchant via the verify-email token
-    // Since we can't get the token, use the API to approve as admin
-    const meRes = await page.request.get("/api/users/me")
-    // We're not logged in yet, so use request context directly
+    // The new merchant has an unverified email — approving via API would
+    // require the verify-email token, which we can't get in e2e. So just
+    // verify the registration flow up to the login gate.
 
     // Login with the new merchant
     await page.goto("/login")

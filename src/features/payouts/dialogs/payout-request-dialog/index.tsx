@@ -66,7 +66,7 @@ export function PayoutRequestDialog({
 
   return (
     <FormDialog
-       key={`${payableTotal}-${payableAmount}-${openCount}`}
+      key={`${payableTotal}-${payableAmount}-${openCount}`}
       open={open}
       onOpenChange={onOpenChange}
       title="Request payout"
@@ -76,7 +76,7 @@ export function PayoutRequestDialog({
       submittingLabel="Submitting"
       submitLabel="Submit request"
       submitIcon={<Wallet className="size-4" />}
-       submitDisabled={payableTotal === 0}
+      submitDisabled={payableTotal === 0}
     >
       <div className="grid grid-cols-1 gap-4 pt-2 pb-4">
         <div className="border-border bg-muted/40 rounded-lg border p-4">

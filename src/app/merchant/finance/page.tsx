@@ -188,8 +188,8 @@ export default function MerchantFinancePage() {
           {
             label: "Available for payout",
             value: formatTk(filteredAvailable),
-              hint: `${merchantPayableTotal} settled order${
-                merchantPayableTotal === 1 ? "" : "s"
+            hint: `${merchantPayableTotal} settled order${
+              merchantPayableTotal === 1 ? "" : "s"
             }`,
             icon: Banknote,
             tone: "bg-chart-2/15 text-chart-2",

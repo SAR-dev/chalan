@@ -7,53 +7,45 @@ import { deliveryCity } from "@/lib/db/schema"
 import { deliveryCityUpdateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const PATCH = withErrorHandler(async (
+export const PATCH = withErrorHandler(
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
+    if (me.role !== "SUPER_ADMIN") return forbidden()
 
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const { id } = await params
+    const parsed = await parseBody(req, deliveryCityUpdateSchema)
+    if (parsed.error) return parsed.error
 
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
-  if (me.role !== "SUPER_ADMIN") return forbidden()
+    const [updated] = await db
+      .update(deliveryCity)
+      .set({
+        ...parsed.data,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(deliveryCity.id, id))
+      .returning()
 
-  const { id } = await params
-  const parsed = await parseBody(req, deliveryCityUpdateSchema)
-  if (parsed.error) return parsed.error
+    if (!updated) return notFound()
+    return NextResponse.json(updated)
+  },
+)
 
-  const [updated] = await db
-    .update(deliveryCity)
-    .set({
-      ...parsed.data,
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(deliveryCity.id, id))
-    .returning()
+export const DELETE = withErrorHandler(
+  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
+    if (me.role !== "SUPER_ADMIN") return forbidden()
 
-  if (!updated) return notFound()
-  return NextResponse.json(updated)
-})
+    const { id } = await params
 
+    const [updated] = await db
+      .update(deliveryCity)
+      .set({ isActive: false, updatedAt: new Date().toISOString() })
+      .where(eq(deliveryCity.id, id))
+      .returning()
 
-export const DELETE = withErrorHandler(async (
-
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
-
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
-  if (me.role !== "SUPER_ADMIN") return forbidden()
-
-  const { id } = await params
-
-  const [updated] = await db
-    .update(deliveryCity)
-    .set({ isActive: false, updatedAt: new Date().toISOString() })
-    .where(eq(deliveryCity.id, id))
-    .returning()
-
-  if (!updated) return notFound()
-  return NextResponse.json({ ok: true })
-})
-
+    if (!updated) return notFound()
+    return NextResponse.json({ ok: true })
+  },
+)

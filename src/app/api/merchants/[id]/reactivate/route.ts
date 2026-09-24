@@ -7,36 +7,32 @@ import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const PATCH = withErrorHandler(async (
+export const PATCH = withErrorHandler(
+  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
+    if (me.role !== "SUPER_ADMIN") {
+      return forbidden()
+    }
 
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const { id } = await params
 
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
-  if (me.role !== "SUPER_ADMIN") {
-    return forbidden()
-  }
+    const [updated] = await db
+      .update(merchant)
+      .set({ status: "ACTIVE" })
+      .where(eq(merchant.id, id))
+      .returning()
 
-  const { id } = await params
+    if (!updated) return notFound()
 
-  const [updated] = await db
-    .update(merchant)
-    .set({ status: "ACTIVE" })
-    .where(eq(merchant.id, id))
-    .returning()
+    await logAudit({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: "MERCHANT_REACTIVATED",
+      entityType: "merchant",
+      entityId: updated.id,
+      description: `Reactivated merchant ${updated.businessName}`,
+    })
 
-  if (!updated) return notFound()
-
-  await logAudit({
-    actor: { userId: me.userId, name: me.name, role: me.role },
-    action: "MERCHANT_REACTIVATED",
-    entityType: "merchant",
-    entityId: updated.id,
-    description: `Reactivated merchant ${updated.businessName}`,
-  })
-
-  return NextResponse.json(updated)
-})
-
+    return NextResponse.json(updated)
+  },
+)

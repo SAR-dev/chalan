@@ -13,9 +13,7 @@ const bulkRejectSchema = idsSchema.extend({
   reason: z.string().trim().min(1).default("Bulk reject"),
 })
 
-export const PATCH = withErrorHandler(async (
-req: Request
-) => {
+export const PATCH = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -77,4 +75,3 @@ req: Request
 
   return NextResponse.json({ ok: true, count: updated.length })
 })
-

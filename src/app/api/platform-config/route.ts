@@ -8,9 +8,7 @@ import { platformConfig } from "@/lib/db/schema"
 import { parseBody, platformConfigSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-
-) => {
+export const GET = withErrorHandler(async () => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -42,10 +40,7 @@ export const GET = withErrorHandler(async (
   return NextResponse.json(config)
 })
 
-
-export const PATCH = withErrorHandler(async (
-req: Request
-) => {
+export const PATCH = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -100,4 +95,3 @@ req: Request
 
   return NextResponse.json(config)
 })
-

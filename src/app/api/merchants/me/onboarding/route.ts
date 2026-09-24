@@ -6,9 +6,7 @@ import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const PATCH = withErrorHandler(async (
-
-) => {
+export const PATCH = withErrorHandler(async () => {
   const me = await requireSession()
   if (!me || me.role !== "MERCHANT" || !me.merchantId) return unauthorized()
 
@@ -19,4 +17,3 @@ export const PATCH = withErrorHandler(async (
 
   return NextResponse.json({ ok: true })
 })
-

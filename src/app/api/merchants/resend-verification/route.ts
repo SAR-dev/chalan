@@ -18,9 +18,7 @@ const resendVerificationSchema = z.object({
 
 // Public endpoint — no session required. Allows unverified merchants to
 // request a new activation email from the login page.
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const parsed = await parseBody(req, resendVerificationSchema)
   if (parsed.error) return parsed.error
 
@@ -90,4 +88,3 @@ req: Request
 
   return NextResponse.json({ success: true })
 })
-

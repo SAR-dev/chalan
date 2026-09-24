@@ -1,5 +1,6 @@
 "use client"
 
+import { Banknote, CheckCircle2, Clock, Receipt } from "lucide-react"
 import { useState } from "react"
 import { AreaChart } from "@/components/charts"
 import { DateRangePicker } from "@/components/date-range-picker"
@@ -8,7 +9,6 @@ import { StatCardList } from "@/components/stat-card-list"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useOrderAnalytics } from "@/features/orders/hooks/use-order-analytics"
 import { formatTk } from "@/lib/pricing"
-import { Banknote, CheckCircle2, Clock, Receipt } from "lucide-react"
 
 export default function CodReconciliationPage() {
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined)
@@ -60,7 +60,7 @@ export default function CodReconciliationPage() {
           },
           {
             label: "Settlement rate",
-            value: `${cod?.totalCollected ?? 0 > 0 ? Math.round(((cod?.totalSettled ?? 0) / (cod?.totalCollected ?? 1)) * 100) : 0}%`,
+            value: `${(cod?.totalCollected ?? 0) > 0 ? Math.round(((cod?.totalSettled ?? 0) / (cod?.totalCollected ?? 1)) * 100) : 0}%`,
             icon: Receipt,
             tone: "info",
           },

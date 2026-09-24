@@ -8,9 +8,7 @@ const bulkDispatchSchema = z.object({
   riderId: z.string().min(1, "Rider is required"),
 })
 
-export const PATCH = withErrorHandler(async (
-req: Request
-) => {
+export const PATCH = withErrorHandler(async (req: Request) => {
   const parsed = await parseBody(req, bulkDispatchSchema)
   if (parsed.error) return parsed.error
   return applyBulkOrderTransition("dispatch", parsed.data.ids, parsed.data)

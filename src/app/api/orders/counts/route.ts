@@ -6,9 +6,7 @@ import { dbRead as db } from "@/lib/db"
 import { order } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -52,4 +50,3 @@ req: Request
     returned: row?.returned ?? 0,
   })
 })
-

@@ -130,7 +130,8 @@ export function validateEnv(): void {
     } else if (ssk && !/^[0-9a-f]{64}$/i.test(ssk)) {
       e.push({
         key: "SMTP_SECRET_KEY",
-        message: "Must be 64 hex characters (32 bytes). Generate with `openssl rand -hex 32`.",
+        message:
+          "Must be 64 hex characters (32 bytes). Generate with `openssl rand -hex 32`.",
       })
     }
 

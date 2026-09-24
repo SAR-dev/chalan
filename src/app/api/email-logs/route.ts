@@ -7,9 +7,7 @@ import { emailLog } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -79,4 +77,3 @@ req: Request
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
 })
-

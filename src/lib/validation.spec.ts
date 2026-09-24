@@ -392,7 +392,14 @@ describe("merchantBrandingSchema", () => {
   })
 
   it("accepts all valid preset colors", () => {
-    const presets = ["#f97316", "#2563eb", "#10b981", "#8b5cf6", "#ef4444", "#06b6d4"]
+    const presets = [
+      "#f97316",
+      "#2563eb",
+      "#10b981",
+      "#8b5cf6",
+      "#ef4444",
+      "#06b6d4",
+    ]
     for (const color of presets) {
       const result = merchantBrandingSchema.safeParse({ brandColor: color })
       expect(result.success).toBe(true)

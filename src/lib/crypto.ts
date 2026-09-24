@@ -15,7 +15,9 @@ function getKey(): Buffer {
     return Buffer.from(hex, "hex")
   }
   if (hex) {
-    console.warn("[crypto] SMTP_SECRET_KEY must be 64 hex chars; falling back to dev key")
+    console.warn(
+      "[crypto] SMTP_SECRET_KEY must be 64 hex chars; falling back to dev key",
+    )
   }
   return DEV_KEY
 }
@@ -48,9 +50,10 @@ export function decryptSecret(encoded: string): string {
   try {
     const decipher = createDecipheriv(ALGO, key, iv)
     decipher.setAuthTag(tag)
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString(
-      "utf8",
-    )
+    return Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]).toString("utf8")
   } catch (err) {
     console.error("[crypto] Failed to decrypt secret:", err)
     throw new Error("Failed to decrypt stored secret")

@@ -149,7 +149,12 @@ describe("PATCH /api/orders/bulk/settle-cod", () => {
         warehouseId: "wh_1",
         codSettledAt: null,
       },
-      { id: "o2", status: "PICKED_UP", warehouseId: "wh_1", codSettledAt: null },
+      {
+        id: "o2",
+        status: "PICKED_UP",
+        warehouseId: "wh_1",
+        codSettledAt: null,
+      },
       {
         id: "o3",
         status: "DELIVERED",

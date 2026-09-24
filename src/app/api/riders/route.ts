@@ -3,14 +3,12 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
 import { dbRead } from "@/lib/db"
-import { enumValue } from "@/lib/db-helpers"
 import { rider, riderTaskTypes } from "@/lib/db/schema"
+import { enumValue } from "@/lib/db-helpers"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -69,7 +67,7 @@ req: Request
 
   let taskTypeFilter: ReturnType<typeof eq> | undefined
   if (taskTypeParam) {
-    const taskType = enumValue<typeof riderTaskTypes[number]>(
+    const taskType = enumValue<(typeof riderTaskTypes)[number]>(
       taskTypeParam,
       riderTaskTypes,
     )
@@ -185,4 +183,3 @@ req: Request
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
 })
-

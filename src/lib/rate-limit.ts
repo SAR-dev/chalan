@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server"
 import Redis from "ioredis"
+import { NextResponse } from "next/server"
 
 interface RateLimitEntry {
   count: number
@@ -83,7 +83,7 @@ function getRedis(): Redis | null {
   return redis
 }
 
- /**
+/**
  * Fixed-window rate limiter for API route handlers.
  *
  * Returns `null` when the request is allowed, or a `NextResponse` with
@@ -106,13 +106,13 @@ export async function rateLimit(
   const client = getRedis()
   if (client) {
     try {
-      const [count, ttl] = await client.eval(
+      const [count, ttl] = (await client.eval(
         WINDOW_SCRIPT,
         1,
         `rl:${key}`,
         String(max),
         String(window),
-      ) as [number, number]
+      )) as [number, number]
       if (Number(count) > max) {
         const retryAfter = Math.max(1, Math.ceil(Number(ttl) / 1000))
         return NextResponse.json(

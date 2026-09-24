@@ -3,7 +3,9 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
-import { enumValues } from "@/lib/db-helpers"
+import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
+import { pickupWarehouseId } from "@/lib/db/order-lookup"
+import { buildWarehouseOrderScope } from "@/lib/db/order-scope"
 import {
   balanceTransaction,
   deliveryCity as deliveryCityTable,
@@ -15,19 +17,15 @@ import {
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
+import { enumValues } from "@/lib/db-helpers"
 import { canPlaceOrders } from "@/lib/merchant-verification"
-import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
-import { pickupWarehouseId } from "@/lib/db/order-lookup"
-import { buildWarehouseOrderScope } from "@/lib/db/order-scope"
 import { paginateResponse, parseDateRange, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
 import { calcCodFee, calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { orderCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -75,7 +73,10 @@ req: Request
 
   const statuses = parseStatusFilter(req, orderStatuses)
   if (statuses.length > 0) {
-    const statusClause = inArray(order.status, enumValues<(typeof orderStatuses)[number]>(statuses))
+    const statusClause = inArray(
+      order.status,
+      enumValues<(typeof orderStatuses)[number]>(statuses),
+    )
     where = where ? and(where, statusClause) : statusClause
   }
 
@@ -147,10 +148,7 @@ req: Request
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
 })
 
-
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
@@ -364,4 +362,3 @@ req: Request
 
   return NextResponse.json(newOrder, { status: 201 })
 })
-

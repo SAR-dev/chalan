@@ -14,7 +14,8 @@ export function useOrderAnalytics(params?: {
 }) {
   const url = new URL(KEY, window.location.origin)
   if (params?.merchantId) url.searchParams.set("merchantId", params.merchantId)
-  if (params?.warehouseId) url.searchParams.set("warehouseId", params.warehouseId)
+  if (params?.warehouseId)
+    url.searchParams.set("warehouseId", params.warehouseId)
   if (params?.from) url.searchParams.set("from", params.from)
   if (params?.to) url.searchParams.set("to", params.to)
 

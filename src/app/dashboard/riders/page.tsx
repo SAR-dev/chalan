@@ -13,12 +13,14 @@ export default async function RidersPage() {
   const limit = 20
 
   const [[stats], rows] = await Promise.all([
-    dbRead.select({
-      total: sql<number>`count(*)::int`,
-      active: sql<number>`count(*) filter (where ${rider.isActive})::int`,
-      delivery: sql<number>`count(*) filter (where ${rider.taskType} in ('DELIVERY', 'BOTH'))::int`,
-      pickup: sql<number>`count(*) filter (where ${rider.taskType} in ('PICKUP', 'BOTH'))::int`,
-    }).from(rider),
+    dbRead
+      .select({
+        total: sql<number>`count(*)::int`,
+        active: sql<number>`count(*) filter (where ${rider.isActive})::int`,
+        delivery: sql<number>`count(*) filter (where ${rider.taskType} in ('DELIVERY', 'BOTH'))::int`,
+        pickup: sql<number>`count(*) filter (where ${rider.taskType} in ('PICKUP', 'BOTH'))::int`,
+      })
+      .from(rider),
     dbRead
       .select({
         id: rider.id,

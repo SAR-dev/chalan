@@ -9,9 +9,7 @@ import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, pickupLocationSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -29,10 +27,7 @@ req: Request
   // city (pickup_location.cityId → delivery_city.warehouseId) so they can
   // never enumerate pickup locations outside their own warehouse.
   let joinCity = false
-  let where:
-    | ReturnType<typeof and>
-    | ReturnType<typeof eq>
-    | undefined
+  let where: ReturnType<typeof and> | ReturnType<typeof eq> | undefined
 
   switch (me.role) {
     case "MERCHANT": {
@@ -63,9 +58,7 @@ req: Request
     }
     default: {
       // SUPER_ADMIN — full visibility, optional merchant filter.
-      where = merchantId
-        ? eq(pickupLocation.merchantId, merchantId)
-        : undefined
+      where = merchantId ? eq(pickupLocation.merchantId, merchantId) : undefined
     }
   }
 
@@ -112,11 +105,8 @@ req: Request
   })
 })
 
-
 // Merchant registers a new pickup location (shop) for their own business.
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -157,4 +147,3 @@ req: Request
 
   return NextResponse.json(created, { status: 201 })
 })
-

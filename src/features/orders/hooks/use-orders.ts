@@ -139,11 +139,7 @@ export function useOrders({
     : null
   const { data: payableResponse } = useSWR<
     PaginatedResponse<Order> & { totalEarnings?: number }
-  >(
-    currentUser ? payableKey : null,
-    jsonFetcher,
-    swrOptions,
-  )
+  >(currentUser ? payableKey : null, jsonFetcher, swrOptions)
   const merchantPayableOrders = payableResponse?.data ?? []
   const merchantPayableTotal = payableResponse?.total ?? 0
   const merchantPayableAmount = payableResponse?.totalEarnings ?? 0

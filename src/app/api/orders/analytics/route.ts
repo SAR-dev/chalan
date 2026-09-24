@@ -7,9 +7,7 @@ import { order } from "@/lib/db/schema"
 import { parseDateRange } from "@/lib/pagination"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -18,7 +16,7 @@ req: Request
   const warehouseId = url.searchParams.get("warehouseId")
 
   // Build base where clause based on role
-  let where = undefined
+  let where
   if (me.role === "MERCHANT" && me.merchantId) {
     where = eq(order.merchantId, me.merchantId)
   } else if (me.role === "WAREHOUSE_ADMIN" && me.warehouseId) {
@@ -53,7 +51,9 @@ req: Request
     .select({
       date: sql<string>`date(${order.createdAt})`.as("date"),
       count: sql<number>`count(*)`.as("count"),
-      revenue: sql<number>`coalesce(sum(${order.merchantEarnings}), 0)`.as("revenue"),
+      revenue: sql<number>`coalesce(sum(${order.merchantEarnings}), 0)`.as(
+        "revenue",
+      ),
     })
     .from(order)
     .where(where)
@@ -73,31 +73,62 @@ req: Request
   // 3. Delivery performance
   const [deliveryStats] = await dbRead
     .select({
-      totalDelivered: sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')`.as("totalDelivered"),
-      totalFailed: sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')`.as("totalFailed"),
-      totalReturned: sql<number>`count(*) filter (where ${order.status} = 'RETURNED')`.as("totalReturned"),
-      avgDeliveryTimeHours: sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)`.as("avgDeliveryTimeHours"),
+      totalDelivered:
+        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')`.as(
+          "totalDelivered",
+        ),
+      totalFailed:
+        sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')`.as(
+          "totalFailed",
+        ),
+      totalReturned:
+        sql<number>`count(*) filter (where ${order.status} = 'RETURNED')`.as(
+          "totalReturned",
+        ),
+      avgDeliveryTimeHours:
+        sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)`.as(
+          "avgDeliveryTimeHours",
+        ),
     })
     .from(order)
     .where(where)
     .limit(1)
 
-  const totalOutcome = (deliveryStats?.totalDelivered ?? 0) + (deliveryStats?.totalFailed ?? 0) + (deliveryStats?.totalReturned ?? 0)
-  const successRate = totalOutcome > 0 ? ((deliveryStats?.totalDelivered ?? 0) / totalOutcome) * 100 : 0
+  const totalOutcome =
+    (deliveryStats?.totalDelivered ?? 0) +
+    (deliveryStats?.totalFailed ?? 0) +
+    (deliveryStats?.totalReturned ?? 0)
+  const successRate =
+    totalOutcome > 0
+      ? ((deliveryStats?.totalDelivered ?? 0) / totalOutcome) * 100
+      : 0
 
   // 4. COD summary
   const [codSummary] = await dbRead
     .select({
-      totalCollected: sql<number>`coalesce(sum(${order.productCost}) filter (where ${order.status} = 'DELIVERED'), 0)`.as("totalCollected"),
-      totalSettled: sql<number>`coalesce(sum(${order.productCost}) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null), 0)`.as("totalSettled"),
-      settledCount: sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)`.as("settledCount"),
-      pendingCount: sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)`.as("pendingCount"),
+      totalCollected:
+        sql<number>`coalesce(sum(${order.productCost}) filter (where ${order.status} = 'DELIVERED'), 0)`.as(
+          "totalCollected",
+        ),
+      totalSettled:
+        sql<number>`coalesce(sum(${order.productCost}) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null), 0)`.as(
+          "totalSettled",
+        ),
+      settledCount:
+        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)`.as(
+          "settledCount",
+        ),
+      pendingCount:
+        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)`.as(
+          "pendingCount",
+        ),
     })
     .from(order)
     .where(where)
     .limit(1)
 
-  const pendingSettlement = (codSummary?.totalCollected ?? 0) - (codSummary?.totalSettled ?? 0)
+  const pendingSettlement =
+    (codSummary?.totalCollected ?? 0) - (codSummary?.totalSettled ?? 0)
 
   return NextResponse.json({
     ordersByDay,
@@ -107,7 +138,8 @@ req: Request
       totalFailed: deliveryStats?.totalFailed ?? 0,
       totalReturned: deliveryStats?.totalReturned ?? 0,
       successRate: Math.round(successRate * 10) / 10,
-      avgDeliveryTimeHours: Math.round((deliveryStats?.avgDeliveryTimeHours ?? 0) * 10) / 10,
+      avgDeliveryTimeHours:
+        Math.round((deliveryStats?.avgDeliveryTimeHours ?? 0) * 10) / 10,
     },
     codSummary: {
       totalCollected: codSummary?.totalCollected ?? 0,
@@ -118,4 +150,3 @@ req: Request
     },
   })
 })
-

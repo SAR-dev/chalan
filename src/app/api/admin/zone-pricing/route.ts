@@ -7,9 +7,7 @@ import { zonePricing } from "@/lib/db/schema"
 import { parseBody, zonePricingCreateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
-req: Request
-) => {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN" && me.role !== "WAREHOUSE_ADMIN") {
@@ -30,10 +28,7 @@ req: Request
   return NextResponse.json(rows)
 })
 
-
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -73,4 +68,3 @@ req: Request
 
   return NextResponse.json(result, { status: existing.length > 0 ? 200 : 201 })
 })
-

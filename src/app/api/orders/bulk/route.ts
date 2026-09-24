@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
+import { pickupWarehouseIds } from "@/lib/db/order-lookup"
 import {
   balanceTransaction,
   deliveryCity,
@@ -12,16 +13,13 @@ import {
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
-import { pickupWarehouseIds } from "@/lib/db/order-lookup"
 import { canPlaceOrders } from "@/lib/merchant-verification"
 import { calcCodFee, calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { orderBulkCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const POST = withErrorHandler(async (
-req: Request
-) => {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
@@ -264,4 +262,3 @@ req: Request
 
   return NextResponse.json(created, { status: 201 })
 })
-

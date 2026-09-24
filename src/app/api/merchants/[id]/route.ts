@@ -8,143 +8,135 @@ import { merchant } from "@/lib/db/schema"
 import { merchantBrandingSchema, merchantProfileSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const GET = withErrorHandler(async (
+export const GET = withErrorHandler(
+  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
 
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const { id } = await params
 
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
+    const isOwner = me.role === "MERCHANT" && me.merchantId === id
+    const isAdmin = me.role === "SUPER_ADMIN"
+    if (!isOwner && !isAdmin) {
+      return forbidden()
+    }
 
-  const { id } = await params
+    const [found] = await dbRead
+      .select({
+        id: merchant.id,
+        businessName: merchant.businessName,
+        ownerName: merchant.ownerName,
+        email: merchant.email,
+        phone: merchant.phone,
+        address: merchant.address,
+        status: merchant.status,
+        businessType: merchant.businessType,
+        onboardingCompletedAt: merchant.onboardingCompletedAt,
+        emailVerifiedAt: merchant.emailVerifiedAt,
+        phoneVerifiedAt: merchant.phoneVerifiedAt,
+        baseRate: merchant.baseRate,
+        extraRatePerKg: merchant.extraRatePerKg,
+        freeWeightKg: merchant.freeWeightKg,
+        maxWeightKg: merchant.maxWeightKg,
+        codFeePercentage: merchant.codFeePercentage,
+        nidSubmittedAt: merchant.nidSubmittedAt,
+        nidVerifiedAt: merchant.nidVerifiedAt,
+        nidVerifiedBy: merchant.nidVerifiedBy,
+        nidRejectedAt: merchant.nidRejectedAt,
+        nidRejectedBy: merchant.nidRejectedBy,
+        nidRejectionReason: merchant.nidRejectionReason,
+        nidNumber: merchant.nidNumber,
+        nidFrontImage: merchant.nidFrontImage,
+        nidBackImage: merchant.nidBackImage,
+        nidSelfieImage: merchant.nidSelfieImage,
+        approvedBy: merchant.approvedBy,
+        approvedAt: merchant.approvedAt,
+        logoUrl: merchant.logoUrl,
+        brandColor: merchant.brandColor,
+        hidePlatformBranding: merchant.hidePlatformBranding,
+        createdAt: merchant.createdAt,
+        updatedAt: merchant.updatedAt,
+      })
+      .from(merchant)
+      .where(eq(merchant.id, id))
+      .limit(1)
 
-  const isOwner = me.role === "MERCHANT" && me.merchantId === id
-  const isAdmin = me.role === "SUPER_ADMIN"
-  if (!isOwner && !isAdmin) {
-    return forbidden()
-  }
+    if (!found) return notFound()
 
-  const [found] = await dbRead
-    .select({
-      id: merchant.id,
-      businessName: merchant.businessName,
-      ownerName: merchant.ownerName,
-      email: merchant.email,
-      phone: merchant.phone,
-      address: merchant.address,
-      status: merchant.status,
-      businessType: merchant.businessType,
-      onboardingCompletedAt: merchant.onboardingCompletedAt,
-      emailVerifiedAt: merchant.emailVerifiedAt,
-      phoneVerifiedAt: merchant.phoneVerifiedAt,
-      baseRate: merchant.baseRate,
-      extraRatePerKg: merchant.extraRatePerKg,
-      freeWeightKg: merchant.freeWeightKg,
-      maxWeightKg: merchant.maxWeightKg,
-      codFeePercentage: merchant.codFeePercentage,
-      nidSubmittedAt: merchant.nidSubmittedAt,
-      nidVerifiedAt: merchant.nidVerifiedAt,
-      nidVerifiedBy: merchant.nidVerifiedBy,
-      nidRejectedAt: merchant.nidRejectedAt,
-      nidRejectedBy: merchant.nidRejectedBy,
-      nidRejectionReason: merchant.nidRejectionReason,
-      nidNumber: merchant.nidNumber,
-      nidFrontImage: merchant.nidFrontImage,
-      nidBackImage: merchant.nidBackImage,
-      nidSelfieImage: merchant.nidSelfieImage,
-      approvedBy: merchant.approvedBy,
-      approvedAt: merchant.approvedAt,
-      logoUrl: merchant.logoUrl,
-      brandColor: merchant.brandColor,
-      hidePlatformBranding: merchant.hidePlatformBranding,
-      createdAt: merchant.createdAt,
-      updatedAt: merchant.updatedAt,
-    })
-    .from(merchant)
-    .where(eq(merchant.id, id))
-    .limit(1)
-
-  if (!found) return notFound()
-
-  return NextResponse.json(found)
-})
-
+    return NextResponse.json(found)
+  },
+)
 
 // Update a merchant's own business details or branding. A merchant may only
 // edit their own business; Admins / Super Admins may edit any merchant.
-export const PATCH = withErrorHandler(async (
+export const PATCH = withErrorHandler(
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
 
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const { id } = await params
 
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
+    const isOwner = me.role === "MERCHANT" && me.merchantId === id
+    const isAdmin = me.role === "SUPER_ADMIN"
+    if (!isOwner && !isAdmin) {
+      return forbidden()
+    }
 
-  const { id } = await params
-
-  const isOwner = me.role === "MERCHANT" && me.merchantId === id
-  const isAdmin = me.role === "SUPER_ADMIN"
-  if (!isOwner && !isAdmin) {
-    return forbidden()
-  }
-
-  // Try profile schema first (businessName, email, phone, address), then branding schema.
-  const { data: body, error: bodyError } = await parseBody(
-    req,
-    merchantProfileSchema.or(merchantBrandingSchema),
-  )
-  if (bodyError) return bodyError
-
-  const profileParsed = merchantProfileSchema.safeParse(body)
-  const brandingParsed = merchantBrandingSchema.safeParse(body)
-
-  const updates: Record<string, unknown> = {}
-
-  if (profileParsed.success) {
-    const { businessName, email, phone, address } = profileParsed.data
-    updates.businessName = businessName.trim()
-    updates.email = email.trim()
-    updates.phone = phone.trim()
-    updates.address = address.trim()
-  }
-
-  if (brandingParsed.success) {
-    const { logoUrl, brandColor, hidePlatformBranding } = brandingParsed.data
-    if (logoUrl !== undefined) updates.logoUrl = logoUrl
-    if (brandColor !== undefined) updates.brandColor = brandColor
-    if (hidePlatformBranding !== undefined)
-      updates.hidePlatformBranding = hidePlatformBranding
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json(
-      { error: "No valid fields to update" },
-      { status: 400 },
+    // Try profile schema first (businessName, email, phone, address), then branding schema.
+    const { data: body, error: bodyError } = await parseBody(
+      req,
+      merchantProfileSchema.or(merchantBrandingSchema),
     )
-  }
+    if (bodyError) return bodyError
 
-  const [updated] = await db
-    .update(merchant)
-    .set(updates)
-    .where(eq(merchant.id, id))
-    .returning()
+    const profileParsed = merchantProfileSchema.safeParse(body)
+    const brandingParsed = merchantBrandingSchema.safeParse(body)
 
-  if (!updated) return notFound()
+    const updates: Record<string, unknown> = {}
 
-  // Only admins editing a merchant they don't own need an audit trail.
-  if (me.role !== "MERCHANT" && profileParsed.success) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "MERCHANT_UPDATED",
-      entityType: "merchant",
-      entityId: updated.id,
-      description: `Updated merchant ${updated.businessName}`,
-      metadata: updates,
-    })
-  }
+    if (profileParsed.success) {
+      const { businessName, email, phone, address } = profileParsed.data
+      updates.businessName = businessName.trim()
+      updates.email = email.trim()
+      updates.phone = phone.trim()
+      updates.address = address.trim()
+    }
 
-  return NextResponse.json(updated)
-})
+    if (brandingParsed.success) {
+      const { logoUrl, brandColor, hidePlatformBranding } = brandingParsed.data
+      if (logoUrl !== undefined) updates.logoUrl = logoUrl
+      if (brandColor !== undefined) updates.brandColor = brandColor
+      if (hidePlatformBranding !== undefined)
+        updates.hidePlatformBranding = hidePlatformBranding
+    }
 
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields to update" },
+        { status: 400 },
+      )
+    }
+
+    const [updated] = await db
+      .update(merchant)
+      .set(updates)
+      .where(eq(merchant.id, id))
+      .returning()
+
+    if (!updated) return notFound()
+
+    // Only admins editing a merchant they don't own need an audit trail.
+    if (me.role !== "MERCHANT" && profileParsed.success) {
+      await logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "MERCHANT_UPDATED",
+        entityType: "merchant",
+        entityId: updated.id,
+        description: `Updated merchant ${updated.businessName}`,
+        metadata: updates,
+      })
+    }
+
+    return NextResponse.json(updated)
+  },
+)

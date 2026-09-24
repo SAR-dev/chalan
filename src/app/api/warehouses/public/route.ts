@@ -7,9 +7,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // Public list of *active* warehouses, used to populate the warehouse selector
 // on the unauthenticated rider application form. Only id, name, and city are
 // returned.
-export const GET = withErrorHandler(async (
-
-) => {
+export const GET = withErrorHandler(async () => {
   const rows = await db
     .select({ id: warehouse.id, name: warehouse.name, city: warehouse.city })
     .from(warehouse)
@@ -21,4 +19,3 @@ export const GET = withErrorHandler(async (
     },
   })
 })
-

@@ -7,52 +7,48 @@ import { db } from "@/lib/db"
 import { rider } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-export const PATCH = withErrorHandler(async (
+export const PATCH = withErrorHandler(
+  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
+    const isAdmin = me.role === "SUPER_ADMIN"
+    const isWarehouseAdmin = me.role === "WAREHOUSE_ADMIN"
+    if (!isAdmin && !isWarehouseAdmin) {
+      return forbidden()
+    }
 
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
+    const { id } = await params
 
-) => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
-  const isAdmin = me.role === "SUPER_ADMIN"
-  const isWarehouseAdmin = me.role === "WAREHOUSE_ADMIN"
-  if (!isAdmin && !isWarehouseAdmin) {
-    return forbidden()
-  }
+    const [current] = await db
+      .select({ isActive: rider.isActive, warehouseId: rider.warehouseId })
+      .from(rider)
+      .where(eq(rider.id, id))
+      .limit(1)
 
-  const { id } = await params
+    if (!current) return notFound()
 
-  const [current] = await db
-    .select({ isActive: rider.isActive, warehouseId: rider.warehouseId })
-    .from(rider)
-    .where(eq(rider.id, id))
-    .limit(1)
+    // Warehouse Admins can only toggle riders based at their own hub.
+    if (
+      isWarehouseAdmin &&
+      (!me.warehouseId || current.warehouseId !== me.warehouseId)
+    ) {
+      return forbidden()
+    }
 
-  if (!current) return notFound()
+    const [updated] = await db
+      .update(rider)
+      .set({ isActive: !current.isActive })
+      .where(eq(rider.id, id))
+      .returning()
 
-  // Warehouse Admins can only toggle riders based at their own hub.
-  if (
-    isWarehouseAdmin &&
-    (!me.warehouseId || current.warehouseId !== me.warehouseId)
-  ) {
-    return forbidden()
-  }
+    await logAudit({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: updated.isActive ? "RIDER_ACTIVATED" : "RIDER_DEACTIVATED",
+      entityType: "rider",
+      entityId: updated.id,
+      description: `${updated.isActive ? "Activated" : "Deactivated"} rider ${updated.name}`,
+    })
 
-  const [updated] = await db
-    .update(rider)
-    .set({ isActive: !current.isActive })
-    .where(eq(rider.id, id))
-    .returning()
-
-  await logAudit({
-    actor: { userId: me.userId, name: me.name, role: me.role },
-    action: updated.isActive ? "RIDER_ACTIVATED" : "RIDER_DEACTIVATED",
-    entityType: "rider",
-    entityId: updated.id,
-    description: `${updated.isActive ? "Activated" : "Deactivated"} rider ${updated.name}`,
-  })
-
-  return NextResponse.json(updated)
-})
-
+    return NextResponse.json(updated)
+  },
+)
