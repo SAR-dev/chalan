@@ -1,5 +1,5 @@
 {
-  "id": "c0a09cb6-6ddc-45ad-b8b4-e9279573f844",
+  "id": "a8a29dd4-d474-4b53-828e-8cac38e98738",
   "prevId": "63ac0b4a-c601-4b43-928e-2c106106bda4",
   "version": "7",
   "dialect": "postgresql",
@@ -977,82 +977,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.failed_mail": {
-      "name": "failed_mail",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "to": {
-          "name": "to",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject": {
-          "name": "subject",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "html": {
-          "name": "html",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "failedAt": {
-          "name": "failedAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.mail_config": {
       "name": "mail_config",
       "schema": "",
@@ -1409,6 +1333,21 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "merchant_email_unique": {
+          "name": "merchant_email_unique",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1931,6 +1870,21 @@
           "columns": [
             {
               "expression": "warehouseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "order_delivery_city_id_idx": {
+          "name": "order_delivery_city_id_idx",
+          "columns": [
+            {
+              "expression": "deliveryCityId",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

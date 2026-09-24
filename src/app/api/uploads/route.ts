@@ -3,7 +3,12 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, serverError, unauthorized } from "@/lib/api-response"
 import { saveFile } from "@/lib/storage"
-import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, UPLOAD_FOLDERS, type UploadFolder } from "@/lib/storage/config"
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_FOLDERS,
+  type UploadFolder,
+} from "@/lib/storage/config"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Accepts a single image file (multipart/form-data) and stores it, returning

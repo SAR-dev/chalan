@@ -109,7 +109,9 @@ e2e/specs/01-core-flows.spec.ts    # All core scenarios in one file
 e2e/selectors.ts                    # Centralized data-testid selectors
 ```
 
-**Run:** `pnpm build` (manual) then `pnpm test:e2e`. Playwright config uses `pnpm start` — build must be done first.
+**Run:** `pnpm build` (manual) then `pnpm test:e2e`. Playwright's `webServer`
+reseeds the DB (`pnpm db:seed:full`) and starts `pnpm start` — build must be
+done first.
 
 **Credentials (seeded — all passwords `12qwaszx`):**
 - Super Admin: `admin01@email.com` / `12qwaszx`

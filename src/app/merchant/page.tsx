@@ -1,6 +1,13 @@
 "use client"
 
-import { AlertCircle, Ban, ExternalLink, Package, PackagePlus, Wallet } from "lucide-react"
+import {
+  AlertCircle,
+  Ban,
+  ExternalLink,
+  Package,
+  PackagePlus,
+  Wallet,
+} from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { AreaChart, PieChart } from "@/components/charts"
@@ -8,7 +15,13 @@ import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"

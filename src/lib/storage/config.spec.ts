@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import type { UploadFolder } from "./config"
-import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, UPLOAD_FOLDERS, UPLOAD_MAX_DIMENSIONS } from "./config"
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_FOLDERS,
+  UPLOAD_MAX_DIMENSIONS,
+} from "./config"
 
 describe("ALLOWED_IMAGE_TYPES", () => {
   it("contains 5 image types", () => {

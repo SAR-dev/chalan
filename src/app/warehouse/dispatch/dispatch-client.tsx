@@ -1,8 +1,20 @@
 "use client"
 
-import { Bike, MoreHorizontal, PackageOpen, Send, ShoppingBag, Truck, UserPlus } from "lucide-react"
+import {
+  Bike,
+  MoreHorizontal,
+  PackageOpen,
+  Send,
+  ShoppingBag,
+  Truck,
+  UserPlus,
+} from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CellTwoRow, DataTable, type DataTableColumn } from "@/components/data-table"
+import {
+  CellTwoRow,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
 import { Button } from "@/components/ui/button"

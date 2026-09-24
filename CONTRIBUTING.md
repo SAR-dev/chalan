@@ -2461,9 +2461,10 @@ e2e/
 
 #### Configuration
 
-See [`playwright.config.ts`](./playwright.config.ts). The `webServer` runs a bare
-`pnpm start` — **it does not reseed the database**, so the DB must already contain
-the deterministic seed data (see T4 in `ROADMAP.md` for this known gap).
+See [`playwright.config.ts`](./playwright.config.ts). The `webServer` runs
+`pnpm db:seed:full && pnpm start` — it **reseeds the database** with the
+deterministic seed data (truncating existing rows) before starting the server,
+so every run begins from the same known state.
 
 - **Build required:** `pnpm build` before the first run (rebuild after app code
   changes). Test-only changes (`*.spec.ts`, `selectors.ts`, `helpers.ts`) need no
@@ -2541,7 +2542,7 @@ pnpm exec playwright test --ui    # UI debugger (watch mode)
 
 There is currently **no e2e job** in `.github/workflows/ci.yml` — e2e only runs
 locally (see T3 in `ROADMAP.md`). Adding one requires a PostgreSQL service
-container, a `pnpm build` step, and a seed step, since `webServer` does not seed.
+container and a `pnpm build` step; the `webServer` seeds the DB itself.
 
 #### Writing a new E2E test — checklist
 

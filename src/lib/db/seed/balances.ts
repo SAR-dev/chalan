@@ -1,7 +1,12 @@
 import { sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
-import { ADMIN_USER_NAMES, MERCHANT_IDS, SEED_ORDERS, SEED_PAYOUT_REQUESTS } from "@/lib/db/seed/seed-content"
+import {
+  ADMIN_USER_NAMES,
+  MERCHANT_IDS,
+  SEED_ORDERS,
+  SEED_PAYOUT_REQUESTS,
+} from "@/lib/db/seed/seed-content"
 import { log } from "./helpers"
 
 export async function seedBalances() {

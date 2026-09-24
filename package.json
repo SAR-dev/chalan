@@ -24,6 +24,7 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx src/lib/db/migrate.ts",
     "db:admin": "tsx scripts/setup.ts",
+    "db:seed:full": "tsx src/lib/db/seed/index-full.ts",
     "ci:fix": "pnpm lint && pnpm format",
     "ci:check": "pnpm typecheck && pnpm lint:check && pnpm format:check",
     "ci:test": "pnpm test:unit:run && pnpm build && pnpm test:e2e",

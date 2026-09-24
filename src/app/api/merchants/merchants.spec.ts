@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { SEED_IMAGE_PLACEHOLDER } from "@/lib/db/seed/seed-content"
 import { PATCH as approveMerchant } from "./[id]/approve/route"
 import { POST as adjustBalance } from "./[id]/balance/adjust/route"
 import { PATCH as confirmPayment } from "./[id]/balance/payment/[txId]/confirm/route"
@@ -12,7 +13,7 @@ import { PATCH as reactivateMerchant } from "./[id]/reactivate/route"
 import { GET as getMerchant, PATCH as updateMerchant } from "./[id]/route"
 import { PATCH as suspendMerchant } from "./[id]/suspend/route"
 import { POST as sendVerifyEmail } from "./[id]/verify-email/route"
-import { GET as listMerchants, POST as createMerchant } from "./route"
+import { POST as createMerchant, GET as listMerchants } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
@@ -733,9 +734,9 @@ describe("POST /api/merchants/:id/verify-email", () => {
 
 describe("PATCH /api/merchants/:id/nid", () => {
   const validBody = {
-    nidFrontImage: "data:image/png;base64,front_base64",
-    nidBackImage: "data:image/png;base64,back_base64",
-    nidSelfieImage: "data:image/png;base64,selfie_base64",
+    nidFrontImage: SEED_IMAGE_PLACEHOLDER,
+    nidBackImage: SEED_IMAGE_PLACEHOLDER,
+    nidSelfieImage: SEED_IMAGE_PLACEHOLDER,
   }
 
   it("401 when unauthenticated", async () => {
@@ -820,17 +821,17 @@ describe("PATCH /api/merchants/:id/nid", () => {
     updateResult.push({
       id: "m_1",
       nidSubmittedAt: "2025-01-02T00:00:00Z",
-      nidFrontImage: "front_base64",
-      nidBackImage: "back_base64",
-      nidSelfieImage: "selfie_base64",
+      nidFrontImage: SEED_IMAGE_PLACEHOLDER,
+      nidBackImage: SEED_IMAGE_PLACEHOLDER,
+      nidSelfieImage: SEED_IMAGE_PLACEHOLDER,
     })
     const res = await submitNid(req("PATCH", undefined, validBody), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({
-      nidFrontImage: "front_base64",
-      nidBackImage: "back_base64",
-      nidSelfieImage: "selfie_base64",
+      nidFrontImage: SEED_IMAGE_PLACEHOLDER,
+      nidBackImage: SEED_IMAGE_PLACEHOLDER,
+      nidSelfieImage: SEED_IMAGE_PLACEHOLDER,
     })
   })
 
@@ -840,9 +841,9 @@ describe("PATCH /api/merchants/:id/nid", () => {
     updateResult.push({
       id: "m_1",
       nidSubmittedAt: "2025-01-02T00:00:00Z",
-      nidFrontImage: "front_base64",
-      nidBackImage: "back_base64",
-      nidSelfieImage: "selfie_base64",
+      nidFrontImage: SEED_IMAGE_PLACEHOLDER,
+      nidBackImage: SEED_IMAGE_PLACEHOLDER,
+      nidSelfieImage: SEED_IMAGE_PLACEHOLDER,
     })
     const res = await submitNid(req("PATCH", undefined, validBody), ctx())
     expect(res.status).toBe(200)

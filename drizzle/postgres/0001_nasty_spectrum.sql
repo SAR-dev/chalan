@@ -100,19 +100,6 @@ CREATE TABLE "email_log" (
 	"markedSentAt" timestamp with time zone
 );
 --> statement-breakpoint
-CREATE TABLE "failed_mail" (
-	"id" text PRIMARY KEY NOT NULL,
-	"to" text NOT NULL,
-	"subject" text NOT NULL,
-	"html" text,
-	"text" text,
-	"error" text NOT NULL,
-	"attempts" integer NOT NULL,
-	"failedAt" timestamp with time zone DEFAULT now() NOT NULL,
-	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
-	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "mail_config" (
 	"id" text PRIMARY KEY NOT NULL,
 	"label" text NOT NULL,
@@ -411,6 +398,7 @@ CREATE INDEX "email_log_to_trgm_idx" ON "email_log" USING gin ("to" gin_trgm_ops
 CREATE INDEX "email_log_subject_trgm_idx" ON "email_log" USING gin ("subject" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "merchant_status_idx" ON "merchant" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "merchant_created_at_idx" ON "merchant" USING btree ("createdAt");--> statement-breakpoint
+CREATE UNIQUE INDEX "merchant_email_unique" ON "merchant" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "merchant_email_verified_at_idx" ON "merchant" USING btree ("emailVerifiedAt");--> statement-breakpoint
 CREATE INDEX "merchant_nid_submitted_at_idx" ON "merchant" USING btree ("nidSubmittedAt");--> statement-breakpoint
 CREATE INDEX "merchant_nid_verified_at_idx" ON "merchant" USING btree ("nidVerifiedAt");--> statement-breakpoint
@@ -421,6 +409,7 @@ CREATE INDEX "merchant_email_trgm_idx" ON "merchant" USING gin ("email" gin_trgm
 CREATE INDEX "merchant_phone_trgm_idx" ON "merchant" USING gin ("phone" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "order_merchant_id_idx" ON "order" USING btree ("merchantId");--> statement-breakpoint
 CREATE INDEX "order_warehouse_id_idx" ON "order" USING btree ("warehouseId");--> statement-breakpoint
+CREATE INDEX "order_delivery_city_id_idx" ON "order" USING btree ("deliveryCityId");--> statement-breakpoint
 CREATE INDEX "order_pickup_rider_id_idx" ON "order" USING btree ("pickupRiderId");--> statement-breakpoint
 CREATE INDEX "order_delivery_rider_id_idx" ON "order" USING btree ("deliveryRiderId");--> statement-breakpoint
 CREATE INDEX "order_pickup_location_id_idx" ON "order" USING btree ("pickupLocationId");--> statement-breakpoint

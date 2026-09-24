@@ -1,6 +1,12 @@
 "use client"
 
-import { ExternalLink, MapPin, Package, PackageCheck, Store } from "lucide-react"
+import {
+  ExternalLink,
+  MapPin,
+  Package,
+  PackageCheck,
+  Store,
+} from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"

@@ -1,6 +1,14 @@
 "use client"
 
-import { Ban, Boxes, CheckCircle2, Clock, MoreHorizontal, Truck, X } from "lucide-react"
+import {
+  Ban,
+  Boxes,
+  CheckCircle2,
+  Clock,
+  MoreHorizontal,
+  Truck,
+  X,
+} from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { DataTable, type DataTableColumn } from "@/components/data-table"

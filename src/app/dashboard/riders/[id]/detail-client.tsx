@@ -11,6 +11,7 @@ import {
   User,
   XCircle,
 } from "lucide-react"
+import { ImageZoom } from "@/components/image-zoom"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -224,7 +225,7 @@ export function RiderDetailClient({ rider }: { rider: RiderData }) {
                         <span className="text-muted-foreground text-xs">
                           Front
                         </span>
-                        <img
+                        <ImageZoom
                           src={rider.nidFrontImage}
                           alt="NID front"
                           className="rounded-lg border object-cover aspect-video h-full"
@@ -236,7 +237,7 @@ export function RiderDetailClient({ rider }: { rider: RiderData }) {
                         <span className="text-muted-foreground text-xs">
                           Back
                         </span>
-                        <img
+                        <ImageZoom
                           src={rider.nidBackImage}
                           alt="NID back"
                           className="rounded-lg border object-cover aspect-video h-full"
@@ -248,7 +249,7 @@ export function RiderDetailClient({ rider }: { rider: RiderData }) {
                         <span className="text-muted-foreground text-xs">
                           Selfie
                         </span>
-                        <img
+                        <ImageZoom
                           src={rider.nidSelfieImage}
                           alt="NID selfie"
                           className="rounded-lg border object-cover aspect-video h-full"

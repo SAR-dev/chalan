@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { siteConfig, SiteIcon } from "@/config/site"
+import { SiteIcon, siteConfig } from "@/config/site"
 import { AuthProvider } from "@/features/account/hooks/use-auth"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"

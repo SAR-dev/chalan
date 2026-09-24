@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { DELETE as deletePickupLocation, PATCH as updatePickupLocation } from "./[id]/route"
-import { GET as listPickupLocations, POST as createPickupLocation } from "./route"
+import {
+  DELETE as deletePickupLocation,
+  PATCH as updatePickupLocation,
+} from "./[id]/route"
+import {
+  POST as createPickupLocation,
+  GET as listPickupLocations,
+} from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false

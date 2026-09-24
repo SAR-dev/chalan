@@ -5,7 +5,11 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
-import { merchantBrandingSchema, merchantProfileSchema, parseBody } from "@/lib/validation"
+import {
+  merchantBrandingSchema,
+  merchantProfileSchema,
+  parseBody,
+} from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const GET = withErrorHandler(

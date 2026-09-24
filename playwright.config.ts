@@ -19,10 +19,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm start",
+    // Reseed the DB (deterministic seed-content), then start the server —
+    // each run begins from the same known data (see seed/index-full.ts).
+    command: "pnpm db:seed:full && pnpm start",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 180_000,
     // Better Auth's rate limiter (max: 10/min against get-session in production)
     // gets exhausted by the suite's many logins/session checks, causing auth
     // bootstrap to fail and shells to bounce back to /login. Disable for e2e.
