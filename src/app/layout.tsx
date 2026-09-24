@@ -75,8 +75,8 @@ export default async function RootLayout({
   children: ReactNode
 }>) {
   // x-nonce is set by the edge proxy (src/proxy.ts) for every page request so
-  // Next can nonce its inline scripts AND we can forward it to components that
-  // inject their own inline scripts (next-themes, NextTopLoader).
+  // Next can nonce its inline scripts AND we can forward it to next-themes,
+  // which injects its own inline <script> for theme flash prevention.
   const headerList = await headers()
   const nonce = headerList.get("x-nonce") ?? undefined
 
@@ -87,7 +87,11 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-background font-sans antialiased">
-        <NextTopLoader nonce={nonce} />
+        {/* No nonce here on purpose: nextjs-toploader renders <style nonce> without
+            suppressHydrationWarning, and React doesn't expose the nonce to the
+            client render (nonce="" vs server value → hydration mismatch). Styles are
+            allowed by `style-src 'unsafe-inline'`, so they don't need one. */}
+        <NextTopLoader />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

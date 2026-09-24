@@ -39,10 +39,16 @@ function createNonce(): string {
 }
 
 function buildCsp(nonce: string): string {
+  // React's dev build uses eval() (call-stack reconstruction, fast refresh).
+  // Production never does, so 'unsafe-eval' is development-only — keeping the
+  // production policy strict while unblocking the dev overlay.
+  const devScriptSrc =
+    process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
+
   return [
     "default-src 'self'",
     // Inline hydration scripts get the per-request nonce; no 'unsafe-inline'.
-    `script-src 'self' 'nonce-${nonce}'`,
+    `script-src 'self' 'nonce-${nonce}'${devScriptSrc}`,
     // next-themes / NextTopLoader inject inline <style> for theme flicker
     // prevention & progress bar — those need 'unsafe-inline' (styles only).
     "style-src 'self' 'unsafe-inline'",

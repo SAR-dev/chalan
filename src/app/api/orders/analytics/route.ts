@@ -47,10 +47,15 @@ export const GET = withErrorHandler(async (req: Request) => {
   }
 
   // 1. Orders by day (last 30 days or date range)
+  // NOTE: Postgres returns bigint (count) and numeric (avg) as JS *strings*
+  // through node-postgres. `sql<number>` is a TypeScript-only assertion and
+  // does not coerce at runtime, so every aggregate must be cast explicitly —
+  // otherwise Recharts receives strings and its path/axis math yields NaN,
+  // rendering blank charts.
   const ordersByDay = await dbRead
     .select({
       date: sql<string>`date(${order.createdAt})`.as("date"),
-      count: sql<number>`count(*)`.as("count"),
+      count: sql<number>`count(*)::int`.as("count"),
       revenue: sql<number>`coalesce(sum(${order.merchantEarnings}), 0)`.as(
         "revenue",
       ),
@@ -64,7 +69,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   const ordersByStatus = await dbRead
     .select({
       status: order.status,
-      count: sql<number>`count(*)`.as("count"),
+      count: sql<number>`count(*)::int`.as("count"),
     })
     .from(order)
     .where(where)
@@ -74,19 +79,19 @@ export const GET = withErrorHandler(async (req: Request) => {
   const [deliveryStats] = await dbRead
     .select({
       totalDelivered:
-        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')`.as(
+        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')::int`.as(
           "totalDelivered",
         ),
       totalFailed:
-        sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')`.as(
+        sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')::int`.as(
           "totalFailed",
         ),
       totalReturned:
-        sql<number>`count(*) filter (where ${order.status} = 'RETURNED')`.as(
+        sql<number>`count(*) filter (where ${order.status} = 'RETURNED')::int`.as(
           "totalReturned",
         ),
       avgDeliveryTimeHours:
-        sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)`.as(
+        sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)::float`.as(
           "avgDeliveryTimeHours",
         ),
     })
@@ -115,11 +120,11 @@ export const GET = withErrorHandler(async (req: Request) => {
           "totalSettled",
         ),
       settledCount:
-        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)`.as(
+        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)::int`.as(
           "settledCount",
         ),
       pendingCount:
-        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)`.as(
+        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)::int`.as(
           "pendingCount",
         ),
     })

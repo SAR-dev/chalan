@@ -35,11 +35,13 @@ export const GET = withErrorHandler(async (req: Request) => {
   // All three counts share the same warehouseId predicate, so compute them
   // in a single pass over the order_warehouse_status_created_at index with
   // aggregate FILTER clauses — one round-trip instead of three.
+  // `::int` is required: Postgres bigint arrives as a JS string via
+  // node-postgres, and `sql<number>` is a compile-time assertion only.
   const [row] = await db
     .select({
-      failedAttempt: sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')`,
-      unsettled: sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)`,
-      returned: sql<number>`count(*) filter (where ${order.status} = 'RETURNED')`,
+      failedAttempt: sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')::int`,
+      unsettled: sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)::int`,
+      returned: sql<number>`count(*) filter (where ${order.status} = 'RETURNED')::int`,
     })
     .from(order)
     .where(eq(order.warehouseId, warehouseId))

@@ -71,7 +71,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   const [[{ count, totalEarnings }], rows] = await Promise.all([
     db
       .select({
-        count: sql<number>`count(*)`,
+        count: sql<number>`count(*)::int`,
         totalEarnings: sql<number>`coalesce(sum(${order.merchantEarnings}), 0)`,
       })
       .from(order)
