@@ -123,7 +123,9 @@ src/lib/
   upload-image.ts                    client-side image upload with compression
   db/index.ts                        Drizzle client — initialises pg pool, exports db (primary/writes), dbRead (read-replica, falls back to primary), and pool
   db/schema.ts                       re-exports schema.postgres (kept for import-path compat)
-  db/schema.postgres.ts              PostgreSQL table definitions (pg-core types)
+  db/schema.postgres/                PostgreSQL table definitions (pg-core types), split by domain:
+                                     enums.ts, helpers.ts, auth.ts, warehouses.ts, logistics.ts,
+                                     merchants.ts, orders.ts, finance.ts, platform.ts + index.ts barrel
   db/seed/                           per-entity seed modules (riders, orders, merchant-balances, etc.)
   db/seed.ts                         main seed runner
   db/seed-credentials.ts             credential seeding
@@ -1469,7 +1471,9 @@ Rules:
 
 Example: the `rider.taskType` column added recently.
 
-1. **Schema** — add the column in `src/lib/db/schema.postgres.ts`.
+1. **Schema** — add the column to the right domain module in `src/lib/db/schema.postgres/`
+   (e.g. `auth.ts` for user/profile columns, `orders.ts` for order columns — the barrel
+   `index.ts` re-exports everything, so import paths never change).
    Use a `text(... { enum })` for enums and export the values array if the UI needs it:
    ```ts
    export const riderTaskTypes = ["PICKUP", "DELIVERY", "BOTH"] as const
@@ -1514,7 +1518,9 @@ the above in three ways:
 
 Example structure to mirror: **merchants** (rich).
 
-1. **Schema** — add the `pgTable` in `src/lib/db/schema.postgres.ts`, with `createId()` PK and
+1. **Schema** — add the `pgTable` to the right domain module in `src/lib/db/schema.postgres/`
+   (pick the module matching the domain; watch FK dependency order — a new parent table goes
+   in an earlier module than its dependents), with `createId()` PK and
    relations via `.references()`.
 2. **Type** — re-export from `src/lib/types.ts`:
    `export type Thing = typeof thing.$inferSelect`.
@@ -1875,7 +1881,9 @@ If you need to run a raw command that requires the env, use `dotenv-cli`:
 pnpm dotenv -e .env.development.local -- drizzle-kit push
 ```
 
-**When you add or change a column, update `src/lib/db/schema.postgres.ts`** — it is the single source of truth.
+**When you add or change a column, update the matching module in `src/lib/db/schema.postgres/`**
+— the folder (with its `index.ts` barrel) is the single source of truth; import paths stay
+`@/lib/db/schema`.
 
 ```bash
 # Push schema to the database

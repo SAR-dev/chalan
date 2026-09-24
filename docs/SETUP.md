@@ -198,7 +198,8 @@ pnpm db:admin
 
 - `src/lib/db/index.ts` — Drizzle client; initialises the pg pool and exports `db` (primary/writes), `dbRead` (read-replica, falls back to primary), and `pool`.
 - `src/lib/db/schema.ts` — re-exports `schema.postgres` (kept for import-path compatibility).
-- `src/lib/db/schema.postgres.ts` — PostgreSQL schema (pg-core types).
+- `src/lib/db/schema.postgres/` — PostgreSQL schema (pg-core types), split into domain
+  modules (`enums.ts`, `auth.ts`, `orders.ts`, …) with an `index.ts` barrel.
 - `src/lib/db/seed.ts` — seed script, creates users via Better Auth.
 - `src/lib/auth.ts` — Better Auth config; uses `pool` directly.
 - `drizzle.config.ts` — drizzle-kit config (PostgreSQL only).
@@ -321,6 +322,7 @@ docker compose -f docker/compose.cluster.yml run --rm migrate-dashboard
 
 - `pnpm db:push` is interactive — use `pnpm exec drizzle-kit push --force` for non-interactive runs.
 - Always `set -a && . ./.env.development.local && set +a` before running `db:*` scripts.
-- Edit only `src/lib/db/schema.postgres.ts` when making schema changes — there is a single schema file.
+- Edit the matching domain module under `src/lib/db/schema.postgres/` when making schema
+  changes (the `index.ts` barrel re-exports everything — there is still one logical schema).
 - In a multi-instance deployment, all containers must share the same `BETTER_AUTH_SECRET` and `DATABASE_URL` — the session and user tables are shared and auth will break if secrets differ across instances.
 - The rate limiter in `src/lib/rate-limit.ts` and the upload proxy in `src/proxy.ts` use in-memory stores. For multi-host deployments (containers on different machines), swap the internal `Map` for a Redis/Upstash store so rate limits are enforced globally, not per-container.

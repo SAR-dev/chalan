@@ -1,283 +1,428 @@
-# Unified Plan — Order Actions Expansion + Role Module Features
+# TODO: CSV Bulk Order Import
 
-This merges **ORDER.md** (new order statuses/actions, schema, API, audit, notifications) with **REFACTOR.md** (per-role UI feature roadmap for Merchant, Rider, Warehouse, Admin). Several REFACTOR features directly depend on, or duplicate, ORDER actions — those overlaps are called out explicitly in §8 so they aren't built twice or inconsistently.
-
----
-
-## 1. Updated Order Status Flow
-
-```
-PENDING → APPROVED → PICKED_UP → IN_WAREHOUSE → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
-   ↓ ↓        ↓            ↓             ↓              ↓              ↓
-REJECTED  CANCELLED    CANCELLED     CANCELLED      CANCELLED      FAILED_ATTEMPT → RETURNED
-   |         ↓             ↓                                              ↓
-   |    (assigned to    HELD ⇄ (APPROVED/PICKED_UP/IN_WAREHOUSE)      REATTEMPT → OUT_FOR_DELIVERY
-   |       rider)             ↓
-   |                       DAMAGED (from IN_WAREHOUSE only)
-   ↓
-CANCELLED
-```
-
-New terminal/side statuses: `HELD` (pausable from APPROVED/PICKED_UP/IN_WAREHOUSE, returns to prior status on release), `DAMAGED` (from IN_WAREHOUSE), `REJECTED` (from PENDING, alternative to CANCELLED).
+> Status: **v1 ready to implement.** v1.1, v1.2 and v2 are scoped but not started.
+> Primary user: Merchant (`/merchant`). Pricing, balance ledger, guards and
+> `MAX_BULK_ORDERS` stay in the existing `POST /api/orders/bulk` write path.
+> v1 adds a CSV front-end to it with **no server changes**.
 
 ---
 
-## 2. Full Transition Table
+## 1. Goal, scope and versions
 
-| Transition | Roles | From | To | Source |
-|---|---|---|---|---|
-| `approve` | SUPER_ADMIN | PENDING | APPROVED | existing |
-| `reject` | SUPER_ADMIN | PENDING | REJECTED | ORDER §2 |
-| `edit` | SUPER_ADMIN | PENDING | PENDING (no change) | ORDER §1 |
-| `edit` (merchant-scoped) | MERCHANT | PENDING | PENDING (no change) | REFACTOR Merchant F2 — **see §8.1 conflict** |
-| `cancel` | SUPER_ADMIN, WAREHOUSE_ADMIN, MERCHANT | PENDING…IN_TRANSIT | CANCELLED | existing |
-| `hold` | SUPER_ADMIN, WAREHOUSE_ADMIN | APPROVED, PICKED_UP, IN_WAREHOUSE | HELD | ORDER §3 |
-| `release` | SUPER_ADMIN, WAREHOUSE_ADMIN | HELD | previous status | ORDER §4 |
-| `assign-pickup-rider` | WAREHOUSE_ADMIN | APPROVED | APPROVED (+riderId) | existing |
-| `reassign-rider` (generic) | SUPER_ADMIN, WAREHOUSE_ADMIN | APPROVED / IN_WAREHOUSE | same | ORDER §7 |
-| `reassign-pickup-rider` | WAREHOUSE_ADMIN | APPROVED (has pickupRiderId) | same | ORDER §12 — specialization of §7 |
-| `reassign-delivery-rider` | WAREHOUSE_ADMIN | IN_WAREHOUSE (has deliveryRiderId) | same | ORDER §13 — specialization of §7 |
-| `picked-up` | RIDER | APPROVED | PICKED_UP | existing |
-| `receive` | WAREHOUSE_ADMIN | PICKED_UP | IN_WAREHOUSE | existing |
-| `transfer-warehouse` | SUPER_ADMIN, WAREHOUSE_ADMIN | PICKED_UP, IN_WAREHOUSE | same warehouse-shifted | ORDER §5 |
-| `hold-parcel` | WAREHOUSE_ADMIN | IN_WAREHOUSE | HELD | ORDER §9 |
-| `mark-damaged` | WAREHOUSE_ADMIN | IN_WAREHOUSE | DAMAGED | ORDER §10 |
-| `dispatch` | WAREHOUSE_ADMIN | IN_WAREHOUSE | IN_TRANSIT | existing |
-| `force-dispatch` | WAREHOUSE_ADMIN | IN_WAREHOUSE | IN_TRANSIT | ORDER §11 |
-| `reschedule` | SUPER_ADMIN, WAREHOUSE_ADMIN | IN_WAREHOUSE, IN_TRANSIT | same (+rescheduledTo) | ORDER §8 |
-| `out-for-delivery` | RIDER | IN_TRANSIT | OUT_FOR_DELIVERY | existing |
-| `delivered` | RIDER | OUT_FOR_DELIVERY | DELIVERED | existing |
-| `failed` | RIDER | OUT_FOR_DELIVERY | FAILED_ATTEMPT | existing |
-| `reattempt` | WAREHOUSE_ADMIN | FAILED_ATTEMPT | OUT_FOR_DELIVERY | existing |
-| `return` | WAREHOUSE_ADMIN | FAILED_ATTEMPT | RETURNED | existing |
-| `settle-cod` | WAREHOUSE_ADMIN | DELIVERED | DELIVERED (+codSettledAt) | existing |
-| `add-note` | SUPER_ADMIN, WAREHOUSE_ADMIN | any | same | ORDER §6 |
+**Goal:** A merchant downloads a CSV template, fills it (or pastes rows from a
+spreadsheet), previews and validates row by row, and creates all orders in one
+request. **Nothing is imported until the whole file is error-free (all-or-nothing).**
+
+**Key simplification:** v1 caps imports at `MAX_BULK_ORDERS` (50), so an import is a
+single request to the existing endpoint. That gives real server-side atomicity (one
+transaction) and removes chunking, idempotency keys, checkpoints, retry/backoff and
+partial-failure screens. Those return in v1.2 only if larger imports are needed.
+
+| Version | Theme                                   | Server changes            | Rows |
+|---------|-----------------------------------------|---------------------------|------|
+| v1      | Single-request import, validate + fix loop | none                   | 50   |
+| v1.1    | Duplicate protection, faster fixing     | guard + read-only endpoint (no migration) | 50 |
+| v1.2    | Large imports                           | idempotency + migration   | 500  |
+| v2      | Polish and resilience                   | none                      | 500  |
+| v3      | Only if requested                       | varies                    | n/a  |
+
+**Non-goals (all versions up to v2):**
+- Excel (`.xlsx`): CSV and paste only. Workaround: "Save as CSV UTF-8" or copy/paste.
+- Admin/warehouse-initiated import: merchant-only, same as `POST /api/orders/bulk`.
+- Editing existing orders or status changes: import always creates `PENDING` orders.
+- Importing fees, status or IDs: every fee is computed server-side.
 
 ---
 
-## 3. Schema Changes (unchanged from ORDER.md, no additions needed from REFACTOR)
+## 2. Building blocks (reuse, don't rebuild)
 
-```sql
-ALTER TABLE "order" ADD COLUMN "heldAt" timestamp;
-ALTER TABLE "order" ADD COLUMN "heldBy" text;
-ALTER TABLE "order" ADD COLUMN "holdReason" text;
-ALTER TABLE "order" ADD COLUMN "releasedAt" timestamp;
-ALTER TABLE "order" ADD COLUMN "releasedBy" text;
+| Piece                | Location                                                  | Reused how                                                                           |
+|----------------------|-----------------------------------------------------------|--------------------------------------------------------------------------------------|
+| Bulk create endpoint | `src/app/api/orders/bulk/route.ts`                        | The only write path: MERCHANT-only, `rateLimitByIp("orders-bulk", 10, 60)`, `orderBulkCreateSchema` (1..50), zone pricing, `ORDER_CHARGE` + balance upsert in one transaction |
+| Row schema           | `orderCreateSchema` (`src/lib/validation.ts`)             | Per-row client validation; server re-validates                                       |
+| Hook action          | `useOrders().createBulkOrders` (`use-orders.ts`)          | The single submit call in v1; wrapped by `importOrders` in v1.2                      |
+| CSV out              | `toCsv` / `downloadCsv` (`src/lib/csv.ts`)                | Template and error CSV downloads (BOM handled)                                       |
+| Lookups              | `GET /api/pickup-locations`, `GET /api/delivery-cities`   | Resolve names to IDs. Use the existing delivery-cities SWR hook, or add `useDeliveryCities` in `src/features/orders/hooks/` |
+| Zone pricing         | `GET /api/zone-pricing`, `calcDeliveryCharge`/`calcCodFee` | Fee estimates (v1.1)                                                                |
+| Dialog patterns      | `src/components/form-dialog.tsx`, `ConfirmDialog`         | Shell for the import dialog                                                          |
+| Single-order form    | `src/app/merchant/orders/new/page.tsx`                    | Field semantics reference (phone, weight, COD)                                       |
 
-ALTER TABLE "order" ADD COLUMN "rejectedAt" timestamp;
-ALTER TABLE "order" ADD COLUMN "rejectedBy" text;
-ALTER TABLE "order" ADD COLUMN "rejectionReason" text;
+**Gap:** no CSV parser exists in the repo (`csv.ts` is export-only), so add `papaparse`.
 
-ALTER TABLE "order" ADD COLUMN "damagedAt" timestamp;
-ALTER TABLE "order" ADD COLUMN "damagedBy" text;
-ALTER TABLE "order" ADD COLUMN "damageNotes" text;
-ALTER TABLE "order" ADD COLUMN "damagePhotos" text[];
+---
 
-ALTER TABLE "order" ADD COLUMN "rescheduledAt" timestamp;
-ALTER TABLE "order" ADD COLUMN "rescheduledBy" text;
-ALTER TABLE "order" ADD COLUMN "rescheduledTo" timestamp;
-ALTER TABLE "order" ADD COLUMN "rescheduleReason" text;
+# v1: Import up to 50 orders (client-only)
 
-ALTER TABLE "order" ADD COLUMN "internalNotes" text;
+**Flow:** download template, upload CSV or paste rows, preview with validation, fix
+and re-upload (or edit the pasted text) until clean, import in one request.
 
-ALTER TABLE "order" ADD COLUMN "transferredAt" timestamp;
-ALTER TABLE "order" ADD COLUMN "transferredBy" text;
-ALTER TABLE "order" ADD COLUMN "previousWarehouseId" text;
-ALTER TABLE "order" ADD COLUMN "transferReason" text;
+## 3. CSV format spec
+
+### 3.1 Template (downloadable from the dialog)
+
+Header row plus 1 sample row. The sample row is filled dynamically with the merchant's
+**first real pickup location name** and an **active delivery city** (fetched when the
+dialog opens). If the merchant has no pickup locations, the template uses the
+placeholder `MY PICKUP LOCATION` and the dialog blocks importing.
+
+```csv
+pickup_location,recipient_name,recipient_phone,delivery_city,delivery_address,parcel_weight_kg,product_cost,delivery_type,delivery_map_link,merchant_note
+Merchant 1 Pickup,John Doe,01712345678,Dhaka,House 1 Road 1 Dhanmondi Dhaka,1.5,1200,STANDARD,,"fragile packaging"
 ```
 
-```typescript
-export const orderStatuses = [
-  "PENDING", "APPROVED", "PICKED_UP", "IN_WAREHOUSE", "IN_TRANSIT",
-  "OUT_FOR_DELIVERY", "DELIVERED", "FAILED_ATTEMPT", "RETURNED", "CANCELLED",
-  "HELD", "DAMAGED", "REJECTED",
-] as const
+### 3.2 Columns
+
+| #  | Column              | Required | Format / rules                                              | Normalization before validation                                          |
+|----|---------------------|----------|-------------------------------------------------------------|--------------------------------------------------------------------------|
+| 1  | `pickup_location`   | yes      | Exact (case-insensitive) name of merchant's pickup location | trim, collapse inner whitespace                                          |
+| 2  | `recipient_name`    | yes      | 1-200 chars                                                 | trim                                                                     |
+| 3  | `recipient_phone`   | yes      | BD mobile `01XXXXXXXXX` (`isValidBdPhone`)                  | convert Bangla numerals; strip spaces/dashes/`+880`/`+88` to `01...`     |
+| 4  | `delivery_city`     | yes      | Exact (case-insensitive) name of an active delivery city    | trim                                                                     |
+| 5  | `delivery_address`  | yes      | Full address                                                | trim                                                                     |
+| 6  | `parcel_weight_kg`  | yes      | number > 0, <= merchant `maxWeightKg`                       | convert Bangla numerals; parse `1,5`/`1.5` to `1.5`                      |
+| 7  | `product_cost`      | yes      | number >= 0 (COD amount; 0 = prepaid)                       | convert Bangla numerals; strip `৳`/`TK`/currency and thousands commas    |
+| 8  | `delivery_type`     | no       | `STANDARD` or `FRAGILE` (default `STANDARD`)                | upper-case, trim                                                         |
+| 9  | `delivery_map_link` | no       | valid URL or empty                                          | trim                                                                     |
+| 10 | `merchant_note`     | no       | <= 100 chars                                                | trim; when empty, set to `[CSV import YYYY-MM-DD]` (see §7)              |
+
+Not columns (server-owned): `deliveryFee`, `codFee`, `merchantEarnings`,
+`warehouseId`, `status`, any IDs.
+
+### 3.3 Header aliases (forgiving headers)
+
+Header normalization: lower-case, trim, replace spaces/hyphens with `_`. Then apply
+this alias map (exact match on the normalized header). Defined once in `template.ts`
+as `headerAliases`.
+
+| Canonical           | Accepted aliases                                        |
+|---------------------|---------------------------------------------------------|
+| `pickup_location`   | `pickup`, `pickup_point`, `pickup_name`                 |
+| `recipient_name`    | `name`, `customer_name`, `recipient`, `customer`        |
+| `recipient_phone`   | `phone`, `mobile`, `recipient_mobile`, `customer_phone` |
+| `delivery_city`     | `city`                                                  |
+| `delivery_address`  | `address`, `recipient_address`                          |
+| `parcel_weight_kg`  | `weight`, `weight_kg`, `parcel_weight`                  |
+| `product_cost`      | `cod`, `cod_amount`, `amount`, `price`, `product_price` |
+| `delivery_type`     | `type`                                                  |
+| `delivery_map_link` | `map_link`, `map`, `location_link`                      |
+| `merchant_note`     | `note`, `notes`, `remarks`                              |
+
+### 3.4 Parsing rules
+
+- **Inputs:** a `.csv` file **or** pasted text (TSV/CSV from Excel/Google Sheets).
+  Both feed the same parser; Papa runs with `delimiter: ""` (auto-detect) and `header: true`.
+- **Encoding (files only):** decode the `ArrayBuffer` with
+  `new TextDecoder("utf-8", { fatal: true })`; strip BOM. Reject the file if decoding
+  throws or the result contains U+FFFD. Message: *"This file doesn't look like valid
+  UTF-8. Re-save it as 'CSV UTF-8' in Excel/Sheets."* Never render mojibake in preview.
+- **Dialect:** RFC 4180 (quoted fields, `""` escapes, CRLF/LF). No hand-rolled parser.
+- **Empty rows:** skip fully-empty rows but keep physical line numbers (`__line`,
+  header = line 1) so errors say **"Row 14"** and match Excel.
+- **File-level rejects:** more than `MAX_BULK_ORDERS` (50) data rows, over 2 MB, or
+  not `.csv`. The message states the limit and the actual value.
+- **Headers:** after aliasing, if any of the 7 required headers is missing, show one
+  error listing the missing names and stay in `idle`. Unknown extra columns are ignored.
+
+## 4. Architecture
+
+```
+CSV file / pasted text ──decode+parse──▶ rows[]
+   ──resolve──▶ IDs (pickup location, delivery city)     [GET lookups, cached SWR]
+   ──validate──▶ per-row { ok } | { errors: ["Row 14: ..."] }   [orderCreateSchema]
+   ──preview──▶ table + summary
+   ──confirm──▶ POST /api/orders/bulk (one request, ≤ 50 rows)
+   ──result──▶ success toast, or error with server row errors mapped to CSV rows
 ```
 
----
+**Why client-side, not a new multipart endpoint:**
+1. No new write surface: auth, merchant guards, overweight checks, zone pricing and
+   the balance ledger stay in the existing route.
+2. Row errors surface **before** anything is written (preview gate).
+3. The file never leaves the browser; recipient PII is only sent as structured JSON
+   to an authenticated merchant endpoint.
+4. Follows the repo's 3-step error pipeline unchanged.
 
-## 4. Consolidated API Endpoints
+## 5. UI spec (v1)
 
-### Order actions (ORDER.md — backend, role-guarded per §2 table)
+**Entry point:** merchant orders list page, toolbar button **"Import CSV"**.
 
-| Method | Endpoint | Notes |
-|---|---|---|
-| `PATCH` | `/api/orders/[id]/edit` | **Shared by SUPER_ADMIN and MERCHANT** — see §8.1 |
-| `PATCH` | `/api/orders/[id]/reject` | SUPER_ADMIN |
-| `PATCH` | `/api/orders/[id]/hold` | SUPER_ADMIN, WAREHOUSE_ADMIN |
-| `PATCH` | `/api/orders/[id]/release` | SUPER_ADMIN, WAREHOUSE_ADMIN |
-| `PATCH` | `/api/orders/[id]/transfer-warehouse` | SUPER_ADMIN, WAREHOUSE_ADMIN |
-| `PATCH` | `/api/orders/[id]/note` | SUPER_ADMIN, WAREHOUSE_ADMIN |
-| `PATCH` | `/api/orders/[id]/reassign-rider` | SUPER_ADMIN, WAREHOUSE_ADMIN (generic) |
-| `PATCH` | `/api/orders/[id]/reschedule` | SUPER_ADMIN, WAREHOUSE_ADMIN |
-| `PATCH` | `/api/orders/[id]/damage` | WAREHOUSE_ADMIN |
+**Dialog:** `src/features/orders/dialogs/bulk-import-dialog.tsx`, built on
+`FormDialog`. Never rendered inline in a page file.
 
-### Bulk (shared across modules — see §8.2)
+States: `idle → parsing → preview → submitting → done | error`.
 
-| Method | Endpoint | Consumers |
-|---|---|---|
-| `PATCH` | `/api/orders/bulk/cancel` | Merchant F4, Warehouse F3, Admin F3 |
-| `PATCH` | `/api/orders/bulk/approve` | exists — Admin F3 |
-| `PATCH` | `/api/orders/bulk/reattempt` | Warehouse F3 (new) |
-| `PATCH` | `/api/orders/bulk/return` | Warehouse F3 (new) |
-| `PATCH` | `/api/merchants/bulk/approve` | exists — Admin F3 |
-| `PATCH` | `/api/merchants/bulk/suspend` | Admin F3 (new) |
-| `PATCH` | `/api/merchants/bulk/reactivate` | Admin F3 (new) |
+| State      | Content                                                                                                                                                                                                                                  |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| idle       | File input (accept `.csv`), "Paste rows from Excel/Google Sheets" textarea, **Download template**, constraints hint (50 rows, 2 MB), plain list of the merchant's valid pickup locations and active cities. No pickup locations: show "Add a pickup location first" with a link, and disable file/paste inputs. |
+| parsing    | spinner (`bulk-import-loading`)                                                                                                                                                                                                          |
+| preview    | Summary (`bulk-import-summary`): `N valid · M errors`. Plain table (`bulk-import-preview`, no virtualization at 50 rows): row #, recipient, city, weight, COD, per-row errors in red. Footer: **Download error CSV** (only if M>0), **Import N orders** (**disabled until M=0 and N>0**), **Cancel**. Pasted text stays in the textarea so it can be edited and re-parsed in place. |
+| submitting | Import button disabled, spinner. A `useRef` "submitting" flag is set synchronously on first click, before any state update, to block double-submit.                                                                                       |
+| done       | Success toast "N orders created", mutate SWR keys (`/api/orders`, `.../counts`, `.../payable`), close dialog.                                                                                                                            |
+| error      | Toast via `formatOrderError`; dialog stays open. Server `rows: [...]` errors (e.g. overweight) are mapped back to CSV row numbers and shown. Retry is **not** offered for validation failures. On network error or timeout, show: *"We couldn't confirm the import. Check your orders list before retrying."* |
 
-### Per-module additions (REFACTOR.md)
+**Error messages** are instructions, never raw schema paths:
+`Row 14: phone must be a Bangladeshi number like 01712345678`.
 
-| Method | Endpoint | Module |
-|---|---|---|
-| `GET` | `/api/merchants/[id]/analytics` | Merchant F6 |
-| `GET` | `/api/riders/[id]/delivery-history` | Rider F2 |
-| `GET` | `/api/riders/[id]/earnings` | Rider F3 |
-| `PATCH` | `/api/riders/[id]/active` | Rider F5 |
-| `PATCH` | `/api/users/me` (extend w/ notification prefs) | Rider F6 |
-| `GET` | `/api/riders/performance` | Warehouse F2 |
-| `GET` | `/api/warehouses/[id]/analytics` | Warehouse F4 |
-| `GET` | `/api/warehouses/[id]/reconciliation` | Warehouse F5 |
-| `GET` | `/api/warehouses/[id]/activity` | Warehouse F6 |
-| `GET` | `/api/analytics/platform` | Admin F1 |
-| `GET` | `/api/riders/[id]/performance` | Admin F5 |
-| `GET/PATCH` | `/api/notifications*` | Admin F6 |
-| `GET` (extended) | `/api/audit-logs` (+dateFrom/dateTo/actorRole/actionType/entityType) | Admin F7 |
+**Error CSV:** original columns plus an `error` column. The merchant fixes it and
+re-uploads. Because nothing is imported while errors exist, a fixed file re-imports
+cleanly with no partial state.
 
----
+**data-testid constants** (add to `e2e/selectors.ts` under `orders`):
 
-## 5. Consolidated Audit Actions
+| testid                      | Element                          |
+|-----------------------------|----------------------------------|
+| `bulk-import-open`          | toolbar entry button             |
+| `bulk-import-template`      | Download template button         |
+| `bulk-import-file`          | file input                       |
+| `bulk-import-paste`         | paste textarea                   |
+| `bulk-import-loading`       | parsing spinner                  |
+| `bulk-import-summary`       | preview summary                  |
+| `bulk-import-preview`       | preview table container          |
+| `bulk-import-row-{line}`    | one preview row (physical line)  |
+| `bulk-import-error-export`  | Download error CSV button        |
+| `bulk-import-confirm`       | Import button                    |
 
-```typescript
-export const ORDER_AUDIT_ACTIONS = {
-  ORDER_EDITED: "Edited order",                 // fired by both merchant + admin edit paths — see §8.1
-  ORDER_REJECTED: "Rejected order",
-  ORDER_HELD: "Held order",
-  ORDER_RELEASED: "Released order",
-  ORDER_WAREHOUSE_TRANSFERRED: "Transferred order to different warehouse",
-  ORDER_NOTE_ADDED: "Added internal note to order",
-  ORDER_RIDER_REASSIGNED: "Reassigned rider on order",
-  ORDER_RESCHEDULED: "Rescheduled delivery",
-  PARCEL_DAMAGED: "Marked parcel as damaged",
-  PARCEL_FORCE_DISPATCHED: "Force dispatched parcel",
-  PICKUP_RIDER_REASSIGNED: "Reassigned pickup rider",
-  DELIVERY_RIDER_REASSIGNED: "Reassigned delivery rider",
-} as const
-```
+## 6. Mapping and validation (v1)
 
-Recommend distinguishing actor in the audit **entry** (existing `actorRole`/`actorId` fields) rather than adding parallel `ORDER_EDITED_BY_MERCHANT` actions — keeps the audit log filterable by role (needed anyway for Admin F7).
+1. **Lookups** (once per dialog open, via SWR):
+    - `pickup_location` to `pickupLocationId` (merchant's own only). Mismatch: row
+      error `Unknown pickup location "X"`.
+    - `delivery_city` to `deliveryCityId` (active cities only), same pattern.
+2. **Row validation:** build the exact `orderCreateSchema` input, `safeParse`, flatten
+   `issues` through the `formatOrderError` pattern, prefixed `Row N:`.
+3. **Overweight:** compare against merchant `maxWeightKg` client-side. The server also
+   checks; map its `rows: [...]` back to CSV rows by submission order.
 
----
+## 7. Auditability
 
-## 6. Consolidated Notifications
+No import-tracking table. When `merchant_note` is empty, the import sets it to
+`[CSV import YYYY-MM-DD]`. This lets a merchant search their order list to answer
+"did that batch go through?", which is also the recovery path for the v1 network-timeout
+gap. A merchant-provided note is never modified.
 
-| Event | Recipient | Channel | Template |
-|---|---|---|---|
-| Order edited | Merchant | Email | "Your order {code} was edited by admin" |
-| Order rejected | Merchant | Email | "Your order {code} was rejected. Reason: {reason}" |
-| Order held | Merchant | Email | "Your order {code} is on hold. Reason: {reason}" |
-| Order released | Merchant | Email | "Your order {code} has been released" |
-| Parcel damaged | Merchant | Email | "Order {code} was damaged in warehouse" |
-| Rider reassigned | Old rider | In-app | "Order {code} has been reassigned" |
-| Rider reassigned | New rider | In-app | "Order {code} has been assigned to you" |
-| Delivery rescheduled | Merchant | Email | "Order {code} delivery rescheduled to {date}" |
-| New assignment / status change | Rider | In-app + Email (per prefs) | Rider F6 preferences gate this |
-| Order/merchant/rider/payout events | Admin/Super Admin | In-app feed | Admin F6 notification center |
+## 8. Files (v1)
 
----
+| Action | Path                                                 | Notes                                                                                         |
+|--------|------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| add    | `src/features/orders/bulk-import/template.ts`        | `orderImportHeaders`, `headerAliases`, `buildTemplateCsv()`, `buildErrorCsv(rows)` using `toCsv` |
+| add    | `src/features/orders/bulk-import/csv-parse.ts`       | Papa wrapper to typed `RawOrderRow[]` with `__line`; encoding/BOM/header/row-limit/size guards (pure) |
+| add    | `src/features/orders/bulk-import/resolve-rows.ts`    | name-to-ID mapping + normalization + `orderCreateSchema` validation (pure)                    |
+| add    | `src/features/orders/bulk-import/*.spec.ts`          | colocated unit tests                                                                          |
+| add    | `src/features/orders/dialogs/bulk-import-dialog.tsx` | dialog UI (§5)                                                                                |
+| edit   | `src/app/merchant/orders/page.tsx`                   | `bulk-import-open` button + dialog wiring                                                     |
+| edit   | `e2e/selectors.ts`                                   | constants from §5                                                                             |
+| edit   | `package.json`                                       | add `papaparse` (+ `@types/papaparse` if not bundled)                                         |
+| edit   | `docs/REFACTOR.md` §10                               | replace open question with "decided: CSV v1 client-side import (see TODO.md)"                 |
+| edit   | `CONTRIBUTING.md`                                    | one paragraph in the orders section pointing at the import flow                               |
 
-## 7. Per-Module UI Roadmap (from REFACTOR.md, cross-referenced to ORDER actions)
+## 9. Security and limits (v1)
 
-### Merchant (`/merchant`)
-1. **Order Detail Page** (`/merchant/orders/[id]`) — foundation; shared `order-timeline.tsx` component reused by Rider.
-2. **Delivery Proof Viewer** — read-only section on detail page.
-3. **Order Editing** — reuses `PATCH /api/orders/[id]/edit`, merchant-scoped (§8.1).
-4. **Bulk Cancel UI** — reuses shared `PATCH /api/orders/bulk/cancel` (§8.2).
-5. **Balance Transaction History** (`/merchant/finance/transactions`).
-6. **Analytics Dashboard** (`/merchant/analytics`).
+- No new write path and no server changes. The existing route's auth, merchant ACTIVE +
+  `canPlaceOrders` guards, and `rateLimitByIp("orders-bulk", 10, 60)` apply unchanged.
+- Limits: 50 rows / 2 MB per import (client-enforced); server enforces 50/request.
+- PII: no file upload; JSON only, to an authenticated merchant endpoint. No import
+  state is persisted client-side in v1.
+- No `dangerouslySetInnerHTML` in the preview; render cells as text.
+- Error CSV download reuses `downloadCsv` (BOM + timestamped name).
 
-### Rider (`/rider`)
-1. **Order Detail Page** (`/rider/orders/[id]`) — reuses shared `order-timeline.tsx`.
-2. **Open in Maps / Navigation** — no new API.
-3. **Delivery History & Stats** (`/rider/history`).
-4. **Earnings / COD Summary** (`/rider/earnings`).
-5. **Availability Toggle**.
-6. **Notification Preferences**.
+## 10. Test plan (v1)
 
-### Warehouse (`/warehouse`)
-0. **Order Detail Page** — already exists, shared component.
-1. **Hold Parcel / Mark Damaged / Transfer Warehouse / Force Dispatch** — direct UI wiring for ORDER §5, §9, §10, §11. *(Not itemized as its own feature in REFACTOR — add explicitly, see §8.5/§8.6.)*
-2. **Reassign Pickup/Delivery Rider** — dispatch page buttons for ORDER §12/§13.
-3. **Bulk Operations Expansion** — bulk reattempt/return, reuses shared bulk cancel.
-4. **Rider Performance Dashboard**.
-5. **Warehouse Analytics Dashboard**.
-6. **COD Reconciliation Enhancements**.
-7. **Parcel Tracking / Activity Feed**.
+**Unit (Vitest, colocated):**
+- `csv-parse.spec.ts`: happy path; quoted commas/newlines; BOM; non-UTF-8 detection
+  (fatal decode, U+FFFD); missing-header error; alias mapping; TSV paste; row limit;
+  size limit; empty-row skip; `__line` with a multi-line quoted field.
+- `resolve-rows.spec.ts`: name resolution (case/whitespace); phone normalization
+  (`+88017...`, `017-1234-5678`, Bangla numerals); numeric parsing (`1,5`, `৳1,200`,
+  Bangla numerals); note auto-tag only when empty; zod flattening with row numbers;
+  overweight flag.
+- `template.spec.ts`: headers match §3.2; template round-trips through `csv-parse` to
+  1 valid row; error CSV re-parses cleanly.
 
-### Admin / Super Admin (`/dashboard`)
-1. **Order action dropdown additions**: Edit, Reject, Hold, Reassign rider, Reschedule, Add note (ORDER §1–§2, §3, §7, §8, §6).
-2. **Held Orders page/tab** (`/dashboard/held-orders`) — release/cancel/transfer actions. *(New; not in REFACTOR's original Admin feature list — add per ORDER's UI Changes section.)*
-3. **Merchant Detail Page**.
-4. **Bulk Operations Expansion** (orders bulk-cancel, merchants bulk suspend/reactivate).
-5. **Rider Performance page**.
-6. **Platform Analytics Dashboard**.
-7. **Data Export** (CSV, all major tables).
-8. **Audit Log Enhancements** (filters, detail drawer, export).
-9. **Notification Center**.
+**E2E (Playwright, data-testid policy)**, new `e2e/specs/05-bulk-import.spec.ts`:
+- Upload path: login as merchant, open dialog, `setInputFiles` with an in-memory CSV
+  (1 valid + 1 invalid row). Preview shows 1 valid / 1 error and `bulk-import-confirm`
+  is disabled. Re-upload a fixed file, counts read 2 valid / 0 errors, confirm enabled,
+  import, toast and orders appear in the list. Template button visibility asserted.
+- Paste path: paste rows into `bulk-import-paste`, same preview.
+- Blocked import: with at least 1 error the confirm button stays disabled and the
+  error CSV still downloads.
+- Each test creates its own rows via the dialog; no shared-seed mutation.
 
----
+**Verification checklist (before PR):** `pnpm ci:check` + `pnpm ci:test`.
 
-## 8. Conflicts / Overlaps to Resolve Before Building
+## 11. Milestones (v1)
 
-1. **Duplicate `edit` endpoint.** ORDER.md gives SUPER_ADMIN a full-field edit while REFACTOR gives MERCHANT a narrower edit (no `productCost`/`parcelWeightKg` recalculation implied). Recommend **one** `PATCH /api/orders/[id]/edit` handler that branches allowed fields by role, rather than two separate routes — avoids drift between the two field sets and a single `ORDER_EDITED` audit trail.
-2. **Duplicate bulk-cancel endpoint.** Merchant, Warehouse, and Admin modules each ask for `PATCH /api/orders/bulk/cancel`. Build once, scope the order-set query by the caller's role (merchant → own orders; warehouse → own warehouse; admin → any), not three separate routes.
-3. **Generic vs. specialized rider reassignment.** ORDER.md's own Phase 4 ("Warehouse Optimizations") already flags `reassign-pickup-rider`/`reassign-delivery-rider` (§12–13) as a **refactor of** the generic `reassign-rider` (§7) built in Phase 1. Build the generic endpoint + UI first (Admin dropdown), then specialize into the Warehouse dispatch page — don't build both from scratch in parallel.
-4. **Reschedule exposure.** ORDER.md gives SUPER_ADMIN/WAREHOUSE_ADMIN a `reschedule` action; REFACTOR's Merchant open question asks whether merchants should get this too. Recommend building the backend/admin UI first and treating merchant-facing reschedule as a follow-up decision, not blocking Phase 1–2.
-5. **Held Orders page is net-new.** It's in ORDER.md's "UI Changes" section but absent from REFACTOR's Admin feature list — add it explicitly to the Admin roadmap (done above) so it isn't dropped.
-6. **Damage / Force Dispatch UI is net-new for Warehouse.** ORDER.md defines these as Warehouse Admin actions with target pages (`/warehouse/exceptions`, `/warehouse/dispatch`), but REFACTOR's Warehouse module plan doesn't list them as features — added explicitly to §7 above.
+| #  | Milestone                | Scope                                                                                         | Effort | Done when                                         |
+|----|--------------------------|-----------------------------------------------------------------------------------------------|--------|---------------------------------------------------|
+| M1 | Template + parser + resolver | `template.ts`, `csv-parse.ts`, `resolve-rows.ts`, papaparse dep, unit tests               | M      | All specs green; template round-trips             |
+| M2 | Dialog + wiring          | State machine `idle → done`, lookups, preview table, error CSV, submit, entry button, testids | M      | Upload/paste, preview, import works end to end    |
+| M3 | E2E + docs               | Playwright spec (§10), `REFACTOR.md` §10, `CONTRIBUTING.md`, `pnpm ci:check` + `pnpm ci:test` | S      | E2E green; docs updated                           |
+
+## 12. Accepted v1 risks
+
+1. **Network timeout after submit has an unknown outcome.** Mitigated by the warning
+   message and the `[CSV import]` tag; fixed by idempotency in v1.2.
+2. **Re-uploading the same file creates duplicate orders.** Mitigated by the count on
+   the Import button; fixed in v1.1.
 
 ---
 
-## 9. Unified Implementation Roadmap
+# v1.1: Duplicate protection and faster fixing
 
-**Phase 0 — Shared foundation**
-- Shared `order-timeline.tsx` + order detail pages for Merchant and Rider (Warehouse's already exists).
+Ship this first after v1: accidental double-imports are the biggest real-world risk.
+No migration needed.
 
-**Phase 1 — Core admin actions + first UI**
-- Backend: `edit` (role-branched, §8.1), `reject`, `reassign-rider` (generic).
-- Frontend: Admin order dropdown (Edit/Reject/Reassign), Merchant order editing on detail page.
+**Server**
+- **Duplicate guard** in `POST /api/orders/bulk`: unless `allowDuplicates: true`, check
+  the merchant's orders from the last `BULK_DUPLICATE_GUARD_MINUTES` (5). Any match
+  returns `409 { code: "LIKELY_DUPLICATE", duplicates: [{ index, orderId, createdAt }] }`
+  and creates nothing.
+- Add optional `allowDuplicates: boolean` (default `false`) to `orderBulkCreateSchema`.
+- **Read-only endpoint** `POST /api/orders/bulk/check-duplicates`
+  (`src/app/api/orders/bulk/check-duplicates/route.ts`): MERCHANT-only, session-scoped,
+  `rateLimitByIp("orders-bulk-check", 30, 60)`. Body `{ rows: [{ index, recipientPhone,
+  deliveryAddress, productCost }] }` (1..50). Response `{ matches: [{ index, orderId,
+  createdAt }] }` for orders in the last `BULK_DUPLICATE_LOOKBACK_HOURS` (24). Query
+  narrowed by `merchantId` + `recipientPhone IN (...)` + `createdAt >= since`; address
+  and cost compared in memory (use the schema's real field names).
+- **Shared code:** `src/lib/order-dedupe-key.ts` (`normalizeDedupeKey`: phone to `01...`,
+  address lower-cased with collapsed whitespace, cost rounded to 2 decimals) and
+  `src/lib/order-duplicates.ts` (`findRecentDuplicateOrders(merchantId, rows, since)`).
+  Constants (`BULK_DUPLICATE_GUARD_MINUTES=5`, `BULK_DUPLICATE_LOOKBACK_HOURS=24`,
+  `STRONG_DUPLICATE_MINUTES=10`) live next to `MAX_BULK_ORDERS`.
 
-**Phase 2 — Exception handling**
-- Backend: `hold`/`release`, `mark-damaged`, `transfer-warehouse`.
-- Frontend: Held Orders page, Warehouse exceptions "Mark damaged", Warehouse dispatch "Transfer warehouse" + "Hold parcel".
+**Client**
+- Duplicate tuple: `(recipient_phone, delivery_address, product_cost)`, advisory only.
 
-**Phase 3 — Bulk operations (cross-cutting)**
-- Backend: shared `bulk/cancel` (role-scoped, §8.2), `bulk/reattempt`, `bulk/return`, `merchants/bulk/suspend`, `merchants/bulk/reactivate`.
-- Frontend: Merchant bulk-cancel UI, Warehouse bulk reattempt/return, Admin bulk expansion.
+  | Layer        | Compared against                                    | Severity                                                       |
+    |--------------|-----------------------------------------------------|----------------------------------------------------------------|
+  | In-file      | Other rows in the same import                       | Soft (amber); all but the first occurrence flagged             |
+  | Cross-import | Merchant's orders from the last 24 h via `check-duplicates` (one batched call after resolve) | Soft if older than 10 min; **strong** if within 10 min |
 
-**Phase 4 — Advanced ops**
-- Backend: `reschedule`, `add-note`, `force-dispatch`.
-- Frontend: Reschedule dialog, internal notes UI, force-dispatch dialog.
+- Each flagged row gets an include checkbox (default included). "Skip all likely
+  duplicates" button when strong duplicates exist. Included flagged rows send
+  `allowDuplicates: true`; otherwise it is omitted and the server guard is the safety net.
+- Summary becomes `N valid · M errors · D possible duplicates`.
+- Handle `409 LIKELY_DUPLICATE` from the server (two-tabs case): map `duplicates[].index`
+  to CSV rows and offer **Skip these rows** or **Import anyway**.
+- **Inline fix:** error cells are click-to-edit and revalidate live.
+- **Show only errors** toggle.
+- **Fee estimates:** `estimate-fees.ts` fetches `GET /api/zone-pricing` once per dialog
+  open and computes estimated fees per valid row with `calcDeliveryCharge`/`calcCodFee`.
+  Summary adds `Est. fees ৳X · Total COD ৳Y`, labeled "Est."; omitted if the fetch
+  fails, never blocks import.
+- **Entry point:** "Bulk import CSV instead" link on `/merchant/orders/new`.
 
-**Phase 5 — Warehouse rider-assignment specialization**
-- Backend: `reassign-pickup-rider`, `reassign-delivery-rider` (refactor of Phase 1's generic endpoint, §8.3).
-- Frontend: Dispatch page reassign buttons.
-
-**Phase 6 — Analytics & reporting** *(independent, highest effort — parallelizable across modules)*
-- Merchant analytics, Rider history/earnings, Warehouse rider-performance/analytics/reconciliation, Admin platform analytics + rider performance + merchant detail page.
-
-**Phase 7 — Polish / nice-to-haves**
-- Data export, audit log enhancements, notification center, rider notification prefs + availability toggle, open-in-maps, delivery proof viewer.
+**New files:** `bulk-import/dedupe.ts`, `bulk-import/estimate-fees.ts`, the two shared
+`src/lib` files, the check-duplicates route, plus specs. **Tests:** dedupe (in-file,
+soft vs strong at the 10 min boundary, normalization equivalence), fee estimates, API
+specs for the guard (409 within 5 min, `allowDuplicates: true` creates, outside 5 min
+creates) and `check-duplicates` (24 h window, merchant scoping, rejects non-merchants
+and over-limit rows), plus an E2E duplicate flow (re-import the same file, warnings
+appear, rows remain importable).
 
 ---
 
-## 10. Open Questions (merged)
+# v1.2: Large imports (up to 500 rows)
 
-- Should the merchant-facing `edit` and admin `edit` truly share one endpoint, or does the differing field set (COD/weight recalculation) justify a thin wrapper instead? (§8.1)
-- Should merchants be able to request a reschedule, or only view one set by admin/warehouse?
-- Chart library: Recharts vs. CSS-based bars — pick once, reuse across Merchant/Rider/Warehouse/Admin analytics (four separate analytics features all need this decision).
-- Should CSV bulk upload for orders be included? (currently out of scope everywhere)
-- Should riders see merchant phone number at pickup time?
-- Is a real-time activity feed (Warehouse F6) needed, or is polling sufficient — same question applies to the Admin notification center.
-- Should reconciliation/settlement support partial (selected-orders-only) settling?
-- Should Super Admin be able to impersonate users for debugging?
-- Should analytics support scheduled email reports?
-- Should audit logs capture IP address?
+The only version that needs a migration. The pieces are tightly coupled; ship together.
+
+**Server**
+- **Prisma model `BulkOrderRequest`:** `id`, `merchantId`, `idempotencyKey`,
+  `requestHash` (sha256 of canonical JSON body), `response` (Json snapshot),
+  `createdAt`; `@@unique([merchantId, idempotencyKey])`, `@@index([createdAt])`.
+  Written **only on success**, in the same transaction as the orders.
+- **`POST /api/orders/bulk` order of checks:** auth/guards, rate limit, idempotency
+  replay, validation, duplicate guard, create.
+    1. Optional `Idempotency-Key` header (UUID); malformed returns `400`.
+    2. Stored record for `(merchantId, key)`: same hash returns the stored response with
+       `replayed: true`; different hash returns `422 { code: "IDEMPOTENCY_KEY_REUSED" }`.
+       Replay is checked before validation and balance checks, so a replay never fails
+       because prices or balance changed.
+    3. A unique violation on the key (concurrent identical request) re-reads and returns
+       a replay.
+    4. Best-effort purge of `BulkOrderRequest` rows older than 7 days, outside the
+       transaction, errors ignored.
+
+**Client**
+- `useOrders().importOrders(plan, callbacks)`:
+    - **Plan freeze:** on confirm, split included rows into chunks of 50 in file order,
+      one UUID v4 key per chunk sent as `Idempotency-Key`. Plan and keys never change.
+    - **Sequential execution.** 500 rows = 10 chunks fits the 10/min rate limit. Stop at
+      the first non-retryable failure; remaining chunks are "not attempted".
+    - **429:** honor `Retry-After` (fallback 10 s, cap 65 s), max 2 retries per chunk,
+      UI shows "Waiting for rate limit, retrying...".
+    - **Network error/timeout:** retry the same chunk with the **same key** (max 2
+      retries, 2 s then 5 s backoff). The server replays the stored result or creates
+      once, so there is no unknown outcome.
+    - **409 `LIKELY_DUPLICATE`:** result screen with **Skip these rows and continue**
+      (re-chunk, new key) or **Import anyway** (resend with `allowDuplicates: true`).
+    - **400 with `rows: [...]`:** map to CSV row numbers via chunk order; Retry not offered.
+- **Confirmation:** more than 100 included rows opens `ConfirmDialog` ("Create 320
+  orders in 7 batches? This takes about a minute."). ETA = remaining chunks × moving
+  average chunk latency (initial guess 2 s) plus any rate-limit wait.
+- **Progress:** `x / total chunks` + ETA (`bulk-import-progress`), cancel after the
+  current chunk.
+- **Partial-failure result:** "80 created · chunk 7 failed (reason) · 20 not attempted",
+  with **Download remaining rows CSV** (only un-created rows, template format, plus
+  `error` column where known) and **Retry** (resubmits pending chunks with original keys).
+- **Cap:** raise `MAX_IMPORT_ROWS` to 500 and virtualize the preview with
+  `@tanstack/react-virtual`. Add `buildRemainingCsv(rows)` to `template.ts`.
+- New testids: `bulk-import-progress`, `bulk-import-remaining-export`, `bulk-import-retry`.
+
+**Tests:** API specs for idempotency (same key + same body twice creates one set and
+replays; same key + different body returns 422; concurrent identical requests create
+one set). E2E: 500-row import completes; forced mid-import failure recovers with no
+duplicates.
+
+---
+
+# v2: Polish and resilience
+
+- **Checkpoint and resume:** `sessionStorage` key `bulk-import:{merchantId}`, written at
+  plan freeze and after every chunk: `{ importId, createdDate, fileName, chunks: [{ key,
+  lines[], status, payload?, rawRows? }], doneTupleHashes[] }`. Payloads/raw rows kept
+  only for non-`done` chunks; SHA-256 hashes (no plain PII) for created rows. Cleared on
+  success, discard or sign-out; does not survive tab close.
+- **`resuming` state:** "We found an import that didn't finish (80/320 created)" with
+  **Resume**, **Download remaining rows**, **Discard** (`bulk-import-resume`,
+  `bulk-import-discard`).
+- **"Already imported" flag:** rows whose tuple hash is in `doneTupleHashes` are
+  excluded by default (unchecked; the merchant can re-check to force).
+- **Accessibility:** keyboard editing of error cells (Enter to edit, Escape to cancel,
+  Tab to move); `aria-live="polite"` progress announcements; focus moves to the summary
+  when parsing completes and to the result heading when submission ends.
+- **Mobile:** horizontal scroll with sticky row #/error column; buttons at least 44 px.
+- **Ease-of-use extras:** `example` column in the error CSV (correct format), click-to-copy
+  pickup locations and cities, any-cell inline editing.
+- **Encoding and file checks:** mojibake regex `/à¦|à§/`, and the separate
+  `idle-mismatch` "wrong file entirely" screen when 2 or fewer required headers are
+  recognized (3-6 recognized keeps the missing-headers error).
+
+---
+
+# v3: Only if requested
+
+- `.xlsx` support
+- Admin or warehouse-initiated import
+- Import-history table replacing the `[CSV import]` note tag
+
+---
+
+## Decisions (final for v1)
+
+| Question                     | Decision                                                                                             |
+|------------------------------|------------------------------------------------------------------------------------------------------|
+| Where does parsing run?      | Client-side; all writes go through `POST /api/orders/bulk`                                           |
+| Parser library               | `papaparse`                                                                                          |
+| Who can import?              | Merchant only                                                                                        |
+| Fees in CSV?                 | Never; server computes all fees and the balance ledger                                               |
+| Invalid-row policy           | All-or-nothing: import blocked until every row is valid                                              |
+| Row cap                      | v1: 50 rows / 2 MB (single request). v1.2: 500 rows via chunking                                     |
+| Fee estimates                | v1.1; omitted gracefully if zone pricing can't be fetched                                            |
+| Template sample row          | Dynamic (merchant's first pickup location + an active city)                                          |
+| Excel                        | Not supported; CSV + paste-from-spreadsheet only                                                     |
+| Duplicate policy             | v1.1: warn, never hard-block; server guard 5 min, cross-import lookback 24 h, strong within 10 min   |
+| Retry safety                 | v1: none (accepted risk). v1.2: client-generated `Idempotency-Key` per chunk + `BulkOrderRequest`    |
+| Resume storage               | v2: `sessionStorage` checkpoint                                                                      |
+| Audit tagging                | Auto-tag empty notes with `[CSV import YYYY-MM-DD]`; no import-tracking table                        |

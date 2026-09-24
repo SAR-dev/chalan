@@ -180,7 +180,7 @@ function formatOrderError(data: {
 
 ### Database
 
-- Schema: single file `src/lib/db/schema.postgres.ts` (re-exported via `schema.ts`)
+- Schema: folder `src/lib/db/schema.postgres/` (domain modules + `index.ts` barrel, re-exported via `schema.ts`)
 - New tables: `delivery_zone`, `zone_pricing` (N×N pricing matrix), `delivery_city` (with zoneId + warehouseId)
 - Updated: `pickup_location` (cityId instead of warehouseId), `order` (deliveryCityId FK)
 - Queries: **inline in each `route.ts`** — no separate queries file

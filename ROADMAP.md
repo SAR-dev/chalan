@@ -1,15 +1,15 @@
 # ROADMAP — Making This Platform Ready for Selling
 
 > Last audited: 2026-09-24. Verified against the actual codebase (branch `develop`).
-> Build ✅ · Typecheck ✅ · Unit ✅ (946/946) · **E2E 46/46 ✅** (webServer reseeds automatically) · Lint/format ✅ (`pnpm ci:check` green) · **Phase 4 complete (T1-T10 all ✅)**
+> Build ✅ · Typecheck ✅ · Unit ✅ (946/946) · **E2E 46/46 ✅** (webServer reseeds automatically) · Lint/format ✅ (`pnpm ci:check` green) · **Phases 2, 3 & 4 complete** (Phase 1 code-complete — L7 removed; only Phase 5 remains)
 
 ## Phase Status Summary
 
 | Phase | Title                                        | Status          | Breakdown                                     |
 |-------|----------------------------------------------|-----------------|-----------------------------------------------|
-| 1     | Security (S1-S10 + L1-L8)                    | ⚠️ In progress  | 14 ✅ / 2 ⚠️ / 2 ❌ (of 18)                    |
+| 1     | Security (S1-S10 + L1-L8)                    | ✅ Complete     | 17/17 ✅ (L7 removed — accepted local/dev default) |
 | 2     | Correctness Bugs (B1-B8)                     | ✅ Complete     | 8/8 ✅                                        |
-| 3     | Maintainability & Performance (Q1-Q10)       | 🔶 In progress  | 2 ✅ / 4 ⚠️ / 4 ❌                            |
+| 3     | Maintainability & Performance (Q1-Q10)       | ✅ Complete     | 10/10 ✅                                       |
 | 4     | Testing, CI & Documentation (T1-T10)         | ✅ Complete     | 10/10 ✅                                       |
 | 5     | Product & Growth (roadmap)                   | ⏳ On hold      | Behind stability of Phases 1-4                |
 
@@ -60,7 +60,9 @@ Functional B2B delivery management platform:
 | S9  | **Add CSRF/origin checks**                             | `src/lib/csrf.ts:16-38`, `src/lib/validation.ts:48-56`       | ✅ `isAllowedOrigin()` (Origin/Referer vs SITE_URL + request host) enforced inside `parseBody`, so every mutation route using it rejects cross-site calls. No middleware, matching the roadmap's stated option.                                                                                                                                                     | ✅     | M      |
 | S10 | **Encrypt SMTP password at rest + mask everywhere**    | `src/app/api/admin/mail-config/**`, `src/lib/crypto.ts:24-35`, `src/lib/env.ts:103-109` | ✅ AES-256-GCM via `encryptSecret()` (store `:67`), masked in GET/create/activate (`[id]/activate/route.ts:61`), decrypted at send (`src/lib/mailer.ts:61`). `SMTP_SECRET_KEY` now provisioned: `env/` + `docker/.env`, `env.ts` enforces it in production + format-checks 64-hex, 4 new `env.spec.ts` cases.                                       | ✅     | S      |
 
-> Phase 1b security is complete; the only outstanding item is L7 (local-DB-cred rotation), which is documented as acceptable for local/dev and still pending production rotation guidance.
+> Phase 1b security is complete. L7 (local-DB-cred rotation) was removed from the roadmap —
+> the `postgres:admin` default is accepted for local/dev, and production instances are
+> expected to set their own `DATABASE_URL` credentials at deploy time.
 
 ## Phase 1b: Security — Low/Medium housekeeping
 
@@ -72,7 +74,6 @@ Functional B2B delivery management platform:
 | L4 | Hardcoded super-admin password in seed                      | `src/lib/db/seed/seed-content.ts:24-34`, `.env.example`, `docs/ENV.md` | ✅ seeded SUPER_ADMIN accounts now read `SEED_SUPER_ADMIN_PASSWORD` (`?? "admin123"`), documented as optional in `.env.example` + `docs/ENV.md`; known default only for local/e2e.                                                                                                                               | ✅     |
 | L5 | Timings-safe cron-secret compare                            | `src/lib/cron-auth.ts:8-12`                                                      | ✅ `safeEqual()` SHA-256-hashes both sides → `crypto.timingSafeEqual`; used by all 3 cron routes.                                                                                                                              | ✅     |
 | L6 | Non-merchant roles can read any merchant's pickup locations | `src/app/api/pickup-locations/route.ts:19-58`                                   | ✅ NEW scoping: MERCHANT→own; WAREHOUSE_ADMIN→their warehouse's cities (optional `?merchantId` within it); RIDER→their warehouse's cities via rider lookup (no merchant targeting, no cross-warehouse enumeration); SUPER_ADMIN→all. Spec covers all branches (16 tests).                                             | ✅     |
-| L7 | Weak local DB creds                                         | `.env` / `.env.example`                                                         | ⚠️ `postgres:admin` default — fine locally; still needs documented rotation for production instances.                                                                                                                          | ⚠️     |
 | L8 | Email-log iframe sandbox                                    | `src/features/email-logs/dialogs/email-log-detail-dialog.tsx:103`               | ✅ iframe still `sandbox="allow-same-origin"` only; no `allow-scripts`. Safe state.                                                                                                                                            | ✅     |
 
 ---
@@ -103,7 +104,7 @@ Functional B2B delivery management platform:
 | Q5  | **Add error boundaries**                                                                                                  | `src/app/(onboarding)/`, `login`, `register`, `forgot-password`                                                           | ✅ `error.tsx` present in `(onboarding)/`, `login/`, `register/`, and now `forgot-password/error.tsx` (mirrors the login boundary). All public pages covered.                                                                                                                                                                                                                 | ✅     |
 | Q6  | **`BETTER_AUTH_URL` is documented but dead**                                                                              | `src/lib/auth.ts:7`, `.env.example:14`, `src/lib/env.ts:90-94`                                                             | ✅ removed everywhere: `.env.example`, `docs/ENV.md`, `env/.env.monolith.docker`, `env/.env.cluster.docker`; deleted the dead self-referencing `NEXT_PUBLIC_SITE_URL` warn branch in `env.ts`. `baseURL` derives from `NEXT_PUBLIC_SITE_URL` only.                                                                                                                             | ✅     |
 | Q7  | **Accessibility: icon-only buttons/"search" input**                                                                       | `src/components/data-table.tsx:863-876`, `warehouses-client.tsx:98-104`, `image-upload.tsx:72-100`                        | ✅ DataTable search now has `aria-label="Search"`; warehouse actions use the established sr-only `Actions` label; image preview actions use `Replace image` / `Remove image` labels.                                                                                                                                     | ✅     |
-| Q8  | **Break up the biggest files**                                                                                            | `data-table.tsx` (1416), `seed-content.ts` (1167), `schema.postgres.ts` (997), `track/[id]/page.tsx` (775), `merchant/orders/new/page.tsx` (764) | ❌ All unchanged; schema still single-file despite AGENTS.md note.                                                                                                                                                                                                                                                                                                               | ❌     |
+| Q8  | **Break up the biggest files**                                                                                            | `data-table.tsx`, `seed-content.ts`, `schema.postgres.ts`, `track/[id]/page.tsx`, `merchant/orders/new/page.tsx`                                                                                                                                              | ✅ All five split into folders with `index` barrels — export surface unchanged, zero behavior change: `data-table.tsx` (1339) → 9 modules (`index.tsx` 869 + types/cells/classes/column-visibility/toolbar/bulk-actions/pagination/skeleton); `seed-content.ts` (1098) → 13 domain modules; `schema.postgres.ts` (934) → 10 modules (`enums/helpers/auth/warehouses/logistics/merchants/orders/finance/platform` + barrel; `drizzle.config.ts` now points at `schema.ts`; runtime export parity 37/37 verified by `schema.spec.ts`); `track/[id]/page.tsx` (775) → 80 + `lib.ts`/`components/`; `merchant/orders/new/page.tsx` (777) → 311 + 4 components (DOM proven byte-identical in 7 scenarios; e2e-critical ids/labels intact). Verified: `ci:check` · 946/946 unit · build · 46/46 e2e.                                                                                                                                    | ✅     |
 | Q9  | **Remove dead/misleading APIs**                                                                                           | `src/lib/pagination.ts:127-134` (`applySort`), `src/lib/hooks/use-table-filters.ts:56-61` (`setFilter`)                    | ✅ `applySort` removed from `pagination.ts` (+ its spec block + unused `asc`/`desc` imports); `setFilter` removed from `use-table-filters.ts` (0 callers). `pagination.spec.ts` green.                                                                                                                                                                                      | ✅     |
 | Q10 | **Vertical slices**: subscribe orders to the shared feature                                                               | `src/features/orders/transitions.ts`                                                                                       | ✅ All 23 transition routes delegate to `transitions.ts`; list/detail/warehouse/payable queries share the order scopes/projection modules.                                                                                                                                                                           | ✅     |
 
@@ -229,6 +230,7 @@ Functional B2B delivery management platform:
 | **T2 — E2E docs rewound**                                | CONTRIBUTING E2E section rewritten to the real suite (4 files/46 tests, no seed/storage-state project, no e2e CI job); unit-spec counts re-derived from `vitest list` |
 | **Q6 — `BETTER_AUTH_URL` removed**                        | Gone from `.env.example`, `docs/ENV.md`, both docker env files; self-referencing `env.ts` warn branch deleted |
 | **Phase 4 — all of T3/T4/T6/T7/T8/T10**                  | T3: `e2e` CI job (postgres service + extensions + push + chromium + build + test + failure artifacts). T4: webServer runs `pnpm db:seed:full && pnpm start` (auto-reseed). T6: `.husky/pre-commit` → `pnpm exec lint-staged`, broken tsc lint-staged entry dropped, stray root `pre-commit` deleted. T7: both compose files run `migrate.ts`, `APP_IMAGE` sha pinning in deploy.yml + explicit migrate run, `pull_policy: build` removed. T8: SETUP/ENV docs reconciled with reality. T10: 11 gap routes covered (+151 tests → **946/946**) |
+| **Q8 — five oversized files split**                       | `data-table.tsx`→9-module folder; `seed-content.ts`→13 domain modules; `schema.postgres.ts`→10 modules (barrel + `drizzle.config.ts`→`schema.ts`, export parity 37/37); `track/[id]/page.tsx` 775→80 + lib/components; `merchant/orders/new/page.tsx` 777→311 + 4 components (DOM byte-identical, e2e selectors intact). Export surfaces unchanged; AGENTS/CONTRIBUTING/SETUP schema docs updated. Verified `ci:check` · 946/946 · build · 46/46 e2e |
 
 ## Verified-Clean Areas (don't regress these)
 
@@ -245,9 +247,9 @@ Functional B2B delivery management platform:
 ## Suggested Order
 
 ```
-1. Phase 1 Security   ✅ S1-S10, L1-L6, L8 done. Open: L7 (local DB cred rotation guidance) → Phase 2
-                       (L7 needs a deploy-time rotation decision, not code).
-2. Phase 3 Quality    ✅ Q2/Q3/Q5/Q6/Q7/Q9/Q10 done → open: Q8 (split big files) + L7
+1. Phase 1 Security   ✅ COMPLETE — S1-S10, L1-L6, L8 done; L7 removed (accepted local default)
+2. Phase 3 Quality    ✅ COMPLETE — all of Q1-Q10 done (Q8: five oversized files split into
+                       folders with barrels; schema docs updated to the folder layout)
 3. Phase 4 CI/Tests   ✅ COMPLETE — all of T1-T10 done (CI e2e job, auto-reseed, husky,
                        migration alignment, docs fixed, spec gaps closed: 946/946)
 4. Phase 5 Product roadmap (parallel, after stability)                             [ongoing]
