@@ -36,12 +36,19 @@ export const MAX_TABLE_ROWS_PER_PAGE = 250
 export const BADGE_TONES = {
   pending: "bg-chart-3/15 text-chart-3 border-chart-3/25",
   info: "bg-chart-1/15 text-chart-1 border-chart-1/25",
-  success: "bg-chart-2/15 text-chart-2 border-chart-2/25",
-  transit: "bg-chart-4/15 text-chart-4 border-chart-4/25",
+  success:
+    "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/25",
+  transit:
+    "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/25",
   warehouse: "bg-accent text-accent-foreground border-accent-foreground/20",
   neutral: "bg-muted text-muted-foreground border-border",
   danger: "bg-destructive/10 text-destructive border-destructive/20",
   brand: "bg-primary/10 text-primary border-primary/20",
+  violet:
+    "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/25",
+  rose: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/25",
+  slate:
+    "bg-slate-800 text-slate-100 border-slate-600 dark:bg-slate-200 dark:text-slate-900 dark:border-slate-400",
 } as const
 
 export type BadgeTone = keyof typeof BADGE_TONES
@@ -62,14 +69,14 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 export const ORDER_STATUS_TONES: Record<OrderStatus, BadgeTone> = {
   PENDING: "pending",
   APPROVED: "info",
-  PICKED_UP: "info",
+  PICKED_UP: "violet",
   IN_WAREHOUSE: "warehouse",
-  IN_TRANSIT: "transit",
+  IN_TRANSIT: "rose",
   OUT_FOR_DELIVERY: "transit",
   DELIVERED: "success",
   FAILED_ATTEMPT: "danger",
   RETURNED: "neutral",
-  CANCELLED: "danger",
+  CANCELLED: "slate",
 }
 
 export const MERCHANT_STATUS_LABELS: Record<MerchantStatus, string> = {

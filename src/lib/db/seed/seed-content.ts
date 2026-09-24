@@ -18,11 +18,14 @@ export interface SeedUserCredential {
   role: SeedRole
 }
 
-// Seeded SUPER_ADMIN password. Defaults to the documented e2e/dev credential;
+// Shared password for every seeded account (local dev / e2e only).
+const SEED_PASSWORD = "12qwaszx"
+
+// Seeded SUPER_ADMIN password. Defaults to the shared seed password;
 // set SEED_SUPER_ADMIN_PASSWORD in any real environment so no known default
 // password ever ships in a seeded database.
 const SEED_SUPER_ADMIN_PASSWORD =
-  process.env.SEED_SUPER_ADMIN_PASSWORD ?? "admin123"
+  process.env.SEED_SUPER_ADMIN_PASSWORD ?? SEED_PASSWORD
 
 export const SEED_USER_CREDENTIALS = {
   // Admins
@@ -43,39 +46,39 @@ export const SEED_USER_CREDENTIALS = {
   },
   warehouseAdmin1: {
     email: "warehouse.admin01@email.com",
-    password: "warehouse123",
+    password: SEED_PASSWORD,
     role: "WAREHOUSE_ADMIN",
   },
   warehouseAdmin2: {
     email: "warehouse.admin02@email.com",
-    password: "warehouse123",
+    password: SEED_PASSWORD,
     role: "WAREHOUSE_ADMIN",
   },
 
   // Merchants
   merchant1: {
     email: "merchant1@email.com",
-    password: "merchant123",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant2: {
     email: "merchant2@email.com",
-    password: "merchant123",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant3: {
     email: "merchant3@email.com",
-    password: "merchant123",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant4: {
     email: "merchant4@email.com",
-    password: "merchant123",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant5: {
     email: "merchant5@email.com",
-    password: "merchant123",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
 } as const satisfies Record<string, SeedUserCredential>
@@ -90,7 +93,7 @@ function buildRiderCredentials(
       `rider${i + 1}`,
       {
         email: `rider${i + 1}@email.com`,
-        password: "rider123",
+        password: SEED_PASSWORD,
         role: "RIDER" as const,
       },
     ]),
@@ -99,7 +102,7 @@ function buildRiderCredentials(
 
 const PENDING_RIDER_CREDENTIAL: SeedUserCredential = {
   email: "pending.rider@email.com",
-  password: "rider123",
+  password: SEED_PASSWORD,
   role: "RIDER",
 }
 
@@ -270,7 +273,7 @@ export const MERCHANT_IDS = {
 
 export const SEED_DEMO_CREDENTIALS = {
   email: "demo@kikuya.com",
-  password: "demo123",
+  password: SEED_PASSWORD,
 }
 
 export const SEED_MERCHANTS: MerchantSeedEntry[] = [

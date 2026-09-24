@@ -136,7 +136,7 @@ a known default exists — but set an override in any real environment.
 
 | Variable                   | Required | Default      | Description                                                          |
 | -------------------------- | -------- | ------------ | -------------------------------------------------------------------- |
-| `SEED_SUPER_ADMIN_PASSWORD` | No       | `admin123`   | Password for seeded super-admin accounts (no known default in prod)  |
+| `SEED_SUPER_ADMIN_PASSWORD` | No       | `12qwaszx`   | Password for seeded super-admin accounts (no known default in prod)  |
 
 ---
 

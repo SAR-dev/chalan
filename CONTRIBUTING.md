@@ -2482,13 +2482,15 @@ in through the UI via the shared `login()` helper, which clears cookies first
 (a second login in the same test would otherwise be redirected away by the
 already-authed login page).
 
+All seeded accounts share the password `12qwaszx`:
+
 | Role           | Email                        | Password       |
 | -------------- | ---------------------------- | -------------- |
-| Super admin    | `admin01@email.com`          | `admin123`     |
-| Warehouse admin| `warehouse.admin01@email.com`| `warehouse123` |
-| Merchant       | `merchant1@email.com`          | `merchant123`  |
-| Rider          | `rider1@email.com`             | `rider123`     |
-| Demo merchant  | `demo@kikuya.com`            | `demo123`      |
+| Super admin    | `admin01@email.com`          | `12qwaszx`     |
+| Warehouse admin| `warehouse.admin01@email.com`| `12qwaszx`     |
+| Merchant       | `merchant1@email.com`          | `12qwaszx`    |
+| Rider          | `rider1@email.com`             | `12qwaszx`    |
+| Demo merchant  | `demo@kikuya.com`            | `12qwaszx`      |
 
 These mirror `src/lib/db/seed/seed-content.ts`. If you seed with
 `SEED_SUPER_ADMIN_PASSWORD` set, the super-admin password differs from the table.
@@ -2499,9 +2501,11 @@ These mirror `src/lib/db/seed/seed-content.ts`. If you seed with
    has a stable ID and predictable values. No faker, no randomness. `helpers.ts`
    re-exports the credentials the suite needs.
 
-2. **Prefer named selectors** (`e2e/selectors.ts`) — add a constant before
-   writing a test against a new page. (Coverage is partial today; inline
-   `page.getByTestId(...)` / `page.getByRole(...)` calls are also acceptable.)
+2. **Use `data-testid` selectors wherever possible** — add a `data-testid`
+   attribute to the component under test and a constant in `e2e/selectors.ts`
+   before writing a test against a new page. `getByRole`/`getByText` are
+   fallbacks only for elements that cannot carry a test id (headings, generic
+   text) — never for buttons, inputs, rows, or dialogs you can tag.
 
 3. **Independent tests** — each test sets up its own preconditions via
    `page.request`. No test depends on the outcome of another.
@@ -2546,8 +2550,11 @@ container, a `pnpm build` step, and a seed step, since `webServer` does not seed
 2. **Use `CREDS` / seed constants** — don't hardcode emails, passwords, codes,
    or IDs in a spec; take them from `e2e/helpers.ts` or
    `src/lib/db/seed/seed-content.ts`.
-3. **Prefer named selectors** — add a constant to `e2e/selectors.ts` for new
-   elements; `getByRole`/`getByTestId` inline is fine for one-offs.
+3. **Use `data-testid` selectors where possible** — add a `data-testid` to the
+   element and a constant to `e2e/selectors.ts`. Fall back to
+   `getByRole`/`getByText` only for elements without a test id (headings,
+   generic text); tag buttons, inputs, rows, and dialogs instead of relying on
+   role/text matching.
 4. **Make it independent** — the test must work alone, in any order, and
    without depending on another test's side effects.
 5. **Avoid `waitForTimeout`** — use `waitForURL`, `waitForSelector`, or

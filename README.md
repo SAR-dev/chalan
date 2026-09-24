@@ -37,11 +37,11 @@ Created by `pnpm db:admin` — local dev only. Sign in at `/login`:
 
 | Role            | Email                  | Password        |
 | --------------- | ---------------------- | --------------- |
-| Super Admin     | (set during setup)     | (set during setup) |
-| Super Admin     | `admin02@email.com`       | `admin123`      |
-| Warehouse Admin | `warehouse.admin01@email.com`        | `warehouse123`  |
-| Merchant        | `imran@threadline.com` | `merchant123`   |
-| Rider           | `jahangir@email.com`     | `rider123`      |
+| Super Admin     | `admin01@email.com`    | `12qwaszx`      |
+| Warehouse Admin | `warehouse.admin01@email.com` | `12qwaszx` |
+| Merchant        | `merchant1@email.com`  | `12qwaszx`      |
+| Rider           | `rider1@email.com`     | `12qwaszx`      |
+| Demo merchant   | `demo@kikuya.com`      | `12qwaszx`      |
 
 > `warehouse.admin02@email.com` is seeded inactive (tests disabled-user handling). Full list in [`docs/SETUP.md`](./docs/SETUP.md).
 

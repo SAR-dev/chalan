@@ -67,8 +67,8 @@ test.describe("Merchant Branding", () => {
     // Login via API
     const loginRes = await request.post("/api/auth/sign-in/email", {
       data: {
-        email: "merchant1@email.com",
-        password: "merchant123",
+        email: CREDS.merchant.email,
+        password: CREDS.merchant.password,
         callbackURL: "/merchant",
       },
     })

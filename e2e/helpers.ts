@@ -8,23 +8,23 @@ import { auth } from "./selectors"
 export const CREDS = {
   superAdmin: {
     email: "admin01@email.com",
-    password: "admin123",
+    password: "12qwaszx",
     home: "/dashboard",
   },
   warehouseAdmin: {
     email: "warehouse.admin01@email.com",
-    password: "warehouse123",
+    password: "12qwaszx",
     home: "/warehouse",
   },
   merchant: {
     email: "merchant1@email.com",
-    password: "merchant123",
+    password: "12qwaszx",
     home: "/merchant",
   },
-  rider: { email: "rider1@email.com", password: "rider123", home: "/rider" },
+  rider: { email: "rider1@email.com", password: "12qwaszx", home: "/rider" },
   demoMerchant: {
     email: "demo@kikuya.com",
-    password: "demo123",
+    password: "12qwaszx",
     home: "/merchant",
   },
 } as const
