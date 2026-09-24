@@ -54,6 +54,10 @@ export const auth = betterAuth({
     max: process.env.NODE_ENV === "production" ? 10 : 100,
     customRules: {
       "/sign-in/*": { window: 60, max: 100 },
+      // get-session is polled by every page load / SWR bootstrap — keep it
+      // under its own generous cap so it never starves real users inside the
+      // tighter global production limit.
+      "/get-session": { window: 60, max: 60 },
     },
   },
   session: {

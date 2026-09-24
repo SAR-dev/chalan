@@ -6,7 +6,7 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 import { buildTableUrl, useTableFilters } from "@/lib/hooks/use-table-filters"
 import type { PaginatedResponse } from "@/lib/pagination"
-import type { Role, User } from "@/lib/types"
+import type { Role, TeamMember } from "@/lib/types"
 import { formatError } from "@/lib/validation"
 
 const KEY = "/api/team"
@@ -27,7 +27,7 @@ export function useTeam({
   initialData,
   initialTotal,
 }: {
-  initialData?: User[]
+  initialData?: TeamMember[]
   initialTotal?: number
 } = {}) {
   const { currentUser } = useAuth()
@@ -50,7 +50,7 @@ export function useTeam({
     error,
     isLoading,
     mutate,
-  } = useSWR<PaginatedResponse<User>>(currentUser ? url : null, jsonFetcher, {
+  } = useSWR<PaginatedResponse<TeamMember>>(currentUser ? url : null, jsonFetcher, {
     ...swrOptions,
     ...(isDefaultQuery && initialData
       ? {

@@ -6,9 +6,55 @@
 //   2. Rate-limit the upload endpoint to prevent flood attacks.
 //      Uses an in-process sliding-window counter (Map + timestamp).
 //      For multi-instance deployments swap this out for a Redis/Upstash store.
+//   3. Per-request CSP nonce — a fresh crypto nonce is generated for every
+//      page request, injected into the Content-Security-Policy response header
+//      AND forwarded to the server via the request headers so Next.js applies
+//      it to the inline scripts it renders (see next.config headers).
+//
+// Why a nonce instead of a static CSP? Next.js inlines its hydration scripts,
+// which must be signed by a nonce. A static `Content-Security-Policy` in
+// next.config can't carry a per-request nonce, so it lives here (only for
+// page routes; API/static responses don't need it).
 
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+
+// ---------------------------------------------------------------------------
+// CSP (Content-Security-Policy)
+// ---------------------------------------------------------------------------
+
+const SCRIPT_NONCE_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+
+/**
+ * 24 random characters from a 64-char alphabet (~144 bits of entropy).
+ * Meets the CSP `nonce-*` token grammar (base64-ish, no padding needed).
+ */
+function createNonce(): string {
+  const bytes = new Uint8Array(24)
+  crypto.getRandomValues(bytes)
+  let nonce = ""
+  for (const byte of bytes) nonce += SCRIPT_NONCE_CHARS[byte % 64]
+  return nonce
+}
+
+function buildCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    // Inline hydration scripts get the per-request nonce; no 'unsafe-inline'.
+    `script-src 'self' 'nonce-${nonce}'`,
+    // next-themes / NextTopLoader inject inline <style> for theme flicker
+    // prevention & progress bar — those need 'unsafe-inline' (styles only).
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' blob: data: https:",
+    "font-src 'self'",
+    "connect-src 'self' https:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ")
+}
 
 // ---------------------------------------------------------------------------
 // Role-based instance isolation
@@ -99,10 +145,11 @@ export function proxy(req: NextRequest) {
 
   // 2. Upload rate limiting
   if (req.method === "POST" && pathname === "/api/uploads") {
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown"
-
-    if (!uploadRateLimit(ip)) {
+    const forwarded = req.headers.get("x-forwarded-for")
+    const ip = forwarded?.split(",")[0]?.trim()
+    // No resolvable IP → skip the limiter rather than share one "unknown"
+    // bucket across every visitor (cross-tenant DoS).
+    if (ip && !uploadRateLimit(ip)) {
       return NextResponse.json(
         { error: "Too many uploads. Please wait a moment and try again." },
         { status: 429 },
@@ -110,21 +157,33 @@ export function proxy(req: NextRequest) {
     }
   }
 
-  return NextResponse.next()
+  // 3. Per-request CSP nonce (page routes only — enforced by the matcher).
+  const nonce = createNonce()
+  const csp = buildCsp(nonce)
+
+  // Forward the nonce + CSP to the server so Next applies the nonce to its
+  // inline hydration scripts; then set the same CSP for the browser.
+  const requestHeaders = new Headers(req.headers)
+  requestHeaders.set("x-nonce", nonce)
+  requestHeaders.set("content-security-policy", csp)
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  response.headers.set("content-security-policy", csp)
+  return response
 }
 
 export const config = {
   /*
-   * Match every role portal path plus the upload API route.
-   * API routes, login, register, track, landing, and static assets are
-   * intentionally excluded — they must remain accessible on all instances so
-   * auth, public tracking, and uploads continue to work.
+   * Every HTML page route needs the nonce'd CSP. API routes, static assets,
+   * _next, and uploads are handled specially:
+   *   - /api/uploads      → rate-limited above (needs the proxy to run).
+   *   - everything else   → matches the negative-lookahead, so page routes
+   *                          (dashboard/merchant/rider/warehouse, login,
+   *                          register, track, landing, static files) all get
+   *                          the CSP header.
    */
   matcher: [
-    "/dashboard/:path*",
-    "/merchant/:path*",
-    "/rider/:path*",
-    "/warehouse/:path*",
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
     "/api/uploads",
   ],
 }

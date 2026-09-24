@@ -6,11 +6,14 @@ import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { merchantPricingSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -38,4 +41,5 @@ export async function PATCH(
   })
 
   return NextResponse.json(updated)
-}
+})
+

@@ -24,7 +24,17 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+
+# NEXT_PUBLIC_* values are inlined into client bundles at build time. They are
+# injected here as build args (see .dockerignore — .env files never enter the
+# image), while server-only secrets are supplied at runtime via env_file.
+ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
+ARG NEXT_PUBLIC_ENV=development
+ARG NEXT_PUBLIC_BASE_URL=
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
+    NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV \
+    NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 RUN --mount=type=cache,id=nextcache,target=/app/.next/cache \
     pnpm build
 

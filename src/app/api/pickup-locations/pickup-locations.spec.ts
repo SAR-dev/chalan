@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  DELETE as deletePickupLocation,
-  PATCH as updatePickupLocation,
-} from "./[id]/route"
-import {
-  POST as createPickupLocation,
-  GET as listPickupLocations,
-} from "./route"
+import { DELETE as deletePickupLocation, PATCH as updatePickupLocation } from "./[id]/route"
+import { GET as listPickupLocations, POST as createPickupLocation } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
@@ -17,6 +11,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: () => (rateLimited ? ({ status: 429 } as Response) : null),
+  rateLimitByIp: () => (rateLimited ? ({ status: 429 } as Response) : null),
   getClientIp: () => "127.0.0.1",
 }))
 
@@ -28,6 +23,7 @@ vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
     const chain: Record<string, unknown> = {
       from: () => chain,
+      innerJoin: () => chain,
       where: () => chain,
       limit: () => chain,
       offset: () => chain,
@@ -94,6 +90,18 @@ const merchantSession = {
   userId: "u2",
   merchantId: "m_1",
 }
+const warehouseAdminSession = {
+  role: "WAREHOUSE_ADMIN",
+  name: "Warehouse Wendy",
+  userId: "u3",
+  warehouseId: "wh_1",
+}
+const riderSession = {
+  role: "RIDER",
+  name: "Rider Rhea",
+  userId: "u4",
+  riderId: "r_1",
+}
 
 describe("GET /api/pickup-locations", () => {
   it("401 when unauthenticated", async () => {
@@ -117,6 +125,53 @@ describe("GET /api/pickup-locations", () => {
       req("GET", "http://test.local/api?merchantId=m_1"),
     )
     expect(res.status).toBe(200)
+  })
+
+  it("warehouse admin sees own warehouse's locations", async () => {
+    sessionState.value = warehouseAdminSession
+    selectQueue.push([{ count: 1 }], [{ id: "pl_1" }])
+    const res = await listPickupLocations(req("GET"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.total).toBe(1)
+  })
+
+  it("warehouse admin may filter by merchant within their warehouse", async () => {
+    sessionState.value = warehouseAdminSession
+    selectQueue.push([{ count: 1 }], [{ id: "pl_1" }])
+    const res = await listPickupLocations(
+      req("GET", "http://test.local/api?merchantId=m_1"),
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it("warehouse admin without a warehouse gets an empty list", async () => {
+    sessionState.value = { role: "WAREHOUSE_ADMIN", userId: "u3" }
+    const res = await listPickupLocations(req("GET"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.total).toBe(0)
+  })
+
+  it("rider sees only their warehouse's locations", async () => {
+    sessionState.value = riderSession
+    selectQueue.push(
+      [{ warehouseId: "wh_1" }],
+      [{ count: 2 }],
+      [{ id: "pl_1" }, { id: "pl_2" }],
+    )
+    const res = await listPickupLocations(req("GET"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.total).toBe(2)
+  })
+
+  it("rider without a riderId gets an empty list", async () => {
+    sessionState.value = { role: "RIDER", userId: "u4" }
+    const res = await listPickupLocations(req("GET"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.total).toBe(0)
   })
 })
 

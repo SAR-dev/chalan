@@ -1,25 +1,73 @@
-import { eq, sql } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
-import { deliveryCity, pickupLocation } from "@/lib/db/schema"
+import { deliveryCity, pickupLocation, rider } from "@/lib/db/schema"
 import { paginateResponse, parsePagination } from "@/lib/pagination"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, pickupLocationSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
   const { limit, offset } = parsePagination(req)
   const merchantId = new URL(req.url).searchParams.get("merchantId")
-  const effectiveMerchantId =
-    me.role === "MERCHANT" ? me.merchantId : merchantId
+  // Every non-SUPER_ADMIN role is scoped to what they may actually use:
+  //   MERCHANT          → their own locations only.
+  //   WAREHOUSE_ADMIN   → locations in their warehouse's cities (they may
+  //                       still filter by ?merchantId within that scope).
+  //   RIDER             → locations in their warehouse's cities (to resolve
+  //                       shop addresses for assigned orders) — no merchant
+  //                       targeting.
+  //   SUPER_ADMIN       → everything, optional ?merchantId filter.
+  // Riders/warehouse admins are additionally narrowed through the delivery
+  // city (pickup_location.cityId → delivery_city.warehouseId) so they can
+  // never enumerate pickup locations outside their own warehouse.
+  let joinCity = false
+  let where:
+    | ReturnType<typeof and>
+    | ReturnType<typeof eq>
+    | undefined
 
-  const where = effectiveMerchantId
-    ? eq(pickupLocation.merchantId, effectiveMerchantId)
-    : undefined
+  switch (me.role) {
+    case "MERCHANT": {
+      if (!me.merchantId) return NextResponse.json(paginateResponse([], 0))
+      where = eq(pickupLocation.merchantId, me.merchantId)
+      break
+    }
+    case "WAREHOUSE_ADMIN": {
+      if (!me.warehouseId) return NextResponse.json(paginateResponse([], 0))
+      joinCity = true
+      where = and(
+        eq(deliveryCity.warehouseId, me.warehouseId),
+        merchantId ? eq(pickupLocation.merchantId, merchantId) : undefined,
+      )
+      break
+    }
+    case "RIDER": {
+      if (!me.riderId) return NextResponse.json(paginateResponse([], 0))
+      const [riderRow] = await dbRead
+        .select({ warehouseId: rider.warehouseId })
+        .from(rider)
+        .where(eq(rider.id, me.riderId))
+        .limit(1)
+      if (!riderRow) return NextResponse.json(paginateResponse([], 0))
+      joinCity = true
+      where = eq(deliveryCity.warehouseId, riderRow.warehouseId)
+      break
+    }
+    default: {
+      // SUPER_ADMIN — full visibility, optional merchant filter.
+      where = merchantId
+        ? eq(pickupLocation.merchantId, merchantId)
+        : undefined
+    }
+  }
 
   let q = dbRead
     .select({
@@ -34,18 +82,26 @@ export async function GET(req: Request) {
     })
     .from(pickupLocation)
     .$dynamic()
-  if (where) q = q.where(where)
+  let countQ = dbRead
+    .select({ count: sql<number>`count(*)` })
+    .from(pickupLocation)
+    .$dynamic()
+  if (joinCity) {
+    q = q.innerJoin(deliveryCity, eq(pickupLocation.cityId, deliveryCity.id))
+    countQ = countQ.innerJoin(
+      deliveryCity,
+      eq(pickupLocation.cityId, deliveryCity.id),
+    )
+  }
+  if (where) {
+    q = q.where(where)
+    countQ = countQ.where(where)
+  }
   if (limit !== undefined) q = q.limit(limit)
   if (offset !== undefined) q = q.offset(offset)
 
   // COUNT and data fetch are independent — run them in parallel.
-  const [[{ count }], rows] = await Promise.all([
-    dbRead
-      .select({ count: sql<number>`count(*)` })
-      .from(pickupLocation)
-      .where(where),
-    q,
-  ])
+  const [[{ count }], rows] = await Promise.all([countQ, q])
 
   // Pickup locations change rarely — allow short-lived browser caching to
   // avoid a round-trip on repeat navigation.
@@ -54,10 +110,13 @@ export async function GET(req: Request) {
       "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
     },
   })
-}
+})
+
 
 // Merchant registers a new pickup location (shop) for their own business.
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -65,7 +124,7 @@ export async function POST(req: Request) {
     return forbidden()
   }
 
-  const limited = rateLimit(`pickup-locations:${getClientIp(req)}`, 10, 60)
+  const limited = await rateLimitByIp(req, "pickup-locations", 10, 60)
   if (limited) return limited
 
   const parsed = await parseBody(req, pickupLocationSchema)
@@ -97,4 +156,5 @@ export async function POST(req: Request) {
     .returning()
 
   return NextResponse.json(created, { status: 201 })
-}
+})
+

@@ -2,11 +2,7 @@
 
 import { MoreHorizontal, Pencil } from "lucide-react"
 import { useMemo, useState } from "react"
-import {
-  CellTwoRow,
-  DataTable,
-  type DataTableColumn,
-} from "@/components/data-table"
+import { CellTwoRow, DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -99,6 +95,7 @@ export function WarehousesPageClient({
             render={
               <Button variant="ghost" size="icon" className="size-8">
                 <MoreHorizontal className="size-4" />
+                <span className="sr-only">Actions</span>
               </Button>
             }
           />

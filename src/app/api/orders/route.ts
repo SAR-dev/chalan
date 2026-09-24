@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, type SQL, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, type SQL, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
@@ -16,12 +16,18 @@ import {
   zonePricing,
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
+import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
+import { pickupWarehouseId } from "@/lib/db/order-lookup"
+import { buildWarehouseOrderScope } from "@/lib/db/order-scope"
 import { paginateResponse, parseDateRange, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
 import { calcCodFee, calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { orderCreateSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -40,16 +46,9 @@ export async function GET(req: Request) {
       break
     case "WAREHOUSE_ADMIN":
       if (!me.warehouseId) return NextResponse.json(paginateResponse([], 0))
-      // Orders already logged into this warehouse, plus picked-up parcels
-      // not yet assigned to any warehouse — these are the incoming
-      // candidates any warehouse admin can receive (see app/warehouse/page.tsx).
-      // Also include APPROVED orders without a pickup rider so warehouse
-      // admins can assign one.
-      where = or(
-        eq(order.warehouseId, me.warehouseId),
-        and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
-        and(isNull(order.pickupRiderId), eq(order.status, "APPROVED")),
-      )
+      // Shared scope: logged-in orders, intake candidates, APPROVED orders
+      // awaiting pickup-rider assignment (see buildWarehouseOrderScope()).
+      where = buildWarehouseOrderScope(me.warehouseId)
       break
     case "SUPER_ADMIN":
       where = undefined
@@ -74,7 +73,7 @@ export async function GET(req: Request) {
     where = where ? and(where, searchClause) : searchClause
   }
 
-  const statuses = parseStatusFilter(req)
+  const statuses = parseStatusFilter(req, orderStatuses)
   if (statuses.length > 0) {
     const statusClause = inArray(order.status, enumValues<(typeof orderStatuses)[number]>(statuses))
     where = where ? and(where, statusClause) : statusClause
@@ -94,28 +93,8 @@ export async function GET(req: Request) {
   // Lean projection for list view — omits wide/rarely-rendered columns such as
   // pickupProofRefs and the ~15 lifecycle timestamps.
   const listColumns = {
-    id: order.id,
-    merchantId: order.merchantId,
-    warehouseId: order.warehouseId,
-    pickupLocationId: order.pickupLocationId,
-    pickupRiderId: order.pickupRiderId,
-    deliveryRiderId: order.deliveryRiderId,
-    recipientName: order.recipientName,
-    recipientPhone: order.recipientPhone,
-    deliveryAddress: order.deliveryAddress,
-    deliveryCity: deliveryCityTable.name,
-    deliveryMapLink: order.deliveryMapLink,
-    parcelWeightKg: order.parcelWeightKg,
-    deliveryType: order.deliveryType,
-    productCost: order.productCost,
-    deliveryFee: order.deliveryFee,
-    codFee: order.codFee,
-    merchantEarnings: order.merchantEarnings,
-    status: order.status,
+    ...ORDER_CORE_COLUMNS,
     merchantNote: order.merchantNote,
-    codSettledAt: order.codSettledAt,
-    createdAt: order.createdAt,
-    updatedAt: order.updatedAt,
     merchantPhone: merchant.phone,
     pickupLocationMapLink: pickupLocation.mapLink,
   }
@@ -166,9 +145,12 @@ export async function GET(req: Request) {
   const [[{ count }], rows] = await Promise.all([countQuery, dbQuery])
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
-}
+})
 
-export async function POST(req: Request) {
+
+export const POST = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
@@ -177,7 +159,7 @@ export async function POST(req: Request) {
 
   const merchantId = me.merchantId
 
-  const limited = rateLimit(`orders:${getClientIp(req)}`, 30, 60)
+  const limited = await rateLimitByIp(req, "orders", 30, 60)
   if (limited) return limited
 
   const parsed = await parseBody(req, orderCreateSchema)
@@ -198,22 +180,14 @@ export async function POST(req: Request) {
     ? deliveryMapLink.trim()
     : null
 
-  const [pickup] = await db
-    .select({ warehouseId: deliveryCityTable.warehouseId })
-    .from(pickupLocation)
-    .innerJoin(
-      deliveryCityTable,
-      eq(pickupLocation.cityId, deliveryCityTable.id),
-    )
-    .where(eq(pickupLocation.id, pickupLocationId))
-    .limit(1)
-  if (!pickup?.warehouseId) {
+  const hubId = await pickupWarehouseId(pickupLocationId)
+  if (!hubId) {
     return badRequest("Pickup location has no warehouse assigned.")
   }
   const [hub] = await db
     .select({ id: warehouse.id, isActive: warehouse.isActive })
     .from(warehouse)
-    .where(eq(warehouse.id, pickup.warehouseId))
+    .where(eq(warehouse.id, hubId))
     .limit(1)
   if (!hub || !hub.isActive) {
     return badRequest("No active warehouse available for this pickup location.")
@@ -245,7 +219,7 @@ export async function POST(req: Request) {
         : "Your merchant account is suspended and cannot create orders.",
     )
   }
-  const verification = canPlaceOrders(merchantRow as any)
+  const verification = canPlaceOrders(merchantRow)
   if (!verification.allowed) {
     return forbidden(verification.reason)
   }
@@ -389,4 +363,5 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json(newOrder, { status: 201 })
-}
+})
+

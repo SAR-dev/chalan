@@ -1,34 +1,17 @@
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm"
+import { desc, eq, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
+import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
+import { buildWarehouseOrderScope } from "@/lib/db/order-scope"
 import { deliveryCity, order } from "@/lib/db/schema"
 import { WarehouseOrdersPageClient } from "./orders-client"
 
 const ORDER_COLUMNS = {
-  id: order.id,
-  merchantId: order.merchantId,
-  pickupLocationId: order.pickupLocationId,
-  recipientName: order.recipientName,
-  recipientPhone: order.recipientPhone,
-  deliveryAddress: order.deliveryAddress,
-  deliveryCity: deliveryCity.name,
-  deliveryMapLink: order.deliveryMapLink,
-  parcelWeightKg: order.parcelWeightKg,
-  deliveryType: order.deliveryType,
-  productCost: order.productCost,
-  deliveryFee: order.deliveryFee,
-  codFee: order.codFee,
-  merchantEarnings: order.merchantEarnings,
-  status: order.status,
-  createdAt: order.createdAt,
-  updatedAt: order.updatedAt,
-  pickupRiderId: order.pickupRiderId,
+  ...ORDER_CORE_COLUMNS,
   pickedUpAt: order.pickedUpAt,
-  warehouseId: order.warehouseId,
   receivedAtWarehouseAt: order.receivedAtWarehouseAt,
   receivedByWarehouse: order.receivedByWarehouse,
-  deliveryRiderId: order.deliveryRiderId,
   dispatchedAt: order.dispatchedAt,
   dispatchedBy: order.dispatchedBy,
   deliveredAt: order.deliveredAt,
@@ -40,7 +23,6 @@ const ORDER_COLUMNS = {
   cancelledAt: order.cancelledAt,
   cancelledBy: order.cancelledBy,
   cancelReason: order.cancelReason,
-  codSettledAt: order.codSettledAt,
   codSettledBy: order.codSettledBy,
   payoutRequestId: order.payoutRequestId,
 }
@@ -53,11 +35,7 @@ export default async function WarehouseOrdersPage() {
 
   const limit = 20
 
-  const warehouseScope = or(
-    eq(order.warehouseId, me.warehouseId),
-    and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
-    and(isNull(order.pickupRiderId), eq(order.status, "APPROVED")),
-  )
+  const warehouseScope = buildWarehouseOrderScope(me.warehouseId)
 
   const [[{ total }], rows] = await Promise.all([
     dbRead

@@ -79,26 +79,6 @@ export function useRiders({
   const riders = response?.data ?? initialData ?? []
   const total = response?.total ?? initialTotal ?? 0
 
-  // Unfiltered list for stat card counts — fetches all statuses regardless
-  // of the current tab filter.
-  const allUrl = buildTableUrl(KEY, {
-    limit: 9999,
-    offset: 0,
-    q: filters.debouncedQuery || undefined,
-    isActive: undefined,
-    taskType: undefined,
-    sortId: filters.sortId || undefined,
-    sortDir: filters.sortId ? filters.sortDir : undefined,
-  })
-
-  const { data: allResponse } = useSWR<PaginatedResponse<Rider>>(
-    currentUser ? allUrl : null,
-    jsonFetcher,
-    swrOptions,
-  )
-
-  const allRiders = allResponse?.data ?? []
-
   // Fetch current rider record when the logged-in user is a rider.
   const riderId = currentUser?.role === "RIDER" ? currentUser.riderId : null
   const { data: currentRiderResponse } = useSWR<Rider>(
@@ -166,7 +146,6 @@ export function useRiders({
 
   return {
     riders,
-    allRiders,
     total,
     page: filters.page,
     setPage: filters.setPage,

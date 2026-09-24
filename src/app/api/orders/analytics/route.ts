@@ -1,12 +1,15 @@
-import { and, eq, gte, lte, sql } from "drizzle-orm"
+import { and, eq, gte, lte, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
 import { dbRead } from "@/lib/db"
 import { order } from "@/lib/db/schema"
 import { parseDateRange } from "@/lib/pagination"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -23,6 +26,16 @@ export async function GET(req: Request) {
   } else if (me.role === "SUPER_ADMIN") {
     if (merchantId) where = eq(order.merchantId, merchantId)
     else if (warehouseId) where = eq(order.warehouseId, warehouseId)
+  } else if (me.role === "RIDER") {
+    // A rider only ever sees analytics over their own deliveries/pickups —
+    // never platform-wide aggregates. Without a rider binding the query can
+    // never match anything.
+    where = me.riderId
+      ? or(
+          eq(order.deliveryRiderId, me.riderId),
+          eq(order.pickupRiderId, me.riderId),
+        )
+      : eq(order.id, "")
   }
 
   // Apply date range filter
@@ -104,4 +117,5 @@ export async function GET(req: Request) {
       pendingCount: codSummary?.pendingCount ?? 0,
     },
   })
-}
+})
+

@@ -6,11 +6,14 @@ import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { rider } from "@/lib/db/schema"
 import { parseBody, riderUpdateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(
+export const GET = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -41,15 +44,18 @@ export async function GET(
   }
 
   return NextResponse.json(found)
-}
+})
+
 
 // Update a rider's details. Admins / Super Admins can edit any rider and
 // reassign their warehouse and task type. Warehouse Admins can only edit
 // riders based at their own hub and may not move a rider to another hub.
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -112,4 +118,5 @@ export async function PATCH(
   })
 
   return NextResponse.json(updated)
-}
+})
+

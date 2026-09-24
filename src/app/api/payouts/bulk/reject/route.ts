@@ -7,12 +7,15 @@ import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { order, payoutRequest } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 const bulkRejectSchema = idsSchema.extend({
   reason: z.string().trim().min(1).default("Bulk reject"),
 })
 
-export async function PATCH(req: Request) {
+export const PATCH = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -73,4 +76,5 @@ export async function PATCH(req: Request) {
   )
 
   return NextResponse.json({ ok: true, count: updated.length })
-}
+})
+

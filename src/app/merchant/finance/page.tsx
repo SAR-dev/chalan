@@ -1,19 +1,13 @@
 "use client"
 
 import { Banknote, Coins, ExternalLink, Package, Wallet } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
@@ -26,15 +20,27 @@ import type { Order } from "@/lib/types"
 
 export default function MerchantFinancePage() {
   const { currentMerchant } = useMerchants()
-  const { merchantPayableOrders, isLoading: isLoadingOrders } = useOrders()
-  const { merchantPayoutRequests, isLoading: isLoadingPayouts } = usePayouts()
-  const requestColumns = usePayoutRequestColumns()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined)
   const [dateTo, setDateTo] = useState<string | undefined>(undefined)
+  const [payablePage, setPayablePage] = useState(1)
+  const [payableLimit, setPayableLimit] = useState(20)
+  const {
+    merchantPayableOrders,
+    merchantPayableTotal,
+    merchantPayableAmount,
+    isLoading: isLoadingOrders,
+  } = useOrders({
+    payablePage,
+    payableLimit,
+    payableDateFrom: dateFrom,
+    payableDateTo: dateTo,
+  })
+  const { merchantPayoutRequests, isLoading: isLoadingPayouts } = usePayouts()
+  const requestColumns = usePayoutRequestColumns()
 
   const isActive = currentMerchant?.status === "ACTIVE"
-  const canRequest = isActive && merchantPayableOrders.length > 0
+  const canRequest = isActive && merchantPayableTotal > 0
 
   function _getPayableSearchValue(o: Order, columnId: string): string | null {
     switch (columnId) {
@@ -153,25 +159,8 @@ export default function MerchantFinancePage() {
     },
   ]
 
-  const filteredPayableOrders = useMemo(() => {
-    if (!dateFrom && !dateTo) return merchantPayableOrders
-    return merchantPayableOrders.filter((o) => {
-      if (!o.deliveredAt) return false
-      const d = new Date(o.deliveredAt)
-      if (dateFrom && d < new Date(dateFrom)) return false
-      if (dateTo) {
-        const end = new Date(dateTo)
-        end.setHours(23, 59, 59, 999)
-        if (d > end) return false
-      }
-      return true
-    })
-  }, [merchantPayableOrders, dateFrom, dateTo])
-
-  const filteredAvailable = filteredPayableOrders.reduce(
-    (sum, o) => sum + o.merchantEarnings,
-    0,
-  )
+  const filteredPayableOrders = merchantPayableOrders
+  const filteredAvailable = merchantPayableAmount
 
   const paidOut = merchantPayoutRequests
     .filter((p) => p.status === "PAID")
@@ -199,8 +188,8 @@ export default function MerchantFinancePage() {
           {
             label: "Available for payout",
             value: formatTk(filteredAvailable),
-            hint: `${filteredPayableOrders.length} settled order${
-              filteredPayableOrders.length === 1 ? "" : "s"
+              hint: `${merchantPayableTotal} settled order${
+                merchantPayableTotal === 1 ? "" : "s"
             }`,
             icon: Banknote,
             tone: "bg-chart-2/15 text-chart-2",
@@ -245,8 +234,14 @@ export default function MerchantFinancePage() {
           <DateRangePicker
             from={dateFrom}
             to={dateTo}
-            onFromChange={setDateFrom}
-            onToChange={setDateTo}
+            onFromChange={(value) => {
+              setDateFrom(value)
+              setPayablePage(1)
+            }}
+            onToChange={(value) => {
+              setDateTo(value)
+              setPayablePage(1)
+            }}
             className="mb-4"
           />
           {filteredPayableOrders.length === 0 ? (
@@ -273,6 +268,12 @@ export default function MerchantFinancePage() {
               getRowKey={(o) => o.id}
               initialSortId="tracking"
               loading={isLoadingOrders}
+              serverPaginated
+              total={merchantPayableTotal}
+              onPageChange={(page, limit) => {
+                setPayablePage(page)
+                setPayableLimit(limit)
+              }}
             />
           )}
         </CardContent>
@@ -317,6 +318,8 @@ export default function MerchantFinancePage() {
 
       <PayoutRequestDialog
         payableOrders={merchantPayableOrders}
+        payableTotal={merchantPayableTotal}
+        payableAmount={merchantPayableAmount}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />

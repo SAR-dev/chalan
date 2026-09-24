@@ -53,13 +53,6 @@ export function useTableFilters(options?: UseTableFiltersOptions) {
     [],
   )
 
-  const setFilter = useCallback(
-    (_key: string, _value: string | number | string[] | undefined) => {
-      setPage(1)
-    },
-    [],
-  )
-
   return {
     query,
     setQuery,
@@ -80,7 +73,6 @@ export function useTableFilters(options?: UseTableFiltersOptions) {
     debouncedQuery: trimmedQuery,
     offset,
     onSortChange,
-    setFilter,
   }
 }
 

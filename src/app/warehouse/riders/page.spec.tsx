@@ -54,7 +54,13 @@ beforeEach(() => {
 
 async function importPage() {
   const { WarehouseRidersPageClient } = await import("./riders-client")
-  renderPage(<WarehouseRidersPageClient initialData={[]} initialTotal={0} />)
+  renderPage(
+    <WarehouseRidersPageClient
+      initialData={[]}
+      initialTotal={0}
+      initialCounts={{ active: 0, delivery: 0, pickup: 0 }}
+    />,
+  )
 }
 
 describe("Warehouse riders page", () => {

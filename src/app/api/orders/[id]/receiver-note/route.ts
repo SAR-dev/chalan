@@ -3,16 +3,25 @@ import { NextResponse } from "next/server"
 import { conflict, notFound } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { order } from "@/lib/db/schema"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { orderReceiverNoteSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Public endpoint — no session required. The tracking page lets the recipient
 // leave a note on their own parcel before it is delivered. Locked once the
 // order reaches a terminal status (DELIVERED / RETURNED / CANCELLED).
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const { id } = await params
+
+  // Public unauthenticated write — anyone with the cuid2 order id (printed on
+  // parcels) could overwrite the receiver note, so throttle by IP.
+  const limited = await rateLimitByIp(req, "receiver-note", 10, 60)
+  if (limited) return limited
 
   const parsed = await parseBody(req, orderReceiverNoteSchema)
   if (parsed.error) return parsed.error
@@ -42,4 +51,5 @@ export async function PATCH(
     .returning()
 
   return NextResponse.json(updated)
-}
+})
+

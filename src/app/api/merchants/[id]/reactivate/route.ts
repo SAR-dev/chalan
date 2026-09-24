@@ -5,11 +5,14 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -35,4 +38,5 @@ export async function PATCH(
   })
 
   return NextResponse.json(updated)
-}
+})
+

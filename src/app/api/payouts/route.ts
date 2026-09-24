@@ -6,10 +6,13 @@ import { db, dbRead } from "@/lib/db"
 import { enumValues } from "@/lib/db-helpers"
 import { merchant, order, payoutRequest, payoutRequestStatuses } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, payoutCreateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -28,7 +31,7 @@ export async function GET(req: Request) {
     searchClause = or(...conditions)
   }
 
-  const statuses = parseStatusFilter(req)
+  const statuses = parseStatusFilter(req, payoutRequestStatuses)
 
   if (me.role === "MERCHANT" && me.merchantId) {
     let where = eq(payoutRequest.merchantId, me.merchantId)
@@ -146,16 +149,19 @@ export async function GET(req: Request) {
   ])
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
-}
+})
 
-export async function POST(req: Request) {
+
+export const POST = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can request payouts")
   }
 
-  const limited = rateLimit(`payouts:${getClientIp(req)}`, 10, 60)
+  const limited = await rateLimitByIp(req, "payouts", 10, 60)
   if (limited) return limited
 
   const parsed = await parseBody(req, payoutCreateSchema)
@@ -213,4 +219,5 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json(newRequest, { status: 201 })
-}
+})
+

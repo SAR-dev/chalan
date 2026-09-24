@@ -1,6 +1,7 @@
 import { Analytics } from "@vercel/analytics/next"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
+import { headers } from "next/headers"
 import NextTopLoader from "nextjs-toploader"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -68,11 +69,17 @@ export const viewport: Viewport = {
   ],
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode
 }>) {
+  // x-nonce is set by the edge proxy (src/proxy.ts) for every page request so
+  // Next can nonce its inline scripts AND we can forward it to components that
+  // inject their own inline scripts (next-themes, NextTopLoader).
+  const headerList = await headers()
+  const nonce = headerList.get("x-nonce") ?? undefined
+
   return (
     <html
       lang="en"
@@ -80,12 +87,13 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-background font-sans antialiased">
-        <NextTopLoader />
+        <NextTopLoader nonce={nonce} />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           {children}
           <Toaster />

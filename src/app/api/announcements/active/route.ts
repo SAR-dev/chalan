@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
 import { announcement } from "@/lib/db/schema"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Returns announcements that are currently live for the caller's role.
 // "Live" = isActive AND publishedAt <= now AND (expiresAt IS NULL OR expiresAt > now)
@@ -11,7 +12,9 @@ import { announcement } from "@/lib/db/schema"
 //
 // No pagination — active announcements are expected to be small in number.
 // The client is responsible for read/unread state (localStorage).
-export async function GET() {
+export const GET = withErrorHandler(async (
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -54,4 +57,5 @@ export async function GET() {
   )
 
   return NextResponse.json(forMe)
-}
+})
+

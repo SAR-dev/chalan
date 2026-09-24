@@ -4,11 +4,14 @@ import { requireSession } from "@/lib/api-auth"
 import { forbidden, notFound } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { mailConfig } from "@/lib/db/schema"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me || me.role !== "SUPER_ADMIN") return forbidden()
 
@@ -54,5 +57,8 @@ export async function PATCH(
     .where(eq(mailConfig.id, id))
     .limit(1)
 
-  return NextResponse.json(updated)
-}
+  return NextResponse.json(
+    updated ? { ...updated, pass: updated.pass ? "••••••••" : "" } : updated,
+  )
+})
+

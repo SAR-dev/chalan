@@ -17,21 +17,15 @@
 
 import { lt, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { isAuthorizedCron } from "@/lib/cron-auth"
 import { db } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function POST(req: Request) {
-  const secret = process.env.CRON_SECRET
-  if (!secret) {
-    console.error("[cron/cleanup-audit-logs] CRON_SECRET is not set")
-    return NextResponse.json(
-      { error: "Server misconfiguration" },
-      { status: 500 },
-    )
-  }
-
-  const auth = req.headers.get("authorization")
-  if (auth !== `Bearer ${secret}`) {
+export const POST = withErrorHandler(async (
+req: Request
+) => {
+  if (!isAuthorizedCron(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -54,4 +48,5 @@ export async function POST(req: Request) {
 
   console.log("[cron/cleanup-audit-logs]", result)
   return NextResponse.json(result)
-}
+})
+

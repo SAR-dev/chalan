@@ -5,8 +5,11 @@ import { forbidden, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { zonePricing } from "@/lib/db/schema"
 import { parseBody, zonePricingCreateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN" && me.role !== "WAREHOUSE_ADMIN") {
@@ -25,9 +28,12 @@ export async function GET(req: Request) {
     .orderBy(asc(zonePricing.fromZoneId), asc(zonePricing.toZoneId))
 
   return NextResponse.json(rows)
-}
+})
 
-export async function POST(req: Request) {
+
+export const POST = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -66,4 +72,5 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json(result, { status: existing.length > 0 ? 200 : 201 })
-}
+})
+

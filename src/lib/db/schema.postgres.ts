@@ -10,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 
 // =============================================================================
@@ -360,6 +361,9 @@ export const merchant = pgTable(
   (t) => [
     index("merchant_status_idx").on(t.status),
     index("merchant_created_at_idx").on(t.createdAt),
+    // `user.email` is unique; the merchant link must be too or a
+    // check-then-insert race can create duplicate merchant rows per email.
+    uniqueIndex("merchant_email_unique").on(t.email),
     index("merchant_email_verified_at_idx").on(t.emailVerifiedAt),
     index("merchant_nid_submitted_at_idx").on(t.nidSubmittedAt),
     index("merchant_nid_verified_at_idx").on(t.nidVerifiedAt),
@@ -678,6 +682,7 @@ export const order = pgTable(
     // Role-scoped list queries (most common access pattern)
     index("order_merchant_id_idx").on(t.merchantId),
     index("order_warehouse_id_idx").on(t.warehouseId),
+    index("order_delivery_city_id_idx").on(t.deliveryCityId),
     index("order_pickup_rider_id_idx").on(t.pickupRiderId),
     index("order_delivery_rider_id_idx").on(t.deliveryRiderId),
     index("order_pickup_location_id_idx").on(t.pickupLocationId),
@@ -711,26 +716,12 @@ export const order = pgTable(
 )
 
 // =============================================================================
-// Failed mail log
+// Failed mail log — REMOVED
 //
-// A row is inserted whenever sendMail() exhausts all retries without success.
-// Useful for debugging delivery failures and manual re-sending.
+// `failed_mail` was a write-only table inserted by `mailer.ts` and never read
+// (superseded by `email_log`, which records failed sends with
+// `status = 'FAILED'`). Dropped in favour of email_log — see the 2026-09 audit.
 // =============================================================================
-
-export const failedMail = pgTable("failed_mail", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  to: text("to").notNull(), // comma-joined if multiple recipients
-  subject: text("subject").notNull(),
-  html: text("html"),
-  text: text("text"),
-  error: text("error").notNull(), // lastError.message
-  attempts: integer("attempts").notNull(), // total attempts made (retries + 1)
-  failedAt: ts("failedAt").notNull().defaultNow(),
-  createdAt: ts("createdAt").notNull().defaultNow(),
-  updatedAt: ts("updatedAt").notNull().defaultNow(),
-})
 
 // =============================================================================
 // Email log

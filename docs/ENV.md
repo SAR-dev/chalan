@@ -44,8 +44,27 @@ and automatically enables `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`,
 | Variable                   | Required | Default                | Description                                                                            |
 | -------------------------- | -------- | ---------------------- | -------------------------------------------------------------------------------------- |
 | `BETTER_AUTH_SECRET`       | **Yes**  | —                      | Auth signing key. Min 32 chars. Generate with `openssl rand -base64 32`                |
-| `BETTER_AUTH_URL`          | No       | `NEXT_PUBLIC_SITE_URL` | Auth callback URL. Set if different from the site URL                                  |
 | `BETTER_AUTH_ALLOWED_URLS` | No       | —                      | Comma-separated origins for callbacks & CSRF. Required for multi-subdomain deployments |
+
+---
+
+## Mail
+
+The SMTP connection lives in the database (Super Admin → Settings → SMTP Server), but its
+password is encrypted at rest using an env-provided AES-256-GCM key:
+
+| Variable           | Required     | Default | Description                                                                   |
+| ------------------ | ------------ | ------- | ----------------------------------------------------------------------------- |
+| `SMTP_SECRET_KEY`  | **Yes** (prod) | —     | 64-hex-char AES-256-GCM key for SMTP passwords at rest. `openssl rand -hex 32` |
+| `MAIL_DISABLED`    | No           | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)            |
+
+---
+
+## Rate Limiting
+
+| Variable    | Required | Default | Description                                                                                          |
+| ----------- | -------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `REDIS_URL` | No       | —       | Redis connection string. When set, API rate limits are shared across app instances; otherwise an in-memory store is used (single-instance dev). Ignored if the connection fails. |
 
 ---
 
@@ -106,6 +125,18 @@ and automatically enables `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`,
 | ---------------------- | -------- | ------------- | ----------------------------------------------- |
 | `NEXT_PUBLIC_SITE_URL` | **Yes**  | —             | Canonical public URL for SEO, OG tags, sitemaps |
 | `NEXT_PUBLIC_ENV`      | **Yes**  | `development` | One of: `development`, `production`             |
+
+---
+
+## Seed
+
+Applied by the seed script when creating the three demo SUPER_ADMIN accounts
+(`admin01`/`admin02`/`admin03@email.com`). They are provided as e2e fixtures, so
+a known default exists — but set an override in any real environment.
+
+| Variable                   | Required | Default      | Description                                                          |
+| -------------------------- | -------- | ------------ | -------------------------------------------------------------------- |
+| `SEED_SUPER_ADMIN_PASSWORD` | No       | `admin123`   | Password for seeded super-admin accounts (no known default in prod)  |
 
 ---
 

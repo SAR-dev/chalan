@@ -3,7 +3,11 @@
 // No auth, no DB query — intentionally minimal so it responds fast
 // and doesn't produce noise in audit or access logs.
 import { NextResponse } from "next/server"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET() {
+export const GET = withErrorHandler(async (
+
+) => {
   return NextResponse.json({ ok: true })
-}
+})
+

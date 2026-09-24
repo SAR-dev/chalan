@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Fragment } from "react"
+import { cache, Fragment } from "react"
 import { ImageZoom } from "@/components/image-zoom"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -201,7 +201,10 @@ const STATUS_COPY: Record<
 
 // ─── data fetching ────────────────────────────────────────────────────────────
 
-async function fetchOrderData(idOrCode: string) {
+// Cached so `generateMetadata` and the page body share one query set per
+// request instead of hitting the DB twice (1 order select + up to 4 child
+// selects either time).
+const fetchOrderData = cache(async (idOrCode: string) => {
   const normalized = idOrCode.trim().toUpperCase()
 
   // Try matching by id
@@ -243,7 +246,7 @@ async function fetchOrderData(idOrCode: string) {
     deliveryRider: deliveryRiderRows[0] ?? null,
     warehouse: warehouseRows[0] ?? null,
   }
-}
+})
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
@@ -253,7 +256,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const code = decodeURIComponent(id).toUpperCase()
+  const code = decodeURIComponent(id).trim().toUpperCase()
   const data = await fetchOrderData(code)
 
   const statusLabel = data
@@ -272,7 +275,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TrackDetailPage({ params }: Props) {
   const { id } = await params
-  const idOrCode = decodeURIComponent(id)
+  const idOrCode = decodeURIComponent(id).trim().toUpperCase()
   const data = await fetchOrderData(idOrCode)
 
   // If not found, render a friendly not-found UI (don't use Next's notFound()

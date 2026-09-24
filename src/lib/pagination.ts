@@ -1,4 +1,4 @@
-import { asc, type Column, desc } from "drizzle-orm"
+import { type Column } from "drizzle-orm"
 
 export const MAX_LIMIT = 100
 
@@ -34,8 +34,15 @@ export function parsePagination(req: Request): {
  * Parse a `?status=` query parameter that may contain comma-separated values.
  * Returns a deduplicated array of trimmed, upper-cased status strings, or an
  * empty array when the parameter is absent / empty.
+ *
+ * When `allowed` is provided, unknown statuses are dropped so a garbage value
+ * (e.g. `?status=BOGUS`) can never be passed to `enumValues()` and silently
+ * match nothing.
  */
-export function parseStatusFilter(req: Request): string[] {
+export function parseStatusFilter(
+  req: Request,
+  allowed?: readonly string[],
+): string[] {
   const raw = new URL(req.url).searchParams.get("status")
   if (!raw) return []
   const statuses = [
@@ -46,6 +53,9 @@ export function parseStatusFilter(req: Request): string[] {
         .filter(Boolean),
     ),
   ]
+  if (allowed && allowed.length > 0) {
+    return statuses.filter((s) => allowed.includes(s))
+  }
   return statuses
 }
 
@@ -108,17 +118,4 @@ export function parseSort<T extends Record<string, Column>>(
 
   const direction: SortDir = rawDir === "desc" ? "desc" : "asc"
   return { column, direction }
-}
-
-/**
- * Apply a sort clause to a Drizzle query builder that supports `.orderBy()`.
- * Returns the query with the appropriate `asc()` or `desc()` applied.
- */
-export function applySort<Q extends { orderBy: (clause: any) => Q }>(
-  query: Q,
-  sort: { column: Column; direction: SortDir },
-): Q {
-  return sort.direction === "asc"
-    ? query.orderBy(asc(sort.column))
-    : query.orderBy(desc(sort.column))
 }

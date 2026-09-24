@@ -4,13 +4,16 @@ import { requireSession } from "@/lib/api-auth"
 import { conflict, forbidden, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { balancePaymentSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function POST(
+export const POST = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -21,7 +24,7 @@ export async function POST(
     return forbidden()
   }
 
-  const limited = rateLimit(`balance-payment:${getClientIp(req)}`, 5, 60)
+  const limited = await rateLimitByIp(req, "balance-payment", 5, 60)
   if (limited) return limited
 
   // Block submission if a PENDING payment already exists.
@@ -79,4 +82,5 @@ export async function POST(
   })
 
   return NextResponse.json(inserted, { status: 201 })
-}
+})
+

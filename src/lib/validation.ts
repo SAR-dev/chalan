@@ -7,6 +7,7 @@ import {
   PROFILE_ROLES,
   RIDER_TASK_TYPES,
 } from "@/lib/constants"
+import { isAllowedOrigin } from "@/lib/csrf"
 
 export const idsSchema = z.object({
   ids: z
@@ -41,6 +42,19 @@ export async function parseBody<T extends z.ZodType>(
 ): Promise<
   { data: z.infer<T>; error: null } | { data: null; error: NextResponse }
 > {
+  // CSRF — reject cross-site requests up front. Browsers attach Origin to
+  // state-changing same/cross-origin requests, so any mismatch cannot come
+  // from a legitimate page in this app.
+  if (!isAllowedOrigin(req)) {
+    return {
+      data: null,
+      error: NextResponse.json(
+        { error: "Invalid request origin" },
+        { status: 403 },
+      ),
+    }
+  }
+
   let raw: unknown
   try {
     raw = await req.json()

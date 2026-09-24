@@ -1,25 +1,20 @@
 import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import {
-  badRequest,
-  conflict,
-  forbidden,
-  notFound,
-  unauthorized,
-} from "@/lib/api-response"
+import { badRequest, conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { deliveryCity, order, pickupLocation } from "@/lib/db/schema"
 import { parseBody, pickupLocationSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Loads a pickup location and verifies the signed-in merchant owns it. Returns
 // either the row or a NextResponse error to short-circuit the handler.
 async function loadOwned(id: string) {
   const me = await requireSession()
-  if (!me) return { error: unauthorized() } as const
+  if (!me) return { error: unauthorized(), row: null }
 
   if (me.role !== "MERCHANT" || !me.merchantId) {
-    return { error: forbidden() } as const
+    return { error: forbidden(), row: null }
   }
 
   const [row] = await db
@@ -43,21 +38,23 @@ async function loadOwned(id: string) {
     .limit(1)
 
   if (!row) {
-    return { error: notFound() } as const
+    return { error: notFound(), row: null }
   }
 
-  return { row } as const
+  return { error: null, row }
 }
 
 // Merchant updates one of their pickup locations (pickup location name, address, map
 // link).
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const { id } = await params
   const owned = await loadOwned(id)
-  if ("error" in owned) return owned.error
+  if (owned.error) return owned.error
 
   const parsed = await parseBody(req, pickupLocationSchema)
   if (parsed.error) return parsed.error
@@ -88,18 +85,21 @@ export async function PATCH(
     .returning()
 
   return NextResponse.json(updated)
-}
+})
+
 
 // Merchant removes one of their pickup locations. Blocked if any order still
 // references it (the order.pickupLocationId FK has no cascade), so the
 // merchant keeps an accurate audit trail.
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const { id } = await params
   const owned = await loadOwned(id)
-  if ("error" in owned) return owned.error
+  if (owned.error) return owned.error
 
   const [referencing] = await db
     .select({ id: order.id })
@@ -115,4 +115,5 @@ export async function DELETE(
 
   await db.delete(pickupLocation).where(eq(pickupLocation.id, id))
   return NextResponse.json({ ok: true })
-}
+})
+

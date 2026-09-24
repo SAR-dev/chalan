@@ -4,8 +4,11 @@ import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
 import { order } from "@/lib/db/schema"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -48,4 +51,5 @@ export async function GET(req: Request) {
     unsettled: row?.unsettled ?? 0,
     returned: row?.returned ?? 0,
   })
-}
+})
+

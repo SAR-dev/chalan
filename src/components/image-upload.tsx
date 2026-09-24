@@ -76,6 +76,7 @@ export function ImageUpload({
                 className="w-full h-full shadow-sm rounded-r-none"
                 onClick={() => inputRef.current?.click()}
                 disabled={disabled || uploading}
+                aria-label="Replace image"
               >
                 {uploading ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -95,6 +96,7 @@ export function ImageUpload({
                 className="h-full w-full shadow-sm hover:bg-destructive hover:text-destructive-foreground rounded-l-none"
                 onClick={() => onChange(null)}
                 disabled={disabled || uploading}
+                aria-label="Remove image"
               >
                 <Trash2 className="size-4" />
               </Button>

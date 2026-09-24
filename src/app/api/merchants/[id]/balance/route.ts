@@ -5,11 +5,14 @@ import { forbidden, unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(
+export const GET = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -90,4 +93,5 @@ export async function GET(
     balance,
     ...paginateResponse(transactions, count, limit, offset),
   })
-}
+})
+

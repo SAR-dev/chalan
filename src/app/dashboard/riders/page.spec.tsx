@@ -45,7 +45,7 @@ async function importPage() {
     <RidersPageClient
       initialData={[]}
       initialTotal={0}
-      initialCounts={{ active: 0 }}
+       initialCounts={{ active: 0, delivery: 0, pickup: 0 }}
     />,
   )
 }

@@ -69,6 +69,16 @@ type JoinedUser = typeof user.$inferSelect &
 
 export type User = Loosen<JoinedUser>
 
+// Team roster list item. The team API and dashboard page project a narrow flat
+// row (id, name, email, role, phone, isActive, warehouseId) — NOT a full
+// joined `User`. This type is the honest shape of that projection so callers
+// don't have to cast the joined `User` (which requires extra fields like
+// createdAt / updatedAt that the projection never selects).
+export type TeamMember = Pick<
+  User,
+  "id" | "name" | "email" | "role" | "phone" | "isActive" | "warehouseId"
+>
+
 export type Warehouse = Loosen<typeof warehouse.$inferSelect>
 // `balance` is not a column on the merchant table — it comes from a LEFT JOIN
 // with merchant_balance in the list endpoint. It is optional so the type stays

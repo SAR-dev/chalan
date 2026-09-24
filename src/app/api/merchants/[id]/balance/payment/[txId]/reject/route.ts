@@ -5,13 +5,16 @@ import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { balancePaymentRejectSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string; txId: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -25,7 +28,7 @@ export async function PATCH(
   if (parsed.error) return parsed.error
   const { reason } = parsed.data
 
-  const limited = rateLimit(`balance-reject:${getClientIp(req)}`, 20, 60)
+  const limited = await rateLimitByIp(req, "balance-reject", 20, 60)
   if (limited) return limited
 
   const committed: { row: typeof balanceTransaction.$inferSelect | null } = {
@@ -97,4 +100,5 @@ export async function PATCH(
   }
 
   return response
-}
+})
+

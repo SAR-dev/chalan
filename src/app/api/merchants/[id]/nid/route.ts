@@ -5,11 +5,14 @@ import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-respons
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { nidSubmitSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -72,4 +75,5 @@ export async function PATCH(
     nidSelfieImage: updated.nidSelfieImage,
     nidNumber: updated.nidNumber,
   })
-}
+})
+

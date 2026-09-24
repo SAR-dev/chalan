@@ -6,11 +6,14 @@ import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { merchantBrandingSchema, merchantProfileSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(
+export const GET = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -65,14 +68,17 @@ export async function GET(
   if (!found) return notFound()
 
   return NextResponse.json(found)
-}
+})
+
 
 // Update a merchant's own business details or branding. A merchant may only
 // edit their own business; Admins / Super Admins may edit any merchant.
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -140,4 +146,5 @@ export async function PATCH(
   }
 
   return NextResponse.json(updated)
-}
+})
+

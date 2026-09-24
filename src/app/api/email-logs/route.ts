@@ -5,8 +5,11 @@ import { unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
 import { emailLog } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -75,4 +78,5 @@ export async function GET(req: Request) {
   ])
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
-}
+})
+

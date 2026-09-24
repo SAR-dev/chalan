@@ -5,13 +5,16 @@ import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { order } from "@/lib/db/schema"
 import { orderMerchantNoteSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Authenticated endpoint — only the owning merchant can update their note.
 // Locked once the order reaches a terminal status (DELIVERED / RETURNED / CANCELLED).
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -53,4 +56,5 @@ export async function PATCH(
     .returning()
 
   return NextResponse.json(updated)
-}
+})
+

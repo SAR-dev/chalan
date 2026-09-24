@@ -7,8 +7,11 @@ import { db, dbRead } from "@/lib/db"
 import { warehouse } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import { parseBody, warehouseCreateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -71,9 +74,12 @@ export async function GET(req: Request) {
       "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
     },
   })
-}
+})
 
-export async function POST(req: Request) {
+
+export const POST = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -114,4 +120,5 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json(created, { status: 201 })
-}
+})
+

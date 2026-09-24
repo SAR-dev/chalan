@@ -10,21 +10,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import type { User } from "@/lib/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { TeamMember } from "@/lib/types"
 
 const UNASSIGNED = "__unassigned__"
 
 interface ChangeWarehouseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  user: User | null
+  user: TeamMember | null
   warehouses: { id: string; name: string; city: string }[]
   selectedWarehouseId: string
   onWarehouseChange: (warehouseId: string) => void

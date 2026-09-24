@@ -1,14 +1,19 @@
-import { and, eq, isNull, or } from "drizzle-orm"
+import { and, eq, or } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { notFound, unauthorized } from "@/lib/api-response"
+import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
+import { buildWarehouseOrderScope } from "@/lib/db/order-scope"
 import { dbRead as db } from "@/lib/db"
 import { deliveryCity, order } from "@/lib/db/schema"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(
+export const GET = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -30,12 +35,9 @@ export async function GET(
       break
     case "WAREHOUSE_ADMIN":
       if (!me.warehouseId) return notFound()
-      // Mirror the list endpoint: warehouse-assigned orders OR picked-up
-      // parcels not yet assigned to any warehouse (incoming candidates).
-      scope = or(
-        eq(order.warehouseId, me.warehouseId),
-        and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
-      )
+      // Same scope as the list endpoint (incl. APPROVED/unassigned orders) so
+      // every row in the list opens in the details dialog.
+      scope = buildWarehouseOrderScope(me.warehouseId)
       break
     case "SUPER_ADMIN":
       scope = undefined
@@ -49,33 +51,14 @@ export async function GET(
 
   const [row] = await db
     .select({
-      id: order.id,
-      merchantId: order.merchantId,
-      pickupLocationId: order.pickupLocationId,
-      recipientName: order.recipientName,
-      recipientPhone: order.recipientPhone,
-      deliveryAddress: order.deliveryAddress,
-      deliveryCity: deliveryCity.name,
-      deliveryMapLink: order.deliveryMapLink,
-      parcelWeightKg: order.parcelWeightKg,
-      deliveryType: order.deliveryType,
-      productCost: order.productCost,
-      deliveryFee: order.deliveryFee,
-      codFee: order.codFee,
-      merchantEarnings: order.merchantEarnings,
-      status: order.status,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
+      ...ORDER_CORE_COLUMNS,
       approvedBy: order.approvedBy,
       approvedAt: order.approvedAt,
-      pickupRiderId: order.pickupRiderId,
       assignedAt: order.assignedAt,
       pickedUpAt: order.pickedUpAt,
       pickupProofRefs: order.pickupProofRefs,
-      warehouseId: order.warehouseId,
       receivedAtWarehouseAt: order.receivedAtWarehouseAt,
       receivedByWarehouse: order.receivedByWarehouse,
-      deliveryRiderId: order.deliveryRiderId,
       dispatchedAt: order.dispatchedAt,
       dispatchedBy: order.dispatchedBy,
       outForDeliveryAt: order.outForDeliveryAt,
@@ -94,7 +77,6 @@ export async function GET(
       cancelReason: order.cancelReason,
       merchantNote: order.merchantNote,
       receiverNote: order.receiverNote,
-      codSettledAt: order.codSettledAt,
       codSettledBy: order.codSettledBy,
       payoutRequestId: order.payoutRequestId,
     })
@@ -105,4 +87,5 @@ export async function GET(
 
   if (!row) return notFound()
   return NextResponse.json(row)
-}
+})
+

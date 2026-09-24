@@ -23,9 +23,10 @@ async function ensureMigrationTable(pool: Pool) {
   `)
 }
 
-async function getAppliedMigrations(pool: Pool): Promise<Set<string>> {
-  const { rows } = await pool.query('SELECT "hash" FROM "__drizzle_migrations"')
-  return new Set(rows.map((r: any) => r.hash))
+function getAppliedMigrations(pool: Pool): Promise<Set<string>> {
+  return pool
+    .query<{ hash: string }>('SELECT "hash" FROM "__drizzle_migrations"')
+    .then(({ rows }) => new Set(rows.map((r) => r.hash)))
 }
 
 async function main() {
@@ -58,8 +59,9 @@ async function main() {
       for (let i = 0; i < statements.length; i++) {
         try {
           await pool.query(statements[i])
-        } catch (err: any) {
-          console.error(`  [${i + 1}/${statements.length}] ${err.message}`)
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err)
+          console.error(`  [${i + 1}/${statements.length}] ${message}`)
           console.error(`  SQL: ${statements[i].slice(0, 300)}`)
           throw err
         }

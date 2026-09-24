@@ -6,11 +6,14 @@ import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
 import { balanceAdjustSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function POST(
+export const POST = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -61,4 +64,5 @@ export async function POST(
   })
 
   return NextResponse.json(inserted, { status: 201 })
-}
+})
+

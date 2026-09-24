@@ -81,17 +81,10 @@ export function validateEnv(): void {
     // A deploy with NEXT_PUBLIC_ENV=development in production would silently
     // disable Vercel Analytics and keep localhost in trustedOrigins, so make
     // sure that var is explicitly validated rather than left to its fallback.
-    const nodeEnv = oneOf(
-      e,
-      "NEXT_PUBLIC_ENV",
-      ["development", "production"],
-      "development",
-    )
-    if (nodeEnv === "production" && !process.env.NEXT_PUBLIC_SITE_URL) {
-      console.warn(
-        "[env] NEXT_PUBLIC_SITE_URL is unset in production — falling back to NEXT_PUBLIC_SITE_URL",
-      )
-    }
+    // A deploy with NEXT_PUBLIC_ENV=development in production would silently
+    // disable Vercel Analytics — validate the var rather than trusting its
+    // fallback.
+    oneOf(e, "NEXT_PUBLIC_ENV", ["development", "production"], "development")
 
     // Used to authenticate the /api/cron/cleanup-sessions endpoint.
     // Generate with: openssl rand -base64 32
@@ -119,6 +112,32 @@ export function validateEnv(): void {
           message: "Must be a positive integer (days).",
         })
       }
+    }
+
+    // AES-256-GCM key for SMTP password at rest (64 hex chars = 32 bytes).
+    // Optional in development (crypto.ts falls back to a dev key so local
+    // setups keep working), REQUIRED in production — silently using the
+    // hardcoded dev key would make stored secrets decryptable by anyone with
+    // the source. Generate with: openssl rand -hex 32
+    const isProd = process.env.NEXT_PUBLIC_ENV === "production"
+    const ssk = process.env.SMTP_SECRET_KEY
+    if (isProd && !ssk) {
+      e.push({
+        key: "SMTP_SECRET_KEY",
+        message:
+          "Required in production (AES-256-GCM key for SMTP password at rest). Generate with `openssl rand -hex 32`.",
+      })
+    } else if (ssk && !/^[0-9a-f]{64}$/i.test(ssk)) {
+      e.push({
+        key: "SMTP_SECRET_KEY",
+        message: "Must be 64 hex characters (32 bytes). Generate with `openssl rand -hex 32`.",
+      })
+    }
+
+    // Optional — Redis for cross-instance rate limiting. When unset the rate
+    // limiter uses an in-memory store; validate the URL when provided.
+    if (process.env.REDIS_URL) {
+      required(e, "REDIS_URL", "Redis connection string (for rate limiting)")
     }
 
     const provider = oneOf(

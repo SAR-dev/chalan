@@ -18,21 +18,27 @@ export interface SeedUserCredential {
   role: SeedRole
 }
 
+// Seeded SUPER_ADMIN password. Defaults to the documented e2e/dev credential;
+// set SEED_SUPER_ADMIN_PASSWORD in any real environment so no known default
+// password ever ships in a seeded database.
+const SEED_SUPER_ADMIN_PASSWORD =
+  process.env.SEED_SUPER_ADMIN_PASSWORD ?? "admin123"
+
 export const SEED_USER_CREDENTIALS = {
   // Admins
   admin1: {
     email: "admin01@email.com",
-    password: "admin123",
+    password: SEED_SUPER_ADMIN_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin2: {
     email: "admin02@email.com",
-    password: "admin123",
+    password: SEED_SUPER_ADMIN_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin3: {
     email: "admin03@email.com",
-    password: "admin123",
+    password: SEED_SUPER_ADMIN_PASSWORD,
     role: "SUPER_ADMIN",
   },
   warehouseAdmin1: {

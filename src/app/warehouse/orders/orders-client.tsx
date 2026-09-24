@@ -1,14 +1,6 @@
 "use client"
 
-import {
-  Ban,
-  Boxes,
-  CheckCircle2,
-  Clock,
-  MoreHorizontal,
-  Truck,
-  X,
-} from "lucide-react"
+import { Ban, Boxes, CheckCircle2, Clock, MoreHorizontal, Truck, X } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
@@ -85,7 +77,7 @@ export function WarehouseOrdersPageClient({
     setStatuses,
     isLoading,
     bulkCancelOrders,
-  } = useOrders({ initialData, initialTotal })
+  } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
   const [tab, setTab] = useState<FilterTab>("ALL")

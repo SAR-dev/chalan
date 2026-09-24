@@ -6,11 +6,14 @@ import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { order, profile, rider, warehouse } from "@/lib/db/schema"
 import { parseBody, warehouseUpdateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(
+export const GET = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -41,12 +44,15 @@ export async function GET(
   if (!found) return notFound()
 
   return NextResponse.json(found)
-}
+})
 
-export async function PATCH(
+
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -113,12 +119,15 @@ export async function PATCH(
   })
 
   return NextResponse.json(updated)
-}
+})
 
-export async function DELETE(
+
+export const DELETE = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -166,4 +175,5 @@ export async function DELETE(
   })
 
   return NextResponse.json({ ok: true })
-}
+})
+

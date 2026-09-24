@@ -2,32 +2,26 @@ import { createId } from "@paralleldrive/cuid2"
 import { eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import {
-  badRequest,
-  forbidden,
-  notFound,
-  unauthorized,
-} from "@/lib/api-response"
+import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
-import {
-  balanceTransaction,
-  merchantBalance,
-  payoutRequest,
-} from "@/lib/db/schema"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { balanceTransaction, merchantBalance, payoutRequest } from "@/lib/db/schema"
+import { rateLimitByIp } from "@/lib/rate-limit"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
     return forbidden()
   }
 
-  const limited = rateLimit(`payout-paid:${getClientIp(req)}`, 20, 60)
+  const limited = await rateLimitByIp(req, "payout-paid", 20, 60)
   if (limited) return limited
 
   const { id } = await params
@@ -101,4 +95,5 @@ export async function PATCH(
   }
 
   return response
-}
+})
+

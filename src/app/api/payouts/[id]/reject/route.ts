@@ -1,22 +1,20 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import {
-  badRequest,
-  forbidden,
-  notFound,
-  unauthorized,
-} from "@/lib/api-response"
+import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { order, payoutRequest } from "@/lib/db/schema"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, payoutRejectSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -28,7 +26,7 @@ export async function PATCH(
   if (parsed.error) return parsed.error
   const { reason } = parsed.data
 
-  const limited = rateLimit(`payout-reject:${getClientIp(req)}`, 20, 60)
+  const limited = await rateLimitByIp(req, "payout-reject", 20, 60)
   if (limited) return limited
 
   // Transaction: lock the request row for the guard + write so two
@@ -82,4 +80,5 @@ export async function PATCH(
   }
 
   return response
-}
+})
+

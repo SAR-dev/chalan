@@ -27,6 +27,7 @@ vi.mock("@/lib/audit", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: () => (rateLimited ? ({ status: 429 } as Response) : null),
+  rateLimitByIp: () => (rateLimited ? ({ status: 429 } as Response) : null),
   getClientIp: () => "127.0.0.1",
 }))
 
@@ -136,6 +137,11 @@ const merchantSession = {
   userId: "u3",
   merchantId: "m_1",
 }
+const warehouseAdmin = {
+  role: "WAREHOUSE_ADMIN",
+  name: "Warehouse Wan",
+  userId: "u4",
+}
 
 describe("GET /api/merchants", () => {
   it("401 when unauthenticated", async () => {
@@ -150,6 +156,23 @@ describe("GET /api/merchants", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.total).toBe(1)
+  })
+
+  it("warehouse admin sees PII-light list (no NID/rates/balance)", async () => {
+    sessionState.value = warehouseAdmin
+    selectQueue.push([
+      { id: "m_1", businessName: "My Biz", phone: "017", status: "APPROVED" },
+      { id: "m_2", businessName: "Other", phone: "018", status: "PENDING" },
+    ])
+    const res = await listMerchants(req("GET"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.total).toBe(2)
+    expect(json.data[0]).not.toHaveProperty("nidNumber")
+    expect(json.data[0]).not.toHaveProperty("baseRate")
+    expect(json.data[0]).not.toHaveProperty("balance")
+    expect(json.data[0]).not.toHaveProperty("email")
+    expect(json.data[0]).toHaveProperty("businessName")
   })
 
   it("admin sees paginated list", async () => {

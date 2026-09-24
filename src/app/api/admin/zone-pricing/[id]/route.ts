@@ -5,11 +5,14 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { zonePricing } from "@/lib/db/schema"
 import { parseBody, zonePricingUpdateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -26,12 +29,15 @@ export async function PATCH(
 
   if (!updated) return notFound()
   return NextResponse.json(updated)
-}
+})
 
-export async function DELETE(
+
+export const DELETE = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -42,4 +48,5 @@ export async function DELETE(
 
   if (!deleted) return notFound()
   return NextResponse.json({ ok: true })
-}
+})
+

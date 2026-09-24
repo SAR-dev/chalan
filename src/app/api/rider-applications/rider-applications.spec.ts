@@ -21,6 +21,7 @@ vi.mock("@/lib/mailer", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: () => null,
+  rateLimitByIp: () => null,
   getClientIp: () => "127.0.0.1",
 }))
 

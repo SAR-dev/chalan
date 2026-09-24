@@ -9,23 +9,26 @@ import {
   merchant,
   merchantBalance,
   order,
-  pickupLocation,
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
+import { pickupWarehouseIds } from "@/lib/db/order-lookup"
 import { canPlaceOrders } from "@/lib/merchant-verification"
 import { calcCodFee, calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { orderBulkCreateSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (
+req: Request
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can create orders")
   }
 
-  const limited = rateLimit(`orders-bulk:${getClientIp(req)}`, 10, 60)
+  const limited = await rateLimitByIp(req, "orders-bulk", 10, 60)
   if (limited) return limited
 
   const parsed = await parseBody(req, orderBulkCreateSchema)
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
         : "Your merchant account is suspended and cannot create orders.",
     )
   }
-  const verification = canPlaceOrders(merchantRow as any)
+  const verification = canPlaceOrders(merchantRow)
   if (!verification.allowed) {
     return forbidden(verification.reason)
   }
@@ -81,17 +84,14 @@ export async function POST(req: Request) {
 
   // Resolve warehouse for each unique pickup location via city → warehouse.
   const pickupLocationIds = [...new Set(inputs.map((i) => i.pickupLocationId))]
-  const pickups = await db
-    .select({ id: pickupLocation.id, warehouseId: deliveryCity.warehouseId })
-    .from(pickupLocation)
-    .innerJoin(deliveryCity, eq(pickupLocation.cityId, deliveryCity.id))
-    .where(inArray(pickupLocation.id, pickupLocationIds))
+  const pickupWarehouses = await pickupWarehouseIds(pickupLocationIds)
   const warehouseByPickup: Record<string, string> = {}
-  for (const p of pickups) {
-    if (!p.warehouseId) {
-      return badRequest(`Pickup location ${p.id} has no warehouse assigned.`)
+  for (const p of pickupLocationIds) {
+    const warehouseId = pickupWarehouses.get(p) ?? null
+    if (!warehouseId) {
+      return badRequest(`Pickup location ${p} has no warehouse assigned.`)
     }
-    warehouseByPickup[p.id] = p.warehouseId
+    warehouseByPickup[p] = warehouseId
   }
 
   // ── Pre-fetch zone pricing for all unique city pairs ──
@@ -263,4 +263,5 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json(created, { status: 201 })
-}
+})
+

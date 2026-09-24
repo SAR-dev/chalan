@@ -4,8 +4,11 @@ import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH() {
+export const PATCH = withErrorHandler(async (
+
+) => {
   const me = await requireSession()
   if (!me || me.role !== "MERCHANT" || !me.merchantId) return unauthorized()
 
@@ -15,4 +18,5 @@ export async function PATCH() {
     .where(eq(merchant.id, me.merchantId))
 
   return NextResponse.json({ ok: true })
-}
+})
+

@@ -45,6 +45,7 @@ vi.mock("@/lib/db", () => {
   const db = {
     select: () => makeSelectChain(),
     update: () => makeUpdateChain(),
+    transaction: (fn: (tx: unknown) => unknown) => fn(db),
   }
   return { db, dbRead: { ...db, select: () => makeSelectChain() }, pool: {} }
 })
@@ -111,13 +112,28 @@ describe("PATCH /api/orders/bulk/settle-cod", () => {
     const res = await settleCod(req({ ids: ["o1"] }))
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toBe("No unsettled orders found for the given IDs.")
+    expect(json.error).toBe("No orders found for the given IDs.")
   })
 
   it("settles orders and returns count", async () => {
     sessionState.value = whAdmin
-    selectQueue.push([{ id: "o1" }])
-    updateResult.push({ id: "o1" })
+    selectQueue.push([
+      {
+        id: "o1",
+        status: "DELIVERED",
+        warehouseId: "wh_1",
+        codSettledAt: null,
+        merchantId: "m1",
+        merchantEarnings: 0,
+      },
+    ])
+    updateResult.push({
+      id: "o1",
+      status: "DELIVERED",
+      warehouseId: "wh_1",
+      codSettledAt: new Date().toISOString(),
+      codSettledBy: "WH Walt",
+    })
     const res = await settleCod(req({ ids: ["o1"] }))
     const json = await res.json()
     expect(res.status).toBe(200)
@@ -126,9 +142,29 @@ describe("PATCH /api/orders/bulk/settle-cod", () => {
 
   it("only settles DELIVERED orders with null codSettledAt", async () => {
     sessionState.value = whAdmin
-    selectQueue.push([{ id: "o1" }])
+    selectQueue.push([
+      {
+        id: "o1",
+        status: "DELIVERED",
+        warehouseId: "wh_1",
+        codSettledAt: null,
+      },
+      { id: "o2", status: "PICKED_UP", warehouseId: "wh_1", codSettledAt: null },
+      {
+        id: "o3",
+        status: "DELIVERED",
+        warehouseId: "wh_2",
+        codSettledAt: null,
+      },
+      {
+        id: "o4",
+        status: "DELIVERED",
+        warehouseId: "wh_1",
+        codSettledAt: "2026-01-01T00:00:00.000Z",
+      },
+    ])
     updateResult.push({ id: "o1" })
-    const res = await settleCod(req({ ids: ["o1", "o2", "o3"] }))
+    const res = await settleCod(req({ ids: ["o1", "o2", "o3", "o4"] }))
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.count).toBe(1)
@@ -136,7 +172,14 @@ describe("PATCH /api/orders/bulk/settle-cod", () => {
 
   it("sets codSettledAt and codSettledBy on update", async () => {
     sessionState.value = whAdmin
-    selectQueue.push([{ id: "o1" }])
+    selectQueue.push([
+      {
+        id: "o1",
+        status: "DELIVERED",
+        warehouseId: "wh_1",
+        codSettledAt: null,
+      },
+    ])
     updateResult.push({ id: "o1" })
     await settleCod(req({ ids: ["o1"] }))
     expect(updatePayloads[0]).toMatchObject({

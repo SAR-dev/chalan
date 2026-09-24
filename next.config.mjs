@@ -7,6 +7,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const nextConfig = {
   // Produce a self-contained build (.next/standalone) for small Docker images.
   output: "standalone",
+  // ioredis is a server-side Redis client — keep it external so it is not
+  // bundled into the build (matches nodemailer etc.).
+  serverExternalPackages: ["ioredis"],
   env: {},
   // Pin the workspace root to this project so Next.js doesn't pick up a
   // stray lockfile elsewhere on the machine (e.g. C:\Users\1142\package-lock.json).
@@ -30,18 +33,10 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' blob: data: https:",
-              "font-src 'self'",
-              "connect-src 'self' https:",
-              "frame-ancestors 'none'",
-            ].join("; "),
-          },
+          // NOTE: Content-Security-Policy is NOT set here. It must carry a
+          // per-request nonce for Next's inline hydration scripts, which a
+          // static header can't express. It is generated in src/proxy.ts and
+          // applied to page routes via its matcher.
         ],
       },
     ]

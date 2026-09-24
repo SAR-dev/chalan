@@ -7,13 +7,16 @@ import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 const TOKEN_EXPIRY_HOURS = 24
 
-export async function POST(
+export const POST = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -85,4 +88,5 @@ export async function POST(
   ).catch((err) => console.error("[mailer] Verification email failed:", err))
 
   return NextResponse.json({ success: true })
-}
+})
+

@@ -1,7 +1,6 @@
 import { type Column } from "drizzle-orm"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
-  applySort,
   MAX_LIMIT,
   paginateResponse,
   parseDateRange,
@@ -65,6 +64,14 @@ describe("parseStatusFilter", () => {
   it("returns empty array when param missing", () => {
     const req = new Request("http://localhost")
     expect(parseStatusFilter(req)).toEqual([])
+  })
+
+  it("drops statuses not in the allowed whitelist", () => {
+    const req = new Request("http://localhost?status=active,bogus,PENDING")
+    expect(parseStatusFilter(req, ["ACTIVE", "PENDING"])).toEqual([
+      "ACTIVE",
+      "PENDING",
+    ])
   })
 })
 
@@ -132,25 +139,5 @@ describe("parseSort", () => {
   it("returns null when sort param missing", () => {
     const req = new Request("http://localhost")
     expect(parseSort(req, columnMap)).toBeNull()
-  })
-})
-
-describe("applySort", () => {
-  const mockColumn = { name: "createdAt" } as unknown as Column
-
-  it("applies asc when direction is asc", () => {
-    const orderBy = vi.fn().mockReturnValue("query")
-    const query = { orderBy } as any
-    const result = applySort(query, { column: mockColumn, direction: "asc" })
-    expect(orderBy).toHaveBeenCalled()
-    expect(result).toBe("query")
-  })
-
-  it("applies desc when direction is desc", () => {
-    const orderBy = vi.fn().mockReturnValue("query")
-    const query = { orderBy } as any
-    const result = applySort(query, { column: mockColumn, direction: "desc" })
-    expect(orderBy).toHaveBeenCalled()
-    expect(result).toBe("query")
   })
 })

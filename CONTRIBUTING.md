@@ -104,7 +104,7 @@ src/components/                          generic, feature-agnostic UI only
   charts/                            recharts wrappers (area-chart.tsx, bar-chart.tsx, pie-chart.tsx)
   ui/                                shadcn-style primitives (button, dialog, switch, skeleton, progress, etc.)
   navigation/                        sidebar components per role
-src/proxy.ts                             edge proxy — role-based instance isolation + upload rate limiting (merged from middleware.ts)
+src/proxy.ts                             edge proxy — role isolation + upload rate limiting + per-request CSP nonce (merged from middleware.ts)
 src/lib/
   auth.ts, auth-client.ts            Better Auth server + client config
   env.ts                             environment variable validation (validated at boot via src/instrumentation.ts)
@@ -1347,8 +1347,11 @@ requests per minute per IP using an in-process sliding-window counter. In the
 multi-instance Docker deployment, each container enforces the limit
 independently — for multi-host deployments, swap the in-memory `Map` for a
 Redis/Upstash store so the cap is enforced globally across all containers.
-The matcher is configured in `src/proxy.ts`'s `config` export — don't widen it
-without a reason.
+The matcher is configured in `src/proxy.ts`'s `config` export — it covers every
+page route PLUS `/api/uploads`. The wide page matcher is intentional: the proxy
+generates a per-request CSP nonce (see `src/app/layout.tsx`) that every HTML page
+must receive. Only add/remove matcher entries with a reason — API routes and
+`_next/*` assets intentionally stay excluded.
 
 ---
 

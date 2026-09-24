@@ -6,11 +6,14 @@ import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { announcement } from "@/lib/db/schema"
 import { announcementUpdateSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
+
   req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -57,12 +60,15 @@ export async function PATCH(
   })
 
   return NextResponse.json(updated)
-}
+})
 
-export async function DELETE(
+
+export const DELETE = withErrorHandler(async (
+
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+
+) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -88,4 +94,5 @@ export async function DELETE(
   })
 
   return NextResponse.json({ ok: true })
-}
+})
+

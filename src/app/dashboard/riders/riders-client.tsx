@@ -1,14 +1,6 @@
 "use client"
 
-import {
-  Bike,
-  CheckCircle2,
-  Eye,
-  MoreHorizontal,
-  Pencil,
-  Users,
-  Warehouse as WarehouseIcon,
-} from "lucide-react"
+import { Bike, CheckCircle2, Eye, MoreHorizontal, Pencil, Users, Warehouse as WarehouseIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
@@ -40,11 +32,10 @@ export function RidersPageClient({
 }: {
   initialData: (Rider & { warehouseName?: string | null })[]
   initialTotal: number
-  initialCounts: { active: number }
+  initialCounts: { active: number; delivery: number; pickup: number }
 }) {
   const {
     riders,
-    allRiders,
     total,
     page: _page,
     setPage,
@@ -116,14 +107,9 @@ export function RidersPageClient({
     setPage(1)
   }, [tab, setIsActive, setPage])
 
-  const activeCount =
-    allRiders.filter((r) => r.isActive).length || initialCounts.active
-  const deliveryCount = allRiders.filter(
-    (r) => r.taskType === "DELIVERY" || r.taskType === "BOTH",
-  ).length
-  const pickupCount = allRiders.filter(
-    (r) => r.taskType === "PICKUP" || r.taskType === "BOTH",
-  ).length
+  const activeCount = initialCounts.active
+  const deliveryCount = initialCounts.delivery
+  const pickupCount = initialCounts.pickup
 
   const quickFilterSections = [
     {
@@ -173,7 +159,7 @@ export function RidersPageClient({
         items={[
           {
             label: statCardLabels.dashboard.riders.totalRiders.label,
-            value: total || allRiders.length,
+            value: total,
             icon: Users,
           },
           {

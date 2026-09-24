@@ -339,7 +339,7 @@ describe("PATCH /orders/:id/picked-up", () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
       [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
-      [{ warehouseId: "wh_9" }], // pickup location with warehouse
+      [{ id: "pl_1", warehouseId: "wh_9" }], // pickup location with warehouse
     ]
     dbState.updateResult = [makeOrder({ status: "PICKED_UP" })]
     const { status, payload } = await call(pickedUp, {
@@ -358,7 +358,7 @@ describe("PATCH /orders/:id/picked-up", () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
       [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
-      [{ warehouseId: null }], // pickup location without warehouse
+      [{ id: "pl_1", warehouseId: null }], // pickup location without warehouse
     ]
     dbState.updateResult = [makeOrder({ status: "PICKED_UP" })]
     const { status, payload } = await call(pickedUp, {
