@@ -2493,8 +2493,7 @@ All seeded accounts share the password `12qwaszx`:
 | Rider          | `rider1@email.com`             | `12qwaszx`    |
 | Demo merchant  | `demo@kikuya.com`            | `12qwaszx`      |
 
-These mirror `src/lib/db/seed/seed-content.ts`. If you seed with
-`SEED_SUPER_ADMIN_PASSWORD` set, the super-admin password differs from the table.
+These mirror `src/lib/db/seed/seed-content.ts`.
 
 #### Three core principles
 

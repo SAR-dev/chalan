@@ -21,27 +21,21 @@ export interface SeedUserCredential {
 // Shared password for every seeded account (local dev / e2e only).
 const SEED_PASSWORD = "12qwaszx"
 
-// Seeded SUPER_ADMIN password. Defaults to the shared seed password;
-// set SEED_SUPER_ADMIN_PASSWORD in any real environment so no known default
-// password ever ships in a seeded database.
-const SEED_SUPER_ADMIN_PASSWORD =
-  process.env.SEED_SUPER_ADMIN_PASSWORD ?? SEED_PASSWORD
-
 export const SEED_USER_CREDENTIALS = {
   // Admins
   admin1: {
     email: "admin01@email.com",
-    password: SEED_SUPER_ADMIN_PASSWORD,
+    password: SEED_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin2: {
     email: "admin02@email.com",
-    password: SEED_SUPER_ADMIN_PASSWORD,
+    password: SEED_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin3: {
     email: "admin03@email.com",
-    password: SEED_SUPER_ADMIN_PASSWORD,
+    password: SEED_PASSWORD,
     role: "SUPER_ADMIN",
   },
   warehouseAdmin1: {

@@ -128,18 +128,6 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 ---
 
-## Seed
-
-Applied by the seed script when creating the three demo SUPER_ADMIN accounts
-(`admin01`/`admin02`/`admin03@email.com`). They are provided as e2e fixtures, so
-a known default exists — but set an override in any real environment.
-
-| Variable                   | Required | Default      | Description                                                          |
-| -------------------------- | -------- | ------------ | -------------------------------------------------------------------- |
-| `SEED_SUPER_ADMIN_PASSWORD` | No       | `12qwaszx`   | Password for seeded super-admin accounts (no known default in prod)  |
-
----
-
 ## Testing
 
 Set these locally when running e2e tests. The Playwright `webServer` sets them
