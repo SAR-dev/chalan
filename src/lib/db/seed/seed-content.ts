@@ -18,58 +18,67 @@ export interface SeedUserCredential {
   role: SeedRole
 }
 
+// Shared password for every seeded account (local dev / e2e only).
+const SEED_PASSWORD = "12qwaszx"
+
+// Seeded SUPER_ADMIN password. Defaults to the shared seed password;
+// set SEED_SUPER_ADMIN_PASSWORD in any real environment so no known default
+// password ever ships in a seeded database.
+const SEED_SUPER_ADMIN_PASSWORD =
+  process.env.SEED_SUPER_ADMIN_PASSWORD ?? SEED_PASSWORD
+
 export const SEED_USER_CREDENTIALS = {
   // Admins
   admin1: {
     email: "admin01@email.com",
-    password: "admin123",
+    password: SEED_SUPER_ADMIN_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin2: {
     email: "admin02@email.com",
-    password: "admin123",
+    password: SEED_SUPER_ADMIN_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin3: {
     email: "admin03@email.com",
-    password: "admin123",
+    password: SEED_SUPER_ADMIN_PASSWORD,
     role: "SUPER_ADMIN",
   },
   warehouseAdmin1: {
     email: "warehouse.admin01@email.com",
-    password: "warehouse123",
+    password: SEED_PASSWORD,
     role: "WAREHOUSE_ADMIN",
   },
   warehouseAdmin2: {
     email: "warehouse.admin02@email.com",
-    password: "warehouse123",
+    password: SEED_PASSWORD,
     role: "WAREHOUSE_ADMIN",
   },
 
   // Merchants
   merchant1: {
-    email: "merchant1@app.com",
-    password: "merchant123",
+    email: "merchant1@email.com",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant2: {
-    email: "merchant2@app.com",
-    password: "merchant123",
+    email: "merchant2@email.com",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant3: {
-    email: "merchant3@app.com",
-    password: "merchant123",
+    email: "merchant3@email.com",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant4: {
-    email: "merchant4@app.com",
-    password: "merchant123",
+    email: "merchant4@email.com",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
   merchant5: {
-    email: "merchant5@app.com",
-    password: "merchant123",
+    email: "merchant5@email.com",
+    password: SEED_PASSWORD,
     role: "MERCHANT",
   },
 } as const satisfies Record<string, SeedUserCredential>
@@ -83,8 +92,8 @@ function buildRiderCredentials(
     Array.from({ length: count }, (_, i) => [
       `rider${i + 1}`,
       {
-        email: `rider${i + 1}@app.com`,
-        password: "rider123",
+        email: `rider${i + 1}@email.com`,
+        password: SEED_PASSWORD,
         role: "RIDER" as const,
       },
     ]),
@@ -92,8 +101,8 @@ function buildRiderCredentials(
 }
 
 const PENDING_RIDER_CREDENTIAL: SeedUserCredential = {
-  email: "pending.rider@app.com",
-  password: "rider123",
+  email: "pending.rider@email.com",
+  password: SEED_PASSWORD,
   role: "RIDER",
 }
 
@@ -102,7 +111,7 @@ const PENDING_RIDER_CREDENTIAL: SeedUserCredential = {
 // ---------------------------------------------------------------------------
 export const SEED_WAREHOUSES: (typeof warehouse.$inferInsert)[] = [
   {
-    id: "b5mujkfyyq6qqw5t1unbm8b7",
+    id: "WH-100001E",
     name: "Dhaka Central Hub",
     address: "Plot 22, Tejgaon Industrial Area",
     city: "Dhaka",
@@ -110,7 +119,7 @@ export const SEED_WAREHOUSES: (typeof warehouse.$inferInsert)[] = [
     isActive: true,
   },
   {
-    id: "op3s6e6t0q4oaerl6boqng1r",
+    id: "WH-100002E",
     name: "Chattogram Port Hub",
     address: "Agrabad Commercial Area, Block C",
     city: "Chattogram",
@@ -118,7 +127,7 @@ export const SEED_WAREHOUSES: (typeof warehouse.$inferInsert)[] = [
     isActive: true,
   },
   {
-    id: "u9kbfapo43wkoj65972psioh",
+    id: "WH-100003E",
     name: "Sylhet Regional Depot",
     address: "Zindabazar Main Road",
     city: "Sylhet",
@@ -165,14 +174,14 @@ export const SEED_ADMIN_USERS: AdminUserConfig[] = [
     ...SEED_USER_CREDENTIALS.warehouseAdmin1,
     phone: "+8801711000020",
     isActive: true,
-    warehouseId: "b5mujkfyyq6qqw5t1unbm8b7",
+    warehouseId: "WH-100001E",
   },
   {
     name: "WarehouseAdmin02",
     ...SEED_USER_CREDENTIALS.warehouseAdmin2,
     phone: "+8801711000021",
     isActive: false,
-    warehouseId: "op3s6e6t0q4oaerl6boqng1r",
+    warehouseId: "WH-100002E",
   },
 ]
 
@@ -180,7 +189,7 @@ export const SEED_ADMIN_USERS: AdminUserConfig[] = [
 // Counts for bulk-generated entities
 // ---------------------------------------------------------------------------
 export const SEED_COUNTS = {
-  merchants: 5,
+  merchants: 6,
   riders: 10,
   orders: 100,
   payoutRequests: 2,
@@ -196,9 +205,9 @@ const RIDER_CREDENTIALS = buildRiderCredentials(SEED_COUNTS.riders)
 // Stable warehouse IDs — referenced by riders, orders, etc.
 // ---------------------------------------------------------------------------
 export const WAREHOUSE_IDS = {
-  dhakaCentralHub: "b5mujkfyyq6qqw5t1unbm8b7",
-  chattogramPortHub: "op3s6e6t0q4oaerl6boqng1r",
-  sylhetRegionalDepot: "u9kbfapo43wkoj65972psioh",
+  dhakaCentralHub: "WH-100001E",
+  chattogramPortHub: "WH-100002E",
+  sylhetRegionalDepot: "WH-100003E",
 } as const
 
 // ---------------------------------------------------------------------------
@@ -213,7 +222,7 @@ export const ADMIN_USER_NAMES = {
 } as const
 
 // ---------------------------------------------------------------------------
-// Deterministic: Merchants (5)
+// Deterministic: Merchants (6 — including demo)
 // Each entry carries the user password so the seed module can create accounts.
 // ---------------------------------------------------------------------------
 export interface MerchantSeedEntry {
@@ -225,12 +234,24 @@ export interface MerchantSeedEntry {
   phone: string
   address: string
   status: "PENDING" | "ACTIVE" | "SUSPENDED"
+  businessType?:
+    | "E-commerce"
+    | "Restaurant"
+    | "Grocery"
+    | "Pharmacy"
+    | "Fashion"
+    | "Electronics"
+    | "Other"
+  onboardingCompletedAt?: string | null
   emailVerifiedAt: string | null
   phoneVerifiedAt: string | null
   baseRate: number
   extraRatePerKg: number
   maxWeightKg: number
   freeWeightKg: number
+  logoUrl?: string | null
+  brandColor?: string | null
+  hidePlatformBranding?: boolean
   approvedBy: string | null
   approvedAt: string | null
   nidFrontImage: string | null
@@ -242,12 +263,18 @@ export interface MerchantSeedEntry {
 }
 
 export const MERCHANT_IDS = {
-  merchant1: "seed_merchant_1",
-  merchant2: "seed_merchant_2",
-  merchant3: "seed_merchant_3",
-  merchant4: "seed_merchant_4",
-  merchant5: "seed_merchant_5",
+  merchant1: "MER-100001E",
+  merchant2: "MER-100002E",
+  merchant3: "MER-100003E",
+  merchant4: "MER-100004E",
+  merchant5: "MER-100005E",
+  demo: "MER-100006E",
 } as const
+
+export const SEED_DEMO_CREDENTIALS = {
+  email: "demo@kikuya.com",
+  password: SEED_PASSWORD,
+}
 
 export const SEED_MERCHANTS: MerchantSeedEntry[] = [
   {
@@ -370,6 +397,34 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     nidVerifiedAt: "2026-07-01T00:00:00.000Z",
     nidVerifiedBy: "System",
   },
+  {
+    id: MERCHANT_IDS.demo,
+    businessName: "Kikuya Demo Store",
+    ownerName: "Demo User",
+    email: SEED_DEMO_CREDENTIALS.email,
+    password: SEED_DEMO_CREDENTIALS.password,
+    phone: "+8801700000000",
+    address: "123 Demo Street, Dhaka 1212",
+    status: "ACTIVE",
+    businessType: "E-commerce",
+    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+    emailVerifiedAt: "2026-01-01T00:00:00.000Z",
+    phoneVerifiedAt: "2026-01-01T00:00:00.000Z",
+    baseRate: 50,
+    extraRatePerKg: 10,
+    maxWeightKg: 10,
+    freeWeightKg: 1,
+    brandColor: "#f97316",
+    hidePlatformBranding: false,
+    approvedBy: "System",
+    approvedAt: "2026-01-01T00:00:00.000Z",
+    nidFrontImage: "data:image/png;base64,seed_nid_front",
+    nidBackImage: "data:image/png;base64,seed_nid_back",
+    nidSelfieImage: "data:image/png;base64,seed_nid_selfie",
+    nidSubmittedAt: "2026-01-01T00:00:00.000Z",
+    nidVerifiedAt: "2026-01-01T00:00:00.000Z",
+    nidVerifiedBy: "System",
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -393,7 +448,7 @@ export interface RiderSeedEntry {
 export const RIDER_IDS: Record<string, string> = Object.fromEntries(
   Array.from({ length: SEED_COUNTS.riders }, (_, i) => [
     `rider${i + 1}`,
-    `seed_rider_${i + 1}`,
+    `RID-${String(100001 + i).padStart(6, "0")}E`,
   ]),
 )
 
@@ -433,7 +488,7 @@ const RIDER_TASK_TYPES: ("PICKUP" | "DELIVERY" | "BOTH")[] = [
 export const SEED_RIDERS: RiderSeedEntry[] = Array.from(
   { length: SEED_COUNTS.riders },
   (_, i) => ({
-    id: `seed_rider_${i + 1}`,
+    id: `RID-${String(100001 + i).padStart(6, "0")}E`,
     name: `Rider ${i + 1}`,
     email: RIDER_CREDENTIALS[`rider${i + 1}`].email,
     phone: `+8801711000${String(100 + i + 1).slice(1)}`,
@@ -450,7 +505,7 @@ export const SEED_RIDERS: RiderSeedEntry[] = Array.from(
 
 // Add one PENDING rider application for testing the review flow.
 SEED_RIDERS.push({
-  id: "seed_rider_pending_1",
+  id: "RID-100011E",
   name: "Pending Rider",
   email: PENDING_RIDER_CREDENTIAL.email,
   phone: "+8801719999999",
@@ -523,39 +578,39 @@ export interface PickupLocationSeedEntry {
 
 export const SEED_PICKUP_LOCATIONS: PickupLocationSeedEntry[] = [
   {
-    id: "seed_pickup_1",
+    id: "PKL-100001E",
     merchantId: MERCHANT_IDS.merchant1,
     label: "Merchant 1 Pickup — 100 Business Street",
     address: "100 Business Street, Dhaka",
-    cityId: "seed_city_dhaka",
+    cityId: "DC-100001E",
   },
   {
-    id: "seed_pickup_2",
+    id: "PKL-100002E",
     merchantId: MERCHANT_IDS.merchant2,
     label: "Merchant 2 Pickup — 200 Business Street",
     address: "200 Business Street, Dhaka",
-    cityId: "seed_city_dhaka",
+    cityId: "DC-100001E",
   },
   {
-    id: "seed_pickup_3",
+    id: "PKL-100003E",
     merchantId: MERCHANT_IDS.merchant3,
     label: "Merchant 3 Pickup — 300 Business Street",
     address: "300 Business Street, Dhaka",
-    cityId: "seed_city_dhaka",
+    cityId: "DC-100001E",
   },
   {
-    id: "seed_pickup_4",
+    id: "PKL-100004E",
     merchantId: MERCHANT_IDS.merchant4,
     label: "Merchant 4 Pickup — 400 Business Street",
     address: "400 Business Street, Dhaka",
-    cityId: "seed_city_dhaka",
+    cityId: "DC-100001E",
   },
   {
-    id: "seed_pickup_5",
+    id: "PKL-100005E",
     merchantId: MERCHANT_IDS.merchant5,
     label: "Merchant 5 Pickup — 500 Business Street",
     address: "500 Business Street, Dhaka",
-    cityId: "seed_city_dhaka",
+    cityId: "DC-100001E",
   },
 ]
 
@@ -603,7 +658,7 @@ const ANNOUNCEMENT_TARGET_ROLES: string[][] = [
 export const SEED_ANNOUNCEMENTS: AnnouncementSeedEntry[] = Array.from(
   { length: 6 },
   (_, i) => ({
-    id: `seed_announcement_${i + 1}`,
+    id: `ANN-${String(100001 + i).padStart(6, "0")}E`,
     title: ANNOUNCEMENT_TITLES[i],
     content: ANNOUNCEMENT_CONTENTS[i],
     publishedAt: new Date(Date.now() - (i + 1) * 5 * 86400000).toISOString(),
@@ -631,17 +686,17 @@ export interface AuditLogSeedEntry {
 
 export const SEED_AUDIT_LOGS: AuditLogSeedEntry[] = [
   {
-    id: "seed_audit_1",
+    id: "AL-100001E",
     actorName: ADMIN_USER_NAMES.nadia,
     actorRole: "SUPER_ADMIN",
     action: "MERCHANT_APPROVED",
     entityType: "merchant",
-    entityId: "merchant_1",
+    entityId: "MER-100001E",
     description: "Approved merchant Acme Corp",
     createdAt: "2026-07-10T09:00:00.000Z",
   },
   {
-    id: "seed_audit_2",
+    id: "AL-100002E",
     actorName: ADMIN_USER_NAMES.tanvir,
     actorRole: "SUPER_ADMIN",
     action: "MERCHANT_APPROVED",
@@ -651,7 +706,7 @@ export const SEED_AUDIT_LOGS: AuditLogSeedEntry[] = [
     createdAt: "2026-07-02T10:00:00.000Z",
   },
   {
-    id: "seed_audit_3",
+    id: "AL-100003E",
     actorName: ADMIN_USER_NAMES.tanvir,
     actorRole: "SUPER_ADMIN",
     action: "ORDER_APPROVED",
@@ -661,17 +716,17 @@ export const SEED_AUDIT_LOGS: AuditLogSeedEntry[] = [
     createdAt: "2026-07-13T10:00:00.000Z",
   },
   {
-    id: "seed_audit_4",
+    id: "AL-100004E",
     actorName: ADMIN_USER_NAMES.nadia,
     actorRole: "SUPER_ADMIN",
     action: "PAYOUT_APPROVED",
     entityType: "payout_request",
-    entityId: "PR-SEED-001",
-    description: "Approved payout request PR-SEED-001",
+    entityId: "PR-100001E",
+    description: "Approved payout request PR-100001E",
     createdAt: "2026-07-14T09:00:00.000Z",
   },
   {
-    id: "seed_audit_5",
+    id: "AL-100005E",
     actorName: ADMIN_USER_NAMES.nadia,
     actorRole: "SUPER_ADMIN",
     action: "TEAM_MEMBER_CREATED",
@@ -698,8 +753,8 @@ export interface EmailLogSeedEntry {
 
 export const SEED_EMAIL_LOGS: EmailLogSeedEntry[] = [
   {
-    id: "seed_email_1",
-    to: "merchant1@app.com",
+    id: "EL-100001E",
+    to: "merchant1@email.com",
     subject: "[Delivery Management] Your merchant account has been approved",
     body: "Dear Owner 1, your merchant account has been approved. You can now start accepting orders.",
     status: "SENT",
@@ -708,8 +763,8 @@ export const SEED_EMAIL_LOGS: EmailLogSeedEntry[] = [
     createdAt: "2026-07-02T10:05:00.000Z",
   },
   {
-    id: "seed_email_2",
-    to: "merchant2@app.com",
+    id: "EL-100002E",
+    to: "merchant2@email.com",
     subject: "[Delivery Management] Your merchant account has been approved",
     body: "Dear Owner 2, your merchant account has been approved. You can now start accepting orders.",
     status: "FAILED",
@@ -718,8 +773,8 @@ export const SEED_EMAIL_LOGS: EmailLogSeedEntry[] = [
     createdAt: "2026-07-03T10:05:00.000Z",
   },
   {
-    id: "seed_email_3",
-    to: "merchant3@app.com",
+    id: "EL-100003E",
+    to: "merchant3@email.com",
     subject: "[Delivery Management] New order notification",
     body: "You have received a new order. Please log in to view details and arrange pickup.",
     status: "SENT",
@@ -798,8 +853,8 @@ const RECIPIENT_NAMES = [
 ]
 
 const PRODUCT_COSTS = [
-  500, 800, 1200, 1500, 2000, 2500, 3000, 3500, 4000, 5000, 6000, 7500, 8000,
-  9500, 10000, 12000, 15000, 18000, 20000, 25000,
+  0, 800, 0, 1500, 2000, 0, 3000, 3500, 0, 5000, 6000, 0, 8000, 9500, 0, 12000,
+  0, 18000, 20000, 0,
 ]
 
 const PARCEL_WEIGHTS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0]
@@ -814,7 +869,6 @@ export interface OrderSeedEntry {
   recipientName: string
   recipientPhone: string
   deliveryAddress: string
-  deliveryCity?: string
   parcelWeightKg: number
   deliveryType: "STANDARD" | "FRAGILE"
   productCost: number
@@ -852,21 +906,21 @@ function buildSeedOrders(): OrderSeedEntry[] {
   const activeMerchants = [
     {
       id: MERCHANT_IDS.merchant1,
-      pickupId: "seed_pickup_1",
+      pickupId: "PKL-100001E",
       baseRate: 50,
       extraRatePerKg: 10,
       freeWeightKg: 1,
     },
     {
       id: MERCHANT_IDS.merchant2,
-      pickupId: "seed_pickup_2",
+      pickupId: "PKL-100002E",
       baseRate: 60,
       extraRatePerKg: 15,
       freeWeightKg: 1,
     },
     {
       id: MERCHANT_IDS.merchant3,
-      pickupId: "seed_pickup_3",
+      pickupId: "PKL-100003E",
       baseRate: 70,
       extraRatePerKg: 20,
       freeWeightKg: 1,
@@ -911,13 +965,12 @@ function buildSeedOrders(): OrderSeedEntry[] {
     ).toISOString()
 
     const base: OrderSeedEntry = {
-      id: `seed_order_${String(i + 1).padStart(3, "0")}`,
+      id: `ORD-${String(100001 + i).padStart(6, "0")}E`,
       merchantId: merchant.id,
       pickupLocationId: merchant.pickupId,
       recipientName,
       recipientPhone: `+8801712${String(10000 + i).slice(0, 5)}`,
       deliveryAddress: `${100 + i} Seed Road, ${city}`,
-      deliveryCity: city,
       parcelWeightKg: weight,
       deliveryType,
       productCost,
@@ -1089,7 +1142,7 @@ function buildSeedPayoutRequests(): PayoutRequestSeedEntry[] {
 
   return [
     {
-      id: "PR-SEED-001",
+      id: "PR-100001E",
       merchantId: MERCHANT_IDS.merchant1,
       orderIds: payoutOrder1 ? [payoutOrder1.id] : [],
       amount: payoutOrder1 ? payoutOrder1.merchantEarnings : 60,
@@ -1103,7 +1156,7 @@ function buildSeedPayoutRequests(): PayoutRequestSeedEntry[] {
       paidAt: null,
     },
     {
-      id: "PR-SEED-002",
+      id: "PR-100002E",
       merchantId: MERCHANT_IDS.merchant1,
       orderIds: payoutOrder2 ? [payoutOrder2.id] : [],
       amount: payoutOrder2 ? payoutOrder2.merchantEarnings : 70,

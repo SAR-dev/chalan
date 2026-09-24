@@ -6,13 +6,7 @@ import { FormEvent, useState } from "react"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
@@ -132,7 +126,7 @@ export default function ForgotPasswordPage() {
                         id="email"
                         type="email"
                         autoComplete="email"
-                        placeholder="you@app.com"
+                        placeholder="you@email.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required

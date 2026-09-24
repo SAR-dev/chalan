@@ -1,12 +1,7 @@
 import { sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
-import {
-  ADMIN_USER_NAMES,
-  MERCHANT_IDS,
-  SEED_ORDERS,
-  SEED_PAYOUT_REQUESTS,
-} from "@/lib/db/seed/seed-content"
+import { ADMIN_USER_NAMES, MERCHANT_IDS, SEED_ORDERS, SEED_PAYOUT_REQUESTS } from "@/lib/db/seed/seed-content"
 import { log } from "./helpers"
 
 export async function seedBalances() {
@@ -24,7 +19,7 @@ export async function seedBalances() {
   const BATCH = 25
   for (let i = 0; i < SEED_ORDERS.length; i += BATCH) {
     const batch = SEED_ORDERS.slice(i, i + BATCH).map((o) => ({
-      id: `seed_btx_charge_${o.id}`,
+      id: `BT-${o.id}`,
       merchantId: o.merchantId,
       type: "ORDER_CHARGE" as const,
       amount: o.deliveryFee + o.codFee,
@@ -42,7 +37,7 @@ export async function seedBalances() {
   const deliveredOrders = SEED_ORDERS.filter((o) => o.status === "DELIVERED")
   for (let i = 0; i < deliveredOrders.length; i += BATCH) {
     const batch = deliveredOrders.slice(i, i + BATCH).map((o) => ({
-      id: `seed_btx_earnings_${o.id}`,
+      id: `BTE-${o.id}`,
       merchantId: o.merchantId,
       type: "ORDER_EARNINGS" as const,
       amount: -(o.productCost - o.deliveryFee - o.codFee),
@@ -61,7 +56,7 @@ export async function seedBalances() {
   )
   if (approvedPayout) {
     await db.insert(balanceTransaction).values({
-      id: "seed_btx_payout_confirmed",
+      id: "BT-100001E",
       merchantId: approvedPayout.merchantId,
       type: "PAYMENT_CONFIRMED",
       amount: -approvedPayout.amount,
@@ -80,7 +75,7 @@ export async function seedBalances() {
   const pendingPayout = SEED_PAYOUT_REQUESTS.find((p) => p.status === "PENDING")
   if (pendingPayout) {
     await db.insert(balanceTransaction).values({
-      id: "seed_btx_payout_pending",
+      id: "BT-100002E",
       merchantId: pendingPayout.merchantId,
       type: "PAYMENT_PENDING",
       amount: -pendingPayout.amount,
@@ -127,7 +122,7 @@ export async function seedBalances() {
     const pendingBalance = pendingResult[0]?.total ?? 0
 
     await db.insert(merchantBalance).values({
-      id: `seed_balance_${merchantId}`,
+      id: `MB-${merchantId}`,
       merchantId,
       balance,
       pendingBalance,

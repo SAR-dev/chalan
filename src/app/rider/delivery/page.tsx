@@ -130,7 +130,7 @@ export default function RiderDeliveryQueuePage() {
       header: columnLabels.rider.mapLink,
       align: "center",
       cell: (o) => {
-        const mapLink = (o as any).deliveryMapLink as string | null
+        const mapLink = o.deliveryMapLink ?? null
         return mapLink ? (
           <a
             href={mapLink}

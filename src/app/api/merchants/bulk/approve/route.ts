@@ -6,8 +6,9 @@ import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(req: Request) {
+export const PATCH = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -36,15 +37,17 @@ export async function PATCH(req: Request) {
     .where(inArray(merchant.id, pendingIds))
     .returning()
 
-  for (const m of updated) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "MERCHANT_APPROVED",
-      entityType: "merchant",
-      entityId: m.id,
-      description: `Approved merchant ${m.businessName}`,
-    })
-  }
+  await Promise.all(
+    updated.map((m) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "MERCHANT_APPROVED",
+        entityType: "merchant",
+        entityId: m.id,
+        description: `Approved merchant ${m.businessName}`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: updated.length })
-}
+})

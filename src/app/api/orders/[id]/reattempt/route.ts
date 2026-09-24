@@ -1,9 +1,9 @@
 import { applyOrderTransition } from "@/features/orders/transitions"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  return applyOrderTransition("reattempt", id, req)
-}
+export const PATCH = withErrorHandler(
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const { id } = await params
+    return applyOrderTransition("reattempt", id, req)
+  },
+)

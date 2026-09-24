@@ -1,33 +1,18 @@
 "use client"
 
-import {
-  Building2,
-  CheckCircle2,
-  FileText,
-  Loader2,
-  MapPin,
-  Phone,
-  Tag,
-  User,
-  XCircle,
-} from "lucide-react"
+import { Building2, CheckCircle2, FileText, Loader2, MapPin, Palette, Phone, Tag, User, XCircle } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { FormErrors } from "@/components/form-errors"
+import { ImageUpload } from "@/components/image-upload"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { pageContent } from "@/config/content"
 import { useAuth } from "@/features/account/hooks/use-auth"
@@ -36,6 +21,15 @@ import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { PickupLocationsManager } from "@/features/pickup-locations/components/pickup-locations-manager"
 import { formatTk } from "@/lib/pricing"
 import { merchantProfileSchema, validateFormData } from "@/lib/validation"
+
+const BRAND_PRESETS = [
+  { label: "Orange", value: "#f97316" },
+  { label: "Blue", value: "#2563eb" },
+  { label: "Emerald", value: "#10b981" },
+  { label: "Violet", value: "#8b5cf6" },
+  { label: "Red", value: "#ef4444" },
+  { label: "Cyan", value: "#06b6d4" },
+] as const
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString(undefined, {
@@ -70,11 +64,27 @@ export default function MerchantSettingsPage() {
   const [address, setAddress] = useState(() => currentMerchant?.address ?? "")
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Branding state
+  const [logoUrl, setLogoUrl] = useState<string | null>(
+    () => currentMerchant?.logoUrl ?? null,
+  )
+  const [brandColor, setBrandColor] = useState(
+    () => currentMerchant?.brandColor ?? "",
+  )
+  const [hidePlatformBranding, setHidePlatformBranding] = useState(
+    () => currentMerchant?.hidePlatformBranding ?? false,
+  )
+  const [savingBranding, setSavingBranding] = useState(false)
+
   useEffect(() => {
     if (!currentMerchant) return
     setBusinessName(currentMerchant.businessName)
     setPhone(currentMerchant.phone)
     setAddress(currentMerchant.address)
+    setLogoUrl(currentMerchant.logoUrl ?? null)
+    setBrandColor(currentMerchant.brandColor ?? "")
+    setHidePlatformBranding(currentMerchant.hidePlatformBranding ?? false)
   }, [currentMerchant])
 
   if (!isReady || !isDataReady) return null
@@ -142,6 +152,32 @@ export default function MerchantSettingsPage() {
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSaveBranding() {
+    if (!currentMerchant) return
+    setSavingBranding(true)
+    try {
+      const res = await fetch(`/api/merchants/${currentMerchant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          logoUrl: logoUrl || null,
+          brandColor: brandColor || null,
+          hidePlatformBranding,
+        }),
+      })
+      if (res.ok) {
+        toast.success("Branding settings saved.")
+        // Revalidate merchant data
+        window.location.reload()
+      } else {
+        const data = await res.json().catch(() => null)
+        toast.error(data?.error ?? "Could not save branding settings.")
+      }
+    } finally {
+      setSavingBranding(false)
     }
   }
 
@@ -223,6 +259,105 @@ export default function MerchantSettingsPage() {
                 </CardFooter>
               </Card>
             </form>
+
+            <Card data-testid="branding-section">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="size-4" />
+                  Branding
+                </CardTitle>
+                <CardDescription>
+                  Customize how your business appears in the sidebar and emails.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
+                  <Label>Business logo</Label>
+                  <p className="text-muted-foreground text-xs">
+                    Upload a logo to replace the platform icon in the sidebar.
+                  </p>
+                  <ImageUpload
+                    value={logoUrl}
+                    onChange={setLogoUrl}
+                    folder="logos"
+                    label="Upload logo"
+                    previewClassName="max-h-16 w-auto object-contain"
+                    className="max-w-xs"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Brand color</Label>
+                  <p className="text-muted-foreground text-xs">
+                    Choose a color for the sidebar and accent elements.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {BRAND_PRESETS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        title={preset.label}
+                        onClick={() => setBrandColor(preset.value)}
+                        className={`size-8 rounded-full border-2 transition-all ${
+                          brandColor === preset.value
+                            ? "border-foreground scale-110"
+                            : "border-transparent hover:scale-105"
+                        }`}
+                        style={{ backgroundColor: preset.value }}
+                      />
+                    ))}
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="color"
+                        value={brandColor || "#f97316"}
+                        onChange={(e) => setBrandColor(e.target.value)}
+                        className="size-8 cursor-pointer p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-md"
+                      />
+                      <Input
+                        type="text"
+                        value={brandColor}
+                        onChange={(e) => setBrandColor(e.target.value)}
+                        placeholder="#f97316"
+                        className="w-24 font-mono text-xs"
+                        maxLength={7}
+                        data-testid="brand-color-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <Label>Hide platform branding</Label>
+                    <p className="text-muted-foreground text-xs">
+                      Show only your logo in the sidebar, hiding the platform
+                      name.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={hidePlatformBranding}
+                    onCheckedChange={setHidePlatformBranding}
+                    data-testid="hide-branding-toggle"
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="justify-end">
+                <Button
+                  onClick={handleSaveBranding}
+                  disabled={savingBranding}
+                  data-testid="save-branding"
+                >
+                  {savingBranding ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Saving
+                    </>
+                  ) : (
+                    "Save branding"
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
 
             <PickupLocationsManager merchantId={currentMerchant.id} />
           </div>

@@ -135,6 +135,8 @@ CREATE TABLE "merchant" (
 	"email" text NOT NULL,
 	"phone" text NOT NULL,
 	"address" text NOT NULL,
+	"businessType" text DEFAULT 'Other' NOT NULL,
+	"onboardingCompletedAt" timestamp with time zone,
 	"status" text DEFAULT 'PENDING' NOT NULL,
 	"baseRate" double precision DEFAULT 0 NOT NULL,
 	"extraRatePerKg" double precision DEFAULT 0 NOT NULL,
@@ -159,6 +161,9 @@ CREATE TABLE "merchant" (
 	"nidRejectedAt" timestamp with time zone,
 	"nidRejectedBy" text,
 	"nidRejectionReason" text,
+	"logoUrl" text,
+	"brandColor" text,
+	"hidePlatformBranding" boolean DEFAULT false NOT NULL,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -179,7 +184,6 @@ CREATE TABLE "order" (
 	"recipientName" text NOT NULL,
 	"recipientPhone" text NOT NULL,
 	"deliveryAddress" text NOT NULL,
-	"deliveryCity" text,
 	"deliveryCityId" text,
 	"deliveryMapLink" text,
 	"parcelWeightKg" double precision NOT NULL,
@@ -399,6 +403,8 @@ CREATE INDEX "balance_tx_type_idx" ON "balance_transaction" USING btree ("type")
 CREATE INDEX "balance_tx_order_id_idx" ON "balance_transaction" USING btree ("orderId");--> statement-breakpoint
 CREATE INDEX "balance_tx_created_at_idx" ON "balance_transaction" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "balance_tx_merchant_id_created_at_idx" ON "balance_transaction" USING btree ("merchantId","createdAt");--> statement-breakpoint
+CREATE INDEX "delivery_city_zone_id_idx" ON "delivery_city" USING btree ("zoneId");--> statement-breakpoint
+CREATE INDEX "delivery_city_warehouse_id_idx" ON "delivery_city" USING btree ("warehouseId");--> statement-breakpoint
 CREATE INDEX "email_log_status_idx" ON "email_log" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "email_log_created_at_idx" ON "email_log" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "email_log_to_trgm_idx" ON "email_log" USING gin ("to" gin_trgm_ops);--> statement-breakpoint
@@ -413,6 +419,8 @@ CREATE INDEX "merchant_business_name_trgm_idx" ON "merchant" USING gin ("busines
 CREATE INDEX "merchant_owner_name_trgm_idx" ON "merchant" USING gin ("ownerName" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "merchant_email_trgm_idx" ON "merchant" USING gin ("email" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "merchant_phone_trgm_idx" ON "merchant" USING gin ("phone" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "order_merchant_id_idx" ON "order" USING btree ("merchantId");--> statement-breakpoint
+CREATE INDEX "order_warehouse_id_idx" ON "order" USING btree ("warehouseId");--> statement-breakpoint
 CREATE INDEX "order_pickup_rider_id_idx" ON "order" USING btree ("pickupRiderId");--> statement-breakpoint
 CREATE INDEX "order_delivery_rider_id_idx" ON "order" USING btree ("deliveryRiderId");--> statement-breakpoint
 CREATE INDEX "order_pickup_location_id_idx" ON "order" USING btree ("pickupLocationId");--> statement-breakpoint

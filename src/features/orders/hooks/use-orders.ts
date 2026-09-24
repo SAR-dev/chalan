@@ -30,9 +30,19 @@ type BulkAction =
 export function useOrders({
   initialData,
   initialTotal,
+  includeAllOrders = false,
+  payablePage = 1,
+  payableLimit = 20,
+  payableDateFrom,
+  payableDateTo,
 }: {
   initialData?: Order[]
   initialTotal?: number
+  includeAllOrders?: boolean
+  payablePage?: number
+  payableLimit?: number
+  payableDateFrom?: string
+  payableDateTo?: string
 } = {}) {
   const { currentUser } = useAuth()
   const { currentWarehouse } = useWarehouses()
@@ -81,10 +91,10 @@ export function useOrders({
   const orders = response?.data ?? initialData ?? []
   const total = response?.total ?? initialTotal ?? 0
 
-  // Unfiltered list for stat card counts — fetches all statuses regardless
-  // of the current tab filter. Uses a high limit to get all rows.
+  // Optional workboard data for warehouse screens. Dashboard stat cards use
+  // server-provided aggregates instead of fetching a broad unfiltered list.
   const allUrl = buildTableUrl(KEY, {
-    limit: 9999,
+    limit: 100,
     offset: 0,
     q: filters.debouncedQuery || undefined,
     statuses: undefined,
@@ -95,12 +105,12 @@ export function useOrders({
   })
 
   const { data: allResponse } = useSWR<PaginatedResponse<Order>>(
-    currentUser ? allUrl : null,
+    currentUser && includeAllOrders ? allUrl : null,
     jsonFetcher,
     swrOptions,
   )
 
-  const allOrders = allResponse?.data ?? []
+  const allOrders = includeAllOrders ? (allResponse?.data ?? []) : []
 
   const warehouseId = currentWarehouse?.id
   const countsKey = warehouseId
@@ -119,14 +129,20 @@ export function useOrders({
 
   const merchantId = currentMerchant?.id
   const payableKey = merchantId
-    ? `${KEY}/payable?merchantId=${merchantId}`
+    ? buildTableUrl(`${KEY}/payable`, {
+        merchantId,
+        limit: payableLimit,
+        offset: (payablePage - 1) * payableLimit,
+        dateFrom: payableDateFrom,
+        dateTo: payableDateTo,
+      })
     : null
-  const { data: payableResponse } = useSWR<PaginatedResponse<Order>>(
-    currentUser ? payableKey : null,
-    jsonFetcher,
-    swrOptions,
-  )
+  const { data: payableResponse } = useSWR<
+    PaginatedResponse<Order> & { totalEarnings?: number }
+  >(currentUser ? payableKey : null, jsonFetcher, swrOptions)
   const merchantPayableOrders = payableResponse?.data ?? []
+  const merchantPayableTotal = payableResponse?.total ?? 0
+  const merchantPayableAmount = payableResponse?.totalEarnings ?? 0
 
   const patchOrder = useCallback(
     async (
@@ -469,6 +485,8 @@ export function useOrders({
     warehouseFailedOrders,
     warehouseUnsettledOrders,
     merchantPayableOrders,
+    merchantPayableTotal,
+    merchantPayableAmount,
     isLoading,
     error,
     mutate,

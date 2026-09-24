@@ -1,6 +1,7 @@
 import { Analytics } from "@vercel/analytics/next"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
+import { headers } from "next/headers"
 import NextTopLoader from "nextjs-toploader"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -68,11 +69,17 @@ export const viewport: Viewport = {
   ],
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode
 }>) {
+  // x-nonce is set by the edge proxy (src/proxy.ts) for every page request so
+  // Next can nonce its inline scripts AND we can forward it to next-themes,
+  // which injects its own inline <script> for theme flash prevention.
+  const headerList = await headers()
+  const nonce = headerList.get("x-nonce") ?? undefined
+
   return (
     <html
       lang="en"
@@ -80,12 +87,17 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-background font-sans antialiased">
+        {/* No nonce here on purpose: nextjs-toploader renders <style nonce> without
+            suppressHydrationWarning, and React doesn't expose the nonce to the
+            client render (nonce="" vs server value → hydration mismatch). Styles are
+            allowed by `style-src 'unsafe-inline'`, so they don't need one. */}
         <NextTopLoader />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           {children}
           <Toaster />

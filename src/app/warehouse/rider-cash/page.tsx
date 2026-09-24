@@ -1,31 +1,11 @@
 "use client"
 
-import {
-  AlertTriangle,
-  Banknote,
-  CheckCircle2,
-  Loader2,
-  Users,
-} from "lucide-react"
+import { AlertTriangle, Banknote, CheckCircle2, Loader2, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { useRiders } from "@/features/riders/hooks/use-riders"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatTk } from "@/lib/pricing"
 
 interface RiderCashData {
@@ -37,39 +17,16 @@ interface RiderCashData {
 }
 
 export default function WarehouseRiderCashPage() {
-  const { riders, isLoading: ridersLoading } = useRiders()
   const [cashData, setCashData] = useState<RiderCashData[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (ridersLoading || riders.length === 0) {
-      setLoading(ridersLoading)
-      return
-    }
-
-    // Fetch cash data for all riders in parallel
-    Promise.all(
-      riders.map(async (rider) => {
-        try {
-          const res = await fetch(`/api/riders/${rider.id}/cash`)
-          if (!res.ok) return null
-          const data = await res.json()
-          return {
-            riderId: rider.id,
-            riderName: rider.name,
-            cashOnHand: data.cash.cashOnHand,
-            totalCollected: data.cash.totalCollected,
-            totalSubmitted: data.cash.totalSubmitted,
-          }
-        } catch {
-          return null
-        }
-      }),
-    ).then((results) => {
-      setCashData(results.filter(Boolean) as RiderCashData[])
-      setLoading(false)
-    })
-  }, [riders, ridersLoading])
+    fetch("/api/riders/cash")
+      .then((res) => (res.ok ? (res.json() as Promise<RiderCashData[]>) : []))
+      .then(setCashData)
+      .catch(() => setCashData([]))
+      .finally(() => setLoading(false))
+  }, [])
 
   const totalCashOnHand = cashData.reduce((sum, r) => sum + r.cashOnHand, 0)
   const totalCollected = cashData.reduce((sum, r) => sum + r.totalCollected, 0)

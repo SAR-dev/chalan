@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
 import { parseBody, profileUpdateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Serializes a Better Auth user row + its profile row into the app-level User
 // shape consumed by the client (mirrors the GET response below).
@@ -41,7 +42,7 @@ function serializeUser(
   }
 }
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) {
     return unauthorized()
@@ -81,11 +82,11 @@ export async function GET() {
   return NextResponse.json(
     serializeUser(session.user, row, merchantEmailVerifiedAt),
   )
-}
+})
 
 // Update the signed-in user's own profile: display name, avatar (both on the
 // `user` row), and/or table rows-per-page preference (on `profile`).
-export async function PATCH(req: Request) {
+export const PATCH = withErrorHandler(async (req: Request) => {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) {
     return unauthorized()
@@ -172,4 +173,4 @@ export async function PATCH(req: Request) {
       merchantEmailVerifiedAt,
     ),
   )
-}
+})

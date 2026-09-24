@@ -5,7 +5,14 @@ type VerificationCheck = {
   reason?: string
 }
 
-export function canPlaceOrders(merchant: Merchant): VerificationCheck {
+/**
+ * Only these three merchant fields drive eligibility. Accepting them directly
+ * (instead of a full `Merchant`) lets callers pass a Drizzle row projection
+ * without resorting to `as any` or fetching an entire merchant row.
+ */
+export function canPlaceOrders(
+  merchant: Pick<Merchant, "status" | "emailVerifiedAt" | "nidVerifiedAt">,
+): VerificationCheck {
   if (merchant.status !== "ACTIVE") {
     return { allowed: false, reason: "Your account is not active yet." }
   }

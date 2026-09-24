@@ -99,7 +99,7 @@ export default function RiderPickupQueuePage() {
       id: "merchantPhone",
       header: columnLabels.rider.contact,
       cell: (o) => {
-        const phone = (o as any).merchantPhone as string | null
+        const phone = o.merchantPhone ?? null
         return phone ? (
           <a href={`tel:${phone}`} className="text-sm hover:underline">
             {phone}
@@ -126,7 +126,7 @@ export default function RiderPickupQueuePage() {
       header: columnLabels.rider.mapLink,
       align: "center",
       cell: (o) => {
-        const mapLink = (o as any).pickupLocationMapLink as string | null
+        const mapLink = o.pickupLocationMapLink ?? null
         return mapLink ? (
           <a
             href={mapLink}

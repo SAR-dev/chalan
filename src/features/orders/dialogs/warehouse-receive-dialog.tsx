@@ -1,38 +1,13 @@
 "use client"
 
-import {
-  Bike,
-  MapPin,
-  Package,
-  Phone,
-  Warehouse as WarehouseIcon,
-} from "lucide-react"
+import { Bike, MapPin, Package, Phone, Warehouse as WarehouseIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Separator } from "@/components/ui/separator"
+import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import type { Order } from "@/lib/types"
-
-function InfoRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: React.ReactNode
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-      <div className="min-w-0">
-        <p className="text-muted-foreground text-xs">{label}</p>
-        <p className="text-sm leading-snug font-medium">{value}</p>
-      </div>
-    </div>
-  )
-}
 
 export function WarehouseReceiveDialog({
   order,

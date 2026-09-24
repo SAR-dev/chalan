@@ -31,9 +31,14 @@ export default async function WarehouseRidersPage() {
 
   const warehouseScope = eq(rider.warehouseId, me.warehouseId)
 
-  const [[{ total }], rows] = await Promise.all([
+  const [[stats], rows] = await Promise.all([
     dbRead
-      .select({ total: sql<number>`count(*)::int` })
+      .select({
+        total: sql<number>`count(*)::int`,
+        active: sql<number>`count(*) filter (where ${rider.isActive})::int`,
+        delivery: sql<number>`count(*) filter (where ${rider.taskType} in ('DELIVERY', 'BOTH'))::int`,
+        pickup: sql<number>`count(*) filter (where ${rider.taskType} in ('PICKUP', 'BOTH'))::int`,
+      })
       .from(rider)
       .where(warehouseScope),
     dbRead
@@ -44,5 +49,15 @@ export default async function WarehouseRidersPage() {
       .limit(limit),
   ])
 
-  return <WarehouseRidersPageClient initialData={rows} initialTotal={total} />
+  return (
+    <WarehouseRidersPageClient
+      initialData={rows}
+      initialTotal={stats?.total ?? 0}
+      initialCounts={{
+        active: stats?.active ?? 0,
+        delivery: stats?.delivery ?? 0,
+        pickup: stats?.pickup ?? 0,
+      }}
+    />
+  )
 }

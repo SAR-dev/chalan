@@ -22,15 +22,16 @@ type FilterTab = "ALL" | "ACTIVE" | "INACTIVE"
 export function WarehouseRidersPageClient({
   initialData,
   initialTotal,
+  initialCounts,
 }: {
   initialData: Rider[]
   initialTotal: number
+  initialCounts: { active: number; delivery: number; pickup: number }
 }) {
   const { currentUser } = useAuth()
   const { currentWarehouse } = useWarehouses()
   const {
     riders,
-    allRiders,
     total,
     page: _page,
     setPage,
@@ -63,13 +64,9 @@ export function WarehouseRidersPageClient({
     setPage(1)
   }, [tab, setIsActive, setPage])
 
-  const activeCount = allRiders.filter((r) => r.isActive).length
-  const deliveryCount = allRiders.filter(
-    (r) => r.taskType === "DELIVERY" || r.taskType === "BOTH",
-  ).length
-  const pickupCount = allRiders.filter(
-    (r) => r.taskType === "PICKUP" || r.taskType === "BOTH",
-  ).length
+  const activeCount = initialCounts.active
+  const deliveryCount = initialCounts.delivery
+  const pickupCount = initialCounts.pickup
 
   const quickFilterSections = [
     {

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { merchant } from "@/lib/db/schema"
+import { merchant, user } from "@/lib/db/schema"
 import { SEED_MERCHANTS } from "@/lib/db/seed/seed-content"
 import { createUser, log } from "./helpers"
 
@@ -29,5 +29,14 @@ export async function seedMerchants() {
       isActive: true,
       merchantId: entry.id,
     })
+
+    // If the merchant has emailVerifiedAt set, mark the Better Auth user as
+    // email-verified too so login doesn't get blocked.
+    if (entry.emailVerifiedAt) {
+      await db
+        .update(user)
+        .set({ emailVerified: true })
+        .where(eq(user.email, entry.email))
+    }
   }
 }

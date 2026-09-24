@@ -1,19 +1,8 @@
 "use client"
 
-import {
-  AlertTriangle,
-  MoreHorizontal,
-  RotateCcw,
-  Undo2,
-  Wrench,
-} from "lucide-react"
+import { AlertTriangle, MoreHorizontal, RotateCcw, Undo2, Wrench } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
-import {
-  CellContent,
-  CellTwoRow,
-  DataTable,
-  type DataTableColumn,
-} from "@/components/data-table"
+import { CellContent, CellTwoRow, DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
 import { Button } from "@/components/ui/button"
@@ -75,7 +64,7 @@ export function WarehouseExceptionsPageClient({
     sortDir,
     onSortChange,
     isLoading,
-  } = useOrders({ initialData, initialTotal })
+  } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
   const [tab, setTab] = useState<FilterTab>("NEEDS_ACTION")

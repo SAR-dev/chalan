@@ -120,6 +120,20 @@ services:
     networks:
       - app-net
 
+  # Shared Redis — the app instances rate-limit through this so limits apply
+  # across the whole cluster instead of per-instance (see S6).
+  redis:
+    image: redis:7-alpine
+    container_name: app-redis
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── Cron container ──────────────────────────────────────────────────────
   # Runs HTTP-based cleanup jobs against the dashboard API.
   # If pg_cron is configured (see pg-0 comment above), this container can
@@ -164,6 +178,8 @@ services:
     depends_on:
       migrate-dashboard:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s
@@ -196,6 +212,8 @@ services:
     depends_on:
       migrate-merchant:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s
@@ -228,6 +246,8 @@ services:
     depends_on:
       migrate-rider:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s
@@ -260,6 +280,8 @@ services:
     depends_on:
       migrate-warehouse:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s

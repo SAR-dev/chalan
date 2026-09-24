@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PATCH as approvePayout } from "./[id]/approve/route"
 import { PATCH as markPayoutPaid } from "./[id]/paid/route"
 import { PATCH as rejectPayout } from "./[id]/reject/route"
-import { POST as createPayout, GET as listPayouts } from "./route"
+import { GET as listPayouts, POST as createPayout } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
@@ -17,6 +17,7 @@ vi.mock("@/lib/audit", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: () => (rateLimited ? ({ status: 429 } as Response) : null),
+  rateLimitByIp: () => (rateLimited ? ({ status: 429 } as Response) : null),
   getClientIp: () => "127.0.0.1",
 }))
 

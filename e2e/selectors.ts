@@ -130,6 +130,14 @@ export const settings = {
   mailConfigTable: "[data-testid='mail-config-table']",
 }
 
+// ─── Branding ────────────────────────────────────────────────────────────────
+export const branding = {
+  section: "[data-testid='branding-section']",
+  colorInput: "[data-testid='brand-color-input']",
+  hideToggle: "[data-testid='hide-branding-toggle']",
+  saveButton: "[data-testid='save-branding']",
+}
+
 // ─── Dialogs ─────────────────────────────────────────────────────────────────
 export const dialog = {
   confirm: "[data-testid='confirm-dialog']",

@@ -14,25 +14,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
-import type { User } from "@/lib/types"
+import type { TeamMember } from "@/lib/types"
 
 const UNASSIGNED = "__unassigned__"
 
 interface TeamMemberDialogProps {
-  user: User | null
+  user: TeamMember | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onToggleActive: (user: User) => Promise<void>
-  onUpdateWarehouse: (user: User, warehouseId: string | null) => Promise<void>
+  onToggleActive: (user: TeamMember) => Promise<void>
+  onUpdateWarehouse: (
+    user: TeamMember,
+    warehouseId: string | null,
+  ) => Promise<void>
 }
 
 export function TeamMemberDialog({

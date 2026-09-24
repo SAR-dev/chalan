@@ -5,35 +5,10 @@ import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import type { Order, Rider } from "@/lib/types"
-
-function InfoRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: React.ReactNode
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-      <div className="min-w-0">
-        <p className="text-muted-foreground text-xs">{label}</p>
-        <p className="text-sm leading-snug font-medium">{value}</p>
-      </div>
-    </div>
-  )
-}
 
 export function WarehouseDispatchDialog({
   order,
@@ -65,7 +40,6 @@ export function WarehouseDispatchDialog({
   const selectedRider = deliveryRiders.find((r) => r.id === riderId)
 
   async function handleConfirm() {
-    console.log("[B7] handleConfirm called", { orderId: order!.id, riderId })
     if (!riderId) {
       toast.error("Select a delivery rider first.")
       return
@@ -73,7 +47,6 @@ export function WarehouseDispatchDialog({
     setSubmitting(true)
     try {
       const result = await assignDeliveryRider(order!.id, riderId)
-      console.log("[B7] assignDeliveryRider result", result)
       if (result.ok) {
         toast.success(
           `${order!.id} dispatched with ${selectedRider?.name ?? "rider"}.`,

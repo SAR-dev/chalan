@@ -1,20 +1,13 @@
 import { createId } from "@paralleldrive/cuid2"
-import { eq, sql } from "drizzle-orm"
+import { eq, inArray, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import type { z } from "zod"
 import { requireSession } from "@/lib/api-auth"
-import { forbidden, notFound, unauthorized } from "@/lib/api-response"
+import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
-import {
-  balanceTransaction,
-  deliveryCity,
-  merchant,
-  merchantBalance,
-  order,
-  pickupLocation,
-  rider,
-} from "@/lib/db/schema"
+import { pickupWarehouseId } from "@/lib/db/order-lookup"
+import { balanceTransaction, merchant, merchantBalance, order, rider } from "@/lib/db/schema"
 import {
   orderAssignPickupRiderSchema,
   orderCancelSchema,
@@ -190,18 +183,9 @@ export const ORDER_TRANSITIONS = {
       return null
     },
     buildUpdate: async ({ order: o, body }) => {
-      let warehouseId: string | null = null
-      if (o.pickupLocationId) {
-        const [location] = await db
-          .select({ warehouseId: deliveryCity.warehouseId })
-          .from(pickupLocation)
-          .innerJoin(deliveryCity, eq(pickupLocation.cityId, deliveryCity.id))
-          .where(eq(pickupLocation.id, o.pickupLocationId))
-          .limit(1)
-        if (location?.warehouseId) {
-          warehouseId = location.warehouseId
-        }
-      }
+      const warehouseId = o.pickupLocationId
+        ? await pickupWarehouseId(o.pickupLocationId)
+        : null
       return {
         status: "PICKED_UP",
         pickedUpAt: new Date().toISOString(),
@@ -469,7 +453,7 @@ export async function applyOrderTransition(
   }
 
   const committed: { order: OrderRow | null } = { order: null }
-  const response = await db.transaction(async (tx: any) => {
+  const response = await db.transaction(async (tx) => {
     const [orderRow] = await tx
       .select()
       .from(order)
@@ -548,6 +532,102 @@ export async function applyOrderTransition(
       entityId: committed.order.id,
       description: `${TRANSITION_LABELS[name]} order ${committed.order.id}`,
     })
+  }
+
+  return response
+}
+
+/**
+ * Apply a transition to many orders at once, reusing the exact same
+ * authorize + guard + buildUpdate as the single-order path.
+ *
+ * Orders that fail their guard are skipped (partial success is preserved and
+ * reported via `count`), matching the old bulk-route behaviour without
+ * duplicating the guard logic. Runs inside one transaction.
+ *
+ * `body` is the already-validated request payload from the calling route
+ * (e.g. `{ ids, riderId }`) — the transition's guard/buildUpdate read only the
+ * fields they care about.
+ */
+export async function applyBulkOrderTransition(
+  name: TransitionName,
+  ids: string[],
+  body: Record<string, unknown>,
+): Promise<NextResponse> {
+  const def = ORDER_TRANSITIONS[name] as TransitionDef<z.ZodType | undefined>
+
+  const me = await requireSession()
+  if (!me) return unauthorized()
+  if (!def.authorize(me)) return forbidden()
+
+  const committed: OrderRow[] = []
+  const response = await db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(order)
+      .where(inArray(order.id, ids))
+      .for("update")
+
+    if (rows.length === 0) {
+      return badRequest("No orders found for the given IDs.")
+    }
+
+    let firstFail: GuardError = null
+    const updates: { id: string; values: Record<string, unknown> }[] = []
+    for (const orderRow of rows) {
+      const ctx = {
+        order: orderRow,
+        session: me,
+        body,
+      } as TransitionContext<never>
+      const guardError = await def.guard(ctx)
+      if (guardError) {
+        if (!firstFail) firstFail = guardError
+        continue
+      }
+      updates.push({
+        id: orderRow.id,
+        values: await def.buildUpdate(ctx),
+      })
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            firstFail?.error ??
+            `None of the selected orders can be ${name.replace(/-/g, " ")}.`,
+        },
+        { status: firstFail?.status ?? 400 },
+      )
+    }
+
+    const updated: OrderRow[] = []
+    for (const { id, values } of updates) {
+      const [row] = await tx
+        .update(order)
+        .set(values)
+        .where(eq(order.id, id))
+        .returning()
+      if (row) updated.push(row)
+    }
+
+    committed.push(...updated)
+    return NextResponse.json({ ok: true, count: updated.length })
+  })
+
+  if (committed.length > 0) {
+    await Promise.all(
+      committed.map((o) =>
+        logAudit({
+          actor: { userId: me.userId, name: me.name, role: me.role },
+          action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
+          entityType: "order",
+          entityId: o.id,
+          description: `${TRANSITION_LABELS[name]} order ${o.id} (bulk)`,
+        }),
+      ),
+    )
   }
 
   return response

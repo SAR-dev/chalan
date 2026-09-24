@@ -7,6 +7,7 @@ import {
   PROFILE_ROLES,
   RIDER_TASK_TYPES,
 } from "@/lib/constants"
+import { isAllowedOrigin } from "@/lib/csrf"
 
 export const idsSchema = z.object({
   ids: z
@@ -41,6 +42,19 @@ export async function parseBody<T extends z.ZodType>(
 ): Promise<
   { data: z.infer<T>; error: null } | { data: null; error: NextResponse }
 > {
+  // CSRF — reject cross-site requests up front. Browsers attach Origin to
+  // state-changing same/cross-origin requests, so any mismatch cannot come
+  // from a legitimate page in this app.
+  if (!isAllowedOrigin(req)) {
+    return {
+      data: null,
+      error: NextResponse.json(
+        { error: "Invalid request origin" },
+        { status: 403 },
+      ),
+    }
+  }
+
   let raw: unknown
   try {
     raw = await req.json()
@@ -147,6 +161,18 @@ export const merchantRegisterSchema = z.object({
   email: z.email("A valid email is required"),
   phone: bdPhone("Phone"),
   address: requiredString("Address"),
+  businessType: z
+    .enum([
+      "E-commerce",
+      "Restaurant",
+      "Grocery",
+      "Pharmacy",
+      "Fashion",
+      "Electronics",
+      "Other",
+    ])
+    .optional()
+    .transform((v) => v ?? "Other"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
@@ -210,7 +236,6 @@ export const orderCreateSchema = z.object({
   recipientName: requiredString("Recipient name"),
   recipientPhone: bdPhone("Recipient phone"),
   deliveryAddress: requiredString("Delivery address"),
-  deliveryCity: requiredString("Delivery city"),
   deliveryCityId: requiredString("Delivery city"),
   deliveryMapLink: z
     .url("Map link must be a valid URL")
@@ -399,6 +424,16 @@ export const merchantProfileSchema = z.object({
   address: requiredString("Address"),
 })
 
+export const merchantBrandingSchema = z.object({
+  logoUrl: z.string().nullable().optional(),
+  brandColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color (e.g. #f97316)")
+    .nullable()
+    .optional(),
+  hidePlatformBranding: z.boolean().optional(),
+})
+
 export const merchantVerifyEmailSchema = z.object({
   token: requiredString("Verification token"),
 })
@@ -408,6 +443,17 @@ export const nidSubmitSchema = z.object({
   nidBackImage: requiredString("NID back image"),
   nidSelfieImage: requiredString("NID selfie image"),
   nidNumber: z.string().trim().optional(),
+})
+
+export const nidReviewSchema = z.object({
+  action: z.enum(["approve", "reject"], {
+    error: "action must be 'approve' or 'reject'",
+  }),
+  reason: z
+    .string()
+    .trim()
+    .max(500, "Reason cannot exceed 500 characters")
+    .optional(),
 })
 
 export const teamCreateSchema = z.object({

@@ -44,7 +44,6 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/db/schema", () => ({
   emailLog: { _: { name: "email_log" } },
-  failedMail: { _: { name: "failed_mail" } },
   mailConfig: { isActive: { _: { name: "isActive" } } },
 }))
 
@@ -72,7 +71,7 @@ describe("sendMail", () => {
     expect(sent!.values).toMatchObject({ status: "SENT", to: "a@b.com" })
   })
 
-  it("exhausts retries, logs FAILED email_log and failedMail, then throws", async () => {
+  it("exhausts retries, logs FAILED email_log, then throws", async () => {
     mockSendMail.mockRejectedValue(new Error("SMTP error"))
     const { sendMail } = await import("@/lib/mailer")
     await expect(
@@ -84,8 +83,6 @@ describe("sendMail", () => {
       status: "FAILED",
       to: "fail@test.com",
     })
-    const failedMailEntry = insertCalls.find((c) => c.table === "failed_mail")
-    expect(failedMailEntry?.values).toMatchObject({ to: "fail@test.com" })
   })
 
   it("succeeds on retry", async () => {

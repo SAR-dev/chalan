@@ -59,7 +59,7 @@ export function IntakePageClient({
     setStatuses,
     isLoading,
     bulkReceiveOrders,
-  } = useOrders({ initialData, initialTotal })
+  } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
   const { pickupLocations } = usePickupLocations()

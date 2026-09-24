@@ -7,14 +7,7 @@ import { useState } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { BRAND_NAME } from "@/lib/constants"
 import type { SidebarConfig } from "@/lib/nav-config"
@@ -28,20 +21,45 @@ const navLinkIdle =
 const footerActionClass =
   "mt-0.5 w-full justify-start gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
 
-export function MobileHeader({ config }: { config: SidebarConfig }) {
+export function MobileHeader({
+  config,
+  logoUrl,
+  brandColor,
+  hidePlatformBranding = false,
+}: {
+  config: SidebarConfig
+  logoUrl?: string
+  brandColor?: string
+  hidePlatformBranding?: boolean
+}) {
   const pathname = usePathname()
   const { currentUser, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const BrandIcon = config.brandIcon
   const navItems = config.items
 
+  const headerStyle = brandColor
+    ? ({ "--sidebar-primary": brandColor } as React.CSSProperties)
+    : undefined
+
   return (
-    <header className="border-border flex h-14 items-center justify-between border-b px-3 sm:px-4 md:hidden">
+    <header
+      className="border-border flex h-14 items-center justify-between border-b px-3 sm:px-4 md:hidden"
+      style={headerStyle}
+    >
       <Link href="/" className="flex items-center gap-2">
         <div className="flex size-8 items-center justify-center rounded-lg">
-          <BrandIcon className="size-5" />
+          {logoUrl ? (
+            <img src={logoUrl} alt="" className="size-5 object-contain" />
+          ) : (
+            <BrandIcon className="size-5" />
+          )}
         </div>
-        <span className="text-sm font-semibold sm:text-base">{BRAND_NAME}</span>
+        {!hidePlatformBranding && (
+          <span className="text-sm font-semibold sm:text-base">
+            {BRAND_NAME}
+          </span>
+        )}
       </Link>
 
       <Sheet open={open} onOpenChange={setOpen}>
@@ -52,13 +70,23 @@ export function MobileHeader({ config }: { config: SidebarConfig }) {
             </Button>
           }
         />
-        <SheetContent side="left" className="p-0">
+        <SheetContent side="left" className="p-0" style={headerStyle}>
           {/* Brand */}
           <Link href="/" className="flex h-16 items-center gap-2 px-4">
-            <BrandIcon className="size-4 shrink-0" />
-            <SheetTitle className="text-[13px] font-semibold">
-              {BRAND_NAME}
-            </SheetTitle>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt=""
+                className="size-4 shrink-0 object-contain"
+              />
+            ) : (
+              <BrandIcon className="size-4 shrink-0" />
+            )}
+            {!hidePlatformBranding && (
+              <SheetTitle className="text-[13px] font-semibold">
+                {BRAND_NAME}
+              </SheetTitle>
+            )}
             <span className="bg-sidebar-primary text-sidebar-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
               {config.roleLabel}
             </span>

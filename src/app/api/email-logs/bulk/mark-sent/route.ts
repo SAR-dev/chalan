@@ -6,8 +6,9 @@ import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { emailLog } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function PATCH(req: Request) {
+export const PATCH = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -40,15 +41,17 @@ export async function PATCH(req: Request) {
     })
     .where(inArray(emailLog.id, failedIds))
 
-  for (const l of faileds) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "EMAIL_LOG_MARKED_SENT",
-      entityType: "email_log",
-      entityId: l.id,
-      description: `Marked email to ${l.to} ("${l.subject}") as sent`,
-    })
-  }
+  await Promise.all(
+    faileds.map((l) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "EMAIL_LOG_MARKED_SENT",
+        entityType: "email_log",
+        entityId: l.id,
+        description: `Marked email to ${l.to} ("${l.subject}") as sent`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: faileds.length })
-}
+})

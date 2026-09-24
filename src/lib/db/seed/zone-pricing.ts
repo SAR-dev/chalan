@@ -5,8 +5,8 @@ import { log } from "./helpers"
 const PRICING_MATRIX = [
   // From Dhaka Metro
   {
-    fromZoneId: "seed_zone_dhaka",
-    toZoneId: "seed_zone_dhaka",
+    fromZoneId: "DZ-100001E",
+    toZoneId: "DZ-100001E",
     baseRate: 60,
     extraRatePerKg: 10,
     freeWeightKg: 1,
@@ -14,8 +14,8 @@ const PRICING_MATRIX = [
     codFeePercentage: 1,
   },
   {
-    fromZoneId: "seed_zone_dhaka",
-    toZoneId: "seed_zone_divisional",
+    fromZoneId: "DZ-100001E",
+    toZoneId: "DZ-100002E",
     baseRate: 80,
     extraRatePerKg: 12,
     freeWeightKg: 1,
@@ -23,8 +23,8 @@ const PRICING_MATRIX = [
     codFeePercentage: 1,
   },
   {
-    fromZoneId: "seed_zone_dhaka",
-    toZoneId: "seed_zone_remote",
+    fromZoneId: "DZ-100001E",
+    toZoneId: "DZ-100003E",
     baseRate: 100,
     extraRatePerKg: 15,
     freeWeightKg: 1,
@@ -34,8 +34,8 @@ const PRICING_MATRIX = [
 
   // From Divisional Cities
   {
-    fromZoneId: "seed_zone_divisional",
-    toZoneId: "seed_zone_dhaka",
+    fromZoneId: "DZ-100002E",
+    toZoneId: "DZ-100001E",
     baseRate: 80,
     extraRatePerKg: 12,
     freeWeightKg: 1,
@@ -43,8 +43,8 @@ const PRICING_MATRIX = [
     codFeePercentage: 1,
   },
   {
-    fromZoneId: "seed_zone_divisional",
-    toZoneId: "seed_zone_divisional",
+    fromZoneId: "DZ-100002E",
+    toZoneId: "DZ-100002E",
     baseRate: 70,
     extraRatePerKg: 10,
     freeWeightKg: 1,
@@ -52,8 +52,8 @@ const PRICING_MATRIX = [
     codFeePercentage: 1,
   },
   {
-    fromZoneId: "seed_zone_divisional",
-    toZoneId: "seed_zone_remote",
+    fromZoneId: "DZ-100002E",
+    toZoneId: "DZ-100003E",
     baseRate: 110,
     extraRatePerKg: 15,
     freeWeightKg: 1,
@@ -63,8 +63,8 @@ const PRICING_MATRIX = [
 
   // From Remote Areas
   {
-    fromZoneId: "seed_zone_remote",
-    toZoneId: "seed_zone_dhaka",
+    fromZoneId: "DZ-100003E",
+    toZoneId: "DZ-100001E",
     baseRate: 100,
     extraRatePerKg: 15,
     freeWeightKg: 1,
@@ -72,8 +72,8 @@ const PRICING_MATRIX = [
     codFeePercentage: 1,
   },
   {
-    fromZoneId: "seed_zone_remote",
-    toZoneId: "seed_zone_divisional",
+    fromZoneId: "DZ-100003E",
+    toZoneId: "DZ-100002E",
     baseRate: 110,
     extraRatePerKg: 15,
     freeWeightKg: 1,
@@ -81,8 +81,8 @@ const PRICING_MATRIX = [
     codFeePercentage: 1,
   },
   {
-    fromZoneId: "seed_zone_remote",
-    toZoneId: "seed_zone_remote",
+    fromZoneId: "DZ-100003E",
+    toZoneId: "DZ-100003E",
     baseRate: 90,
     extraRatePerKg: 12,
     freeWeightKg: 1,

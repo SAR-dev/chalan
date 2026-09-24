@@ -6,7 +6,9 @@ import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 const TOKEN_EXPIRY_HOURS = 24
 
@@ -16,9 +18,14 @@ const resendVerificationSchema = z.object({
 
 // Public endpoint — no session required. Allows unverified merchants to
 // request a new activation email from the login page.
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   const parsed = await parseBody(req, resendVerificationSchema)
   if (parsed.error) return parsed.error
+
+  // Public relay into the SMTP queue — tight per-IP budget and a 5 min window
+  // so it cannot be abused to flood a mailbox or spam the mailer.
+  const limited = await rateLimitByIp(req, "resend-verification", 3, 300)
+  if (limited) return limited
 
   const { email } = parsed.data
 
@@ -80,4 +87,4 @@ export async function POST(req: Request) {
   )
 
   return NextResponse.json({ success: true })
-}
+})

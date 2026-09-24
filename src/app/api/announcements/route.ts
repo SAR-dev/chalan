@@ -7,8 +7,9 @@ import { db, dbRead } from "@/lib/db"
 import { announcement } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import { announcementCreateSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -68,9 +69,9 @@ export async function GET(req: Request) {
   ])
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
-}
+})
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -103,4 +104,4 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json(created, { status: 201 })
-}
+})

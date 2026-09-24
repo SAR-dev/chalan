@@ -6,13 +6,7 @@ import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { usePayouts } from "@/features/payouts/hooks/use-payouts"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
@@ -20,10 +14,14 @@ import { PAYOUT_METHODS } from "./const"
 
 export function PayoutRequestDialog({
   payableOrders,
+  payableTotal,
+  payableAmount,
   open,
   onOpenChange,
 }: {
   payableOrders: Order[]
+  payableTotal: number
+  payableAmount: number
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -38,7 +36,7 @@ export function PayoutRequestDialog({
     prevOpen.current = open
   }, [open])
 
-  const total = payableOrders.reduce((sum, o) => sum + o.productCost, 0)
+  const total = payableAmount
   const detailsLabel =
     method === "Bank transfer" ? "Bank account details" : `${method} number`
 
@@ -68,7 +66,7 @@ export function PayoutRequestDialog({
 
   return (
     <FormDialog
-      key={`${payableOrders.map((o) => o.id).join(",")}-${openCount}`}
+      key={`${payableTotal}-${payableAmount}-${openCount}`}
       open={open}
       onOpenChange={onOpenChange}
       title="Request payout"
@@ -78,21 +76,23 @@ export function PayoutRequestDialog({
       submittingLabel="Submitting"
       submitLabel="Submit request"
       submitIcon={<Wallet className="size-4" />}
-      submitDisabled={payableOrders.length === 0}
+      submitDisabled={payableTotal === 0}
     >
       <div className="grid grid-cols-1 gap-4 pt-2 pb-4">
         <div className="border-border bg-muted/40 rounded-lg border p-4">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground flex items-center gap-2 text-sm">
               <Package className="size-4" />
-              {payableOrders.length} order
-              {payableOrders.length === 1 ? "" : "s"} included
+              {payableTotal} order
+              {payableTotal === 1 ? "" : "s"} included
             </span>
             <span className="text-muted-foreground text-sm">Payout amount</span>
           </div>
           <div className="mt-2 flex items-end justify-between">
             <p className="text-muted-foreground font-mono text-xs">
-              {payableOrders.map((o) => o.id).join(", ")}
+              {payableOrders.length > 0
+                ? `Showing ${payableOrders.length} of ${payableTotal} payable orders`
+                : "No payable orders on this page"}
             </p>
             <p className="text-primary text-2xl font-semibold tabular-nums">
               {formatTk(total)}

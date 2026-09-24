@@ -93,6 +93,11 @@ describe("ORDER_STATUS_LABELS", () => {
       ).toBeDefined()
     }
   })
+
+  it("uses a distinct tone for every status", () => {
+    const tones = Object.values(ORDER_STATUS_TONES)
+    expect(new Set(tones).size).toBe(tones.length)
+  })
 })
 
 describe("MERCHANT_STATUS_LABELS", () => {

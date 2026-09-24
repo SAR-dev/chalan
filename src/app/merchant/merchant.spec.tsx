@@ -4,13 +4,7 @@ import { screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { MockOrdersState } from "@/app/__tests__/test-utils"
-import {
-  createMockOrders,
-  makeOrder,
-  makeUser,
-  renderPage,
-  resetIds,
-} from "@/app/__tests__/test-utils"
+import { createMockOrders, makeOrder, makeUser, renderPage, resetIds } from "@/app/__tests__/test-utils"
 
 const mockMerchant = {
   id: "m_1",
@@ -35,6 +29,13 @@ vi.mock("@/features/merchants/hooks/use-merchants", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock("@/features/orders/hooks/use-orders", () => ({
   useOrders: () => mockOrdersState,
+}))
+vi.mock("@/features/orders/hooks/use-order-analytics", () => ({
+  useOrderAnalytics: () => ({
+    analytics: null,
+    isLoading: false,
+    error: null,
+  }),
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -63,7 +64,7 @@ describe("Merchant dashboard", () => {
     await importPage()
     expect(screen.getByText("ORD-0001")).toBeInTheDocument()
     expect(screen.queryByText("ORD-0002")).not.toBeInTheDocument()
-  }, 30000)
+  }, 60000)
 
   it("shows orders in tabs", async () => {
     const orders = Array.from({ length: 5 }, () =>

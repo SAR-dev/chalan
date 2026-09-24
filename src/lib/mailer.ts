@@ -8,14 +8,14 @@
 //
 // Every fully-resolved send attempt (delivered, or all retries exhausted) is
 // recorded in the `email_log` table — this is the Admin/Super Admin "Email
-// logs" history. Failed sends are additionally stored in `failed_mail` as
-// before, for any future manual-resend tooling.
+// logs" history.
 
 import { eq } from "drizzle-orm"
 import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer"
 import { siteConfig } from "@/config/site"
+import { decryptSecret } from "@/lib/crypto"
 import { db, dbRead } from "@/lib/db"
-import { emailLog, failedMail, mailConfig } from "@/lib/db/schema"
+import { emailLog, mailConfig } from "@/lib/db/schema"
 
 export interface MailPayload {
   to: string | string[]
@@ -58,7 +58,7 @@ async function getSmtpConfig(): Promise<SmtpConfig> {
         port: Number(row.port),
         secure: row.secure,
         user: row.user,
-        pass: row.pass,
+        pass: decryptSecret(row.pass),
         fromEmail: row.fromEmail,
         fromName: row.fromName,
       }
@@ -204,21 +204,8 @@ export async function sendMail(
     }
   }
 
-  // All retries exhausted — persist to DB so it can be investigated / re-sent.
-  try {
-    await db.insert(failedMail).values({
-      to: Array.isArray(payload.to) ? payload.to.join(", ") : payload.to,
-      subject: payload.subject,
-      html: payload.html ?? null,
-      text: payload.text ?? null,
-      error: lastError?.message ?? "Unknown error",
-      attempts: totalAttempts,
-    })
-    console.error(`[mailer] Logged failed email to DB (to: ${payload.to})`)
-  } catch (dbErr) {
-    // Don't let a DB failure swallow the original mail error.
-    console.error("[mailer] Failed to log failed email to DB:", dbErr)
-  }
+  // All retries exhausted — the failed send is captured by email_log below
+  // with status "FAILED" (the standalone `failed_mail` table was dropped).
   await logEmail(
     payload,
     "FAILED",

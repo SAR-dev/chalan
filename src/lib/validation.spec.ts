@@ -6,6 +6,7 @@ import {
   formatError,
   idsSchema,
   isValidBdPhone,
+  merchantBrandingSchema,
   merchantPricingSchema,
   normalizePhone,
   orderCreateSchema,
@@ -309,37 +310,104 @@ describe("deliveryCityUpdateSchema", () => {
 })
 
 // ---------------------------------------------------------------------------
-// orderCreateSchema — deliveryCity required
+// orderCreateSchema — deliveryCityId required
 // ---------------------------------------------------------------------------
 
-describe("orderCreateSchema — deliveryCity", () => {
+describe("orderCreateSchema — deliveryCityId", () => {
   const validOrder = {
     pickupLocationId: "pl_1",
     recipientName: "John",
     recipientPhone: "01712345678",
     deliveryAddress: "Road 11, Banani",
-    deliveryCity: "Dhaka",
     deliveryCityId: "city_1",
     parcelWeightKg: 1,
     productCost: 500,
   }
 
-  it("accepts valid order with deliveryCity", () => {
+  it("accepts valid order with deliveryCityId", () => {
     const result = orderCreateSchema.safeParse(validOrder)
     expect(result.success).toBe(true)
   })
 
-  it("rejects order without deliveryCity", () => {
-    const { deliveryCity, ...withoutCity } = validOrder
-    const result = orderCreateSchema.safeParse(withoutCity)
+  it("rejects order without deliveryCityId", () => {
+    const { deliveryCityId, ...withoutCityId } = validOrder
+    const result = orderCreateSchema.safeParse(withoutCityId)
     expect(result.success).toBe(false)
   })
 
-  it("rejects order with empty deliveryCity", () => {
+  it("rejects order with empty deliveryCityId", () => {
     const result = orderCreateSchema.safeParse({
       ...validOrder,
-      deliveryCity: "",
+      deliveryCityId: "",
     })
     expect(result.success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// merchantBrandingSchema
+// ---------------------------------------------------------------------------
+
+describe("merchantBrandingSchema", () => {
+  it("accepts valid hex color", () => {
+    const result = merchantBrandingSchema.safeParse({ brandColor: "#f97316" })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts null values", () => {
+    const result = merchantBrandingSchema.safeParse({
+      logoUrl: null,
+      brandColor: null,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts all fields", () => {
+    const result = merchantBrandingSchema.safeParse({
+      logoUrl: "https://example.com/logo.png",
+      brandColor: "#10b981",
+      hidePlatformBranding: true,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts empty object (all optional)", () => {
+    const result = merchantBrandingSchema.safeParse({})
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects invalid hex without #", () => {
+    const result = merchantBrandingSchema.safeParse({ brandColor: "f97316" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects invalid hex too short", () => {
+    const result = merchantBrandingSchema.safeParse({ brandColor: "#fff" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects invalid hex too long", () => {
+    const result = merchantBrandingSchema.safeParse({ brandColor: "#1234567" })
+    expect(result.success).toBe(false)
+  })
+
+  it("accepts all valid preset colors", () => {
+    const presets = [
+      "#f97316",
+      "#2563eb",
+      "#10b981",
+      "#8b5cf6",
+      "#ef4444",
+      "#06b6d4",
+    ]
+    for (const color of presets) {
+      const result = merchantBrandingSchema.safeParse({ brandColor: color })
+      expect(result.success).toBe(true)
+    }
+  })
+
+  it("accepts uppercase hex", () => {
+    const result = merchantBrandingSchema.safeParse({ brandColor: "#F97316" })
+    expect(result.success).toBe(true)
   })
 })

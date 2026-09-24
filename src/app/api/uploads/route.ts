@@ -3,12 +3,8 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, serverError, unauthorized } from "@/lib/api-response"
 import { saveFile } from "@/lib/storage"
-import {
-  ALLOWED_IMAGE_TYPES,
-  MAX_UPLOAD_BYTES,
-  UPLOAD_FOLDERS,
-  type UploadFolder,
-} from "@/lib/storage/config"
+import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, UPLOAD_FOLDERS, type UploadFolder } from "@/lib/storage/config"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Accepts a single image file (multipart/form-data) and stores it, returning
 // the public URL. Any signed-in user may upload, since this backs avatars,
@@ -21,7 +17,7 @@ import {
 //   local — writes to disk, served via app/uploads/[...path]/route.ts
 //   r2    — uploads to Cloudflare R2, served from R2's public URL
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   let formData: FormData
   try {
     formData = await req.formData()
@@ -72,4 +68,4 @@ export async function POST(req: Request) {
   } catch {
     return serverError("Could not upload the image. Please try again.")
   }
-}
+})

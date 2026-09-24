@@ -5,11 +5,14 @@ import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
-import { profile, user, warehouse } from "@/lib/db/schema"
+import { profile, profileRoles, user, warehouse } from "@/lib/db/schema"
+import { enumValue } from "@/lib/db-helpers"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
+import type { TeamMember } from "@/lib/types"
 import { parseBody, teamCreateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -34,8 +37,9 @@ export async function GET(req: Request) {
   }
 
   const roleParam = new URL(req.url).searchParams.get("role")?.trim()
-  if (roleParam) {
-    where = and(where, eq(profile.role, roleParam as any))!
+  const role = enumValue(roleParam, profileRoles)
+  if (role) {
+    where = and(where, eq(profile.role, role))!
   }
 
   let q = dbRead
@@ -83,22 +87,20 @@ export async function GET(req: Request) {
     q,
   ])
 
-  const team = rows.map(
-    ({ profile: p, user: u }: { profile: any; user: any }) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: p.role,
-      phone: p.phone,
-      isActive: p.isActive,
-      warehouseId: p.warehouseId,
-    }),
-  )
+  const team: TeamMember[] = rows.map(({ profile: p, user: u }) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: p.role,
+    phone: p.phone,
+    isActive: p.isActive,
+    warehouseId: p.warehouseId,
+  }))
 
   return NextResponse.json(paginateResponse(team, count, limit, offset))
-}
+})
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -126,9 +128,8 @@ export async function POST(req: Request) {
       body: { name, email, password, role: newRole as "user" },
     })
   } catch (err) {
-    return badRequest(
-      err instanceof Error ? err.message : "Failed to create user",
-    )
+    console.error("[team] Failed to create user account:", err)
+    return badRequest("Failed to create the team member")
   }
 
   await db.insert(profile).values({
@@ -179,4 +180,4 @@ export async function POST(req: Request) {
     },
     { status: 201 },
   )
-}
+})

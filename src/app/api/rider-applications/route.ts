@@ -4,21 +4,18 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
-import { profile, rider, warehouse } from "@/lib/db/schema"
-import {
-  paginateResponse,
-  parsePagination,
-  parseSort,
-  parseStatusFilter,
-} from "@/lib/pagination"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { profile, rider, riderStatuses, warehouse } from "@/lib/db/schema"
+import { enumValues } from "@/lib/db-helpers"
+import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, riderApplySchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 // ---------------------------------------------------------------------------
 // POST — public rider application (no auth required)
 // ---------------------------------------------------------------------------
-export async function POST(req: Request) {
-  const limited = rateLimit(`rider-apply:${getClientIp(req)}`, 3, 60)
+export const POST = withErrorHandler(async (req: Request) => {
+  const limited = await rateLimitByIp(req, "rider-apply", 3, 60)
   if (limited) return limited
 
   const parsed = await parseBody(req, riderApplySchema)
@@ -65,9 +62,8 @@ export async function POST(req: Request) {
       body: { name, email, password, role: "RIDER" as "user" },
     })
   } catch (err) {
-    return badRequest(
-      err instanceof Error ? err.message : "Could not create user account",
-    )
+    console.error("[rider-applications] Failed to create user account:", err)
+    return badRequest("Could not create the rider account")
   }
 
   // Insert the rider row.
@@ -112,12 +108,12 @@ export async function POST(req: Request) {
     { message: "Application submitted successfully" },
     { status: 201 },
   )
-}
+})
 
 // ---------------------------------------------------------------------------
 // GET — list rider applications (admin only)
 // ---------------------------------------------------------------------------
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") {
@@ -135,9 +131,12 @@ export async function GET(req: Request) {
       )
     : undefined
 
-  const statuses = parseStatusFilter(req)
+  const statuses = parseStatusFilter(req, riderStatuses)
   if (statuses.length > 0) {
-    const statusClause = inArray(rider.status, statuses as any)
+    const statusClause = inArray(
+      rider.status,
+      enumValues<(typeof riderStatuses)[number]>(statuses),
+    )
     where = where ? and(where, statusClause) : statusClause
   }
 
@@ -194,4 +193,4 @@ export async function GET(req: Request) {
   const [[{ count }], rows] = await Promise.all([countQuery, q])
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
-}
+})

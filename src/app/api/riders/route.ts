@@ -3,12 +3,42 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
 import { dbRead } from "@/lib/db"
-import { rider } from "@/lib/db/schema"
+import { rider, riderTaskTypes } from "@/lib/db/schema"
+import { enumValue } from "@/lib/db-helpers"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
+
+  // Merchants never need the rider roster — keep the endpoint admin-facing.
+  if (me.role === "MERCHANT") {
+    return NextResponse.json(paginateResponse([], 0))
+  }
+
+  // Riders may only ever see their own record (hydrates the rider shell's
+  // "current rider"); the full roster is admin-only.
+  if (me.role === "RIDER") {
+    if (!me.riderId) {
+      return NextResponse.json(paginateResponse([], 0))
+    }
+    const [own] = await dbRead
+      .select({
+        id: rider.id,
+        name: rider.name,
+        phone: rider.phone,
+        zone: rider.zone,
+        taskType: rider.taskType,
+        warehouseId: rider.warehouseId,
+        isActive: rider.isActive,
+      })
+      .from(rider)
+      .where(eq(rider.id, me.riderId))
+      .limit(1)
+    const rows = own ? [own] : []
+    return NextResponse.json(paginateResponse(rows, rows.length))
+  }
 
   const { limit, offset } = parsePagination(req)
   const search = new URL(req.url).searchParams.get("q")?.trim()
@@ -37,7 +67,13 @@ export async function GET(req: Request) {
 
   let taskTypeFilter: ReturnType<typeof eq> | undefined
   if (taskTypeParam) {
-    taskTypeFilter = eq(rider.taskType, taskTypeParam as any)
+    const taskType = enumValue<(typeof riderTaskTypes)[number]>(
+      taskTypeParam,
+      riderTaskTypes,
+    )
+    if (taskType) {
+      taskTypeFilter = eq(rider.taskType, taskType)
+    }
   }
 
   const combine = (...clauses: (typeof searchClause | undefined)[]) =>
@@ -146,4 +182,4 @@ export async function GET(req: Request) {
   ])
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
-}
+})

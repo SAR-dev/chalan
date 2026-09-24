@@ -41,6 +41,9 @@ type Loosen<T> = Omit<T, NullableKeys<T>> & Partial<Pick<T, NullableKeys<T>>>
 // `enum` option is a Drizzle/TypeScript-only hint, not a runtime check.)
 export type Role = (typeof profile.$inferSelect)["role"]
 export type MerchantStatus = (typeof merchant.$inferSelect)["status"]
+export type MerchantBusinessType = NonNullable<
+  (typeof merchant.$inferSelect)["businessType"]
+>
 export type DeliveryType = (typeof order.$inferSelect)["deliveryType"]
 export type OrderStatus = (typeof order.$inferSelect)["status"]
 export type PayoutRequestStatus = (typeof payoutRequest.$inferSelect)["status"]
@@ -66,6 +69,16 @@ type JoinedUser = typeof user.$inferSelect &
 
 export type User = Loosen<JoinedUser>
 
+// Team roster list item. The team API and dashboard page project a narrow flat
+// row (id, name, email, role, phone, isActive, warehouseId) — NOT a full
+// joined `User`. This type is the honest shape of that projection so callers
+// don't have to cast the joined `User` (which requires extra fields like
+// createdAt / updatedAt that the projection never selects).
+export type TeamMember = Pick<
+  User,
+  "id" | "name" | "email" | "role" | "phone" | "isActive" | "warehouseId"
+>
+
 export type Warehouse = Loosen<typeof warehouse.$inferSelect>
 // `balance` is not a column on the merchant table — it comes from a LEFT JOIN
 // with merchant_balance in the list endpoint. It is optional so the type stays
@@ -77,7 +90,12 @@ export type Merchant = Loosen<typeof merchant.$inferSelect> & {
 }
 export type PickupLocation = Loosen<typeof pickupLocation.$inferSelect>
 export type Rider = Loosen<typeof rider.$inferSelect>
-export type Order = Loosen<typeof order.$inferSelect>
+export type Order = Loosen<typeof order.$inferSelect> & {
+  deliveryCity?: string | null
+  merchantPhone?: string | null
+  pickupLocationMapLink?: string | null
+  deliveryMapLink?: string | null
+}
 export type PayoutRequest = Loosen<typeof payoutRequest.$inferSelect>
 export type EmailLog = Loosen<typeof emailLog.$inferSelect>
 export type AuditLog = Loosen<typeof auditLog.$inferSelect>
@@ -99,6 +117,7 @@ export interface MerchantRegistrationInput {
   email: string
   phone: string
   address: string
+  businessType?: MerchantBusinessType
   password: string
 }
 
@@ -121,7 +140,6 @@ export interface CreateOrderInput {
   recipientName: string
   recipientPhone: string
   deliveryAddress: string
-  deliveryCity?: string | null
   deliveryCityId: string
   deliveryMapLink?: string | null
   parcelWeightKg: number
@@ -134,3 +152,39 @@ export type Announcement = Loosen<typeof announcement.$inferSelect>
 export type DeliveryCity = typeof deliveryCity.$inferSelect
 export type DeliveryZone = typeof deliveryZone.$inferSelect
 export type ZonePricing = typeof zonePricing.$inferSelect
+
+// --- Analytics types ---------------------------------------------------------
+
+export interface OrdersByDay {
+  date: string
+  count: number
+  revenue: number
+}
+
+export interface OrdersByStatus {
+  status: string
+  count: number
+}
+
+export interface DeliveryPerformance {
+  totalDelivered: number
+  totalFailed: number
+  totalReturned: number
+  successRate: number
+  avgDeliveryTimeHours: number
+}
+
+export interface CodSummary {
+  totalCollected: number
+  totalSettled: number
+  pendingSettlement: number
+  settledCount: number
+  pendingCount: number
+}
+
+export interface OrderAnalytics {
+  ordersByDay: OrdersByDay[]
+  ordersByStatus: OrdersByStatus[]
+  deliveryPerformance: DeliveryPerformance
+  codSummary: CodSummary
+}

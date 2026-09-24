@@ -12,8 +12,15 @@ export default async function RidersPage() {
 
   const limit = 20
 
-  const [[{ total }], rows, stats] = await Promise.all([
-    dbRead.select({ total: sql<number>`count(*)::int` }).from(rider),
+  const [[stats], rows] = await Promise.all([
+    dbRead
+      .select({
+        total: sql<number>`count(*)::int`,
+        active: sql<number>`count(*) filter (where ${rider.isActive})::int`,
+        delivery: sql<number>`count(*) filter (where ${rider.taskType} in ('DELIVERY', 'BOTH'))::int`,
+        pickup: sql<number>`count(*) filter (where ${rider.taskType} in ('PICKUP', 'BOTH'))::int`,
+      })
+      .from(rider),
     dbRead
       .select({
         id: rider.id,
@@ -47,25 +54,16 @@ export default async function RidersPage() {
       .leftJoin(warehouse, sql`${rider.warehouseId} = ${warehouse.id}`)
       .orderBy(rider.name)
       .limit(limit),
-    dbRead
-      .select({
-        isActive: rider.isActive,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(rider)
-      .groupBy(rider.isActive),
   ])
-
-  const statsMap = Object.fromEntries(
-    stats.map((s) => [String(s.isActive), s.count]),
-  )
 
   return (
     <RidersPageClient
       initialData={rows}
-      initialTotal={total}
+      initialTotal={stats?.total ?? 0}
       initialCounts={{
-        active: Number(statsMap.true ?? 0),
+        active: stats?.active ?? 0,
+        delivery: stats?.delivery ?? 0,
+        pickup: stats?.pickup ?? 0,
       }}
     />
   )

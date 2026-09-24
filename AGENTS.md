@@ -111,13 +111,18 @@ e2e/selectors.ts                    # Centralized data-testid selectors
 
 **Run:** `pnpm build` (manual) then `pnpm test:e2e`. Playwright config uses `pnpm start` — build must be done first.
 
-**Credentials (seeded):**
-- Super Admin: `admin01@email.com` / `admin123`
-- Warehouse Admin: `warehouse.admin01@email.com` / `warehouse123`
-- Merchant: `merchant1@app.com` / `merchant123`
-- Rider: `rider1@app.com` / `rider123`
+**Credentials (seeded — all passwords `12qwaszx`):**
+- Super Admin: `admin01@email.com` / `12qwaszx`
+- Warehouse Admin: `warehouse.admin01@email.com` / `12qwaszx`
+- Merchant: `merchant1@email.com` / `12qwaszx`
+- Rider: `rider1@email.com` / `12qwaszx`
 
-Selectors centralized in `e2e/selectors.ts` using `data-testid` attributes.
+**Selector policy:** use `data-testid` selectors wherever possible. Add a
+`data-testid` attribute to the component under test and a constant in
+`e2e/selectors.ts` before writing an assertion against it. `getByRole` /
+`getByText` are fallbacks only for elements that cannot carry a test id
+(headings, generic text) — never for buttons, inputs, rows, or dialogs that
+you can tag. When fixing or writing e2e tests, prefer/convert to test ids.
 
 ## Coding Patterns
 

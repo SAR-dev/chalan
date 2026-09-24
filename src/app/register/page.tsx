@@ -6,18 +6,23 @@ import { FormEvent, useState } from "react"
 import { FormErrors } from "@/components/form-errors"
 import { PublicFooter } from "@/components/public-footer"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-import { SiteIcon, siteConfig } from "@/config/site"
+import { siteConfig, SiteIcon } from "@/config/site"
 import { merchantRegisterSchema, validateFormData } from "@/lib/validation"
+
+const BUSINESS_TYPES = [
+  "E-commerce",
+  "Restaurant",
+  "Grocery",
+  "Pharmacy",
+  "Fashion",
+  "Electronics",
+  "Other",
+] as const
 
 interface FormState {
   businessName: string
@@ -25,6 +30,7 @@ interface FormState {
   email: string
   phone: string
   address: string
+  businessType: string
   password: string
 }
 
@@ -34,6 +40,7 @@ const EMPTY: FormState = {
   email: "",
   phone: "",
   address: "",
+  businessType: "",
   password: "",
 }
 
@@ -68,6 +75,7 @@ export default function RegisterPage() {
       email: form.email.trim(),
       phone: form.phone.trim(),
       address: form.address.trim(),
+      businessType: form.businessType,
       password: form.password,
     })
     if (Object.keys(fieldErrors).length > 0) {
@@ -87,6 +95,7 @@ export default function RegisterPage() {
           email: form.email.trim(),
           phone: form.phone.trim(),
           address: form.address.trim(),
+          businessType: form.businessType,
           password: form.password,
         }),
       })
@@ -225,6 +234,24 @@ export default function RegisterPage() {
                         onChange={(e) => update("businessName", e.target.value)}
                         required
                       />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="businessType">Business type</Label>
+                      <Select
+                        value={form.businessType}
+                        onValueChange={(v) => update("businessType", v ?? "")}
+                      >
+                        <SelectTrigger id="businessType" className="w-full">
+                          <SelectValue placeholder="Select a business type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BUSINESS_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="ownerName">Owner / contact name</Label>

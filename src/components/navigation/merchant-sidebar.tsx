@@ -10,6 +10,9 @@ export function MerchantSidebar() {
     <RoleSidebar
       config={MERCHANT_SIDEBAR}
       footerSubtitle={currentMerchant?.businessName}
+      logoUrl={currentMerchant?.logoUrl ?? undefined}
+      brandColor={currentMerchant?.brandColor ?? undefined}
+      hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}
     />
   )
 }

@@ -4,11 +4,7 @@ import { Loader2, Warehouse } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import {
-  CellTwoRow,
-  DataTable,
-  type DataTableColumn,
-} from "@/components/data-table"
+import { CellTwoRow, DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,7 +15,7 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { ChangeWarehouseDialog } from "@/features/team/dialogs/change-warehouse-dialog"
 import { CreateAccountDialog } from "@/features/team/dialogs/create-account-dialog"
 import { useTeam } from "@/features/team/hooks/use-team"
-import type { User } from "@/lib/types"
+import type { TeamMember } from "@/lib/types"
 
 const UNASSIGNED = "__unassigned__"
 
@@ -29,7 +25,7 @@ function StatusToggle({
   loading,
   isSelf,
 }: {
-  user: User
+  user: TeamMember
   onToggle: () => void
   loading?: boolean
   isSelf?: boolean
@@ -66,7 +62,7 @@ export function TeamPageClient({
   initialTotal,
   initialWarehouses,
 }: {
-  initialData: User[]
+  initialData: TeamMember[]
   initialTotal: number
   initialWarehouses: { id: string; name: string; city: string }[]
 }) {
@@ -86,7 +82,7 @@ export function TeamPageClient({
   } = useTeam({ initialData, initialTotal })
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false)
-  const [warehouseUser, setWarehouseUser] = useState<User | null>(null)
+  const [warehouseUser, setWarehouseUser] = useState<TeamMember | null>(null)
   const [selectedWarehouseId, setSelectedWarehouseId] =
     useState<string>(UNASSIGNED)
   const [warehouseSaving, setWarehouseSaving] = useState(false)
@@ -103,14 +99,14 @@ export function TeamPageClient({
     return initialWarehouses.find((w) => w.id === id)?.name ?? "Unknown"
   }
 
-  async function handleToggleActive(user: User) {
+  async function handleToggleActive(user: TeamMember) {
     setTogglingId(user.id)
     await toggleAccountActive(user.id)
     toast.success(`${user.name} ${user.isActive ? "disabled" : "enabled"}.`)
     setTogglingId(null)
   }
 
-  function openWarehouseDialog(user: User) {
+  function openWarehouseDialog(user: TeamMember) {
     setWarehouseUser(user)
     setSelectedWarehouseId(user.warehouseId ?? UNASSIGNED)
     setWarehouseDialogOpen(true)
@@ -135,7 +131,7 @@ export function TeamPageClient({
     setWarehouseDialogOpen(false)
   }
 
-  const columns: DataTableColumn<User>[] = [
+  const columns: DataTableColumn<TeamMember>[] = [
     {
       id: "name",
       header: "Name",

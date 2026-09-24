@@ -23,5 +23,11 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
+    // Better Auth's rate limiter (max: 10/min against get-session in production)
+    // gets exhausted by the suite's many logins/session checks, causing auth
+    // bootstrap to fail and shells to bounce back to /login. Disable for e2e.
+    env: {
+      AUTH_RATE_LIMIT_DISABLED: "1",
+    },
   },
 })

@@ -4,9 +4,9 @@ import { deliveryZone } from "@/lib/db/schema"
 import { log } from "./helpers"
 
 const ZONES = [
-  { id: "seed_zone_dhaka", name: "Dhaka Metro" },
-  { id: "seed_zone_divisional", name: "Divisional Cities" },
-  { id: "seed_zone_remote", name: "Remote Areas" },
+  { id: "DZ-100001E", name: "Dhaka Metro" },
+  { id: "DZ-100002E", name: "Divisional Cities" },
+  { id: "DZ-100003E", name: "Remote Areas" },
 ]
 
 export async function seedDeliveryZones() {

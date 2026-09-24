@@ -1,29 +1,16 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  or,
-  sql,
-} from "drizzle-orm"
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
-import { merchant, order, payoutRequest } from "@/lib/db/schema"
-import {
-  paginateResponse,
-  parsePagination,
-  parseSort,
-  parseStatusFilter,
-} from "@/lib/pagination"
-import { getClientIp, rateLimit } from "@/lib/rate-limit"
+import { merchant, order, payoutRequest, payoutRequestStatuses } from "@/lib/db/schema"
+import { enumValues } from "@/lib/db-helpers"
+import { paginateResponse, parsePagination, parseSort, parseStatusFilter } from "@/lib/pagination"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, payoutCreateSchema } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
@@ -42,13 +29,19 @@ export async function GET(req: Request) {
     searchClause = or(...conditions)
   }
 
-  const statuses = parseStatusFilter(req)
+  const statuses = parseStatusFilter(req, payoutRequestStatuses)
 
   if (me.role === "MERCHANT" && me.merchantId) {
     let where = eq(payoutRequest.merchantId, me.merchantId)
     if (searchClause) where = and(where, searchClause)!
     if (statuses.length > 0)
-      where = and(where, inArray(payoutRequest.status, statuses as any))!
+      where = and(
+        where,
+        inArray(
+          payoutRequest.status,
+          enumValues<(typeof payoutRequestStatuses)[number]>(statuses),
+        ),
+      )!
 
     let q = dbRead
       .select({
@@ -111,7 +104,10 @@ export async function GET(req: Request) {
     where = where ? and(where, searchClause) : searchClause
   }
   if (statuses.length > 0) {
-    const statusClause = inArray(payoutRequest.status, statuses as any)
+    const statusClause = inArray(
+      payoutRequest.status,
+      enumValues<(typeof payoutRequestStatuses)[number]>(statuses),
+    )
     where = where ? and(where, statusClause) : statusClause
   }
 
@@ -160,16 +156,16 @@ export async function GET(req: Request) {
   ])
 
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
-}
+})
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can request payouts")
   }
 
-  const limited = rateLimit(`payouts:${getClientIp(req)}`, 10, 60)
+  const limited = await rateLimitByIp(req, "payouts", 10, 60)
   if (limited) return limited
 
   const parsed = await parseBody(req, payoutCreateSchema)
@@ -227,4 +223,4 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json(newRequest, { status: 201 })
-}
+})

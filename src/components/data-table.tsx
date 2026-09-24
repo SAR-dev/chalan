@@ -28,19 +28,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAuth } from "@/features/account/hooks/use-auth"
-import {
-  DEFAULT_TABLE_ROWS_PER_PAGE,
-  MAX_TABLE_ROWS_PER_PAGE,
-} from "@/lib/constants"
+import { DEFAULT_TABLE_ROWS_PER_PAGE, MAX_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { downloadCsv, toCsv } from "@/lib/csv"
 import { cn } from "@/lib/utils"
 
@@ -862,6 +852,7 @@ export function DataTable<T>({
             <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               data-testid={id ? `table-search-${id}` : undefined}
+              aria-label="Search"
               placeholder="Search..."
               value={serverPaginated ? (controlledQuery ?? "") : searchQuery}
               onChange={(e) => {

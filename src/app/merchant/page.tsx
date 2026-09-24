@@ -1,26 +1,14 @@
 "use client"
 
-import {
-  AlertCircle,
-  Ban,
-  ExternalLink,
-  Package,
-  PackagePlus,
-  Wallet,
-} from "lucide-react"
+import { AlertCircle, Ban, ExternalLink, Package, PackagePlus, Wallet } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
+import { AreaChart, PieChart } from "@/components/charts"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
@@ -30,6 +18,7 @@ import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
+import { useOrderAnalytics } from "@/features/orders/hooks/use-order-analytics"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
@@ -49,6 +38,7 @@ export default function MerchantOverviewPage() {
   const { currentUser } = useAuth()
   const { currentMerchant } = useMerchants()
   const { orders, isLoading } = useOrders()
+  const { analytics, isLoading: analyticsLoading } = useOrderAnalytics()
 
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -260,6 +250,44 @@ export default function MerchantOverviewPage() {
           },
         ]}
       />
+
+      {/* Analytics Charts */}
+      {analytics && analytics.ordersByDay.length > 0 && (
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Orders over time</CardTitle>
+              <CardDescription>Daily order volume</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AreaChart
+                data={analytics.ordersByDay.map((d) => ({
+                  label: d.date,
+                  value: d.count,
+                }))}
+                height={200}
+                loading={analyticsLoading}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Order status</CardTitle>
+              <CardDescription>Current distribution</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PieChart
+                data={analytics.ordersByStatus.map((d) => ({
+                  name: d.status,
+                  value: d.count,
+                }))}
+                height={200}
+                loading={analyticsLoading}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-center justify-between">

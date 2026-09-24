@@ -1,46 +1,21 @@
 import { expect, test } from "@playwright/test"
+import { CREDS, login } from "../helpers"
 
-// ─── Credentials ─────────────────────────────────────────────────────────────
-const CREDS = {
-  superAdmin: {
-    email: "admin01@email.com",
-    password: "admin123",
-    home: "/dashboard",
-  },
-  warehouseAdmin: {
-    email: "warehouse.admin01@email.com",
-    password: "warehouse123",
-    home: "/warehouse",
-  },
-  merchant: {
-    email: "merchant1@app.com",
-    password: "merchant123",
-    home: "/merchant",
-  },
-  rider: { email: "rider1@app.com", password: "rider123", home: "/rider" },
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-async function login(page: any, cred: typeof CREDS.superAdmin) {
-  await page.goto("/login")
-  await page.locator("[data-testid='login-email']").fill(cred.email)
-  await page.locator("[data-testid='login-password']").fill(cred.password)
-  // Submit form via JS to avoid DOM detachment
-  await page.evaluate(() => {
-    const form = document.querySelector("form")
-    if (form) {
-      const submitBtn = form.querySelector('button[type="submit"]')
-      if (submitBtn) (submitBtn as HTMLButtonElement).click()
-    }
-  })
-  await page.waitForURL(cred.home, { timeout: 15_000 })
-  await page.waitForLoadState("networkidle")
+/** Skip onboarding if the merchant landed on /welcome */
+async function skipOnboardingIfNeeded(page: any) {
+  if (page.url().includes("/welcome")) {
+    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
+    await page.waitForLoadState("networkidle")
+  }
 }
 
 // ─── S1. Full Order Lifecycle ────────────────────────────────────────────────
 test.describe("S1. Full Order Lifecycle", () => {
   test("merchant creates order → admin views orders", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
+
     await page.goto("/merchant/orders/new")
     await page.waitForLoadState("networkidle")
 
@@ -211,6 +186,7 @@ test.describe("S9. Team Management", () => {
 test.describe("Merchant Dashboard", () => {
   test("merchant can access all sections", async ({ page }) => {
     await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/finance")
     await page.waitForLoadState("networkidle")

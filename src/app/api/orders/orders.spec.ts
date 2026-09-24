@@ -4,7 +4,7 @@ import { GET as getOrder } from "./[id]/route"
 import { POST as bulkCreate } from "./bulk/route"
 import { GET as orderCounts } from "./counts/route"
 import { GET as payableOrders } from "./payable/route"
-import { POST as createOrder, GET as listOrders } from "./route"
+import { GET as listOrders, POST as createOrder } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
@@ -19,6 +19,7 @@ vi.mock("@/lib/audit", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: () => (rateLimited ? ({ status: 429 } as Response) : null),
+  rateLimitByIp: () => (rateLimited ? ({ status: 429 } as Response) : null),
   getClientIp: () => "127.0.0.1",
 }))
 
@@ -203,7 +204,7 @@ describe("POST /api/orders", () => {
   it("creates order with warehouse routing", async () => {
     sessionState.value = merchant
     selectQueue.push(
-      [{ warehouseId: "wh_hub" }], // pickup location
+      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
       [{ id: "wh_hub", isActive: true }], // warehouse hub
       [
         {

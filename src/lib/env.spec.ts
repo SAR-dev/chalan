@@ -24,6 +24,7 @@ const OPTIONAL_VARS = [
   "SUPABASE_SERVICE_KEY",
   "SUPABASE_BUCKET",
   "SUPABASE_PUBLIC_URL",
+  "SMTP_SECRET_KEY",
 ]
 
 function allKeys() {
@@ -109,6 +110,30 @@ describe("validateEnv", () => {
     setEnv({
       ...baseEnv(),
       DATABASE_URL_READ_ONLY: "postgres://readonly/mydb",
+    })
+    expect(validateEnv()).toBeUndefined()
+  })
+
+  it("accepts a valid SMTP_SECRET_KEY", () => {
+    setEnv({ ...baseEnv(), SMTP_SECRET_KEY: "a".repeat(64) })
+    expect(validateEnv()).toBeUndefined()
+  })
+
+  it("rejects a malformed SMTP_SECRET_KEY in any env", () => {
+    setEnv({ ...baseEnv(), SMTP_SECRET_KEY: "not-hex-secret" })
+    expect(() => validateEnv()).toThrow("SMTP_SECRET_KEY")
+  })
+
+  it("requires SMTP_SECRET_KEY when NEXT_PUBLIC_ENV=production", () => {
+    setEnv({ ...baseEnv(), NEXT_PUBLIC_ENV: "production" })
+    expect(() => validateEnv()).toThrow("SMTP_SECRET_KEY")
+  })
+
+  it("accepts a valid SMTP_SECRET_KEY in production", () => {
+    setEnv({
+      ...baseEnv(),
+      NEXT_PUBLIC_ENV: "production",
+      SMTP_SECRET_KEY: "b".repeat(64),
     })
     expect(validateEnv()).toBeUndefined()
   })

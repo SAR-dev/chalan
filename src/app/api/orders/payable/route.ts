@@ -1,30 +1,25 @@
-import { and, eq, isNull, sql } from "drizzle-orm"
+import { and, eq, gte, isNull, lte, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
-import { order } from "@/lib/db/schema"
-import { paginateResponse } from "@/lib/pagination"
+import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
+import { deliveryCity, order } from "@/lib/db/schema"
+import { paginateResponse, parsePagination } from "@/lib/pagination"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
 const listColumns = {
-  id: order.id,
-  merchantId: order.merchantId,
-  recipientName: order.recipientName,
-  deliveryCity: order.deliveryCity,
-  productCost: order.productCost,
-  merchantEarnings: order.merchantEarnings,
-  status: order.status,
-  codSettledAt: order.codSettledAt,
+  ...ORDER_CORE_COLUMNS,
   deliveredAt: order.deliveredAt,
-  createdAt: order.createdAt,
 }
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
   const url = new URL(req.url)
   const requestedMerchantId = url.searchParams.get("merchantId")?.trim()
+  const { limit, offset } = parsePagination(req)
 
   // Merchants can only ever see their own payable orders — a merchantId in
   // the query string must not let them (or any other non-admin role) read
@@ -46,17 +41,46 @@ export async function GET(req: Request) {
     return NextResponse.json(paginateResponse([], 0))
   }
 
-  const where = and(
+  const conditions = [
     eq(order.merchantId, merchantId),
-    eq(order.status, "DELIVERED" as any),
+    eq(order.status, "DELIVERED"),
     sql`${order.codSettledAt} is not null`,
     isNull(order.payoutRequestId),
-  )
+  ]
+  const from = url.searchParams.get("from")
+  const to = url.searchParams.get("to")
+  if (from)
+    conditions.push(gte(order.deliveredAt, new Date(from).toISOString()))
+  if (to) {
+    const end = new Date(to)
+    end.setHours(23, 59, 59, 999)
+    conditions.push(lte(order.deliveredAt, end.toISOString()))
+  }
+  const where = and(...conditions)
 
-  const [[{ count }], rows] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(order).where(where),
-    db.select(listColumns).from(order).where(where),
+  let rowsQuery = db
+    .select(listColumns)
+    .from(order)
+    .leftJoin(deliveryCity, eq(order.deliveryCityId, deliveryCity.id))
+    .where(where)
+    .$dynamic()
+  if (limit !== undefined) {
+    rowsQuery = rowsQuery.limit(limit).offset(offset ?? 0)
+  }
+
+  const [[{ count, totalEarnings }], rows] = await Promise.all([
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        totalEarnings: sql<number>`coalesce(sum(${order.merchantEarnings}), 0)`,
+      })
+      .from(order)
+      .where(where),
+    rowsQuery,
   ])
 
-  return NextResponse.json(paginateResponse(rows, count))
-}
+  return NextResponse.json({
+    ...paginateResponse(rows, count, limit, offset),
+    totalEarnings: Number(totalEarnings ?? 0),
+  })
+})

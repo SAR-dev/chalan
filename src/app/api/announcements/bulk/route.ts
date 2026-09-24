@@ -6,8 +6,9 @@ import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { announcement } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
+import { withErrorHandler } from "@/lib/with-error-handler"
 
-export async function DELETE(req: Request) {
+export const DELETE = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
@@ -32,15 +33,17 @@ export async function DELETE(req: Request) {
     ),
   )
 
-  for (const a of existing) {
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "ANNOUNCEMENT_DELETED",
-      entityType: "announcement",
-      entityId: a.id,
-      description: `Deleted announcement "${a.title}"`,
-    })
-  }
+  await Promise.all(
+    existing.map((a) =>
+      logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "ANNOUNCEMENT_DELETED",
+        entityType: "announcement",
+        entityId: a.id,
+        description: `Deleted announcement "${a.title}"`,
+      }),
+    ),
+  )
 
   return NextResponse.json({ ok: true, count: existing.length })
-}
+})

@@ -10,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 
 // =============================================================================
@@ -300,6 +301,21 @@ export const merchant = pgTable(
     email: text("email").notNull(),
     phone: text("phone").notNull(),
     address: text("address").notNull(),
+    businessType: text("businessType", {
+      enum: [
+        "E-commerce",
+        "Restaurant",
+        "Grocery",
+        "Pharmacy",
+        "Fashion",
+        "Electronics",
+        "Other",
+      ],
+    })
+      .notNull()
+      .default("Other"),
+    // Onboarding — set when merchant completes the setup wizard.
+    onboardingCompletedAt: ts("onboardingCompletedAt"),
     status: text("status", { enum: merchantStatuses })
       .notNull()
       .default("PENDING"),
@@ -333,12 +349,21 @@ export const merchant = pgTable(
     nidRejectedAt: ts("nidRejectedAt"),
     nidRejectedBy: text("nidRejectedBy"),
     nidRejectionReason: text("nidRejectionReason"),
+    // Branding — merchant-specific customizations for white-label display.
+    logoUrl: text("logoUrl"),
+    brandColor: text("brandColor"),
+    hidePlatformBranding: boolean("hidePlatformBranding")
+      .notNull()
+      .default(false),
     createdAt: ts("createdAt").notNull().defaultNow(),
     updatedAt: ts("updatedAt").notNull().defaultNow(),
   },
   (t) => [
     index("merchant_status_idx").on(t.status),
     index("merchant_created_at_idx").on(t.createdAt),
+    // `user.email` is unique; the merchant link must be too or a
+    // check-then-insert race can create duplicate merchant rows per email.
+    uniqueIndex("merchant_email_unique").on(t.email),
     index("merchant_email_verified_at_idx").on(t.emailVerifiedAt),
     index("merchant_nid_submitted_at_idx").on(t.nidSubmittedAt),
     index("merchant_nid_verified_at_idx").on(t.nidVerifiedAt),
@@ -567,7 +592,6 @@ export const order = pgTable(
     recipientName: text("recipientName").notNull(),
     recipientPhone: text("recipientPhone").notNull(),
     deliveryAddress: text("deliveryAddress").notNull(),
-    deliveryCity: text("deliveryCity"),
     deliveryCityId: text("deliveryCityId").references(() => deliveryCity.id, {
       onDelete: "set null",
     }),
@@ -656,6 +680,9 @@ export const order = pgTable(
   },
   (t) => [
     // Role-scoped list queries (most common access pattern)
+    index("order_merchant_id_idx").on(t.merchantId),
+    index("order_warehouse_id_idx").on(t.warehouseId),
+    index("order_delivery_city_id_idx").on(t.deliveryCityId),
     index("order_pickup_rider_id_idx").on(t.pickupRiderId),
     index("order_delivery_rider_id_idx").on(t.deliveryRiderId),
     index("order_pickup_location_id_idx").on(t.pickupLocationId),
@@ -689,26 +716,12 @@ export const order = pgTable(
 )
 
 // =============================================================================
-// Failed mail log
+// Failed mail log — REMOVED
 //
-// A row is inserted whenever sendMail() exhausts all retries without success.
-// Useful for debugging delivery failures and manual re-sending.
+// `failed_mail` was a write-only table inserted by `mailer.ts` and never read
+// (superseded by `email_log`, which records failed sends with
+// `status = 'FAILED'`). Dropped in favour of email_log — see the 2026-09 audit.
 // =============================================================================
-
-export const failedMail = pgTable("failed_mail", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  to: text("to").notNull(), // comma-joined if multiple recipients
-  subject: text("subject").notNull(),
-  html: text("html"),
-  text: text("text"),
-  error: text("error").notNull(), // lastError.message
-  attempts: integer("attempts").notNull(), // total attempts made (retries + 1)
-  failedAt: ts("failedAt").notNull().defaultNow(),
-  createdAt: ts("createdAt").notNull().defaultNow(),
-  updatedAt: ts("updatedAt").notNull().defaultNow(),
-})
 
 // =============================================================================
 // Email log
@@ -910,21 +923,28 @@ export const mailConfig = pgTable("mail_config", {
 // Each city belongs to a zone (for pricing) and routes to a warehouse.
 // =============================================================================
 
-export const deliveryCity = pgTable("delivery_city", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  name: text("name").notNull().unique(),
-  zoneId: text("zoneId")
-    .notNull()
-    .references(() => deliveryZone.id, { onDelete: "restrict" }),
-  warehouseId: text("warehouseId")
-    .notNull()
-    .references(() => warehouse.id, { onDelete: "restrict" }),
-  isActive: boolean("isActive").notNull().default(true),
-  createdAt: ts("createdAt").notNull().defaultNow(),
-  updatedAt: ts("updatedAt").notNull().defaultNow(),
-})
+export const deliveryCity = pgTable(
+  "delivery_city",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    name: text("name").notNull().unique(),
+    zoneId: text("zoneId")
+      .notNull()
+      .references(() => deliveryZone.id, { onDelete: "restrict" }),
+    warehouseId: text("warehouseId")
+      .notNull()
+      .references(() => warehouse.id, { onDelete: "restrict" }),
+    isActive: boolean("isActive").notNull().default(true),
+    createdAt: ts("createdAt").notNull().defaultNow(),
+    updatedAt: ts("updatedAt").notNull().defaultNow(),
+  },
+  (t) => [
+    index("delivery_city_zone_id_idx").on(t.zoneId),
+    index("delivery_city_warehouse_id_idx").on(t.warehouseId),
+  ],
+)
 
 // =============================================================================
 // Delivery zones
