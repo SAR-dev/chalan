@@ -1,40 +1,5 @@
 import { expect, test } from "@playwright/test"
-
-// ─── Credentials ─────────────────────────────────────────────────────────────
-const CREDS = {
-  superAdmin: {
-    email: "admin01@email.com",
-    password: "admin123",
-    home: "/dashboard",
-  },
-  warehouseAdmin: {
-    email: "warehouse.admin01@email.com",
-    password: "warehouse123",
-    home: "/warehouse",
-  },
-  merchant: {
-    email: "merchant1@app.com",
-    password: "merchant123",
-    home: "/merchant",
-  },
-  rider: { email: "rider1@app.com", password: "rider123", home: "/rider" },
-}
-
-async function login(page: any, cred: typeof CREDS.superAdmin) {
-  // Ensure a fresh session: a prior login in the same test would otherwise make
-  // the login page redirect an already-authed user away before submission.
-  await page.context().clearCookies()
-  await page.goto("/login")
-  await page.locator("[data-testid='login-email']").fill(cred.email)
-  await page.waitForTimeout(300)
-  await page.locator("[data-testid='login-password']").fill(cred.password)
-  await page.waitForTimeout(300)
-  await page.locator("[data-testid='login-password']").press("Enter")
-  await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
-    timeout: 15_000,
-  })
-  await page.waitForLoadState("networkidle")
-}
+import { CREDS, login } from "../helpers"
 
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {

@@ -2411,20 +2411,21 @@ Current specs:
 | `src/app/api/announcements/announcements.spec.ts`       | 14    | List, create, active, update, delete                                                   |
 | `src/app/api/audit-logs/audit-logs.spec.ts`             | 3     | List (admin only)                                                                      |
 | `src/app/api/cron/cron.spec.ts`                         | 6     | Session, audit-log, and email-log cleanup cron jobs                                    |
+| `src/app/api/delivery-cities/delivery-cities.spec.ts`   | 17    | List, create, update, delete                                                           |
 | `src/app/api/email-logs/email-logs.spec.ts`             | 7     | List, mark failed as sent                                                              |
 | `src/app/api/health/health.spec.ts`                     | 1     | Health check                                                                           |
-| `src/app/api/merchants/merchants.spec.ts`               | 42    | List, create, profile, approve, suspend, reactivate, pricing, balance, payment, adjust |
+| `src/app/api/merchants/merchants.spec.ts`               | 72    | List, create, profile, approve, suspend, reactivate, pricing, balance, payment, adjust |
 | `src/app/api/orders/orders.spec.ts`                     | 24    | List, create, bulk create, counts, payable, detail, receiver note                      |
 | `src/app/api/orders/[id]/transitions.spec.ts`           | 60    | All 12 order transitions end-to-end                                                    |
+| `src/app/api/orders/bulk/settle-cod/settle-cod.spec.ts` | 9     | Bulk COD settlement                                                                    |
 | `src/app/api/payouts/payouts.spec.ts`                   | 18    | List, create, approve, mark paid, reject                                               |
-| `src/app/api/pickup-locations/pickup-locations.spec.ts` | 11    | List, create, update, delete                                                           |
-| `src/app/api/rider-applications/rider-applications.spec.ts` | 11 | List, approve, reject                                                               |
-| `src/app/api/riders/riders.spec.ts`                     | 25    | List, create, detail, update, toggle active                                            |
-| `src/app/api/riders/[id]/cash/cash.spec.ts`             | 6     | Cash summary, submit, confirm                                                          |
-| `src/app/api/team/team.spec.ts`                         | 18    | List, create, toggle active, pricing permission, warehouse assignment                  |
+| `src/app/api/pickup-locations/pickup-locations.spec.ts` | 16    | List (role-scoped), create, update, delete                                             |
+| `src/app/api/rider-applications/rider-applications.spec.ts` | 21 | List, approve, reject                                                               |
+| `src/app/api/riders/riders.spec.ts`                     | 21    | List, create, detail, update, toggle active                                            |
+| `src/app/api/team/team.spec.ts`                         | 14    | List, create, toggle active, pricing permission, warehouse assignment                  |
 | `src/app/api/uploads/uploads.spec.ts`                   | 3     | File upload                                                                            |
-| `src/app/api/users/me/me.spec.ts`                       | 2     | Get and update current user profile                                                    |
-| `src/app/api/warehouses/warehouses.spec.ts`             | 22    | List, create, detail, update, delete                                                   |
+| `src/app/api/users/me/me.spec.ts`                       | 3     | Get and update current user profile                                                    |
+| `src/app/api/warehouses/warehouses.spec.ts`             | 24    | List, create, detail, update, delete                                                   |
 | `src/components/data-table.spec.tsx`                    | 19    | DataTable rendering, column visibility, and bulk selection                             |
 | `src/lib/csv.spec.ts`                                   | 9     | CSV generation helpers                                                                 |
 | `src/lib/pricing.spec.ts`                               | 15    | Delivery charge calculations                                                           |
@@ -2447,183 +2448,114 @@ E2E tests live in `e2e/specs/` and run with Playwright against a real browser.
 
 ```
 e2e/
-  seed-data.ts          # entity IDs, credentials, expected values — re-exports from seed-content.ts
-  seed.ts               # inserts E2E-specific entities with stable IDs (run after main seed)
-  selectors.ts          # CSS + text selectors for every page element
-  api-helpers.ts        # helpers for API-driven test setup (findFirst, createOrder, …)
-  auth.setup.ts         # per-role login + storage state fixture
-  fixtures.ts           # test fixtures (role storage paths, shared state)
-  .auth/                # per-role storage state (gitignored)
+  helpers.ts             # shared CREDS + login() (cookie reset → fill → waitForURL)
+  selectors.ts           # data-testid selectors, grouped by domain
   specs/
-    a-auth.spec.ts              # ✅ 7  — login, logout, role gating
-    auth.spec.ts                # ✅ 7  — duplicate auth spec (same tests as a-auth)
-    b-order-lifecycle.spec.ts   # ✅ 9  — create → approve → assign → pickup → receive → dispatch → deliver
-    c-order-exceptions.spec.ts  # ✅ 2  — cancel pending/approved orders
-    d-admin-dashboard.spec.ts   # ✅ 4  — merchant list, approve, suspend, pricing
-    e-payouts.spec.ts           # ✅ 2  — admin view, super-admin approve payout
-    h-admin-ops.spec.ts         # ✅ 10 — orders filter, cancel, team CRUD, warehouse/rider CRUD, security config, audit/email logs
-    i-merchant-finance.spec.ts  # ✅ 2  — finance page, submit payment dialog
-    j-announcements.spec.ts     # ✅ 5  — create, toggle, edit, delete, merchant banner
-    k-public-pages.spec.ts      # ✅ 8  — landing, register, track, terms, privacy, login
-    l-admin-dashboard-overview.spec.ts   # ✅ 2  — stat cards, quick-action links
-    m-merchant-business.spec.ts          # ✅ 2  — edit business name, add pickup shop
-    n-warehouse-exceptions.spec.ts       # ✅ 3  — view, reattempt, return to sender
-    o-account-settings.spec.ts           # ✅ 3  — admin/merchant/rider profile update
-    p-announcements-inbox.spec.ts        # ✅ 3  — admin DataTable, merchant/rider inbox
-    q-rider-applications.spec.ts         # ✅ 5  — submit application, admin list/approve/reject, no actions for non-pending
+    01-core-flows.spec.ts       # login per role, order lifecycle, warehouse/rider flows
+    02-business-flows.spec.ts   # order ops, warehouse dispatch/intake/exceptions
+    03-onboarding.spec.ts       # merchant onboarding + registration gate
+    04-branding.spec.ts         # merchant branding settings
 ```
 
-**79 tests total** across 16 spec files.
+**46 tests total** across 4 spec files.
 
 #### Configuration
 
-See [`playwright.config.ts`](./playwright.config.ts). The `webServer` runs:
-`tsx e2e/seed.ts && pnpm start` — cleans the DB, seeds all base + E2E entities,
-then starts the production server.
+See [`playwright.config.ts`](./playwright.config.ts). The `webServer` runs a bare
+`pnpm start` — **it does not reseed the database**, so the DB must already contain
+the deterministic seed data (see T4 in `ROADMAP.md` for this known gap).
 
-- **Build required:** `pnpm build` once before first test run (re-build after
-  app code changes). Test-only changes (`.spec.ts`, `selectors.ts`) need no build.
-- **Reporters:** Built-in HTML reporter (`playwright-report/`). Open the report
-  with `pnpm exec playwright show-report`.
-- **Env overrides:** `AUTH_RATE_LIMIT_DISABLED=1` (prevents Better Auth rate
-  limit from blocking `getSession()`), `MAIL_DISABLED=1` (skips SMTP sends).
+- **Build required:** `pnpm build` before the first run (rebuild after app code
+  changes). Test-only changes (`*.spec.ts`, `selectors.ts`, `helpers.ts`) need no
+  rebuild.
+- **Single project:** `chromium`, `workers: 1`, `fullyParallel: false`.
+- **Reporter:** `list` (`playwright-report/` is not generated by default).
+- **Env overrides:** `AUTH_RATE_LIMIT_DISABLED=1` only — Better Auth's limiter
+  otherwise starves the suite's repeated `getSession` calls and bounces shells
+  back to `/login`. `MAIL_DISABLED` is **not** set by the config.
 - **Windows + Turbopack:** Set `NEXT_DISABLE_TYPED_ROUTES=1` in `.env`.
 
-#### Auth setup
+#### Credentials
 
-The `setup` Playwright project logs in as each role and saves per-role storage
-state. The `chromium` project depends on `setup` so every test starts
-pre-authenticated:
+There is **no** storage-state project and **no** `auth.setup.ts`. Every test signs
+in through the UI via the shared `login()` helper, which clears cookies first
+(a second login in the same test would otherwise be redirected away by the
+already-authed login page).
 
-| Storage file           | Email               | Password            |
-| ---------------------- | ------------------- | ------------------- |
-| `admin.json`           | `admin02@email.com`    | `admin123`          |
-| `warehouse-admin.json` | `warehouse.admin01@email.com`     | `warehouse123`      |
-| `merchant1.json`       | `merchant1@app.com` | `merchant123`       |
-| `rider1.json`          | `rider1@app.com`    | `rider123`          |
-| `super-admin.json`     | (from seed-content) | (from seed-content) |
+| Role           | Email                        | Password       |
+| -------------- | ---------------------------- | -------------- |
+| Super admin    | `admin01@email.com`          | `admin123`     |
+| Warehouse admin| `warehouse.admin01@email.com`| `warehouse123` |
+| Merchant       | `merchant1@app.com`          | `merchant123`  |
+| Rider          | `rider1@app.com`             | `rider123`     |
+| Demo merchant  | `demo@kikuya.com`            | `demo123`      |
+
+These mirror `src/lib/db/seed/seed-content.ts`. If you seed with
+`SEED_SUPER_ADMIN_PASSWORD` set, the super-admin password differs from the table.
 
 #### Three core principles
 
 1. **Deterministic seed data** (`src/lib/db/seed/seed-content.ts`) — every entity
-   has a stable ID and predictable values. No faker, no randomness.
-   `e2e/seed-data.ts` re-exports from this single source of truth — tests never
-   hardcode emails, passwords, order codes, or entity IDs.
+   has a stable ID and predictable values. No faker, no randomness. `helpers.ts`
+   re-exports the credentials the suite needs.
 
-2. **Complete selectors** (`e2e/selectors.ts`) — every page element, dialog,
-   table cell, and action button has a named constant in `selectors.ts`. Add a
-   selector before writing a test against a new page.
+2. **Prefer named selectors** (`e2e/selectors.ts`) — add a constant before
+   writing a test against a new page. (Coverage is partial today; inline
+   `page.getByTestId(...)` / `page.getByRole(...)` calls are also acceptable.)
 
 3. **Independent tests** — each test sets up its own preconditions via
-   `page.request`. No test depends on the outcome of another test. Authenticate
-   via `storageState`, use API calls to create/retrieve data, interact via UI,
-   assert on visible elements.
+   `page.request`. No test depends on the outcome of another.
 
 > **Watch for side effects across spec files.** Tests that mutate shared
-> entities (suspending a merchant, toggling an announcement) can break later
-> specs. Prefer E2E-specific entities (e.g. `E2E_CREDENTIALS.testMerchant`)
-> that no other spec mutates.
->
-> **Never share mutable seeded entities across tests.** Seeded orders are for
-> read-only scenarios. Tests that change order status must create their own via
-> the API chain — use helpers in `api-helpers.ts`.
->
-> **Storage state scoping:** Each `test.use({ storageState })` must be wrapped
-> in its own `test.describe()` block to avoid leaking state between tests.
+> entities (suspending a merchant, toggling branding) can break later specs.
+> Prefer entities created for the specific test.
 
 #### Running tests
 
 The webserver starts automatically via Playwright's `webServer` config:
 
 ```bash
-# Run full suite (auto-starts dev server)
+# Run full suite (auto-starts the production server)
 pnpm test:e2e
 ```
 
-**Always work with one test at a time:**
+**Work with one test at a time while iterating:**
 
 ```bash
-pnpm test:e2e -g "B1"                              # single test by name
-pnpm test:e2e e2e/specs/a-auth.spec.ts               # single file
-pnpm test:e2e e2e/specs/a-auth.spec.ts:42            # single test at line
-```
-
-To avoid re-running auth setup on every invocation:
-
-```bash
-pnpm exec playwright test --project setup           # generate auth storage (once)
-pnpm exec playwright test e2e/specs/file.spec.ts -g "Name" --project chromium
+pnpm test:e2e -g "renders rider management"   # single test by name
+pnpm test:e2e e2e/specs/03-onboarding.spec.ts # single file
+pnpm test:e2e e2e/specs/03-onboarding.spec.ts:34  # single test at line
 ```
 
 #### Debugging
 
 ```bash
-pnpm exec playwright test --ui                      # UI debugger (watch mode)
+pnpm exec playwright test --ui    # UI debugger (watch mode)
 ```
 
 #### CI/CD pipeline
 
-The CI workflow (`.github/workflows/ci.yml`) runs E2E tests against a
-PostgreSQL 17 service container:
-
-```yaml
-e2e:
-  runs-on: ubuntu-latest
-  services:
-    postgres:
-      image: postgres:17-alpine
-      env:
-        POSTGRES_USER: test
-        POSTGRES_PASSWORD: test
-        POSTGRES_DB: delivery_test
-      ports:
-        - 5432:5432
-  steps:
-    - uses: actions/checkout@v4
-    - uses: pnpm/action-setup@v4
-    - uses: actions/setup-node@v4
-      with: { node-version: 22, cache: pnpm }
-    - run: pnpm install --frozen-lockfile
-    - run: pnpm exec playwright install chromium
-    - name: Seed e2e data
-      run: npx tsx e2e/seed.ts
-    - run: pnpm test:e2e
-      env: { CI: "true" }
-```
-
-#### Implementation order
-
-| Phase                           | Files                                                                                                                               | Depends on |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 0 — Foundation                  | `seed-data.ts`, `seed.ts`, `selectors.ts`, `auth.setup.ts`, `fixtures.ts`, `api-helpers.ts`, `playwright.config.ts`                 | —          |
-| 1 — Auth + core                 | `a-auth.spec.ts`, `b-order-lifecycle.spec.ts` (B1–B3)                                                                               | Phase 0    |
-| 2 — Full lifecycle + exceptions | `b-order-lifecycle.spec.ts` (B4–B9), `c-order-exceptions.spec.ts`                                                                   | Phase 1    |
-| 3 — Warehouse + Rider           | `f-warehouse.spec.ts`, `g-rider.spec.ts`                                                                                            | Phase 2    |
-| 4 — Admin + finance + misc      | `d-admin-dashboard.spec.ts`, `e-payouts.spec.ts`, `i-merchant-finance.spec.ts`, `j-announcements.spec.ts`, `k-public-pages.spec.ts` | Phase 0    |
-| 5 — Remaining admin             | `l-admin-dashboard-overview.spec.ts`, `m-merchant-business.spec.ts`, `n-warehouse-exceptions.spec.ts`                               | Phase 3    |
-| 6 — Platform Settings + inbox            | `o-account-settings.spec.ts`, `p-announcements-inbox.spec.ts`                                                                       | Phase 4    |
+There is currently **no e2e job** in `.github/workflows/ci.yml` — e2e only runs
+locally (see T3 in `ROADMAP.md`). Adding one requires a PostgreSQL service
+container, a `pnpm build` step, and a seed step, since `webServer` does not seed.
 
 #### Writing a new E2E test — checklist
 
-1. **Add selectors first** — every element you interact with gets a named
-   constant in `e2e/selectors.ts` before the test references it.
-2. **Use seed-data constants** — never hardcode emails, passwords, codes, or
-   IDs. Import from `e2e/seed-data.ts`.
-3. **Add API helpers** — if the test needs precondition data (orders, merchants,
-   etc.), add a reusable helper to `e2e/api-helpers.ts`.
+1. **Sign in with the shared helper** — `await login(page, CREDS.merchant)` from
+   `e2e/helpers.ts`. Never re-implement the fill/press/wait sequence.
+2. **Use `CREDS` / seed constants** — don't hardcode emails, passwords, codes,
+   or IDs in a spec; take them from `e2e/helpers.ts` or
+   `src/lib/db/seed/seed-content.ts`.
+3. **Prefer named selectors** — add a constant to `e2e/selectors.ts` for new
+   elements; `getByRole`/`getByTestId` inline is fine for one-offs.
 4. **Make it independent** — the test must work alone, in any order, and
-   without depending on other test's side effects.
-5. **Use `storageState`** — `test.use({ storageState: "e2e/.auth/<role>.json" })`
-   so the test starts already authenticated.
-6. **Learn from existing specs** — each spec file has a `test.describe` per
-   role, uses `waitForTableReady` after navigation, and asserts toasts after
-   mutations. Follow the same patterns.
-7. **Avoid `waitForTimeout`** — use `waitForSelector`, `waitForResponse`, or
-   `waitForURL` instead.
-8. **Assert toasts** — after every mutation, assert the toast message appeared
-   with expected text using `TOAST.message`.
-9. **Assert status badges** — after status-changing mutations, assert the
-   table row's status badge updated to the expected label.
+   without depending on another test's side effects.
+5. **Avoid `waitForTimeout`** — use `waitForURL`, `waitForSelector`, or
+   `waitForResponse` instead. The suite currently has zero fixed sleeps.
+6. **Assert on visible elements** — after a mutation, assert the resulting row,
+   status badge, or toast text rather than just the click succeeding.
+7. **Reuse seeded read-only entities** — for scenarios that change state, create
+   your own data via `page.request` instead of mutating shared seed rows.
 
 ---
 

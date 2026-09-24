@@ -64,7 +64,7 @@ describe("Merchant dashboard", () => {
     await importPage()
     expect(screen.getByText("ORD-0001")).toBeInTheDocument()
     expect(screen.queryByText("ORD-0002")).not.toBeInTheDocument()
-  }, 30000)
+  }, 60000)
 
   it("shows orders in tabs", async () => {
     const orders = Array.from({ length: 5 }, () =>

@@ -1,43 +1,5 @@
 import { expect, test } from "@playwright/test"
-
-// ─── Credentials ─────────────────────────────────────────────────────────────
-const CREDS = {
-  superAdmin: {
-    email: "admin01@email.com",
-    password: "admin123",
-    home: "/dashboard",
-  },
-  merchant: {
-    email: "merchant1@app.com",
-    password: "merchant123",
-    home: "/merchant",
-  },
-  demo: {
-    email: "demo@kikuya.com",
-    password: "demo123",
-    home: "/merchant",
-  },
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-async function login(page: any, cred: typeof CREDS.superAdmin) {
-  // Ensure a fresh session: a prior login in the same test would otherwise make
-  // the login page redirect an already-authed user away before submission.
-  await page.context().clearCookies()
-  await page.goto("/login")
-  await page.locator("[data-testid='login-email']").fill(cred.email)
-  await page.waitForTimeout(300)
-  await page.locator("[data-testid='login-password']").fill(cred.password)
-  await page.waitForTimeout(300)
-
-  await page.locator("[data-testid='login-password']").press("Enter")
-
-  // Wait for navigation with a longer timeout
-  await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
-    timeout: 15_000,
-  })
-  await page.waitForLoadState("networkidle")
-}
+import { CREDS, login } from "../helpers"
 
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
@@ -83,9 +45,6 @@ test.describe("Merchant Branding", () => {
     // Save branding
     await page.getByTestId("save-branding").click()
     await page.waitForLoadState("networkidle")
-
-    // Verify success toast (may appear briefly)
-    await page.waitForTimeout(1000)
   })
 
   test("merchant can toggle hide platform branding", async ({ page }) => {
@@ -102,7 +61,6 @@ test.describe("Merchant Branding", () => {
     // Save branding
     await page.getByTestId("save-branding").click()
     await page.waitForLoadState("networkidle")
-    await page.waitForTimeout(1000)
   })
 
   test("branding API returns fields for merchant", async ({ request }) => {
@@ -134,22 +92,7 @@ test.describe("Merchant Branding", () => {
 
   test("demo merchant has brand color set", async ({ page }) => {
     // Login as demo merchant
-    await page.goto("/login")
-    await page.locator("[data-testid='login-email']").fill(CREDS.demo.email)
-    await page
-      .locator("[data-testid='login-password']")
-      .fill(CREDS.demo.password)
-    await page.evaluate(() => {
-      const form = document.querySelector("form")
-      if (form) {
-        const submitBtn = form.querySelector('button[type="submit"]')
-        if (submitBtn) (submitBtn as HTMLButtonElement).click()
-      }
-    })
-
-    // Wait for navigation - may land on /merchant or stay on /login
-    await page.waitForLoadState("networkidle")
-    await page.waitForTimeout(3000)
+    await login(page, CREDS.demoMerchant)
 
     // Verify we can access the merchant page (branding should be applied)
     // If login succeeded, sidebar should be visible

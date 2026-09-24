@@ -134,6 +134,8 @@ export interface MockOrdersState {
   dateTo?: string
   warehouseFailedOrders?: number
   merchantPayableOrders?: Order[]
+  merchantPayableTotal?: number
+  merchantPayableAmount?: number
 }
 
 export function createMockOrders(
@@ -161,6 +163,15 @@ export function createMockOrders(
     dateTo: overrides?.dateTo,
     setDateTo: () => {},
     merchantPayableOrders: overrides?.merchantPayableOrders ?? [],
+    merchantPayableTotal:
+      overrides?.merchantPayableTotal ??
+      (overrides?.merchantPayableOrders ?? []).length,
+    merchantPayableAmount:
+      overrides?.merchantPayableAmount ??
+      (overrides?.merchantPayableOrders ?? []).reduce(
+        (sum, o) => sum + o.merchantEarnings,
+        0,
+      ),
     warehouseFailedOrders: overrides?.warehouseFailedOrders ?? 0,
     markOrderPickedUp: () => Promise.resolve({ ok: true }),
     markOutForDelivery: () => Promise.resolve({ ok: true }),

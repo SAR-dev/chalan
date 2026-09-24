@@ -1,43 +1,5 @@
 import { expect, test } from "@playwright/test"
-
-// ─── Credentials ─────────────────────────────────────────────────────────────
-const CREDS = {
-  superAdmin: {
-    email: "admin01@email.com",
-    password: "admin123",
-    home: "/dashboard",
-  },
-  warehouseAdmin: {
-    email: "warehouse.admin01@email.com",
-    password: "warehouse123",
-    home: "/warehouse",
-  },
-  merchant: {
-    email: "merchant1@app.com",
-    password: "merchant123",
-    home: "/merchant",
-  },
-  rider: { email: "rider1@app.com", password: "rider123", home: "/rider" },
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-async function login(page: any, cred: typeof CREDS.superAdmin) {
-  // Starting a login while a prior session is active makes the login page
-  // redirect an already-authed user away before the form can be submitted
-  // (e.g. S1 logs in as merchant, then as admin).
-  await page.context().clearCookies()
-  await page.goto("/login")
-  await page.locator("[data-testid='login-email']").fill(cred.email)
-  await page.waitForTimeout(300)
-  await page.locator("[data-testid='login-password']").fill(cred.password)
-  await page.waitForTimeout(300)
-  await page.locator("[data-testid='login-password']").press("Enter")
-  // Wait for any authenticated page (may land on /welcome for merchants with incomplete onboarding)
-  await page.waitForURL(/\/(merchant|dashboard|warehouse|rider|welcome)/, {
-    timeout: 15_000,
-  })
-  await page.waitForLoadState("networkidle")
-}
+import { CREDS, login } from "../helpers"
 
 /** Skip onboarding if the merchant landed on /welcome */
 async function skipOnboardingIfNeeded(page: any) {

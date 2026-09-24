@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { CREDS, login } from "../helpers"
 
 // ─── Onboarding Flow ─────────────────────────────────────────────────────────
 test.describe("Merchant Onboarding Flow", () => {
@@ -35,17 +36,7 @@ test.describe("Merchant Onboarding Flow", () => {
   }) => {
     // demo@kikuya.com has onboardingCompletedAt set in seed
     // Login via UI
-    await page.goto("/login")
-    await page.locator("[data-testid='login-email']").fill("demo@kikuya.com")
-    await page.locator("[data-testid='login-password']").fill("demo123")
-
-    // Submit and wait for navigation
-    await Promise.all([
-      page.waitForURL(/\/merchant/, { timeout: 15_000 }),
-      page.locator("[data-testid='login-password']").press("Enter"),
-    ])
-    await page.waitForLoadState("networkidle")
-    await page.waitForTimeout(3000)
+    await login(page, CREDS.demoMerchant, { waitFor: /\/merchant/ })
 
     // Verify we're on /merchant — NOT /welcome (onboarding guard) and NOT /login (auth guard)
     expect(page.url()).toMatch(/\/merchant/)
@@ -119,7 +110,6 @@ test.describe("Merchant Onboarding Flow", () => {
 
     // Should show activation prompt (needsActivation)
     await page.waitForLoadState("networkidle")
-    await page.waitForTimeout(2000)
 
     // Should stay on /login — unverified merchants can't log in
     expect(page.url()).toContain("/login")
