@@ -657,11 +657,11 @@ function Timeline({
                     {o.pickupProofRefs && o.pickupProofRefs.length > 0 ? (
                       <div className="mt-1.5 grid grid-cols-3 gap-1.5">
                         {o.pickupProofRefs.map((link, i) => (
-                          <img
+                          <ImageZoom
                             key={i}
                             src={link}
                             alt={`Pickup proof ${i + 1}`}
-                            className="size-full rounded-md object-cover"
+                            className="size-full rounded-md object-cover transition-transform hover:scale-105"
                           />
                         ))}
                       </div>

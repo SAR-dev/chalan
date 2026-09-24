@@ -1,4 +1,14 @@
 {
-  "crons": [{ "path": "/api/cron/cleanup-sessions", "schedule": "0 3 * * *" }],
-  "github": { "silent": true }
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-sessions",
+      "schedule": "0 3 * * *"
+    }
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "*": false
+    }
+  }
 }

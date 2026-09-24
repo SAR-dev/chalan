@@ -61,46 +61,48 @@ export function ImageUpload({
       />
       {value && !hidePreview ? (
         <div className="border-border group relative flex-1 overflow-hidden rounded-lg border">
-          <img
-            src={value}
-            alt="Uploaded preview"
-            className={cn("h-full w-full object-cover", previewClassName)}
-          />
-          {/* Overlay action buttons */}
-          <div className="absolute inset-0 flex items-center justify-center gap-1.5 bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
-            <div className="grid grid-cols-3 h-full">
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="w-full h-full shadow-sm rounded-r-none"
-                onClick={() => inputRef.current?.click()}
-                disabled={disabled || uploading}
-                aria-label="Replace image"
-              >
-                {uploading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Pencil className="size-4" />
-                )}
-              </Button>
-              <ImageZoom
+          <ImageZoom asChild src={value} alt="Uploaded preview">
+            <button
+              type="button"
+              className="hover:cursor-zoom-in block h-full w-full"
+              title="View image"
+            >
+              <img
                 src={value}
-                alt="Preview"
-                className="h-full w-full object-cover"
+                alt="Uploaded preview"
+                className={cn("h-full w-full object-cover", previewClassName)}
               />
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="h-full w-full shadow-sm hover:bg-destructive hover:text-destructive-foreground rounded-l-none"
-                onClick={() => onChange(null)}
-                disabled={disabled || uploading}
-                aria-label="Remove image"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
+            </button>
+          </ImageZoom>
+          {/* Corner actions — image click opens the zoom modal; buttons reveal
+              on hover (always visible on touch devices) */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-1.5">
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="pointer-events-auto pointer-coarse:opacity-100 size-7 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              onClick={() => inputRef.current?.click()}
+              disabled={disabled || uploading}
+              aria-label="Replace image"
+            >
+              {uploading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Pencil className="size-4" />
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="pointer-events-auto pointer-coarse:opacity-100 size-7 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => onChange(null)}
+              disabled={disabled || uploading}
+              aria-label="Remove image"
+            >
+              <Trash2 className="size-4" />
+            </Button>
           </div>
           {/* Uploading overlay */}
           {uploading && (
@@ -233,7 +235,7 @@ export function ImageGalleryUpload({
                 onClick={() => removeAt(index)}
                 disabled={disabled || uploading}
                 aria-label={`Remove photo ${index + 1}`}
-                className="bg-background/80 text-foreground hover:bg-destructive hover:text-destructive-foreground absolute top-1 right-1 inline-flex size-6 items-center justify-center rounded-md backdrop-blur-sm transition-colors"
+                className="bg-background/80 text-foreground hover:bg-destructive hover:text-destructive-foreground pointer-coarse:opacity-100 absolute top-1 right-1 inline-flex size-6 items-center justify-center rounded-md opacity-0 backdrop-blur-sm transition group-hover:opacity-100 focus-visible:opacity-100"
               >
                 <Trash2 className="size-3.5" />
               </button>
