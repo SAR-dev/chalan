@@ -41,7 +41,7 @@ Created by `pnpm db:admin` — local dev only. Sign in at `/login`:
 | Super Admin     | `admin02@email.com`       | `admin123`      |
 | Warehouse Admin | `warehouse.admin01@email.com`        | `warehouse123`  |
 | Merchant        | `imran@threadline.com` | `merchant123`   |
-| Rider           | `jahangir@app.com`     | `rider123`      |
+| Rider           | `jahangir@email.com`     | `rider123`      |
 
 > `warehouse.admin02@email.com` is seeded inactive (tests disabled-user handling). Full list in [`docs/SETUP.md`](./docs/SETUP.md).
 

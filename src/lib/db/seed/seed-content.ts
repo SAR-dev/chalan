@@ -54,27 +54,27 @@ export const SEED_USER_CREDENTIALS = {
 
   // Merchants
   merchant1: {
-    email: "merchant1@app.com",
+    email: "merchant1@email.com",
     password: "merchant123",
     role: "MERCHANT",
   },
   merchant2: {
-    email: "merchant2@app.com",
+    email: "merchant2@email.com",
     password: "merchant123",
     role: "MERCHANT",
   },
   merchant3: {
-    email: "merchant3@app.com",
+    email: "merchant3@email.com",
     password: "merchant123",
     role: "MERCHANT",
   },
   merchant4: {
-    email: "merchant4@app.com",
+    email: "merchant4@email.com",
     password: "merchant123",
     role: "MERCHANT",
   },
   merchant5: {
-    email: "merchant5@app.com",
+    email: "merchant5@email.com",
     password: "merchant123",
     role: "MERCHANT",
   },
@@ -89,7 +89,7 @@ function buildRiderCredentials(
     Array.from({ length: count }, (_, i) => [
       `rider${i + 1}`,
       {
-        email: `rider${i + 1}@app.com`,
+        email: `rider${i + 1}@email.com`,
         password: "rider123",
         role: "RIDER" as const,
       },
@@ -98,7 +98,7 @@ function buildRiderCredentials(
 }
 
 const PENDING_RIDER_CREDENTIAL: SeedUserCredential = {
-  email: "pending.rider@app.com",
+  email: "pending.rider@email.com",
   password: "rider123",
   role: "RIDER",
 }
@@ -751,7 +751,7 @@ export interface EmailLogSeedEntry {
 export const SEED_EMAIL_LOGS: EmailLogSeedEntry[] = [
   {
     id: "EL-100001E",
-    to: "merchant1@app.com",
+    to: "merchant1@email.com",
     subject: "[Delivery Management] Your merchant account has been approved",
     body: "Dear Owner 1, your merchant account has been approved. You can now start accepting orders.",
     status: "SENT",
@@ -761,7 +761,7 @@ export const SEED_EMAIL_LOGS: EmailLogSeedEntry[] = [
   },
   {
     id: "EL-100002E",
-    to: "merchant2@app.com",
+    to: "merchant2@email.com",
     subject: "[Delivery Management] Your merchant account has been approved",
     body: "Dear Owner 2, your merchant account has been approved. You can now start accepting orders.",
     status: "FAILED",
@@ -771,7 +771,7 @@ export const SEED_EMAIL_LOGS: EmailLogSeedEntry[] = [
   },
   {
     id: "EL-100003E",
-    to: "merchant3@app.com",
+    to: "merchant3@email.com",
     subject: "[Delivery Management] New order notification",
     body: "You have received a new order. Please log in to view details and arrange pickup.",
     status: "SENT",
@@ -850,8 +850,8 @@ const RECIPIENT_NAMES = [
 ]
 
 const PRODUCT_COSTS = [
-  500, 800, 1200, 1500, 2000, 2500, 3000, 3500, 4000, 5000, 6000, 7500, 8000,
-  9500, 10000, 12000, 15000, 18000, 20000, 25000,
+  0, 800, 0, 1500, 2000, 0, 3000, 3500, 0, 5000, 6000, 0, 8000, 9500, 0, 12000,
+  0, 18000, 20000, 0,
 ]
 
 const PARCEL_WEIGHTS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0]

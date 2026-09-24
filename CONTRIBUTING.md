@@ -2486,8 +2486,8 @@ already-authed login page).
 | -------------- | ---------------------------- | -------------- |
 | Super admin    | `admin01@email.com`          | `admin123`     |
 | Warehouse admin| `warehouse.admin01@email.com`| `warehouse123` |
-| Merchant       | `merchant1@app.com`          | `merchant123`  |
-| Rider          | `rider1@app.com`             | `rider123`     |
+| Merchant       | `merchant1@email.com`          | `merchant123`  |
+| Rider          | `rider1@email.com`             | `rider123`     |
 | Demo merchant  | `demo@kikuya.com`            | `demo123`      |
 
 These mirror `src/lib/db/seed/seed-content.ts`. If you seed with

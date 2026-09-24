@@ -7,19 +7,13 @@ import { FormEvent, Suspense, useEffect, useState } from "react"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 
-const LOGIN_EMAIL_PLACEHOLDER = "you@app.com"
+const LOGIN_EMAIL_PLACEHOLDER = "you@email.com"
 
 const BrandIcon = siteConfig.icon
 

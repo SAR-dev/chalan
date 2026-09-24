@@ -17,11 +17,11 @@ export const CREDS = {
     home: "/warehouse",
   },
   merchant: {
-    email: "merchant1@app.com",
+    email: "merchant1@email.com",
     password: "merchant123",
     home: "/merchant",
   },
-  rider: { email: "rider1@app.com", password: "rider123", home: "/rider" },
+  rider: { email: "rider1@email.com", password: "rider123", home: "/rider" },
   demoMerchant: {
     email: "demo@kikuya.com",
     password: "demo123",

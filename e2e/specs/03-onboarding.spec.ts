@@ -9,7 +9,7 @@ test.describe("Merchant Onboarding Flow", () => {
     // Login via API
     const loginRes = await request.post("/api/auth/sign-in/email", {
       data: {
-        email: "merchant1@app.com",
+        email: "merchant1@email.com",
         password: "merchant123",
         callbackURL: "/merchant",
       },

@@ -114,8 +114,8 @@ e2e/selectors.ts                    # Centralized data-testid selectors
 **Credentials (seeded):**
 - Super Admin: `admin01@email.com` / `admin123`
 - Warehouse Admin: `warehouse.admin01@email.com` / `warehouse123`
-- Merchant: `merchant1@app.com` / `merchant123`
-- Rider: `rider1@app.com` / `rider123`
+- Merchant: `merchant1@email.com` / `merchant123`
+- Rider: `rider1@email.com` / `rider123`
 
 Selectors centralized in `e2e/selectors.ts` using `data-testid` attributes.
 

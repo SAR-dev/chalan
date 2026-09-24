@@ -8,19 +8,13 @@ import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTeam } from "@/features/team/hooks/use-team"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import type { Role } from "@/lib/types"
 import { teamCreateSchema, validateFormData } from "@/lib/validation"
 
-const ACCOUNT_EMAIL_PLACEHOLDER = "wahouse-admin@app.com"
+const ACCOUNT_EMAIL_PLACEHOLDER = "wahouse-admin@email.com"
 
 type CreatableRole = Extract<Role, "WAREHOUSE_ADMIN">
 
