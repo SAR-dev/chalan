@@ -35,7 +35,6 @@ import {
   DEFAULT_TABLE_ROWS_PER_PAGE,
   MAX_TABLE_ROWS_PER_PAGE,
 } from "@/lib/constants"
-import { isAdminRole } from "@/lib/two-factor"
 import { initials } from "@/lib/utils"
 
 interface Session {
@@ -97,14 +96,14 @@ export function AccountSettings() {
 
   // ── Tabs ─────────────────────────────────────────────────────────────────
   // The require-2FA gate parks unenrolled admins on ?setup=2fa — land them on
-  // the Security tab so the enrollment card is what they see. Read in an
-  // effect to keep the server-rendered markup identical to the first client
-  // render (no useSearchParams Suspense requirement).
+  // the dedicated Two-factor tab so the enrollment card is what they see. Read
+  // in an effect to keep the server-rendered markup identical to the first
+  // client render (no useSearchParams Suspense requirement).
   const [tab, setTab] = useState("profile")
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("setup") === "2fa") {
-      setTab("security")
+      setTab("two-factor")
     }
   }, [])
 
@@ -312,6 +311,9 @@ export function AccountSettings() {
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="security" data-testid="account-tab-security">
             Security
+          </TabsTrigger>
+          <TabsTrigger value="two-factor" data-testid="account-tab-two-factor">
+            Two-factor
           </TabsTrigger>
           <TabsTrigger value="sessions" onClick={loadSessions}>
             Sessions
@@ -611,8 +613,12 @@ export function AccountSettings() {
                 </CardFooter>
               </form>
             </Card>
-            {isAdminRole(currentUser?.role) ? <TwoFactorSettings /> : null}
           </div>
+        </TabsContent>
+
+        {/* ── Two-factor (admin roles) ──────────────────────────────────── */}
+        <TabsContent value="two-factor" className="mt-4">
+          <TwoFactorSettings />
         </TabsContent>
 
         {/* ── Sessions ─────────────────────────────────────────────────── */}

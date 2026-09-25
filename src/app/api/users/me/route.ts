@@ -4,30 +4,27 @@ import { NextResponse } from "next/server"
 import { notFound, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
-import { merchant, platformConfig, profile, user } from "@/lib/db/schema"
+import { merchant, profile, user } from "@/lib/db/schema"
 import { isAdminRole } from "@/lib/two-factor"
 import { parseBody, profileUpdateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-// 2FA state for the signed-in admin (ROADMAP H4). Read straight from the
-// tables — never from the Better Auth session, which can serve a cached user
-// row for up to cookie-cache maxAge after enrolment changed.
+// 2FA state for the signed-in user (ROADMAP H4). `twoFactorEnabled` is read
+// straight from the `user` table — never from the Better Auth session, which
+// can serve a cached user row for up to cookie-cache maxAge after enrolment
+// changed. `twoFactorRequired` is deployment policy: the ADMIN_2FA_REQUIRED
+// env var, applied to admin roles only (merchants/riders may opt in, but are
+// never forced).
 async function loadTwoFactorFlags(userId: string, role: string) {
-  if (!isAdminRole(role)) {
-    return { twoFactorEnabled: false, twoFactorRequired: false }
-  }
   const [userRow] = await dbRead
     .select({ twoFactorEnabled: user.twoFactorEnabled })
     .from(user)
     .where(eq(user.id, userId))
     .limit(1)
-  const [config] = await dbRead
-    .select({ requireAdminTwoFactor: platformConfig.requireAdminTwoFactor })
-    .from(platformConfig)
-    .limit(1)
   return {
     twoFactorEnabled: userRow?.twoFactorEnabled === true,
-    twoFactorRequired: config?.requireAdminTwoFactor === true,
+    twoFactorRequired:
+      isAdminRole(role) && process.env.ADMIN_2FA_REQUIRED === "1",
   }
 }
 

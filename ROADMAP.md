@@ -14,20 +14,20 @@
 
 Sections are listed **in the order they will be worked on**:
 
-| #   | Section                              | Priority    | Effort | Status |
-|-----|--------------------------------------|-------------|--------|--------|
-| 5.1 | Backend permission enforcement sweep | 🔴 High     | M      | ⏳     |
-| 5.2 | User management (admin panel)        | 🔴 High     | M      | ⏳     |
-| 5.3 | Change own email address             | 🟡 Medium   | S–M   | ⏳     |
-| 5.4 | Portal modes — 3 deployable formats  | 🟡 Medium   | M      | ⏳     |
-| 5.5 | Notification system                  | 🟡 Medium   | L      | ⏳     |
-| 5.6 | Storage hygiene — periodic image cleaning | 🟡 Medium | M    | ⏳     |
-| 5.7 | 1% Improvements (quick wins)         | —           | S      | ⏳     |
-| 5.8 | Analytics & Reporting                | 🟡 Medium   | M      | ⏳     |
-| 5.9 | Mobile Experience                    | 🟡 Medium   | M–L    | ⏳     |
-| 5.10| API & Integrations                   | 🟢 Low      | M      | ⏳     |
-| 5.11| Scalability                          | 🟢 Low      | M–L    | ⏳     |
-| 6   | Backlog (deferred)                   | —           | —      | ⏳     |
+| #    | Section                                   | Priority  | Effort | Status |
+|------|-------------------------------------------|-----------|--------|--------|
+| 5.1  | Backend permission enforcement sweep      | 🔴 High   | M      | ⏳      |
+| 5.2  | User management (admin panel)             | 🔴 High   | M      | ⏳      |
+| 5.3  | Change own email address                  | 🟡 Medium | S–M    | ⏳      |
+| 5.4  | Portal modes — 3 deployable formats       | 🟡 Medium | M      | ⏳      |
+| 5.5  | Notification system                       | 🟡 Medium | L      | ⏳      |
+| 5.6  | Storage hygiene — periodic image cleaning | 🟡 Medium | M      | ⏳      |
+| 5.7  | 1% Improvements (quick wins)              | —         | S      | ⏳      |
+| 5.8  | Analytics & Reporting                     | 🟡 Medium | M      | ⏳      |
+| 5.9  | Mobile Experience                         | 🟡 Medium | M–L    | ⏳      |
+| 5.10 | API & Integrations                        | 🟢 Low    | M      | ⏳      |
+| 5.11 | Scalability                               | 🟢 Low    | M–L    | ⏳      |
+| 6    | Backlog (deferred)                        | —         | —      | ⏳      |
 
 **Already shipped (do not re-propose):** phases 1–4 (security S/L, correctness B,
 maintainability Q, testing/CI/docs T — incl. Redis rate limiting S6, CSRF origin
@@ -85,13 +85,13 @@ when done.
 
 A **`/dashboard/users`** page (SUPER_ADMIN only) to manage all accounts:
 
-| Capability | Implementation notes |
-|---|---|
-| List users | all roles: name, email, role, active/banned status, created; server-paginated DataTable (repo pattern) |
-| **Change user password** | better-auth `admin()` plugin is already installed — use its `api.admin.setUserPassword` (no custom hashing); confirm password policy via existing validation |
-| **Ban / unban user** | plugin's ban API — `user.banned/banReason/banExpires` columns already exist in our schema; banned users rejected at sign-in; ban requires a reason (+ optional duration) |
-| Audit | `logAudit` every reset/ban/unban (`USER_PASSWORD_RESET`, `USER_BANNED`, `USER_UNBANNED`), entity `user` |
-| Out of scope (note, don't build) | impersonation (plugin supports it — defer), role changes |
+| Capability                       | Implementation notes                                                                                                                                                     |
+|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| List users                       | all roles: name, email, role, active/banned status, created; server-paginated DataTable (repo pattern)                                                                   |
+| **Change user password**         | better-auth `admin()` plugin is already installed — use its `api.admin.setUserPassword` (no custom hashing); confirm password policy via existing validation             |
+| **Ban / unban user**             | plugin's ban API — `user.banned/banReason/banExpires` columns already exist in our schema; banned users rejected at sign-in; ban requires a reason (+ optional duration) |
+| Audit                            | `logAudit` every reset/ban/unban (`USER_PASSWORD_RESET`, `USER_BANNED`, `USER_UNBANNED`), entity `user`                                                                  |
+| Out of scope (note, don't build) | impersonation (plugin supports it — defer), role changes                                                                                                                 |
 
 Deliverables: route(s) + validation + `use-users` hook + page + dialogs
 (reset-password dialog, ban dialog with ConfirmDialog), nav entry, colocated
@@ -125,11 +125,11 @@ Users change their **login email** from account settings (all roles):
 
 One codebase, **three deployment shapes, selected by env var at runtime (no rebuild)**:
 
-| `PORTAL_MODE` | Portals served | Intended deployment |
-|---|---|---|
-| `admin` | Dashboard (Super Admin) + Warehouse | internal ops instance |
-| `public` | Merchant + Rider | **publicly accessible** customer-facing instance (public = the merchant portal renamed — it will be open to the internet for merchant self-onboarding) |
-| `all` *(default)* | everything | single-instance / dev |
+| `PORTAL_MODE`     | Portals served                      | Intended deployment                                                                                                                                    |
+|-------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `admin`           | Dashboard (Super Admin) + Warehouse | internal ops instance                                                                                                                                  |
+| `public`          | Merchant + Rider                    | **publicly accessible** customer-facing instance (public = the merchant portal renamed — it will be open to the internet for merchant self-onboarding) |
+| `all` *(default)* | everything                          | single-instance / dev                                                                                                                                  |
 
 **Implementation notes:**
 
@@ -163,13 +163,13 @@ In-app notifications for state changes (announcements are broadcast — this is
 
 **V1 (in-app only):**
 
-| Piece | Design |
-|---|---|
-| Table | `notification`: id, userId FK, type (enum), title, body, link, readAt nullable, createdAt — new `schema.postgres` module |
-| Fan-out | written **inside the same transaction** as the triggering change (order transitions → merchant/rider; payout approve/paid → merchant; support reply → ticket owner; merchant approve → merchant; user-mgmt actions in 5.2 → target user). Central helper `src/lib/notify.ts` mirroring `audit.ts` (never throws, one entry point) |
-| API | `GET /api/notifications` (own, paginated + unread count), `PATCH /api/notifications/[id]` (mark read), `PATCH /api/notifications/read-all` |
-| UI | bell in all four shells (`dashboard-shell`, `merchant-shell`, `warehouse-shell`, `rider-shell`) with unread badge (poll/`useNotifications` SWR hook, refresh-on-focus), dropdown or page `/{role}/notifications` (pick dropdown + full page if cheap), `data-testid`s |
-| Delivery | insert-only, no background queue in v1 (same-instance); note queue/Redis as follow-up in 5.11 |
+| Piece    | Design                                                                                                                                                                                                                                                                                                                            |
+|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Table    | `notification`: id, userId FK, type (enum), title, body, link, readAt nullable, createdAt — new `schema.postgres` module                                                                                                                                                                                                          |
+| Fan-out  | written **inside the same transaction** as the triggering change (order transitions → merchant/rider; payout approve/paid → merchant; support reply → ticket owner; merchant approve → merchant; user-mgmt actions in 5.2 → target user). Central helper `src/lib/notify.ts` mirroring `audit.ts` (never throws, one entry point) |
+| API      | `GET /api/notifications` (own, paginated + unread count), `PATCH /api/notifications/[id]` (mark read), `PATCH /api/notifications/read-all`                                                                                                                                                                                        |
+| UI       | bell in all four shells (`dashboard-shell`, `merchant-shell`, `warehouse-shell`, `rider-shell`) with unread badge (poll/`useNotifications` SWR hook, refresh-on-focus), dropdown or page `/{role}/notifications` (pick dropdown + full page if cheap), `data-testid`s                                                             |
+| Delivery | insert-only, no background queue in v1 (same-instance); note queue/Redis as follow-up in 5.11                                                                                                                                                                                                                                     |
 
 **V2 (later, mark in-scope-but-deferred):** email channel for critical types
 (reuse `mailer.ts` + `MAIL_DISABLED`), per-user preferences.
@@ -186,13 +186,13 @@ deleted, or uploads from forms the user abandoned).
 
 **Design (DB-driven sweep):**
 
-| Piece | Design |
-|---|---|
-| Referenced set | Scan known image columns → normalize stored URLs to provider-relative keys: `user.image`, `merchant.logoUrl`, `merchant.nid{Front,Back,Selfie}Image`, `rider.nid*`, `rider_applications.nid*`, `order.deliveryProofRef`, `order.pickupProofRefs[]`, (any future image column added to this list) |
-| Storage listing | Add `listFiles()` + `deleteFile(key)` to `src/lib/storage/` for all 3 providers: local = `fs.readdir`/`unlink`, R2 = `ListObjectsV2`/`DeleteObject`, Supabase = `.list()`/`.remove()` (today only `saveFile` exists — small S/M addition) |
-| Orphan rule | file **not in referenced set** AND **older than grace period** — grace period is mandatory: `ImageUpload` uploads immediately on file select, *before* the form submits, so fresh files are often not yet referenced. Env: `UPLOAD_SWEEP_MIN_AGE_HOURS` (default 48) |
-| Trigger | new `/api/cron/cleanup-uploads` endpoint authenticated by `CRON_SECRET` (same pattern as the 3 existing cleanup jobs); scheduled where the others are: `pg_cron` (local), cron container (cluster compose), Vercel cron. Response: `{ scanned, orphans, deleted, bytesFreed }`; `?dryRun=1` supported |
-| Safety rails | age check per file; re-check referenced-set right before each delete (no stale snapshot); log every deletion; never fail the whole job on one file error |
+| Piece           | Design                                                                                                                                                                                                                                                                                                |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Referenced set  | Scan known image columns → normalize stored URLs to provider-relative keys: `user.image`, `merchant.logoUrl`, `merchant.nid{Front,Back,Selfie}Image`, `rider.nid*`, `rider_applications.nid*`, `order.deliveryProofRef`, `order.pickupProofRefs[]`, (any future image column added to this list)      |
+| Storage listing | Add `listFiles()` + `deleteFile(key)` to `src/lib/storage/` for all 3 providers: local = `fs.readdir`/`unlink`, R2 = `ListObjectsV2`/`DeleteObject`, Supabase = `.list()`/`.remove()` (today only `saveFile` exists — small S/M addition)                                                             |
+| Orphan rule     | file **not in referenced set** AND **older than grace period** — grace period is mandatory: `ImageUpload` uploads immediately on file select, *before* the form submits, so fresh files are often not yet referenced. Env: `UPLOAD_SWEEP_MIN_AGE_HOURS` (default 48)                                  |
+| Trigger         | new `/api/cron/cleanup-uploads` endpoint authenticated by `CRON_SECRET` (same pattern as the 3 existing cleanup jobs); scheduled where the others are: `pg_cron` (local), cron container (cluster compose), Vercel cron. Response: `{ scanned, orphans, deleted, bytesFreed }`; `?dryRun=1` supported |
+| Safety rails    | age check per file; re-check referenced-set right before each delete (no stale snapshot); log every deletion; never fail the whole job on one file error                                                                                                                                              |
 
 Acceptance: unit tests for URL→key normalization + orphan decision; provider
 specs for `listFiles`/`deleteFile` (local fs); cron endpoint spec (401 without
@@ -210,56 +210,56 @@ secret, dry-run deletes nothing); run `dryRun` for a week before enabling delete
 
 ## 5.8 Analytics & Reporting (Medium)
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| Merchant comparison | Compare performance across merchants (admin) | S |
-| PDF/Excel export | Export reports as PDF or Excel | M |
-| Scheduled reports | Email weekly/monthly reports to merchants | M |
-| Rider performance | Delivery success rate, avg time per rider | S |
+| Task                | Description                                  | Effort |
+|---------------------|----------------------------------------------|--------|
+| Merchant comparison | Compare performance across merchants (admin) | S      |
+| PDF/Excel export    | Export reports as PDF or Excel               | M      |
+| Scheduled reports   | Email weekly/monthly reports to merchants    | M      |
+| Rider performance   | Delivery success rate, avg time per rider    | S      |
 
 ---
 
 ## 5.9 Mobile Experience (Medium)
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| PWA improvements | Better offline support, push notifications (pairs with 5.5) | M |
-| Mobile-optimized forms | Simplified order creation for mobile | S |
-| Camera integration | Better photo capture for delivery proof | M |
-| GPS tracking | Real-time rider location tracking | L |
+| Task                   | Description                                                 | Effort |
+|------------------------|-------------------------------------------------------------|--------|
+| PWA improvements       | Better offline support, push notifications (pairs with 5.5) | M      |
+| Mobile-optimized forms | Simplified order creation for mobile                        | S      |
+| Camera integration     | Better photo capture for delivery proof                     | M      |
+| GPS tracking           | Real-time rider location tracking                           | L      |
 
 ---
 
 ## 5.10 API & Integrations (Low)
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| Accounting integration | Export to Tally/QuickBooks | M |
-| SMS gateway | Local SMS providers (order/receiver notifications) | S |
-| WhatsApp notifications | Delivery updates via WhatsApp | M |
+| Task                   | Description                                        | Effort |
+|------------------------|----------------------------------------------------|--------|
+| Accounting integration | Export to Tally/QuickBooks                         | M      |
+| SMS gateway            | Local SMS providers (order/receiver notifications) | S      |
+| WhatsApp notifications | Delivery updates via WhatsApp                      | M      |
 
 ---
 
 ## 5.11 Scalability (Low)
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| Caching layer | Redis for hot data (rate limiting already uses Redis) | S |
-| CDN for static assets | Serve static files from CDN | S |
-| Background jobs | Queue for email, reports, notifications | M |
-| Horizontal scaling | Multiple app instances (Redis rate limiter already shared) | L |
-| Database read replicas | Promote the existing `dbRead` split | M |
-| Database optimization | Remaining query consolidation | M |
+| Task                   | Description                                                | Effort |
+|------------------------|------------------------------------------------------------|--------|
+| Caching layer          | Redis for hot data (rate limiting already uses Redis)      | S      |
+| CDN for static assets  | Serve static files from CDN                                | S      |
+| Background jobs        | Queue for email, reports, notifications                    | M      |
+| Horizontal scaling     | Multiple app instances (Redis rate limiter already shared) | L      |
+| Database read replicas | Promote the existing `dbRead` split                        | M      |
+| Database optimization  | Remaining query consolidation                              | M      |
 
 ---
 
 ## Phase 6 — Backlog (deferred)
 
-| Task | Description | Effort | Notes |
-|------|-------------|--------|-------|
-| API documentation | OpenAPI/Swagger for public API | M | Needs a stable public API surface first |
-| Video tutorials | Setup guides, feature walkthroughs | L | Recorded once product flow stops churning |
-| Status page | Public status page for uptime | S | Meaningful once there's production traffic |
+| Task              | Description                        | Effort | Notes                                      |
+|-------------------|------------------------------------|--------|--------------------------------------------|
+| API documentation | OpenAPI/Swagger for public API     | M      | Needs a stable public API surface first    |
+| Video tutorials   | Setup guides, feature walkthroughs | L      | Recorded once product flow stops churning  |
+| Status page       | Public status page for uptime      | S      | Meaningful once there's production traffic |
 
 ---
 

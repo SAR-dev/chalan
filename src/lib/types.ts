@@ -139,8 +139,6 @@ export interface PlatformConfigInput {
   defaultExtraRatePerKg?: number
   defaultFreeWeightKg?: number
   defaultMaxWeightKg?: number
-  // ROADMAP H4 — global "require 2FA for admin accounts" switch.
-  requireAdminTwoFactor?: boolean
 }
 
 export interface CreateOrderInput {

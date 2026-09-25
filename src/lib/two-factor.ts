@@ -3,9 +3,9 @@
 //
 // Pure, client-safe logic shared by the dashboard / warehouse shells (the
 // enforcement gate), the account settings 2FA card, and their specs. Server
-// concerns (reading the platform-config flag, verifying codes) live in the API
-// routes — keep this module free of server-only imports so both shells can
-// bundle it.
+// concerns (reading the ADMIN_2FA_REQUIRED env flag, verifying codes) live in
+// the API routes — keep this module free of server-only imports so both
+// shells can bundle it.
 // =============================================================================
 
 /** Roles offered 2FA enrollment (and covered by the require toggle). */

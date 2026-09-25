@@ -216,7 +216,6 @@ export const platformConfigSchema = z
     defaultExtraRatePerKg: z.number().nonnegative().optional(),
     defaultFreeWeightKg: z.number().nonnegative().optional(),
     defaultMaxWeightKg: z.number().positive().optional(),
-    requireAdminTwoFactor: z.boolean().optional(),
   })
   .refine(
     (d) =>

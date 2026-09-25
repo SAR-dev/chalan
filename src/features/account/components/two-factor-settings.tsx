@@ -1,6 +1,6 @@
 "use client"
 
-import { Copy, Loader2, ShieldCheck, ShieldOff } from "lucide-react"
+import { Copy, Download, Loader2, ShieldCheck, ShieldOff } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { type FormEvent, useState } from "react"
 import { toast } from "sonner"
@@ -15,9 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/features/account/hooks/use-auth"
-import { usePlatformConfig } from "@/features/platform-config/hooks/use-platform-config"
 import { authClient } from "@/lib/auth-client"
 import { totpSecretFromUri } from "@/lib/two-factor"
 
@@ -25,17 +23,17 @@ type Panel = "none" | "password" | "verify" | "codes" | "disable"
 type PasswordPurpose = "enable" | "regenerate"
 
 /**
- * TOTP enrollment for admin roles (ROADMAP H4). Every Better Auth call goes
- * through `authClient.twoFactor.*`; disabling goes through this app's own
- * `/api/account/two-factor/disable` route, which demands a current TOTP or
- * recovery code. The "require 2FA" switch is SUPER_ADMIN-only.
+ * TOTP enrollment (ROADMAP H4) — available to every role (merchants/riders
+ * opt in freely; admins may be covered by the ADMIN_2FA_REQUIRED env policy,
+ * surfaced by /api/users/me as twoFactorRequired). Every Better Auth call
+ * goes through `authClient.twoFactor.*`; disabling goes through this app's
+ * own `/api/account/two-factor/disable` route, which demands a current TOTP
+ * or recovery code.
  */
 export function TwoFactorSettings() {
   const { currentUser, refreshUser } = useAuth()
-  const { config, updatePlatformConfig } = usePlatformConfig()
 
   const enabled = currentUser?.twoFactorEnabled === true
-  const requireToggle = config?.requireAdminTwoFactor === true
 
   const [panel, setPanel] = useState<Panel>("none")
   const [passwordPurpose, setPasswordPurpose] =
@@ -61,21 +59,6 @@ export function TwoFactorSettings() {
     setPasswordPurpose(purpose)
     setPassword("")
     setPanel("password")
-  }
-
-  async function handleRequireToggle(checked: boolean) {
-    const result = await updatePlatformConfig({
-      requireAdminTwoFactor: checked,
-    })
-    if (result.ok) {
-      toast.success(
-        checked
-          ? "Admins must now enroll in two-factor authentication."
-          : "Two-factor authentication is no longer required.",
-      )
-    } else {
-      toast.error(result.error ?? "Could not update the requirement.")
-    }
   }
 
   async function handlePasswordSubmit(e: FormEvent) {
@@ -178,6 +161,29 @@ export function TwoFactorSettings() {
     } catch {
       toast.error("Could not copy the recovery codes.")
     }
+  }
+
+  function handleDownloadRecoveryCodes() {
+    if (!recoveryCodes) return
+    const content = [
+      "Two-factor authentication — recovery codes",
+      `Generated: ${new Date().toISOString()}`,
+      "",
+      "Keep this file secret. Each code works once if you lose access to your authenticator app.",
+      "",
+      ...recoveryCodes,
+      "",
+    ].join("\n")
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "two-factor-recovery-codes.txt"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success("Recovery codes downloaded.")
   }
 
   return (
@@ -409,6 +415,15 @@ export function TwoFactorSettings() {
               </Button>
               <Button
                 type="button"
+                variant="outline"
+                data-testid="two-factor-recovery-download"
+                onClick={handleDownloadRecoveryCodes}
+              >
+                <Download className="size-4" />
+                Download
+              </Button>
+              <Button
+                type="button"
                 data-testid="two-factor-recovery-done"
                 onClick={() => {
                   setRecoveryCodes(null)
@@ -468,21 +483,18 @@ export function TwoFactorSettings() {
           </form>
         ) : null}
 
-        {currentUser?.role === "SUPER_ADMIN" ? (
-          <div className="border-border flex items-center justify-between gap-4 border-t pt-4">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="two-factor-require">Require 2FA for admins</Label>
-              <p className="text-muted-foreground text-xs">
-                When on, admin accounts must enroll before they can use the
-                dashboards. Off by default.
-              </p>
-            </div>
-            <Switch
-              id="two-factor-require"
-              checked={requireToggle}
-              onCheckedChange={handleRequireToggle}
-              data-testid="two-factor-require-toggle"
-            />
+        {currentUser?.twoFactorRequired === true ? (
+          <div
+            className="border-border border-t pt-4"
+            data-testid="two-factor-policy"
+          >
+            <p className="text-sm font-medium">
+              Two-factor is required by deployment policy
+            </p>
+            <p className="text-muted-foreground text-xs">
+              This instance runs with ADMIN_2FA_REQUIRED=1 — admin accounts must
+              enroll before using the dashboards.
+            </p>
           </div>
         ) : null}
       </CardContent>
