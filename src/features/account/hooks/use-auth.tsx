@@ -9,6 +9,7 @@ import {
   useEffect,
   useState,
 } from "react"
+import { toast } from "sonner"
 import { useSWRConfig } from "swr"
 import { authClient } from "@/lib/auth-client"
 import { homeForRole } from "@/lib/nav-config"
@@ -17,6 +18,19 @@ import type { User } from "@/lib/types"
 // Re-export so client components can keep importing from use-auth while the
 // canonical definition lives in the server-safe nav-config module.
 export { homeForRole }
+
+// Portal-mode gate (ROADMAP 5.4): this deployment does not serve the
+// signed-in role. The server tells us via `portalAllowed` on /api/users/me —
+// sign the stray session back out and surface a clear message instead of
+// letting every shared API fail with opaque 401s.
+const PORTAL_UNAVAILABLE_ERROR =
+  "This portal is not available on this deployment."
+
+async function rejectIfPortalUnavailable(user: User): Promise<boolean> {
+  if (user.portalAllowed !== false) return false
+  await authClient.signOut()
+  return true
+}
 
 interface AuthContextValue {
   currentUser: User | null
@@ -78,8 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session) {
           const res = await fetch("/api/users/me")
           if (res.ok) {
-            const user = await res.json()
-            setCurrentUser(user)
+            const user: User = await res.json()
+            // Session predates a PORTAL_MODE change (or belongs to a role this
+            // instance never served) — clear it and tell the user why.
+            if (await rejectIfPortalUnavailable(user)) {
+              toast.error(PORTAL_UNAVAILABLE_ERROR)
+            } else {
+              setCurrentUser(user)
+            }
           }
         }
       } finally {
@@ -98,6 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: "Could not load your account." } as const
     }
     const user: User = await res.json()
+
+    // Portal-mode gate: this deployment doesn't serve this role — same
+    // treatment as a deactivated account (session must not linger).
+    if (await rejectIfPortalUnavailable(user)) {
+      return { ok: false, error: PORTAL_UNAVAILABLE_ERROR } as const
+    }
 
     if (!user.isActive) {
       // Sign the Better Auth session back out — we don't want a session

@@ -102,6 +102,21 @@ export const riders = {
   row: (id: string) => `[data-testid='rider-row-${id}']`,
 }
 
+// ─── Users (admin user management) ──────────────────────────────────────────
+export const users = {
+  table: "[data-testid='users-table']",
+  search: "[data-testid='table-search-users']",
+  actions: "[data-testid='users-actions']",
+  resetOpen: "[data-testid='users-reset-open']",
+  resetPassword: "[data-testid='users-reset-password']",
+  resetConfirm: "[data-testid='users-reset-confirm']",
+  resetSubmit: "[data-testid='users-reset-submit']",
+  banOpen: "[data-testid='users-ban-open']",
+  banReason: "[data-testid='users-ban-reason']",
+  banSubmit: "[data-testid='users-ban-submit']",
+  unban: "[data-testid='users-unban']",
+}
+
 // ─── Warehouse ───────────────────────────────────────────────────────────────
 export const warehouse = {
   intakeTable: "[data-testid='warehouse-intake']",
@@ -154,6 +169,13 @@ export const balance = {
   adjustButton: "[data-testid='adjust-balance']",
   confirmPayment: "[data-testid='confirm-payment']",
   rejectPayment: "[data-testid='reject-payment']",
+}
+
+// ─── Account email change (5.3) ──────────────────────────────────────────────
+export const email = {
+  current: "[data-testid='email-change-current']",
+  input: "[data-testid='email-change-input']",
+  submit: "[data-testid='email-change-submit']",
 }
 
 // ─── Settings ────────────────────────────────────────────────────────────────

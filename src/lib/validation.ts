@@ -598,3 +598,19 @@ export const supportReplySchema = z
   .refine((d) => d.adminReply !== undefined || d.status !== undefined, {
     error: "Provide a reply or close the ticket",
   })
+
+export const userPasswordSchema = z.object({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+})
+
+export const userBanSchema = z.object({
+  reason: requiredString("Reason")
+    .min(3, "Reason must be at least 3 characters")
+    .max(200, "Reason cannot exceed 200 characters"),
+  expiresInDays: z
+    .number()
+    .int("Duration must be a whole number of days")
+    .min(1, "Duration must be at least 1 day")
+    .max(365, "Duration cannot exceed 365 days")
+    .optional(),
+})

@@ -4,6 +4,7 @@ import {
   PATCH as updateAnnouncement,
 } from "./[id]/route"
 import { GET as activeAnnouncements } from "./active/route"
+import { DELETE as bulkDeleteAnnouncements } from "./bulk/route"
 import { POST as createAnnouncement, GET as listAnnouncements } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -95,6 +96,12 @@ describe("GET /api/announcements", () => {
   it("401 when unauthenticated", async () => {
     const res = await listAnnouncements(req("GET"))
     expect(res.status).toBe(401)
+  })
+
+  it("403 for merchant role (management list is super-admin only)", async () => {
+    sessionState.value = merchantSession
+    const res = await listAnnouncements(req("GET"))
+    expect(res.status).toBe(403)
   })
 
   it("returns paginated announcements", async () => {
@@ -215,5 +222,53 @@ describe("DELETE /api/announcements/:id", () => {
     selectQueue.push([{ title: "Old" }])
     const res = await deleteAnnouncement(req("DELETE"), ctx())
     expect(res.status).toBe(200)
+  })
+})
+
+describe("DELETE /api/announcements/bulk", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await bulkDeleteAnnouncements(
+      req("DELETE", undefined, { ids: ["a1"] }),
+    )
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for merchant role", async () => {
+    sessionState.value = merchantSession
+    const res = await bulkDeleteAnnouncements(
+      req("DELETE", undefined, { ids: ["a1"] }),
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it("400 when ids missing", async () => {
+    sessionState.value = admin
+    const res = await bulkDeleteAnnouncements(req("DELETE", undefined, {}))
+    expect(res.status).toBe(400)
+  })
+
+  it("deletes the given announcements", async () => {
+    sessionState.value = admin
+    selectQueue.push([
+      { id: "a1", title: "One" },
+      { id: "a2", title: "Two" },
+    ])
+    const res = await bulkDeleteAnnouncements(
+      req("DELETE", undefined, { ids: ["a1", "a2"] }),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true, count: 2 })
+  })
+
+  it("no-ops when none of the ids exist", async () => {
+    sessionState.value = admin
+    selectQueue.push([])
+    const res = await bulkDeleteAnnouncements(
+      req("DELETE", undefined, { ids: ["missing"] }),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true, count: 0 })
   })
 })

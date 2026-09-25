@@ -34,6 +34,7 @@ export async function createUser(input: {
       name: input.name,
       email: input.email,
       password: input.password,
+      ...(input.role === "SUPER_ADMIN" ? { role: "admin" as const } : {}),
     },
   })
 

@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // Imports must come after the vi.mock calls (which are hoisted regardless).
 import { logAudit } from "@/lib/audit"
 import { PATCH as approve } from "./approve/route"
+import { PATCH as assignPickupRider } from "./assign-pickup-rider/route"
 import { PATCH as cancel } from "./cancel/route"
 import { PATCH as delivered } from "./delivered/route"
 import { PATCH as dispatch } from "./dispatch/route"
@@ -170,6 +171,16 @@ beforeEach(() => {
   vi.mocked(logAudit).mockClear()
 })
 
+function makeRider(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "rider_1",
+    isActive: true,
+    taskType: "PICKUP",
+    warehouseId: "wh_1",
+    ...overrides,
+  }
+}
+
 // ---------------------------------------------------------------------------
 describe("PATCH /orders/:id/approve", () => {
   it("401 when unauthenticated", async () => {
@@ -250,6 +261,70 @@ describe("PATCH /orders/:id/approve", () => {
     dbState.updateResult = [makeOrder({ status: "APPROVED" })]
     const { status } = await call(approve, { riderId: "r1" })
     expect(status).toBe(200)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe("PATCH /orders/:id/assign-pickup-rider", () => {
+  it("401 when unauthenticated", async () => {
+    const { status } = await call(assignPickupRider, { riderId: "rider_1" })
+    expect(status).toBe(401)
+  })
+
+  it("403 unless WAREHOUSE_ADMIN with warehouseId", async () => {
+    sessionState.value = merchantSession()
+    const { status, json } = await call(assignPickupRider, {
+      riderId: "rider_1",
+    })
+    expect(status).toBe(403)
+    expect(json).toEqual({ error: "Forbidden" })
+  })
+
+  it("403 for warehouse admin without a warehouse", async () => {
+    sessionState.value = { role: "WAREHOUSE_ADMIN", name: "WH Walt" }
+    const { status } = await call(assignPickupRider, { riderId: "rider_1" })
+    expect(status).toBe(403)
+  })
+
+  it("400 when order not APPROVED", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [[makeOrder({ status: "PENDING" })]]
+    const { status, json } = await call(assignPickupRider, {
+      riderId: "rider_1",
+    })
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "Only APPROVED orders can be assigned a pickup rider.",
+    })
+  })
+
+  it("400 when the rider is based at another warehouse", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "APPROVED" })],
+      [makeRider({ warehouseId: "wh_2" })],
+    ]
+    const { status, json } = await call(assignPickupRider, {
+      riderId: "rider_1",
+    })
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "Select a pickup rider based at this warehouse.",
+    })
+  })
+
+  it("assigns an active pickup rider from the admin's warehouse", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [[makeOrder({ status: "APPROVED" })], [makeRider()]]
+    dbState.updateResult = [
+      makeOrder({ status: "APPROVED", pickupRiderId: "rider_1" }),
+    ]
+    const { status, payload } = await call(assignPickupRider, {
+      riderId: "rider_1",
+    })
+    expect(status).toBe(200)
+    expect(payload).toMatchObject({ pickupRiderId: "rider_1" })
+    expect(typeof payload?.assignedAt).toBe("string")
   })
 })
 
@@ -416,6 +491,28 @@ describe("PATCH /orders/:id/receive", () => {
       receivedByWarehouse: "WH Walt",
     })
     expect(typeof payload?.receivedAtWarehouseAt).toBe("string")
+  })
+
+  it("400 when the parcel is held at a different warehouse", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "PICKED_UP", warehouseId: "wh_2" })],
+    ]
+    const { status, json } = await call(receive)
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "This parcel is held at a different warehouse.",
+    })
+  })
+
+  it("receives an unassigned pickup with no warehouse yet", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "PICKED_UP", warehouseId: null })],
+    ]
+    dbState.updateResult = [makeOrder({ status: "IN_WAREHOUSE" })]
+    const { status } = await call(receive)
+    expect(status).toBe(200)
   })
 })
 
@@ -875,6 +972,35 @@ describe("PATCH /orders/:id/cancel", () => {
     expect(json).toEqual({
       error: "Orders cannot be cancelled once they are out for delivery.",
     })
+  })
+
+  it("warehouse admin cannot cancel a parcel held at another warehouse", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "IN_WAREHOUSE", warehouseId: "wh_2" })],
+    ]
+    const { status, json } = await call(cancel)
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "This parcel belongs to a different warehouse.",
+    })
+  })
+
+  it("warehouse admin can cancel an unassigned APPROVED order anywhere", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          status: "APPROVED",
+          warehouseId: "wh_2",
+          pickupRiderId: null,
+        }),
+      ],
+    ]
+    dbState.updateResult = [makeOrder({ status: "CANCELLED" })]
+    const { status, payload } = await call(cancel)
+    expect(status).toBe(200)
+    expect(payload).toMatchObject({ status: "CANCELLED" })
   })
 
   // --- Terminal / idempotency ---

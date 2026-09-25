@@ -3,6 +3,9 @@ import { logAudit } from "@/lib/audit"
 import { PATCH as approvePayout } from "./[id]/approve/route"
 import { PATCH as markPayoutPaid } from "./[id]/paid/route"
 import { PATCH as rejectPayout } from "./[id]/reject/route"
+import { PATCH as bulkApprovePayout } from "./bulk/approve/route"
+import { PATCH as bulkMarkPayoutPaid } from "./bulk/mark-paid/route"
+import { PATCH as bulkRejectPayout } from "./bulk/reject/route"
 import { POST as createPayout, GET as listPayouts } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -306,6 +309,106 @@ describe("PATCH /api/payouts/:id/reject", () => {
           },
         },
       }),
+    )
+  })
+})
+
+describe("PATCH /api/payouts/bulk/approve", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await bulkApprovePayout(
+      req("PATCH", undefined, { ids: ["pr_1"] }),
+    )
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for non-super-admin", async () => {
+    sessionState.value = admin
+    const res = await bulkApprovePayout(
+      req("PATCH", undefined, { ids: ["pr_1"] }),
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it("400 when no pending requests match", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([])
+    const res = await bulkApprovePayout(
+      req("PATCH", undefined, { ids: ["pr_1"] }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it("approves pending requests", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([{ id: "pr_1" }, { id: "pr_2" }])
+    updateResult.push({ id: "pr_1" }, { id: "pr_2" })
+    const res = await bulkApprovePayout(
+      req("PATCH", undefined, { ids: ["pr_1", "pr_2"] }),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true, count: 2 })
+    expect(logAudit).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe("PATCH /api/payouts/bulk/mark-paid", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await bulkMarkPayoutPaid(
+      req("PATCH", undefined, { ids: ["pr_1"] }),
+    )
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for non-super-admin", async () => {
+    sessionState.value = admin
+    const res = await bulkMarkPayoutPaid(
+      req("PATCH", undefined, { ids: ["pr_1"] }),
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it("marks approved requests as paid", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([{ id: "pr_1" }])
+    updateResult.push({ id: "pr_1" })
+    const res = await bulkMarkPayoutPaid(
+      req("PATCH", undefined, { ids: ["pr_1"] }),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true, count: 1 })
+  })
+})
+
+describe("PATCH /api/payouts/bulk/reject", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await bulkRejectPayout(
+      req("PATCH", undefined, { ids: ["pr_1"], reason: "Invalid" }),
+    )
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for non-super-admin", async () => {
+    sessionState.value = admin
+    const res = await bulkRejectPayout(
+      req("PATCH", undefined, { ids: ["pr_1"], reason: "Invalid" }),
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it("rejects pending requests and clears their orders", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([{ id: "pr_1" }])
+    updateResult.push({ id: "pr_1" })
+    const res = await bulkRejectPayout(
+      req("PATCH", undefined, { ids: ["pr_1"], reason: "Invalid details" }),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true, count: 1 })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "PAYOUT_REJECTED" }),
     )
   })
 })

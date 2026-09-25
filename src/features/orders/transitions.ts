@@ -64,6 +64,19 @@ function defineTransition<Schema extends z.ZodType | undefined>(
   return def
 }
 
+// In-memory twin of buildWarehouseOrderScope() (src/lib/db/order-scope.ts):
+// the same three clauses that decide which rows a WAREHOUSE_ADMIN sees in
+// the list/detail endpoints must decide which rows they may act on.
+function warehouseOrderInScope(
+  o: OrderRow,
+  warehouseId: string | null | undefined,
+): boolean {
+  if (!warehouseId) return false
+  if (o.warehouseId === warehouseId) return true
+  if (!o.warehouseId && o.status === "PICKED_UP") return true
+  return o.status === "APPROVED" && !o.pickupRiderId
+}
+
 export const ORDER_TRANSITIONS = {
   approve: defineTransition({
     authorize: (me) => me.role === "SUPER_ADMIN",
@@ -209,10 +222,16 @@ export const ORDER_TRANSITIONS = {
 
   receive: defineTransition({
     authorize: (me) => me.role === "WAREHOUSE_ADMIN" && Boolean(me.warehouseId),
-    guard: ({ order: o }) => {
+    guard: ({ order: o, session }) => {
       if (o.status !== "PICKED_UP") {
         return {
           error: "Only PICKED_UP parcels can be received.",
+          status: 400,
+        }
+      }
+      if (!warehouseOrderInScope(o, session.warehouseId)) {
+        return {
+          error: "This parcel is held at a different warehouse.",
           status: 400,
         }
       }
@@ -408,6 +427,15 @@ export const ORDER_TRANSITIONS = {
         if (!(adminAllowed as readonly string[]).includes(o.status)) {
           return {
             error: "Orders cannot be cancelled once they are out for delivery.",
+            status: 400,
+          }
+        }
+        if (
+          session.role === "WAREHOUSE_ADMIN" &&
+          !warehouseOrderInScope(o, session.warehouseId)
+        ) {
+          return {
+            error: "This parcel belongs to a different warehouse.",
             status: 400,
           }
         }

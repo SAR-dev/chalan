@@ -5,6 +5,7 @@ import { notFound, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
+import { isRoleAllowedIn, parsePortalMode } from "@/lib/portal-mode"
 import { isAdminRole } from "@/lib/two-factor"
 import { parseBody, profileUpdateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -62,6 +63,14 @@ function serializeUser(
     emailVerifiedAt: merchantEmailVerifiedAt ?? null,
     twoFactorEnabled: twoFactor?.twoFactorEnabled ?? false,
     twoFactorRequired: twoFactor?.twoFactorRequired ?? false,
+    // Portal-mode gate (ROADMAP 5.4): false when this role is outside the
+    // deployment's PORTAL_MODE. Deliberately NOT a 403 — the client needs the
+    // payload to explain and sign the user out cleanly; APIs 401 via
+    // requireSession().
+    portalAllowed: isRoleAllowedIn(
+      row.role,
+      parsePortalMode(process.env.PORTAL_MODE),
+    ),
   }
 }
 

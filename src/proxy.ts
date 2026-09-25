@@ -3,14 +3,18 @@
 // Responsibilities:
 //   1. Role-based instance isolation — when ALLOWED_ROLE is set, only that
 //      role's portal is served; other role prefixes redirect to /login.
-//   2. Rate-limit the upload endpoint to prevent flood attacks.
+//   2. Portal-mode gating — when PORTAL_MODE selects a partial deployment
+//      (`admin` or `public`), pages of the disabled portals return 404 so
+//      their shells (and nav) never render. Both filters apply: a request
+//      must satisfy ALLOWED_ROLE (if set) AND PORTAL_MODE.
+//   3. Rate-limit the upload endpoint to prevent flood attacks.
 //      Uses an in-process sliding-window counter (Map + timestamp).
 //      For multi-instance deployments swap this out for a Redis/Upstash store.
-//   3. Per-request CSP nonce — a fresh crypto nonce is generated for every
+//   4. Per-request CSP nonce — a fresh crypto nonce is generated for every
 //      page request, injected into the Content-Security-Policy response header
 //      AND forwarded to the server via the request headers so Next.js applies
 //      it to the inline scripts it renders (see next.config headers).
-//   4. Admin IP allowlist — when ADMIN_IP_ALLOWLIST is set, requests to the
+//   5. Admin IP allowlist — when ADMIN_IP_ALLOWLIST is set, requests to the
 //      admin portal (paths starting /dashboard and /api/admin) from IPs
 //      outside the list get a 403. Defense-in-depth for the portal; other
 //      admin-gated APIs rely on role authz. Unset/empty = disabled.
@@ -23,6 +27,7 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import { ipAllowed, parseAllowlist } from "@/lib/ip-allowlist"
+import { parsePortalMode, portalPageAllowed } from "@/lib/portal-mode"
 
 // ---------------------------------------------------------------------------
 // CSP (Content-Security-Policy)
@@ -105,6 +110,20 @@ function roleGuard(pathname: string, req: NextRequest): NextResponse | null {
   }
 
   return null
+}
+
+// ---------------------------------------------------------------------------
+// Portal-mode gating (ROADMAP 5.4) — PORTAL_MODE selects which portals this
+// instance serves. Pages of a disabled portal 404 at the edge, so its shell
+// (and nav) never renders. `all` (default) serves everything: the guard is a
+// no-op. API/session-side enforcement lives in requireSession().
+// ---------------------------------------------------------------------------
+
+const PORTAL_MODE = parsePortalMode(process.env.PORTAL_MODE)
+
+function portalModeGuard(pathname: string): Response | null {
+  if (portalPageAllowed(pathname, PORTAL_MODE)) return null
+  return new Response("Not found", { status: 404 })
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +210,11 @@ export function proxy(req: NextRequest) {
   const guard = roleGuard(pathname, req)
   if (guard) return guard
 
-  // 3. Upload rate limiting
+  // 3. Portal-mode guard — pages of a disabled portal 404.
+  const portal = portalModeGuard(pathname)
+  if (portal) return portal
+
+  // 4. Upload rate limiting
   if (req.method === "POST" && pathname === "/api/uploads") {
     const forwarded = req.headers.get("x-forwarded-for")
     const ip = forwarded?.split(",")[0]?.trim()
@@ -205,7 +228,7 @@ export function proxy(req: NextRequest) {
     }
   }
 
-  // 4. Per-request CSP nonce (page routes only — enforced by the matcher).
+  // 5. Per-request CSP nonce (page routes only — enforced by the matcher).
   const nonce = createNonce()
   const csp = buildCsp(nonce)
 

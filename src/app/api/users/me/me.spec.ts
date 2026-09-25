@@ -7,22 +7,26 @@ vi.mock("next/headers", () => ({
   headers: () => new Headers(),
 }))
 
+const betterAuthSession: Record<string, unknown> | null = {
+  user: {
+    id: "u1",
+    name: "Test User",
+    email: "test@test.com",
+    emailVerified: true,
+    image: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  session: {},
+}
+const sessionState: { value: Record<string, unknown> | null } = {
+  value: betterAuthSession,
+}
+
 vi.mock("@/lib/auth", () => ({
   auth: {
     api: {
-      getSession: () =>
-        Promise.resolve({
-          user: {
-            id: "u1",
-            name: "Test User",
-            email: "test@test.com",
-            emailVerified: true,
-            image: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          session: {},
-        }),
+      getSession: () => Promise.resolve(sessionState.value),
     },
   },
 }))
@@ -65,6 +69,7 @@ vi.mock("@/lib/db", () => {
 beforeEach(() => {
   selectQueue.length = 0
   updateResult.length = 0
+  sessionState.value = betterAuthSession
 })
 
 function req(method: string, body?: unknown): Request {
@@ -76,6 +81,12 @@ function req(method: string, body?: unknown): Request {
 }
 
 describe("GET /api/users/me", () => {
+  it("401 when unauthenticated", async () => {
+    sessionState.value = null
+    const res = await getMe()
+    expect(res.status).toBe(401)
+  })
+
   it("returns current user profile", async () => {
     selectQueue.push([
       {
@@ -152,9 +163,98 @@ describe("GET /api/users/me", () => {
       vi.unstubAllEnvs()
     }
   })
+
+  it("portalAllowed is false for a merchant on an admin-mode deployment", async () => {
+    vi.stubEnv("PORTAL_MODE", "admin")
+    try {
+      selectQueue.push(
+        [
+          {
+            id: "p1",
+            role: "MERCHANT",
+            phone: "123",
+            isActive: true,
+            tableRowsPerPage: 20,
+            warehouseId: null,
+            merchantId: "m1",
+            riderId: null,
+          },
+        ],
+        [{ emailVerifiedAt: null }],
+        [{ twoFactorEnabled: false }],
+      )
+      const res = await getMe()
+      const json = await res.json()
+      expect(res.status).toBe(200)
+      expect(json.portalAllowed).toBe(false)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it("portalAllowed is true for an admin on an admin-mode deployment", async () => {
+    vi.stubEnv("PORTAL_MODE", "admin")
+    try {
+      selectQueue.push(
+        [
+          {
+            id: "p1",
+            role: "SUPER_ADMIN",
+            phone: "123",
+            isActive: true,
+            tableRowsPerPage: 25,
+            warehouseId: null,
+            merchantId: null,
+            riderId: null,
+          },
+        ],
+        [{ twoFactorEnabled: false }],
+      )
+      const res = await getMe()
+      const json = await res.json()
+      expect(res.status).toBe(200)
+      expect(json.portalAllowed).toBe(true)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it("portalAllowed is true for every role when PORTAL_MODE is unset", async () => {
+    vi.stubEnv("PORTAL_MODE", undefined)
+    try {
+      selectQueue.push(
+        [
+          {
+            id: "p1",
+            role: "MERCHANT",
+            phone: "123",
+            isActive: true,
+            tableRowsPerPage: 20,
+            warehouseId: null,
+            merchantId: "m1",
+            riderId: null,
+          },
+        ],
+        [{ emailVerifiedAt: null }],
+        [{ twoFactorEnabled: false }],
+      )
+      const res = await getMe()
+      const json = await res.json()
+      expect(res.status).toBe(200)
+      expect(json.portalAllowed).toBe(true)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
 })
 
 describe("PATCH /api/users/me", () => {
+  it("401 when unauthenticated", async () => {
+    sessionState.value = null
+    const res = await updateMe(req("PATCH", { name: "New Name" }))
+    expect(res.status).toBe(401)
+  })
+
   it("updates profile", async () => {
     updateResult.push({
       id: "u1",

@@ -111,4 +111,11 @@ export const columnLabels = {
     created: "Created",
     actions: "",
   },
+  user: {
+    name: "Name",
+    role: "Role",
+    status: "Status",
+    created: "Created",
+    actions: "",
+  },
 } as const

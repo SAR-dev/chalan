@@ -165,6 +165,38 @@ Required when deploying with `docker/compose.monolith.yml` or `docker/compose.cl
 
 ---
 
+## Deployment (portal modes)
+
+One codebase ships as three deployment shapes, selected at runtime by the
+server-only `PORTAL_MODE` (never `NEXT_PUBLIC_...` — the browser never reads it
+directly; it learns the answer from `portalAllowed` on `/api/users/me`).
+Changing the value needs a **restart** (env, not DB).
+
+| `PORTAL_MODE`     | Portals served            | Roles allowed                        | Intended deployment                                        |
+| ----------------- | ------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `admin`           | Dashboard + Warehouse     | `SUPER_ADMIN`, `WAREHOUSE_ADMIN`     | Internal ops instance                                      |
+| `public`          | Merchant + Rider          | `MERCHANT`, `RIDER`                  | Internet-facing, customer self-onboarding                  |
+| `all` *(default)* | everything                | all four roles                       | Single instance / dev — unset = zero behavior change       |
+
+Notes:
+
+- **Default is `all`** — leaving the var unset serves every portal (dev/e2e
+  unaffected). Unset/invalid values fall back to `all` (strict validation in
+  `src/lib/env.ts` refuses to boot on a typo).
+- **`public` is a deployment name, not a role** — it maps to the `MERCHANT` +
+  `RIDER` roles (the customer-facing side of the product).
+- **Precedence with `ALLOWED_ROLE` (see Multi-Instance below):**
+  `ALLOWED_ROLE` > `PORTAL_MODE`. `ALLOWED_ROLE` (when set) still restricts a
+  container to its single role, and `PORTAL_MODE` is an additional *group*
+  filter — when both are set a request must satisfy **both**.
+- Enforcement: disabled portals' pages `404` at the edge (`src/proxy.ts`), and
+  their roles get `401` from `requireSession()` on API calls (the sign-in flow
+  additionally signs such sessions out with a clear message). Shared surfaces
+  (`/login`, `/register`, `/track`, `/faq`, `/help`, `/apply`, public APIs)
+  stay reachable in every mode.
+
+---
+
 ## Multi-Instance (Docker compose cluster)
 
 Per-role portal URLs for multi-container deployments. `ALLOWED_ROLE` is set automatically per-container.

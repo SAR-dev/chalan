@@ -12,6 +12,7 @@ const REQUIRED_VARS = [
 const OPTIONAL_VARS = [
   "NEXT_PUBLIC_ENV",
   "STORAGE_PROVIDER",
+  "PORTAL_MODE",
   "DATABASE_URL_READ_ONLY",
   "AUDIT_LOG_RETENTION_DAYS",
   "EMAIL_LOG_RETENTION_DAYS",
@@ -122,6 +123,18 @@ describe("validateEnv", () => {
   it("rejects a malformed SMTP_SECRET_KEY in any env", () => {
     setEnv({ ...baseEnv(), SMTP_SECRET_KEY: "not-hex-secret" })
     expect(() => validateEnv()).toThrow("SMTP_SECRET_KEY")
+  })
+
+  it("accepts every valid PORTAL_MODE value", () => {
+    for (const mode of ["admin", "public", "all"]) {
+      setEnv({ ...baseEnv(), PORTAL_MODE: mode })
+      expect(validateEnv()).toBeUndefined()
+    }
+  })
+
+  it("rejects an invalid PORTAL_MODE", () => {
+    setEnv({ ...baseEnv(), PORTAL_MODE: "merchant" })
+    expect(() => validateEnv()).toThrow("PORTAL_MODE")
   })
 
   it("requires SMTP_SECRET_KEY when NEXT_PUBLIC_ENV=production", () => {

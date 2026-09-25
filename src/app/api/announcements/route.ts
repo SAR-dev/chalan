@@ -12,6 +12,9 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
+  // The management list (incl. drafts) is super-admin only — the public inbox
+  // reads /api/announcements/active instead.
+  if (me.role !== "SUPER_ADMIN") return forbidden()
 
   const { limit, offset } = parsePagination(req)
   const url = new URL(req.url)

@@ -4,9 +4,10 @@
 > removed from this document** (full audit trail in git history — see "Recently
 > Completed" entries in older commits).
 >
-> Current health: Build ✅ · Typecheck ✅ · Unit **1018/1018** ✅ · E2E **51/51** ✅ ·
-> `pnpm ci:check` ✅ (606 files) · CI runs typecheck/lint/format/**security-audit**/build ·
-> husky pre-commit (lint-staged) active · dependency tree has **0 high/critical advisories**.
+> Current health: Build ✅ · Typecheck ✅ · Unit **1154/1154** ✅ · E2E **54/54** ✅ ·
+> `pnpm ci:check` ✅ (627 files) · CI runs typecheck/lint/format/**security-audit**/build ·
+> husky pre-commit (lint-staged) active · dependency tree has **0 high/critical advisories** ·
+> **route-auth-guard** test enforces server-side auth on all 104 API routes.
 
 ---
 
@@ -16,11 +17,11 @@ Sections are listed **in the order they will be worked on**:
 
 | #    | Section                                   | Priority  | Effort | Status |
 |------|-------------------------------------------|-----------|--------|--------|
-| 5.1  | Backend permission enforcement sweep      | 🔴 High   | M      | ⏳      |
-| 5.2  | User management (admin panel)             | 🔴 High   | M      | ⏳      |
-| 5.3  | Change own email address                  | 🟡 Medium | S–M    | ⏳      |
-| 5.4  | Portal modes — 3 deployable formats       | 🟡 Medium | M      | ⏳      |
-| 5.5  | Notification system                       | 🟡 Medium | L      | ⏳      |
+| 5.1  | Backend permission enforcement sweep      | 🔴 High   | M      | ✅      |
+| 5.2  | User management (admin panel)             | 🔴 High   | M      | ✅      |
+| 5.3  | Change own email address                  | 🟡 Medium | S–M    | ✅      |
+| 5.4  | Portal modes — 3 deployable formats       | 🟡 Medium | M      | ✅      |
+| 5.5  | Notification system                       | 🟡 Medium | L      | ⏳ Next |
 | 5.6  | Storage hygiene — periodic image cleaning | 🟡 Medium | M      | ⏳      |
 | 5.7  | 1% Improvements (quick wins)              | —         | S      | ⏳      |
 | 5.8  | Analytics & Reporting                     | 🟡 Medium | M      | ⏳      |
@@ -52,107 +53,72 @@ Functional B2B delivery platform (one instance + one database per customer, no m
 
 ---
 
-## 5.1 Backend permission enforcement sweep — HIGH (first)
+## 5.1 Backend permission enforcement sweep — HIGH ✅
 
-**Problem:** permission checks must never live only in the frontend (hidden buttons/
-routes). Every API must re-verify session, role, and ownership server-side.
+**Done.** Automated guard: `src/app/api/route-auth-guard.spec.ts` statically scans all
+**104 route files** — each must contain `requireSession(` / `auth.api.getSession(` /
+cron-secret auth / a transitions delegate, or sit in the verified 6-route public
+allowlist (auth catch-all, verify-email, health, resend-verification, receiver-note,
+warehouses/public). Guard fails on new unauthenticated routes and on stale allowlist
+entries.
 
-**Scope — check ALL of `src/app/api/**`:**
-
-1. **Inventory**: enumerate every route file; for each, document: auth entry
-   (`requireSession`), role gate, ownership/scoping rule, public-by-design (only
-   `receiver-note`, health, auth, verify-email, uploads/nids are expected public —
-   confirm the list).
-2. **Fix gaps** found by the sweep: any handler missing `requireSession()`, any
-   role check that exists only in the UI, any read/write missing owner/warehouse/
-   merchant scoping (Neon has no RLS — server is the only line).
-3. **Automated guard**: add a unit test that statically scans
-   `src/app/api/**/route.ts` and fails if a handler file has no auth entry point
-   (allow-list the known-public routes) — so future routes can't regress.
-4. **Spec coverage**: every route keeps/gets a colocated spec asserting 401
-   (unauthenticated) + 403 (wrong role) at minimum.
-5. **Frontend/backend parity pass**: for each admin/role-gated UI action, confirm
-   the endpoint behind it enforces the same rule (e.g. dialogs hidden client-side
-   must still be rejected server-side).
-
-Acceptance: guard test in `pnpm test:unit:run`; zero unauthenticated/unscoped
-write endpoints; sweep result table (route → auth → scope → spec) appended here
-when done.
+- **Gaps fixed (4):** `GET /api/announcements` (was any-role → SUPER_ADMIN only),
+  `GET /api/riders/[id]` (cross-hub WAREHOUSE_ADMIN → forbidden),
+  `PATCH orders/:id/receive` + `cancel`/bulk (cross-hub → warehouse scope guard,
+  `warehouseOrderInScope()`)
+- **Specs:** +80 cases; uncovered routes 15 → 3 (all public-by-design); parity table
+  for all 104 routes verified (route → auth → scope → spec)
 
 ---
 
-## 5.2 User management (admin panel) — HIGH (second)
+## 5.2 User management (admin panel) — HIGH ✅
 
-A **`/dashboard/users`** page (SUPER_ADMIN only) to manage all accounts:
-
-| Capability                       | Implementation notes                                                                                                                                                     |
-|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| List users                       | all roles: name, email, role, active/banned status, created; server-paginated DataTable (repo pattern)                                                                   |
-| **Change user password**         | better-auth `admin()` plugin is already installed — use its `api.admin.setUserPassword` (no custom hashing); confirm password policy via existing validation             |
-| **Ban / unban user**             | plugin's ban API — `user.banned/banReason/banExpires` columns already exist in our schema; banned users rejected at sign-in; ban requires a reason (+ optional duration) |
-| Audit                            | `logAudit` every reset/ban/unban (`USER_PASSWORD_RESET`, `USER_BANNED`, `USER_UNBANNED`), entity `user`                                                                  |
-| Out of scope (note, don't build) | impersonation (plugin supports it — defer), role changes                                                                                                                 |
-
-Deliverables: route(s) + validation + `use-users` hook + page + dialogs
-(reset-password dialog, ban dialog with ConfirmDialog), nav entry, colocated
-spec (401/403/validation/happy + audit assertions), e2e (admin resets password →
-login with new password; admin bans → banned login rejected).
+**Done.** `GET /api/admin/users` (paginated, `?q=`/`?role=`/`?sort=`) +
+`PATCH /api/admin/users/[id]/{password,ban,unban}` — SUPER_ADMIN-gated, better-auth
+admin APIs (`setUserPassword`/`banUser`/`unbanUser`), audited (`USER_PASSWORD_RESET`/
+`USER_BANNED`/`USER_UNBANNED`, password never logged), self-ban blocked.
+UI: `/dashboard/users` DataTable + reset-password & ban dialogs + nav entry +
+`USER_STATUS_*` badges + 11 testids. Tests: 22 unit + **S38 e2e** (reset→login→restore,
+ban→sign-in rejected→unban — full state restoration in `try/finally`).
+Fixed en-route: better-auth admin permissions needed `user.role='admin'` on seeded
+SUPER_ADMIN rows (seed helper + DB backfill).
 
 ---
 
-## 5.3 Change own email address — MEDIUM
+## 5.3 Change own email address — MEDIUM ✅
 
-Users change their **login email** from account settings (all roles):
-
-- Flow: current password (or 2FA code for enrolled admins) → new email →
-  **verification link sent to the NEW address** (mailer exists) → on confirm,
-  `user.email` updated (unique index — handle duplicate with a clear 409 message)
-- Reject while a change is pending; allow resend; token expiry via Better Auth
-  verification table (already in schema)
-- Better Auth has `changeEmail`/updateEmail support — use the library flow where
-  possible rather than hand-rolling tokens
-- **Scope decision:** only the account (`user.email`) changes — the merchant's
-  business email (`merchant.email`, used for display/receipts) stays admin-managed;
-  note this in UI copy ("this changes your login email")
-- Specs: request → token created/mail sent (mailer mocked) → confirm → email
-  changed; duplicate-email 409; wrong-password 400; e2e happy path with mailer
-  disabled fallback? (verify how e2e handles verification tokens — reuse the
-  existing verify-email e2e technique)
+**Done.** better-auth `user.changeEmail` flow: `authClient.changeEmail({newEmail})` →
+JWT verification link emailed to the **NEW** address (`changeEmailTemplate`) →
+`/api/auth/verify-email` confirms and rewrites the session. App's static verify-email
+route now delegates dotted (change-email) tokens to `auth.handler` (routing conflict
+fixed + spec). UI: Email card on the Profile tab (current email, new input,
+`email-change-*` testids, no-op guard, expired-link toast). `merchant.email` untouched.
+Tests: +9 unit (template + route delegation) + **S39 e2e** (throwaway merchant,
+JWT re-signed from `BETTER_AUTH_SECRET` for confirm, asserts `user.email` changed /
+`merchant.email` unchanged / old sign-in rejected).
+Known limitation: duplicate new email returns success silently (better-auth
+anti-enumeration — no 409 oracle); self-service change is intentionally unaudited.
 
 ---
 
-## 5.4 Portal modes — 3 deployable formats — MEDIUM
+## 5.4 Portal modes — 3 deployable formats — MEDIUM ✅
 
-One codebase, **three deployment shapes, selected by env var at runtime (no rebuild)**:
+**Done.** `PORTAL_MODE=admin|public|all` (server-only env, default `all`, validated in
+`env.ts`, documented in ENV.md + .env.example):
 
-| `PORTAL_MODE`     | Portals served                      | Intended deployment                                                                                                                                    |
-|-------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `admin`           | Dashboard (Super Admin) + Warehouse | internal ops instance                                                                                                                                  |
-| `public`          | Merchant + Rider                    | **publicly accessible** customer-facing instance (public = the merchant portal renamed — it will be open to the internet for merchant self-onboarding) |
-| `all` *(default)* | everything                          | single-instance / dev                                                                                                                                  |
+| Mode | Portals | Roles |
+|---|---|---|
+| `admin` | dashboard + warehouse | SUPER_ADMIN, WAREHOUSE_ADMIN |
+| `public` | merchant + rider (publicly accessible) | MERCHANT, RIDER |
+| `all` | everything (dev/e2e default) | all four |
 
-**Implementation notes:**
-
-- Server-only env (validated in `src/lib/env.ts`, documented in `docs/ENV.md` +
-  `.env.example`) — must NOT be `NEXT_PUBLIC` (deployment-time choice, same
-  reasoning as `ALLOWED_ROLE`).
-- Enforcement points:
-  1. `src/proxy.ts` — pages of disabled portals → 404 at the edge (and their
-     nav never renders)
-  2. **Sign-in gate** — post-auth, roles outside the mode are rejected with a
-     clear message (otherwise their sessions could still call shared APIs)
-  3. Nav/shell — filter role nav from the mode so client bundles of a
-     `public` instance never link to disabled areas
-- Naming: mode `public` ≠ role name — it maps to roles `MERCHANT` + `RIDER`;
-  keep the env value `public` (the customer portals are the public-facing side).
-- Shared surface stays shared: `/login`, `/register`, `/track`, `/faq`, `/help`,
-  public APIs (zone pricing, cities) work in all modes.
-- Relationship to existing `ALLOWED_ROLE` (single-role containers, multi-instance
-  Docker): `PORTAL_MODE` selects a *group*; `ALLOWED_ROLE` (if set) still wins
-  for single-role containers — document precedence: `ALLOWED_ROLE` > `PORTAL_MODE`.
-- Tests: unit for the mode→roles mapping; proxy gating spec; e2e runs in `all`
-  mode (default) — plus a unit/e2e assertion that `PORTAL_MODE=public` rejects
-  an admin sign-in (use env override in a targeted test if feasible).
+Enforcement: **edge** `portalModeGuard` in proxy (disabled portal pages → 404,
+segment-aware, CSP untouched) · **API** `requireSession()` returns null for
+disallowed roles → 401 · **client** `portalAllowed` from `/api/users/me` →
+sign-in/bootstrap rejected with "This portal is not available on this deployment."
+Nav filtering is automatic (404'd shells never render). Precedence `ALLOWED_ROLE` >
+`PORTAL_MODE` (both must pass). Tests: 23 new (mode matrix, page filter, gate,
+env validation); full e2e green in default mode.
 
 ---
 
@@ -279,11 +245,11 @@ secret, dry-run deletes nothing); run `dryRun` for a week before enabling delete
 ## Execution order
 
 ```
-1. 5.1 Permission sweep        guard test + fixes + specs           [NOW]
-2. 5.2 User management         password reset + ban/unban           [NEXT]
-3. 5.3 Change own email        verification-link flow
-4. 5.4 Portal modes            env-driven 3 deployable formats (admin|public|all)
-5. 5.5 Notification system     in-app v1 (email v2 later)
+1. 5.1 Permission sweep        guard test + fixes + specs           ✅ DONE
+2. 5.2 User management         password reset + ban/unban           ✅ DONE
+3. 5.3 Change own email        verification-link flow               ✅ DONE
+4. 5.4 Portal modes            env-driven 3 deployable formats      ✅ DONE
+5. 5.5 Notification system     in-app v1 (email v2 later)           [NEXT]
 6. 5.6 Storage hygiene         periodic orphan-image sweep (dry-run first)
 7. 5.7 Quick wins              anytime
 8. 5.8–5.11                    medium/low, opportunistic

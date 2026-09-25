@@ -162,6 +162,7 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       group: "System",
     },
     { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
+    { href: "/dashboard/users", label: "Users", icon: Users, group: "System" },
     { href: "/dashboard/team", label: "Admins", icon: Users, group: "System" },
     {
       href: "/dashboard/settings",
