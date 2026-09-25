@@ -23,6 +23,7 @@ export const twoFactor = {
   passwordCancel: "[data-testid='two-factor-password-cancel']",
   secret: "[data-testid='two-factor-secret']",
   secretCopy: "[data-testid='two-factor-secret-copy']",
+  qr: "[data-testid='two-factor-qr']",
   codeInput: "[data-testid='two-factor-code-input']",
   verifySubmit: "[data-testid='two-factor-verify-submit']",
   verifyCancel: "[data-testid='two-factor-verify-cancel']",

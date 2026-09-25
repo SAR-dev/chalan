@@ -50,6 +50,7 @@
     "nextjs-toploader": "^3.9.17",
     "nodemailer": "^9.1.1",
     "pg": "8.21.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19",
     "react-dom": "^19",
     "react-markdown": "^10.1.0",

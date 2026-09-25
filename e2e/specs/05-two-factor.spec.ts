@@ -71,6 +71,8 @@ test.describe("S37. Two-factor authentication for admins", () => {
 
     const secretInput = page.locator(twoFactor.secret)
     await expect(secretInput).toBeVisible({ timeout: 15_000 })
+    // QR shows the same otpauth URI — scannable instead of copying the key
+    await expect(page.locator(twoFactor.qr)).toBeVisible()
     const secret = (await secretInput.inputValue()).trim()
     expect(secret).toMatch(/^[A-Z2-7]+$/)
 
