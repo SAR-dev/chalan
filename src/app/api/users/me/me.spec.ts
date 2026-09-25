@@ -88,11 +88,69 @@ describe("GET /api/users/me", () => {
         merchantId: null,
         riderId: null,
       },
+      [{ twoFactorEnabled: false }],
     ])
     const res = await getMe()
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ id: "u1", name: "Test User" })
+    expect(json.twoFactorRequired).toBe(false)
+    expect(json.twoFactorEnabled).toBe(false)
+  })
+
+  it("admin gets twoFactorRequired when ADMIN_2FA_REQUIRED=1", async () => {
+    vi.stubEnv("ADMIN_2FA_REQUIRED", "1")
+    try {
+      selectQueue.push(
+        [
+          {
+            id: "p1",
+            role: "SUPER_ADMIN",
+            phone: "123",
+            isActive: true,
+            tableRowsPerPage: 20,
+            warehouseId: null,
+            merchantId: null,
+            riderId: null,
+          },
+        ],
+        [{ twoFactorEnabled: true }],
+      )
+      const res = await getMe()
+      const json = await res.json()
+      expect(json.twoFactorRequired).toBe(true)
+      expect(json.twoFactorEnabled).toBe(true)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it("merchant never gets twoFactorRequired but sees their own 2FA state", async () => {
+    vi.stubEnv("ADMIN_2FA_REQUIRED", "1")
+    try {
+      selectQueue.push(
+        [
+          {
+            id: "p1",
+            role: "MERCHANT",
+            phone: "123",
+            isActive: true,
+            tableRowsPerPage: 20,
+            warehouseId: null,
+            merchantId: "m1",
+            riderId: null,
+          },
+        ],
+        [{ emailVerifiedAt: null }],
+        [{ twoFactorEnabled: true }],
+      )
+      const res = await getMe()
+      const json = await res.json()
+      expect(json.twoFactorRequired).toBe(false)
+      expect(json.twoFactorEnabled).toBe(true)
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })
 

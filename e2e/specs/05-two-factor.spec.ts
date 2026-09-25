@@ -1,22 +1,36 @@
 import { expect, type Page, test } from "@playwright/test"
 import { totpSecretFromUri } from "@/lib/two-factor"
-import { CREDS, login } from "../helpers"
+import { CREDS, type E2ECredential, login } from "../helpers"
 import { auth, twoFactor } from "../selectors"
 import { totp } from "../totp"
 
 const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider|welcome)/
 
-async function openSecurityTab(page: Page) {
-  await page.goto("/dashboard/account")
+async function openTwoFactorTab(page: Page, path = "/dashboard/account") {
+  await page.goto(path)
   await page.waitForLoadState("networkidle")
-  await page.locator(auth.accountSecurityTab).click()
+  await page.locator(auth.accountTwoFactorTab).click()
+  // Let /api/users/me settle so status/policy assertions see fresh flags.
+  await page.waitForLoadState("networkidle")
   await expect(page.locator(twoFactor.status)).toBeVisible()
 }
 
-/** Reads the live TOTP secret for the signed-in admin (recovery path). */
-async function fetchTotpSecret(page: Page): Promise<string> {
+/** Skip onboarding if the merchant landed on /welcome */
+async function skipOnboardingIfNeeded(page: Page) {
+  if (page.url().includes("/welcome")) {
+    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
+    await page.waitForLoadState("networkidle")
+  }
+}
+
+/** Reads the live TOTP secret for the signed-in user (recovery path). */
+async function fetchTotpSecret(
+  page: Page,
+  cred: E2ECredential,
+): Promise<string> {
   const res = await page.request.post("/api/auth/two-factor/get-totp-uri", {
-    data: { password: CREDS.superAdmin.password },
+    data: { password: cred.password },
   })
   expect(res.ok()).toBeTruthy()
   const body = (await res.json()) as { totpURI?: string }
@@ -25,14 +39,18 @@ async function fetchTotpSecret(page: Page): Promise<string> {
   return secret as string
 }
 
-/** Best-effort: leave the seeded admin without 2FA after every attempt. */
+/** Best-effort: leave the seeded users without 2FA after every attempt. */
 async function disableIfEnrolled(page: Page) {
   try {
     const me = await page.request.get("/api/users/me")
     if (!me.ok()) return
-    const body = (await me.json()) as { twoFactorEnabled?: boolean }
+    const body = (await me.json()) as {
+      twoFactorEnabled?: boolean
+      role?: string
+    }
     if (body.twoFactorEnabled !== true) return
-    const secret = await fetchTotpSecret(page)
+    const cred = body.role === "MERCHANT" ? CREDS.merchant : CREDS.superAdmin
+    const secret = await fetchTotpSecret(page, cred)
     await page.request.post("/api/account/two-factor/disable", {
       data: { code: totp(secret) },
     })
@@ -41,27 +59,28 @@ async function disableIfEnrolled(page: Page) {
   }
 }
 
-test.describe("S37. Two-factor authentication for admins", () => {
+test.describe("S37. Two-factor authentication", () => {
   test.afterEach(async ({ page }) => {
     await disableIfEnrolled(page)
   })
 
-  test("require-2FA toggle is visible for super admins and off by default", async ({
+  test("no policy line when ADMIN_2FA_REQUIRED is unset, status visible", async ({
     page,
   }) => {
     await login(page, CREDS.superAdmin)
-    await openSecurityTab(page)
+    await openTwoFactorTab(page)
 
-    const toggle = page.locator(twoFactor.requireToggle)
-    await expect(toggle).toBeVisible()
-    await expect(toggle).toHaveAttribute("aria-checked", "false")
+    await expect(page.locator(twoFactor.status)).toHaveText("Disabled")
+    await expect(page.locator(twoFactor.enableButton)).toBeVisible()
+    // Env policy off → the deployment-policy line must not render.
+    await expect(page.locator(twoFactor.policy)).toHaveCount(0)
   })
 
   test("admin enrolls in 2FA and signs in with a TOTP code", async ({
     page,
   }) => {
     await login(page, CREDS.superAdmin)
-    await openSecurityTab(page)
+    await openTwoFactorTab(page)
     await expect(page.locator(twoFactor.status)).toHaveText("Disabled")
 
     // ── Enroll ────────────────────────────────────────────────────────────
@@ -84,6 +103,13 @@ test.describe("S37. Two-factor authentication for admins", () => {
     await expect(recoveryCodes).toBeVisible({ timeout: 15_000 })
     await expect(recoveryCodes).toContainText(/[A-Za-z0-9]{5}-[A-Za-z0-9]{5}/)
     await expect(page.locator(twoFactor.recoveryCopy)).toBeVisible()
+
+    // Download as .txt
+    const downloadPromise = page.waitForEvent("download")
+    await page.locator(twoFactor.recoveryDownload).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toBe("two-factor-recovery-codes.txt")
+
     await page.locator(twoFactor.recoveryDone).click()
     await expect(page.locator(twoFactor.status)).toHaveText("Enabled")
 
@@ -110,7 +136,63 @@ test.describe("S37. Two-factor authentication for admins", () => {
     expect(page.url()).toContain("/dashboard")
 
     // ── Disable again (leaves the seeded admin clean) ─────────────────────
-    await openSecurityTab(page)
+    await openTwoFactorTab(page)
+    await expect(page.locator(twoFactor.status)).toHaveText("Enabled")
+    await page.locator(twoFactor.disableButton).click()
+    await page.locator(twoFactor.disableInput).fill(totp(secret))
+    await page.locator(twoFactor.disableSubmit).click()
+    await expect(page.locator(twoFactor.status)).toHaveText("Disabled", {
+      timeout: 15_000,
+    })
+  })
+
+  test("merchant can opt into 2FA and signs in with a TOTP code", async ({
+    page,
+  }) => {
+    await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
+
+    // ── Opt in from the merchant account page ─────────────────────────────
+    await openTwoFactorTab(page, "/merchant/account")
+    await expect(page.locator(twoFactor.status)).toHaveText("Disabled")
+
+    await page.locator(twoFactor.enableButton).click()
+    await page.locator(twoFactor.passwordInput).fill(CREDS.merchant.password)
+    await page.locator(twoFactor.passwordSubmit).click()
+
+    const secretInput = page.locator(twoFactor.secret)
+    await expect(secretInput).toBeVisible({ timeout: 15_000 })
+    const secret = (await secretInput.inputValue()).trim()
+
+    await page.locator(twoFactor.codeInput).fill(totp(secret))
+    await page.locator(twoFactor.verifySubmit).click()
+
+    await expect(page.locator(twoFactor.recoveryCodes)).toBeVisible({
+      timeout: 15_000,
+    })
+    await page.locator(twoFactor.recoveryDone).click()
+    await expect(page.locator(twoFactor.status)).toHaveText("Enabled")
+
+    // ── Fresh sign-in must challenge the merchant too (role-agnostic) ─────
+    await page.context().clearCookies()
+    await page.goto("/login")
+    await page.locator(auth.loginEmail).fill(CREDS.merchant.email)
+    const passwordInput = page.locator(auth.loginPassword)
+    await passwordInput.waitFor({ state: "visible" })
+    await passwordInput.fill(CREDS.merchant.password)
+    await passwordInput.press("Enter")
+
+    await expect(page.locator(twoFactor.loginInput)).toBeVisible({
+      timeout: 15_000,
+    })
+    await page.locator(twoFactor.loginInput).fill(totp(secret))
+    await page.locator(twoFactor.loginSubmit).click()
+    await page.waitForURL(AUTHENTICATED_URL, { timeout: 15_000 })
+    await page.waitForLoadState("networkidle")
+    await skipOnboardingIfNeeded(page)
+
+    // ── Disable again (leaves the seeded merchant clean) ──────────────────
+    await openTwoFactorTab(page, "/merchant/account")
     await expect(page.locator(twoFactor.status)).toHaveText("Enabled")
     await page.locator(twoFactor.disableButton).click()
     await page.locator(twoFactor.disableInput).fill(totp(secret))

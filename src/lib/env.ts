@@ -158,6 +158,10 @@ export function validateEnv(): void {
       }
     }
 
+    // Optional - "1" makes 2FA mandatory for admin roles (deployment policy).
+    // Unset/empty = optional (admins and merchants/riders may still opt in).
+    oneOf(e, "ADMIN_2FA_REQUIRED", ["0", "1"], "0")
+
     const provider = oneOf(
       e,
       "STORAGE_PROVIDER",

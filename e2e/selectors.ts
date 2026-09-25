@@ -11,12 +11,13 @@ export const auth = {
   registerForm: "[data-testid='register-form']",
   logout: "[data-testid='logout']",
   accountSecurityTab: "[data-testid='account-tab-security']",
+  accountTwoFactorTab: "[data-testid='account-tab-two-factor']",
 }
 
 // ─── Two-factor authentication (H4) ─────────────────────────────────────────
 export const twoFactor = {
   status: "[data-testid='two-factor-status']",
-  requireToggle: "[data-testid='two-factor-require-toggle']",
+  policy: "[data-testid='two-factor-policy']",
   enableButton: "[data-testid='two-factor-enable']",
   passwordInput: "[data-testid='two-factor-password-input']",
   passwordSubmit: "[data-testid='two-factor-password-submit']",
@@ -29,6 +30,7 @@ export const twoFactor = {
   verifyCancel: "[data-testid='two-factor-verify-cancel']",
   recoveryCodes: "[data-testid='two-factor-recovery-codes']",
   recoveryCopy: "[data-testid='two-factor-recovery-copy']",
+  recoveryDownload: "[data-testid='two-factor-recovery-download']",
   recoveryDone: "[data-testid='two-factor-recovery-done']",
   regenerateButton: "[data-testid='two-factor-regenerate']",
   disableButton: "[data-testid='two-factor-disable']",
