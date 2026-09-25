@@ -129,7 +129,7 @@ src/lib/
   db/seed/                           per-entity seed modules (riders, orders, merchant-balances, etc.)
   db/seed.ts                         main seed runner
   db/seed-credentials.ts             credential seeding
-  storage/                           file upload backends (local / R2 / Supabase)
+  storage/                           file upload backends (local / R2)
   hooks/fetcher.ts                   SWR fetcher, RESOURCE_KEYS, swrOptions
   hooks/use-debounced-value.ts       shared debounce hook used by all search hooks
   hooks/use-data-error.ts            aggregates error state for the global banner
@@ -1330,11 +1330,9 @@ import { saveFile } from "@/lib/storage"
 const { publicUrl } = await saveFile(relativePath, buffer, mimeType)
 ```
 
-The active backend is selected by the `STORAGE_PROVIDER` env var (`"local"`,
-`"r2"`, or `"supabase"`). `"local"` writes to disk and serves files via
-`/api/uploads`; `"r2"` uploads to Cloudflare R2; `"supabase"` uploads to
-Supabase Storage using the `@supabase/supabase-js` client with the
-`service_role` key. Defaults to `"local"` when the var is unset.
+The active backend is selected by the `STORAGE_PROVIDER` env var (`"local"` or
+`"r2"`). `"local"` writes to disk and serves files via `/api/uploads`; `"r2"`
+uploads to Cloudflare R2. Defaults to `"local"` when the var is unset.
 
 On the client side, use `uploadImage()` from `src/lib/upload-image.ts`. It compresses
 the file before sending and targets the correct folder (avatar vs. photo). The

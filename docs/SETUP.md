@@ -104,17 +104,19 @@ primary. Here's how to set it up per provider:
 printf "CRON_SECRET='%s'\n" "$(openssl rand -base64 32)" >> .env.development.local
 ```
 
-Three cleanup endpoints are available, all authenticated via `CRON_SECRET`:
+Four cleanup endpoints are available, all authenticated via `CRON_SECRET`:
 
-| Endpoint                       | What it deletes                        | Retention default |
-| ------------------------------ | -------------------------------------- | ----------------- |
-| `/api/cron/cleanup-sessions`   | Expired sessions + verification tokens | Immediate (N/A)   |
-| `/api/cron/cleanup-audit-logs` | Old audit log entries                  | 30 days           |
-| `/api/cron/cleanup-email-logs` | Successful email logs (SENT only)      | 10 days           |
+| Endpoint                       | What it deletes                          | Retention default    |
+| ------------------------------ | ---------------------------------------- | -------------------- |
+| `/api/cron/cleanup-sessions`   | Expired sessions + verification tokens   | Immediate (N/A)      |
+| `/api/cron/cleanup-audit-logs` | Old audit log entries                    | 30 days              |
+| `/api/cron/cleanup-email-logs` | Successful email logs (SENT only)        | 10 days              |
+| `/api/cron/cleanup-uploads`    | Orphaned uploads (unreferenced in the DB) | 48 hours (min age)  |
 
-Retention is configurable via `AUDIT_LOG_RETENTION_DAYS` and
-`EMAIL_LOG_RETENTION_DAYS` env vars. FAILED email log entries are never
-auto-deleted.
+Retention is configurable via `AUDIT_LOG_RETENTION_DAYS`,
+`EMAIL_LOG_RETENTION_DAYS`, and `UPLOAD_SWEEP_MIN_AGE_HOURS` env vars. FAILED
+email log entries are never auto-deleted; `cleanup-uploads` never deletes a
+file referenced by an image column or one younger than the grace period.
 
 On **Vercel**, add `CRON_SECRET` to your project env vars — Vercel Cron injects
 the `Authorization` header automatically. On a **Docker/VPS single instance**,
@@ -127,40 +129,37 @@ call from crontab (stagger times to avoid load spikes):
   -H "Authorization: Bearer $CRON_SECRET" >> /var/log/app-cron.log 2>&1
 0 4 * * * curl -s -X POST https://your-domain/api/cron/cleanup-email-logs \
   -H "Authorization: Bearer $CRON_SECRET" >> /var/log/app-cron.log 2>&1
+30 4 * * * curl -s -X POST "https://your-domain/api/cron/cleanup-uploads?dryRun=1" \
+  -H "Authorization: Bearer $CRON_SECRET" >> /var/log/app-cron.log 2>&1
 ```
 
+Run `cleanup-uploads` with `?dryRun=1` first (as above): a dry run reports
+`{ scanned, orphans, ... }` without deleting anything. Drop the query param
+once a week of logs looks right. The sweep is not in `vercel.json` (free-plan
+cron limit) — see `docs/ENV.md` → Cron.
+
 On a **multi-instance Docker deployment**, the `cron` service in
-`docker/compose.cluster.yml` handles all three automatically — it targets the
+`docker/compose.cluster.yml` handles all four automatically — it targets the
 `dashboard` container's internal port so you don't need to expose the endpoints
 publicly.
 
 ### Storage backends
 
-The app supports three storage providers for file uploads (avatars, delivery
+The app supports two storage providers for file uploads (avatars, delivery
 proofs, pickup-location photos):
 
 | Provider   | `STORAGE_PROVIDER` | When to use                                  |
 | ---------- | ------------------ | -------------------------------------------- |
 | Local disk | `local` (default)  | Single-instance dev or Docker deployments    |
 | R2         | `r2`               | Multi-instance or cloud-native on Cloudflare |
-| Supabase   | `supabase`         | Supabase-hosted projects                     |
 
 > **Multi-instance note:** when running more than one app container, use
-> `STORAGE_PROVIDER=r2` or `STORAGE_PROVIDER=supabase`. Local disk storage
+> `STORAGE_PROVIDER=r2`. Local disk storage
 > is not shared across containers — each instance would see a different subset
 > of uploaded files. The `uploads_data` named volume in the compose files
 > is shared across all role containers, so `local` still works for the
 > multi-instance Docker setup as long as all containers run on the same host.
-> For multi-host deployments, switch to R2 or Supabase.
-
-**Supabase Storage** env vars (when `STORAGE_PROVIDER=supabase`):
-
-```env
-SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-SUPABASE_SERVICE_KEY=xxxxxxxxxxxxx
-SUPABASE_BUCKET=xxxxxxxxxxxxx
-SUPABASE_PUBLIC_URL=https://xxxxxxxxxxxxx.supabase.co/storage/v1/object/public/xxxxxxxxxxxxx
-```
+> For multi-host deployments, switch to R2.
 
 Generate `BETTER_AUTH_SECRET`:
 

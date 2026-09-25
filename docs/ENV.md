@@ -81,7 +81,7 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 | Variable           | Required | Default | Description                       |
 | ------------------ | -------- | ------- | --------------------------------- |
-| `STORAGE_PROVIDER` | **Yes**  | `local` | One of: `local`, `r2`, `supabase` |
+| `STORAGE_PROVIDER` | **Yes**  | `local` | One of: `local`, `r2` |
 
 ### Local (`STORAGE_PROVIDER=local`)
 
@@ -99,24 +99,24 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 | `R2_BUCKET_NAME`       | **Yes**  | R2 bucket name                                  |
 | `R2_PUBLIC_URL`        | **Yes**  | Public URL (r2.dev subdomain or custom domain)  |
 
-### Supabase (`STORAGE_PROVIDER=supabase`)
-
-| Variable               | Required | Description                                                          |
-| ---------------------- | -------- | -------------------------------------------------------------------- |
-| `SUPABASE_URL`         | **Yes**  | Supabase project URL (Settings → API → Project URL)                  |
-| `SUPABASE_SERVICE_KEY` | **Yes**  | `service_role` key (Settings → API → service_role). Server-side only |
-| `SUPABASE_BUCKET`      | **Yes**  | Storage bucket name                                                  |
-| `SUPABASE_PUBLIC_URL`  | **Yes**  | Public base URL for serving files from the bucket                    |
-
 ---
 
 ## Cron
 
-| Variable                   | Required | Default | Description                                                                    |
-| -------------------------- | -------- | ------- | ------------------------------------------------------------------------------ |
-| `CRON_SECRET`              | **Yes**  | —       | Authenticates `/api/cron/*` endpoints. Generate with `openssl rand -base64 32` |
-| `AUDIT_LOG_RETENTION_DAYS` | No       | `30`    | Days to retain audit logs. Older entries are cleaned daily                     |
-| `EMAIL_LOG_RETENTION_DAYS` | No       | `10`    | Days to retain sent email logs. Failed emails are never deleted                |
+| Variable                     | Required | Default | Description                                                                                     |
+| ---------------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `CRON_SECRET`                | **Yes**  | —       | Authenticates `/api/cron/*` endpoints. Generate with `openssl rand -base64 32`                  |
+| `AUDIT_LOG_RETENTION_DAYS`   | No       | `30`    | Days to retain audit logs. Older entries are cleaned daily                                      |
+| `EMAIL_LOG_RETENTION_DAYS`   | No       | `10`    | Days to retain sent email logs. Failed emails are never deleted                                 |
+| `UPLOAD_SWEEP_MIN_AGE_HOURS` | No       | `48`    | Hours an unreferenced upload must age before `/api/cron/cleanup-uploads` may delete it          |
+
+`/api/cron/cleanup-uploads` (ROADMAP 5.6 — storage hygiene) is scheduled via
+crontab / the Docker cron container (pg_cron cannot make HTTP calls, so it is
+not in `scripts/setup-pg-cron.sql`), and is **not** in `vercel.json` (same
+free-plan limit as the audit/email jobs — call it manually or from an external
+scheduler there). It supports `?dryRun=1`, which reports what would be deleted
+without deleting anything — run that first, for a while, before enabling
+deletes.
 
 ---
 

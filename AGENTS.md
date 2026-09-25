@@ -52,7 +52,7 @@ Not every domain has all three subdirs. Minimal domains (audit-logs, platform-co
 | `src/components/navigation/*` | Sidebar components per role |
 | `src/lib/hooks/*` | Shared React hooks (fetcher, use-table-filters, use-debounced-value) |
 | `src/lib/db/*` | Database connection, schema, seeds, migrations |
-| `src/lib/storage/*` | File storage abstraction (Supabase, R2, local) |
+| `src/lib/storage/*` | File storage abstraction (R2, local) |
 | `src/lib/*.ts` | Shared utilities (validation, types, constants, utils, pricing, mailer, audit, auth) |
 
 ### API routes

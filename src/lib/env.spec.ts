@@ -16,15 +16,12 @@ const OPTIONAL_VARS = [
   "DATABASE_URL_READ_ONLY",
   "AUDIT_LOG_RETENTION_DAYS",
   "EMAIL_LOG_RETENTION_DAYS",
+  "UPLOAD_SWEEP_MIN_AGE_HOURS",
   "R2_ACCOUNT_ID",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
   "R2_BUCKET_NAME",
   "R2_PUBLIC_URL",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_KEY",
-  "SUPABASE_BUCKET",
-  "SUPABASE_PUBLIC_URL",
   "SMTP_SECRET_KEY",
 ]
 
@@ -92,9 +89,9 @@ describe("validateEnv", () => {
     expect(() => validateEnv()).toThrow("R2_ACCOUNT_ID")
   })
 
-  it("validates STORAGE_PROVIDER=supabase requires Supabase vars", () => {
+  it("rejects an unknown STORAGE_PROVIDER", () => {
     setEnv({ ...baseEnv(), STORAGE_PROVIDER: "supabase" })
-    expect(() => validateEnv()).toThrow("SUPABASE_URL")
+    expect(() => validateEnv()).toThrow('Must be one of: "local", "r2"')
   })
 
   it("accepts AUDIT_LOG_RETENTION_DAYS when valid", () => {
@@ -105,6 +102,21 @@ describe("validateEnv", () => {
   it("rejects non-positive AUDIT_LOG_RETENTION_DAYS", () => {
     setEnv({ ...baseEnv(), AUDIT_LOG_RETENTION_DAYS: "0" })
     expect(() => validateEnv()).toThrow("Must be a positive integer")
+  })
+
+  it("accepts UPLOAD_SWEEP_MIN_AGE_HOURS when valid", () => {
+    setEnv({ ...baseEnv(), UPLOAD_SWEEP_MIN_AGE_HOURS: "48" })
+    expect(validateEnv()).toBeUndefined()
+  })
+
+  it("rejects non-positive UPLOAD_SWEEP_MIN_AGE_HOURS", () => {
+    setEnv({ ...baseEnv(), UPLOAD_SWEEP_MIN_AGE_HOURS: "0" })
+    expect(() => validateEnv()).toThrow("Must be a positive number (hours)")
+  })
+
+  it("rejects a non-numeric UPLOAD_SWEEP_MIN_AGE_HOURS", () => {
+    setEnv({ ...baseEnv(), UPLOAD_SWEEP_MIN_AGE_HOURS: "soon" })
+    expect(() => validateEnv()).toThrow("Must be a positive number (hours)")
   })
 
   it("accepts DATABASE_URL_READ_ONLY when set", () => {

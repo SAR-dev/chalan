@@ -74,6 +74,26 @@ SELECT cron.schedule(
   $$
 );
 
+-- ── Job 4: Clean orphaned uploads (HTTP only — NOT scheduled by pg_cron) ─────
+-- Intended schedule: daily at 04:30 UTC.
+-- Equivalent to: POST /api/cron/cleanup-uploads
+--
+-- Unlike jobs 1-3, this sweep lists and deletes files in storage (local disk /
+-- R2), which only the app can do — there is no SQL equivalent, and
+-- pg_cron has no HTTP client (this deployment installs no pg_net/http
+-- extension). Schedule the endpoint over HTTP instead:
+--   - Docker cron container: docker/compose.cluster.yml (04:30 line, configured;
+--     ships with ?dryRun=1 — remove that query param after reviewing a week of
+--     dry-run logs, per ROADMAP 5.6 acceptance)
+--   - System crontab / manual run:
+--       30 4 * * * curl -s -X POST "http://localhost:3000/api/cron/cleanup-uploads" \
+--         -H "Authorization: Bearer $CRON_SECRET" >> /var/log/app-cron.log 2>&1
+--   - Vercel: not in vercel.json (free plan limit) — trigger manually or from
+--     an external scheduler.
+-- Grace period: UPLOAD_SWEEP_MIN_AGE_HOURS (default 48) — files younger than
+-- that are never deleted, because ImageUpload stores on file select, before
+-- the owning form is submitted.
+
 -- ── Verification ────────────────────────────────────────────────────────────
 -- Run this to confirm jobs are registered:
 --   SELECT jobid, jobname, schedule, command FROM cron.job;

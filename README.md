@@ -18,7 +18,7 @@ pnpm db:admin             # create first superadmin
 pnpm dev                          # http://localhost:3000
 ```
 
-Required env: `DATABASE_URL`, `BETTER_AUTH_SECRET` (generate with `openssl rand -base64 32`). Everything else is optional or has a safe default — the app validates required vars on boot (`src/lib/env.ts`). Image uploads work out of the box with the default `STORAGE_PROVIDER=local` (files in `./uploads`); switch to `r2` or `supabase` for shared/cloud storage.
+Required env: `DATABASE_URL`, `BETTER_AUTH_SECRET` (generate with `openssl rand -base64 32`). Everything else is optional or has a safe default — the app validates required vars on boot (`src/lib/env.ts`). Image uploads work out of the box with the default `STORAGE_PROVIDER=local` (files in `./uploads`); switch to `r2` for shared/cloud storage.
 
 ## Roles
 
@@ -76,7 +76,7 @@ brand icons all derive from `src/config/site.ts` / `src/icons/SiteIcon.tsx`).
 
 ## Deployment
 
-- **Vercel** — set env vars; use `r2`/`supabase` storage (no local disk); enable `pg_trgm` + `unaccent`.
+- **Vercel** — set env vars; use `r2` storage (no local disk); enable `pg_trgm` + `unaccent`.
 - **Single-instance Docker** — `docker/compose.monolith.yml` (app + Postgres failover cluster via pgpool).
 - **Multi-instance Docker** — `docker/compose.cluster.yml` (one container per role, isolated via `ALLOWED_ROLE`; shared DB, `uploads_data` volume, cloudflared, cron).
 

@@ -116,6 +116,21 @@ export function validateEnv(): void {
       }
     }
 
+    // Optional — grace period in hours before the upload sweep
+    // (/api/cron/cleanup-uploads) may delete an unreferenced upload
+    // (default 48). Set in environment to override; validated only when
+    // present. Must be a positive number so the sweep can never be armed
+    // with a zero grace period.
+    if (process.env.UPLOAD_SWEEP_MIN_AGE_HOURS) {
+      const hours = Number(process.env.UPLOAD_SWEEP_MIN_AGE_HOURS)
+      if (!Number.isFinite(hours) || hours <= 0) {
+        e.push({
+          key: "UPLOAD_SWEEP_MIN_AGE_HOURS",
+          message: "Must be a positive number (hours).",
+        })
+      }
+    }
+
     // AES-256-GCM key for SMTP password at rest (64 hex chars = 32 bytes).
     // Optional in development (crypto.ts falls back to a dev key so local
     // setups keep working), REQUIRED in production — silently using the
@@ -168,12 +183,7 @@ export function validateEnv(): void {
     // runtime by proxy/api-auth, so changing it needs a restart.
     oneOf(e, "PORTAL_MODE", ["admin", "public", "all"], "all")
 
-    const provider = oneOf(
-      e,
-      "STORAGE_PROVIDER",
-      ["local", "r2", "supabase"],
-      "local",
-    )
+    const provider = oneOf(e, "STORAGE_PROVIDER", ["local", "r2"], "local")
 
     if (provider === "local") {
       required(e, "LOCAL_UPLOADS_DIR", "Local uploads directory path")
@@ -183,11 +193,6 @@ export function validateEnv(): void {
       required(e, "R2_SECRET_ACCESS_KEY", "R2 API secret key")
       required(e, "R2_BUCKET_NAME", "R2 bucket name")
       required(e, "R2_PUBLIC_URL", "R2 public base URL")
-    } else if (provider === "supabase") {
-      required(e, "SUPABASE_URL", "Supabase project URL")
-      required(e, "SUPABASE_SERVICE_KEY", "Supabase service role key")
-      required(e, "SUPABASE_BUCKET", "Supabase storage bucket name")
-      required(e, "SUPABASE_PUBLIC_URL", "Supabase public storage URL")
     }
   })
 
