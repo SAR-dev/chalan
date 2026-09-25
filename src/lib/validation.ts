@@ -216,6 +216,7 @@ export const platformConfigSchema = z
     defaultExtraRatePerKg: z.number().nonnegative().optional(),
     defaultFreeWeightKg: z.number().nonnegative().optional(),
     defaultMaxWeightKg: z.number().positive().optional(),
+    requireAdminTwoFactor: z.boolean().optional(),
   })
   .refine(
     (d) =>
@@ -227,6 +228,17 @@ export const platformConfigSchema = z
       path: ["defaultFreeWeightKg"],
     },
   )
+
+// Disabling 2FA (ROADMAP H4) requires a *current* second factor — a live TOTP
+// code or one of the remaining recovery codes — even though the caller is
+// already signed in.
+export const twoFactorDisableSchema = z.object({
+  code: z
+    .string({ error: "Verification code is required" })
+    .trim()
+    .min(1, "Verification code is required")
+    .max(64, "Verification code is too long"),
+})
 
 const noteField = (label: string) =>
   z.string().trim().max(100, `${label} cannot exceed 100 characters`).nullish()
@@ -558,3 +570,32 @@ export const zonePricingUpdateSchema = z.object({
   maxWeightKg: z.number().positive().optional(),
   codFeePercentage: z.number().nonnegative().optional(),
 })
+
+// ---------------------------------------------------------------------------
+// Support tickets
+// ---------------------------------------------------------------------------
+
+export const supportCreateSchema = z.object({
+  subject: requiredString("Subject")
+    .min(3, "Subject must be at least 3 characters")
+    .max(150, "Subject cannot exceed 150 characters"),
+  message: requiredString("Message")
+    .min(10, "Message must be at least 10 characters")
+    .max(2000, "Message cannot exceed 2000 characters"),
+})
+
+// Admin reply (optional) and/or a close (status must be CLOSED). At least one
+// of the two is required so an empty PATCH can never reach the route.
+export const supportReplySchema = z
+  .object({
+    adminReply: z
+      .string({ error: "A reply is required" })
+      .trim()
+      .min(1, "Reply cannot be empty")
+      .max(2000, "Reply cannot exceed 2000 characters")
+      .optional(),
+    status: z.enum(["CLOSED"], { error: "Only CLOSED can be set" }).optional(),
+  })
+  .refine((d) => d.adminReply !== undefined || d.status !== undefined, {
+    error: "Provide a reply or close the ticket",
+  })

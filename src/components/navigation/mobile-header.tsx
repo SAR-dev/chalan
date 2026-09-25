@@ -157,6 +157,7 @@ export function MobileHeader({
                 setOpen(false)
                 logout()
               }}
+              data-testid="mobile-logout"
               className={footerActionClass}
             >
               <LogOut className="size-4" />

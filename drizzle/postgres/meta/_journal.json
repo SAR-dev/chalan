@@ -15,6 +15,20 @@
       "when": 1790257680543,
       "tag": "0001_nasty_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790282387399,
+      "tag": "0002_right_lily_hollister",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790291374473,
+      "tag": "0003_oval_alex_wilder",
+      "breakpoints": true
     }
   ]
 }

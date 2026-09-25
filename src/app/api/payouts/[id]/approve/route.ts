@@ -8,6 +8,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { payoutRequest } from "@/lib/db/schema"
 import { rateLimitByIp } from "@/lib/rate-limit"
@@ -29,12 +30,22 @@ export const PATCH = withErrorHandler(
     // Transaction: lock the request row for the guard + write so two
     // concurrent approve/reject calls on the same request can't both pass the
     // "still PENDING" check against stale state.
-    const committed: { row: typeof payoutRequest.$inferSelect | null } = {
+    const committed: {
+      row: typeof payoutRequest.$inferSelect | null
+      before: Record<string, unknown> | null
+    } = {
       row: null,
+      before: null,
     }
     const response = await db.transaction(async (tx) => {
       const [current] = await tx
-        .select({ status: payoutRequest.status })
+        .select({
+          status: payoutRequest.status,
+          reviewedBy: payoutRequest.reviewedBy,
+          reviewedAt: payoutRequest.reviewedAt,
+          rejectReason: payoutRequest.rejectReason,
+          paidAt: payoutRequest.paidAt,
+        })
         .from(payoutRequest)
         .where(eq(payoutRequest.id, id))
         .for("update")
@@ -56,16 +67,25 @@ export const PATCH = withErrorHandler(
         .returning()
 
       committed.row = updated
+      committed.before = current
       return NextResponse.json(updated)
     })
 
     if (committed.row) {
+      const diff = diffEntity(committed.before, committed.row, [
+        "status",
+        "reviewedBy",
+        "reviewedAt",
+        "rejectReason",
+        "paidAt",
+      ])
       await logAudit({
         actor: { userId: me.userId, name: me.name, role: me.role },
         action: "PAYOUT_APPROVED",
         entityType: "payout_request",
         entityId: committed.row.id,
         description: `Approved payout request ${committed.row.id}`,
+        metadata: diff ? { diff } : null,
       })
     }
 

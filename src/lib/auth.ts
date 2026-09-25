@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth"
-import { admin } from "better-auth/plugins"
+import { admin, twoFactor } from "better-auth/plugins"
+import { siteConfig } from "@/config/site"
 import { pool } from "@/lib/db"
 import { passwordResetTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
@@ -34,7 +35,9 @@ export async function handlePasswordReset({
 }
 
 export const auth = betterAuth({
-  plugins: [admin()],
+  // twoFactor(): TOTP + recovery codes for admin roles (ROADMAP H4). Enrollment
+  // is opt-in; enforcement is a separate platform-config toggle (default OFF).
+  plugins: [admin(), twoFactor({ issuer: siteConfig.name })],
   baseURL,
   emailAndPassword: {
     enabled: true,

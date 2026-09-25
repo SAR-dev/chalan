@@ -198,7 +198,8 @@ pnpm db:admin
 
 - `src/lib/db/index.ts` — Drizzle client; initialises the pg pool and exports `db` (primary/writes), `dbRead` (read-replica, falls back to primary), and `pool`.
 - `src/lib/db/schema.ts` — re-exports `schema.postgres` (kept for import-path compatibility).
-- `src/lib/db/schema.postgres.ts` — PostgreSQL schema (pg-core types).
+- `src/lib/db/schema.postgres/` — PostgreSQL schema (pg-core types), split into domain
+  modules (`enums.ts`, `auth.ts`, `orders.ts`, …) with an `index.ts` barrel.
 - `src/lib/db/seed.ts` — seed script, creates users via Better Auth.
 - `src/lib/auth.ts` — Better Auth config; uses `pool` directly.
 - `drizzle.config.ts` — drizzle-kit config (PostgreSQL only).
@@ -208,8 +209,12 @@ pnpm db:admin
 - `src/app/pwa-icon/[size]/route.tsx` — PWA icons (192/512 PNG) generated from the brand SVG.
 - `public/sw.js` — PWA service worker (precaches app shell; never intercepts `/api/*` or `/uploads/*`). Registered only in production via `src/components/service-worker-register.tsx`.
 - `docker/compose.postgres.yml` / `docker/Dockerfile.postgres` — standalone Postgres for local development (includes `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`, `pg_stat_statements`, `pg_cron`).
-- `playwright.config.ts` — Playwright E2E test config (see [`E2E.md`](./E2E.md)).
-- `e2e/` — Playwright tests: `auth.setup.ts`, `specs/a-auth.spec.ts`, `selectors.ts`, `fixtures.ts`.
+- `playwright.config.ts` — Playwright E2E test config (see [E2E tests](#e2e-tests)
+  below and the E2E section of `CONTRIBUTING.md`).
+- `e2e/` — Playwright tests: `helpers.ts` (shared `CREDS` + `login()`),
+  `selectors.ts` (data-testid constants), `specs/01-core-flows.spec.ts`,
+  `specs/02-business-flows.spec.ts`, `specs/03-onboarding.spec.ts`,
+  `specs/04-branding.spec.ts` (46 tests).
 
 ## Database schema (tables created by db:push)
 
@@ -249,10 +254,13 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 > added to `shared_preload_libraries` in `postgresql.conf` (RDS/Cloud SQL) or
 > enabled via the provider's config panel (Neon: **Extensions** tab).
 
-## Seeded data (from e2e/seed.ts)
+## Seeded data (from `pnpm db:seed:full`)
 
-Warehouses, riders, merchants, pickup locations, security config, users + profiles
-(super admin, admins, warehouse admins, merchants, riders), 18 orders, 2 payout requests.
+Warehouses (3), delivery zones (3), delivery cities (8), zone-pricing matrix
+(9 rows), riders (10 + 1 pending), merchants (6 incl. demo), pickup locations
+(5), admin/warehouse-admin users, announcements (6), 100 orders, 2 payout
+requests, and merchant balances. All seeded accounts share the password
+`12qwaszx` (see `SEED_PASSWORD` in `src/lib/db/seed/seed-content.ts`).
 
 ## Drizzle CLI
 
@@ -266,12 +274,16 @@ pnpm db:admin     # create first superadmin
 ## E2E tests
 
 ```bash
+pnpm build          # required first — the server runs `next start`
 pnpm test:e2e      # run Playwright E2E suite
 ```
 
-Requires a running PostgreSQL instance with seeded data. The Playwright config
-auto-starts the Next.js dev server if not already running. See
-[`E2E.md`](./E2E.md) for full details.
+Requires a running PostgreSQL instance (schema applied via `pnpm db:push`).
+Playwright's `webServer` runs `pnpm db:seed:full && pnpm start` — the database
+is reseeded to deterministic state automatically before the suite starts (if a
+server is already listening on port 3000, it is reused and the reseed is
+skipped — stop it first for a fresh seed). See the E2E section of
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) for full details.
 
 ## Multi-instance deployment environment variables
 
@@ -310,6 +322,7 @@ docker compose -f docker/compose.cluster.yml run --rm migrate-dashboard
 
 - `pnpm db:push` is interactive — use `pnpm exec drizzle-kit push --force` for non-interactive runs.
 - Always `set -a && . ./.env.development.local && set +a` before running `db:*` scripts.
-- Edit only `src/lib/db/schema.postgres.ts` when making schema changes — there is a single schema file.
+- Edit the matching domain module under `src/lib/db/schema.postgres/` when making schema
+  changes (the `index.ts` barrel re-exports everything — there is still one logical schema).
 - In a multi-instance deployment, all containers must share the same `BETTER_AUTH_SECRET` and `DATABASE_URL` — the session and user tables are shared and auth will break if secrets differ across instances.
 - The rate limiter in `src/lib/rate-limit.ts` and the upload proxy in `src/proxy.ts` use in-memory stores. For multi-host deployments (containers on different machines), swap the internal `Map` for a Redis/Upstash store so rate limits are enforced globally, not per-container.

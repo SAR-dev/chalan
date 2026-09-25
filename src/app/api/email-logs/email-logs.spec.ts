@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PATCH as markEmailSent } from "./[id]/route"
+import { PATCH as bulkMarkSent } from "./bulk/mark-sent/route"
 import { GET as listEmailLogs } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -8,8 +9,12 @@ vi.mock("@/lib/api-auth", () => ({
   requireSession: () => Promise.resolve(sessionState.value),
 }))
 
+const { logAuditMock } = vi.hoisted(() => ({
+  logAuditMock: vi.fn(() => Promise.resolve()),
+}))
+
 vi.mock("@/lib/audit", () => ({
-  logAudit: () => Promise.resolve(),
+  logAudit: logAuditMock,
 }))
 
 const selectQueue: unknown[][] = []
@@ -48,10 +53,15 @@ beforeEach(() => {
   selectQueue.length = 0
   updateResult.length = 0
   sessionState.value = null
+  logAuditMock.mockClear()
 })
 
-function req(method: string, url?: string): Request {
-  return new Request(url ?? "http://test.local/api", { method })
+function req(method: string, url?: string, body?: unknown): Request {
+  return new Request(url ?? "http://test.local/api", {
+    method,
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
 }
 
 function ctx(id = "log_1") {
@@ -116,5 +126,72 @@ describe("PATCH /api/email-logs/:id", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "SENT" })
+  })
+})
+
+describe("PATCH /api/email-logs/bulk/mark-sent", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await bulkMarkSent(req("PATCH", undefined, { ids: ["log_1"] }))
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for merchant", async () => {
+    sessionState.value = merchantSession
+    const res = await bulkMarkSent(req("PATCH", undefined, { ids: ["log_1"] }))
+    expect(res.status).toBe(403)
+  })
+
+  it("400 on invalid body with issues", async () => {
+    sessionState.value = admin
+    const res = await bulkMarkSent(req("PATCH", undefined, {}))
+    const json = await res.json()
+    expect(res.status).toBe(400)
+    expect(json.error).toBe("Invalid request body")
+    expect(json.issues).toBeDefined()
+  })
+
+  it("400 when empty ids array", async () => {
+    sessionState.value = admin
+    const res = await bulkMarkSent(req("PATCH", undefined, { ids: [] }))
+    expect(res.status).toBe(400)
+  })
+
+  it("400 when no FAILED entries match the given IDs", async () => {
+    sessionState.value = admin
+    selectQueue.push([])
+    const res = await bulkMarkSent(req("PATCH", undefined, { ids: ["log_1"] }))
+    const json = await res.json()
+    expect(res.status).toBe(400)
+    expect(json.error).toContain("No FAILED entries")
+    expect(logAuditMock).not.toHaveBeenCalled()
+  })
+
+  it("marks failed emails as sent and audits each", async () => {
+    sessionState.value = admin
+    selectQueue.push([
+      { id: "log_1", to: "a@b.com", subject: "Welcome", status: "FAILED" },
+      { id: "log_2", to: "c@d.com", subject: "Reset", status: "FAILED" },
+    ])
+    const res = await bulkMarkSent(
+      req("PATCH", undefined, { ids: ["log_1", "log_2"] }),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toEqual({ ok: true, count: 2 })
+    expect(logAuditMock).toHaveBeenCalledTimes(2)
+    expect(logAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "EMAIL_LOG_MARKED_SENT",
+        entityType: "email_log",
+        entityId: "log_1",
+      }),
+    )
+    expect(logAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "EMAIL_LOG_MARKED_SENT",
+        entityType: "email_log",
+        entityId: "log_2",
+      }),
+    )
   })
 })

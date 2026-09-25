@@ -105,7 +105,12 @@ Feature hooks (`src/features/*/hooks/*.ts`) are NOT unit tested directly. They a
 ### E2E tests — Playwright with data-testid selectors
 
 ```bash
-e2e/specs/01-core-flows.spec.ts    # All core scenarios in one file
+e2e/specs/01-core-flows.spec.ts    # Core flows: lifecycle, roles, public pages
+e2e/specs/02-business-flows.spec.ts # Business/ops flows
+e2e/specs/03-onboarding.spec.ts    # Merchant onboarding
+e2e/specs/04-branding.spec.ts      # Merchant branding
+e2e/specs/05-two-factor.spec.ts    # 2FA for admins
+e2e/specs/06-support.spec.ts       # Support tickets
 e2e/selectors.ts                    # Centralized data-testid selectors
 ```
 
@@ -125,6 +130,12 @@ done first.
 `getByText` are fallbacks only for elements that cannot carry a test id
 (headings, generic text) — never for buttons, inputs, rows, or dialogs that
 you can tag. When fixing or writing e2e tests, prefer/convert to test ids.
+
+**Suite naming:** every `test.describe` must be prefixed with a unique scenario
+id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
+describes continue the serial from the current maximum (check the existing
+specs first); numbers must stay unique with no gaps or duplicates (suite is
+currently S1–S37 across 6 files / 51 tests).
 
 ## Coding Patterns
 
@@ -180,7 +191,7 @@ function formatOrderError(data: {
 
 ### Database
 
-- Schema: single file `src/lib/db/schema.postgres.ts` (re-exported via `schema.ts`)
+- Schema: folder `src/lib/db/schema.postgres/` (domain modules + `index.ts` barrel, re-exported via `schema.ts`)
 - New tables: `delivery_zone`, `zone_pricing` (N×N pricing matrix), `delivery_city` (with zoneId + warehouseId)
 - Updated: `pickup_location` (cityId instead of warehouseId), `order` (deliveryCityId FK)
 - Queries: **inline in each `route.ts`** — no separate queries file

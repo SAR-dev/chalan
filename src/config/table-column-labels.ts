@@ -102,4 +102,13 @@ export const columnLabels = {
     delivered: "Delivered",
     productCost: "COD amount",
   },
+  support: {
+    subject: "Subject",
+    requester: "Requester",
+    message: "Message",
+    reply: "Reply",
+    status: "Status",
+    created: "Created",
+    actions: "",
+  },
 } as const

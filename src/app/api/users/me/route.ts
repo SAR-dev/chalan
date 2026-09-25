@@ -4,9 +4,32 @@ import { NextResponse } from "next/server"
 import { notFound, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
-import { merchant, profile, user } from "@/lib/db/schema"
+import { merchant, platformConfig, profile, user } from "@/lib/db/schema"
+import { isAdminRole } from "@/lib/two-factor"
 import { parseBody, profileUpdateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
+
+// 2FA state for the signed-in admin (ROADMAP H4). Read straight from the
+// tables — never from the Better Auth session, which can serve a cached user
+// row for up to cookie-cache maxAge after enrolment changed.
+async function loadTwoFactorFlags(userId: string, role: string) {
+  if (!isAdminRole(role)) {
+    return { twoFactorEnabled: false, twoFactorRequired: false }
+  }
+  const [userRow] = await dbRead
+    .select({ twoFactorEnabled: user.twoFactorEnabled })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1)
+  const [config] = await dbRead
+    .select({ requireAdminTwoFactor: platformConfig.requireAdminTwoFactor })
+    .from(platformConfig)
+    .limit(1)
+  return {
+    twoFactorEnabled: userRow?.twoFactorEnabled === true,
+    twoFactorRequired: config?.requireAdminTwoFactor === true,
+  }
+}
 
 // Serializes a Better Auth user row + its profile row into the app-level User
 // shape consumed by the client (mirrors the GET response below).
@@ -22,6 +45,7 @@ function serializeUser(
   },
   row: typeof profile.$inferSelect,
   merchantEmailVerifiedAt?: string | null,
+  twoFactor?: { twoFactorEnabled: boolean; twoFactorRequired: boolean },
 ) {
   return {
     id: u.id,
@@ -39,6 +63,8 @@ function serializeUser(
     merchantId: row.merchantId,
     riderId: row.riderId,
     emailVerifiedAt: merchantEmailVerifiedAt ?? null,
+    twoFactorEnabled: twoFactor?.twoFactorEnabled ?? false,
+    twoFactorRequired: twoFactor?.twoFactorRequired ?? false,
   }
 }
 
@@ -79,8 +105,10 @@ export const GET = withErrorHandler(async () => {
     merchantEmailVerifiedAt = merchantRow?.emailVerifiedAt ?? null
   }
 
+  const twoFactor = await loadTwoFactorFlags(session.user.id, row.role)
+
   return NextResponse.json(
-    serializeUser(session.user, row, merchantEmailVerifiedAt),
+    serializeUser(session.user, row, merchantEmailVerifiedAt, twoFactor),
   )
 })
 
@@ -166,11 +194,17 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     merchantEmailVerifiedAt = merchantRow?.emailVerifiedAt ?? null
   }
 
+  const twoFactor = await loadTwoFactorFlags(
+    session.user.id,
+    result.profileRow.role,
+  )
+
   return NextResponse.json(
     serializeUser(
       result.updatedUser,
       result.profileRow,
       merchantEmailVerifiedAt,
+      twoFactor,
     ),
   )
 })

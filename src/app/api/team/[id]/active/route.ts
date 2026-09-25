@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { profile, user } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -37,6 +38,8 @@ export const PATCH = withErrorHandler(
       .where(eq(user.id, id))
       .limit(1)
 
+    const diff = diffEntity(current, updated, ["isActive"])
+
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: updated.isActive
@@ -45,6 +48,7 @@ export const PATCH = withErrorHandler(
       entityType: "user",
       entityId: id,
       description: `${updated.isActive ? "Activated" : "Deactivated"} account for ${targetUser?.name ?? id}`,
+      metadata: diff ? { diff } : null,
     })
 
     return NextResponse.json(updated)

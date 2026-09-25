@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { logAudit } from "@/lib/audit"
 import { PATCH as toggleActive } from "./[id]/active/route"
 import { PATCH as assignWarehouse } from "./[id]/warehouse/route"
 import { POST as createTeam, GET as listTeam } from "./route"
@@ -10,7 +11,7 @@ vi.mock("@/lib/api-auth", () => ({
 }))
 
 vi.mock("@/lib/audit", () => ({
-  logAudit: () => Promise.resolve(),
+  logAudit: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/auth", () => ({
@@ -83,6 +84,7 @@ beforeEach(() => {
   updatePayloads.length = 0
   insertResult.length = 0
   sessionState.value = null
+  vi.mocked(logAudit).mockClear()
 })
 
 function req(method: string, url?: string, body?: unknown): Request {
@@ -205,6 +207,14 @@ describe("PATCH /api/team/:id/active", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.isActive).toBe(false)
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "TEAM_MEMBER_DEACTIVATED",
+        metadata: {
+          diff: { isActive: { from: true, to: false } },
+        },
+      }),
+    )
   })
 })
 
@@ -251,5 +261,13 @@ describe("PATCH /api/team/:id/warehouse", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toBeDefined()
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "TEAM_MEMBER_WAREHOUSE_REASSIGNED",
+        metadata: {
+          diff: { warehouseId: { from: null, to: "wh_1" } },
+        },
+      }),
+    )
   })
 })

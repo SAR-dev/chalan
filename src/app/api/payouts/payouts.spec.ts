@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { logAudit } from "@/lib/audit"
 import { PATCH as approvePayout } from "./[id]/approve/route"
 import { PATCH as markPayoutPaid } from "./[id]/paid/route"
 import { PATCH as rejectPayout } from "./[id]/reject/route"
@@ -12,7 +13,7 @@ vi.mock("@/lib/api-auth", () => ({
 }))
 
 vi.mock("@/lib/audit", () => ({
-  logAudit: () => Promise.resolve(),
+  logAudit: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -81,6 +82,7 @@ beforeEach(() => {
   insertResult.length = 0
   sessionState.value = null
   rateLimited = false
+  vi.mocked(logAudit).mockClear()
 })
 
 function req(method: string, url?: string, body?: unknown): Request {
@@ -189,12 +191,31 @@ describe("PATCH /api/payouts/:id/approve", () => {
 
   it("approves payout", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([{ status: "PENDING" }])
-    updateResult.push({ id: "pr_1", status: "APPROVED" })
+    selectQueue.push([
+      { status: "PENDING", reviewedBy: null, reviewedAt: null },
+    ])
+    updateResult.push({
+      id: "pr_1",
+      status: "APPROVED",
+      reviewedBy: "Super",
+      reviewedAt: "2025-01-02T00:00:00Z",
+    })
     const res = await approvePayout(req("PATCH"), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "APPROVED" })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "PAYOUT_APPROVED",
+        metadata: {
+          diff: {
+            status: { from: "PENDING", to: "APPROVED" },
+            reviewedBy: { from: null, to: "Super" },
+            reviewedAt: { from: null, to: "2025-01-02T00:00:00Z" },
+          },
+        },
+      }),
+    )
   })
 })
 
@@ -212,12 +233,27 @@ describe("PATCH /api/payouts/:id/paid", () => {
 
   it("marks payout as paid", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([{ status: "APPROVED" }])
-    updateResult.push({ id: "pr_1", status: "PAID" })
+    selectQueue.push([{ status: "APPROVED", paidAt: null }])
+    updateResult.push({
+      id: "pr_1",
+      status: "PAID",
+      paidAt: "2025-01-03T00:00:00Z",
+    })
     const res = await markPayoutPaid(req("PATCH"), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "PAID" })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "PAYOUT_PAID",
+        metadata: {
+          diff: {
+            status: { from: "APPROVED", to: "PAID" },
+            paidAt: { from: null, to: "2025-01-03T00:00:00Z" },
+          },
+        },
+      }),
+    )
   })
 })
 
@@ -241,8 +277,16 @@ describe("PATCH /api/payouts/:id/reject", () => {
 
   it("rejects payout", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([{ status: "PENDING" }])
-    updateResult.push({ id: "pr_1", status: "REJECTED" })
+    selectQueue.push([
+      { status: "PENDING", reviewedBy: null, reviewedAt: null },
+    ])
+    updateResult.push({
+      id: "pr_1",
+      status: "REJECTED",
+      reviewedBy: "Super",
+      reviewedAt: "2025-01-02T00:00:00Z",
+      rejectReason: "Invalid details",
+    })
     const res = await rejectPayout(
       req("PATCH", undefined, { reason: "Invalid details" }),
       ctx(),
@@ -250,5 +294,18 @@ describe("PATCH /api/payouts/:id/reject", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "REJECTED" })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "PAYOUT_REJECTED",
+        metadata: {
+          diff: {
+            status: { from: "PENDING", to: "REJECTED" },
+            reviewedBy: { from: null, to: "Super" },
+            reviewedAt: { from: null, to: "2025-01-02T00:00:00Z" },
+            rejectReason: { from: null, to: "Invalid details" },
+          },
+        },
+      }),
+    )
   })
 })

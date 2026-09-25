@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login } from "../helpers"
+import { help } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
 async function skipOnboardingIfNeeded(page: any) {
@@ -172,6 +173,27 @@ test.describe("S22. Delivery Fee Calculator", () => {
   })
 })
 
+// ─── S23. FAQ & Help Center ──────────────────────────────────────────────────
+test.describe("S25. FAQ & Help Center", () => {
+  test("faq page renders", async ({ page }) => {
+    await page.goto("/faq")
+    await expect(page.getByRole("heading", { name: /faq/i })).toBeVisible()
+  })
+
+  test("help center opens a guide", async ({ page }) => {
+    await page.goto("/help")
+    await expect(
+      page.getByRole("heading", { name: /help center/i }),
+    ).toBeVisible()
+
+    await page.locator(help.guideLink("merchant")).click()
+    await page.waitForURL(/\/help\/merchant/)
+    await expect(
+      page.getByRole("heading", { name: /merchant guide/i }),
+    ).toBeVisible()
+  })
+})
+
 // ─── S9. Team Management ─────────────────────────────────────────────────────
 test.describe("S9. Team Management", () => {
   test("admin views team list", async ({ page }) => {
@@ -183,7 +205,7 @@ test.describe("S9. Team Management", () => {
 })
 
 // ─── Merchant Navigation ─────────────────────────────────────────────────────
-test.describe("Merchant Dashboard", () => {
+test.describe("S26. Merchant Dashboard", () => {
   test("merchant can access all sections", async ({ page }) => {
     await login(page, CREDS.merchant)
     await skipOnboardingIfNeeded(page)
@@ -203,7 +225,7 @@ test.describe("Merchant Dashboard", () => {
 })
 
 // ─── Rider Application ───────────────────────────────────────────────────────
-test.describe("Rider Application", () => {
+test.describe("S27. Rider Application", () => {
   test("application page has print button", async ({ page }) => {
     await page.goto("/apply/rider")
     await expect(page.getByRole("button", { name: /print/i })).toBeVisible()
@@ -211,7 +233,7 @@ test.describe("Rider Application", () => {
 })
 
 // ─── Auth Flows ──────────────────────────────────────────────────────────────
-test.describe("Auth", () => {
+test.describe("S28. Auth", () => {
   test("login page renders correctly", async ({ page }) => {
     await page.goto("/login")
     await expect(page.locator("[data-testid='login-email']")).toBeVisible()

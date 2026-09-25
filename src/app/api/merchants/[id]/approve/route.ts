@@ -8,6 +8,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { merchantApprovedTemplate } from "@/lib/mail-templates"
@@ -28,6 +29,8 @@ export const PATCH = withErrorHandler(
       .select({
         status: merchant.status,
         emailVerifiedAt: merchant.emailVerifiedAt,
+        approvedBy: merchant.approvedBy,
+        approvedAt: merchant.approvedAt,
       })
       .from(merchant)
       .where(eq(merchant.id, id))
@@ -51,12 +54,19 @@ export const PATCH = withErrorHandler(
       .where(eq(merchant.id, id))
       .returning()
 
+    const diff = diffEntity(current, updated, [
+      "status",
+      "approvedBy",
+      "approvedAt",
+    ])
+
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: "MERCHANT_APPROVED",
       entityType: "merchant",
       entityId: updated.id,
       description: `Approved merchant ${updated.businessName}`,
+      metadata: diff ? { diff } : null,
     })
 
     const template = await merchantApprovedTemplate({

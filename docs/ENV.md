@@ -68,6 +68,14 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 ---
 
+## Security
+
+| Variable             | Required | Default   | Description                                                                                                                                                                                                                                                                                        |
+| -------------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADMIN_IP_ALLOWLIST` | No       | disabled  | Comma-separated IPs/CIDRs allowed to reach the admin portal: paths starting with `/dashboard` and `/api/admin` (e.g. `203.0.113.5,10.0.0.0/8,2001:db8::/32`). Exact IPv4/IPv6 and CIDR ranges are supported; `*` allows any IP. Unset or empty disables the check entirely (default — e2e and dev are unaffected). Invalid entries are ignored (boot fails if none are valid). Requests from other IPs get `403` and are logged. Other admin-gated APIs are not covered — they rely on role authz. |
+
+---
+
 ## Storage
 
 | Variable           | Required | Default | Description                       |
@@ -128,28 +136,16 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 ---
 
-## Seed
-
-Applied by the seed script when creating the three demo SUPER_ADMIN accounts
-(`admin01`/`admin02`/`admin03@email.com`). They are provided as e2e fixtures, so
-a known default exists — but set an override in any real environment.
-
-| Variable                   | Required | Default      | Description                                                          |
-| -------------------------- | -------- | ------------ | -------------------------------------------------------------------- |
-| `SEED_SUPER_ADMIN_PASSWORD` | No       | `12qwaszx`   | Password for seeded super-admin accounts (no known default in prod)  |
-
----
-
 ## Testing
 
-Set these locally when running e2e tests. The Playwright `webServer` sets them
-automatically — you only need them for manual dev server invocations.
+Set these locally when running e2e tests or manual dev-server test runs.
+Playwright's `webServer` sets `AUTH_RATE_LIMIT_DISABLED=1` automatically for
+the suite; the other variables are for manual invocations only.
 
-| Variable                   | Required | Default | Description                                                                      |
-| -------------------------- | -------- | ------- | -------------------------------------------------------------------------------- |
-| `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)               |
-| `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting for the test suite               |
-| `PLAYWRIGHT_BASE_URL`      | No       | —       | Override the base URL for Playwright tests (defaults to `http://localhost:3000`) |
+| Variable                   | Required | Default | Description                                                    |
+| -------------------------- | -------- | ------- | -------------------------------------------------------------- |
+| `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test) |
+| `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting (webServer sets this for the e2e suite; set manually for other test runs) |
 
 ---
 

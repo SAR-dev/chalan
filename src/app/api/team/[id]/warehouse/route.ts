@@ -8,6 +8,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { profile, user, warehouse } from "@/lib/db/schema"
 import { parseBody, warehouseAssignSchema } from "@/lib/validation"
@@ -28,7 +29,7 @@ export const PATCH = withErrorHandler(
     const { warehouseId } = parsed.data
 
     const [current] = await db
-      .select({ role: profile.role })
+      .select({ role: profile.role, warehouseId: profile.warehouseId })
       .from(profile)
       .where(eq(profile.userId, id))
       .limit(1)
@@ -76,6 +77,8 @@ export const PATCH = withErrorHandler(
       warehouseName = wh?.name ?? warehouseId
     }
 
+    const diff = diffEntity(current, updated, ["warehouseId"])
+
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: "TEAM_MEMBER_WAREHOUSE_REASSIGNED",
@@ -84,6 +87,7 @@ export const PATCH = withErrorHandler(
       description: warehouseName
         ? `Assigned ${targetUser?.name ?? id} to warehouse ${warehouseName}`
         : `Unassigned ${targetUser?.name ?? id} from their warehouse`,
+      metadata: diff ? { diff } : null,
     })
 
     return NextResponse.json(updated)

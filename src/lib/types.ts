@@ -12,6 +12,7 @@ import type {
   pickupLocation,
   profile,
   rider,
+  supportTicket,
   user,
   warehouse,
   zonePricing,
@@ -51,6 +52,7 @@ export type RiderTaskType = (typeof rider.$inferSelect)["taskType"]
 export type RiderStatus = (typeof rider.$inferSelect)["status"]
 export type BalanceTxType = (typeof balanceTransaction.$inferSelect)["type"]
 export type BalanceTxStatus = (typeof balanceTransaction.$inferSelect)["status"]
+export type SupportStatus = (typeof supportTicket.$inferSelect)["status"]
 
 // --- User: Better Auth's `user` row joined 1:1 with our `profile` row ------
 // `userId` is just profile's PK/FK back to user.id, and profile.createdAt
@@ -65,6 +67,9 @@ type JoinedUser = typeof user.$inferSelect &
     // Merchant-specific: email verification timestamp from the merchant table.
     // Only populated for MERCHANT role via /api/users/me.
     emailVerifiedAt?: string | null
+    // Global "admins must enroll in 2FA" flag (platform_config), surfaced by
+    // /api/users/me so the shells can enforce it. Not a user column.
+    twoFactorRequired?: boolean
   }
 
 export type User = Loosen<JoinedUser>
@@ -97,6 +102,7 @@ export type Order = Loosen<typeof order.$inferSelect> & {
   deliveryMapLink?: string | null
 }
 export type PayoutRequest = Loosen<typeof payoutRequest.$inferSelect>
+export type SupportTicket = Loosen<typeof supportTicket.$inferSelect>
 export type EmailLog = Loosen<typeof emailLog.$inferSelect>
 export type AuditLog = Loosen<typeof auditLog.$inferSelect>
 export type MerchantBalance = Loosen<typeof merchantBalance.$inferSelect>
@@ -133,6 +139,8 @@ export interface PlatformConfigInput {
   defaultExtraRatePerKg?: number
   defaultFreeWeightKg?: number
   defaultMaxWeightKg?: number
+  // ROADMAP H4 — global "require 2FA for admin accounts" switch.
+  requireAdminTwoFactor?: boolean
 }
 
 export interface CreateOrderInput {

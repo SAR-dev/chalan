@@ -1,7 +1,7 @@
 "use client"
 
 import { Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { DataErrorBanner } from "@/components/data-error-banner"
 import { MobileHeader } from "@/components/navigation/mobile-header"
@@ -9,6 +9,7 @@ import { WarehouseSidebar } from "@/components/navigation/warehouse-sidebar"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
 import { WAREHOUSE_SIDEBAR } from "@/lib/nav-config"
+import { twoFactorEnforcementPath } from "@/lib/two-factor"
 
 // Warehouse Admin monitors: warehouses, orders, merchants, riders, pickup-locations.
 const WAREHOUSE_KEYS = [
@@ -21,7 +22,19 @@ const WAREHOUSE_KEYS = [
 
 export function WarehouseShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
+
+  // ROADMAP H4 — same gate as the dashboard shell, against the warehouse
+  // account page (/warehouse/account).
+  const twoFactorSetupPath = currentUser
+    ? twoFactorEnforcementPath({
+        role: currentUser.role,
+        twoFactorEnabled: currentUser.twoFactorEnabled,
+        twoFactorRequired: currentUser.twoFactorRequired,
+        pathname,
+      })
+    : null
 
   useEffect(() => {
     if (!isReady) return
@@ -29,10 +42,17 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
       router.replace("/login")
     } else if (currentUser.role !== "WAREHOUSE_ADMIN") {
       router.replace(homeForRole(currentUser.role))
+    } else if (twoFactorSetupPath) {
+      router.replace(twoFactorSetupPath)
     }
-  }, [isReady, currentUser, router])
+  }, [isReady, currentUser, router, twoFactorSetupPath])
 
-  if (!isReady || !currentUser || currentUser.role !== "WAREHOUSE_ADMIN") {
+  if (
+    !isReady ||
+    !currentUser ||
+    currentUser.role !== "WAREHOUSE_ADMIN" ||
+    twoFactorSetupPath
+  ) {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
         <Loader2 className="text-muted-foreground size-6 animate-spin" />

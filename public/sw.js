@@ -15,7 +15,7 @@
  * changed CACHE_VERSION prunes the previous generation automatically.
  */
 
-const VERSION = "v23"
+const VERSION = "v24"
 const SHELL_CACHE = `jhorexpress-shell-${VERSION}`
 const STATIC_CACHE = `jhorexpress-static-${VERSION}`
 

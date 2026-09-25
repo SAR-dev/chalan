@@ -11,7 +11,16 @@ export function PublicFooter() {
             © {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
           </span>
         </div>
-        <div className="text-muted-foreground flex gap-5">
+        <div className="text-muted-foreground flex flex-wrap justify-center gap-5">
+          <Link href="/faq" className="hover:text-foreground transition-colors">
+            FAQ
+          </Link>
+          <Link
+            href="/help"
+            className="hover:text-foreground transition-colors"
+          >
+            Help center
+          </Link>
           <Link
             href="/terms"
             className="hover:text-foreground transition-colors"

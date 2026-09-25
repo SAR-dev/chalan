@@ -45,6 +45,11 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             cd /opt/delivery-management
+            # Pin the exact image built by this run (compose reads APP_IMAGE).
+            export APP_IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
             docker compose pull
             docker compose up -d --remove-orphans
+            # Apply versioned migrations (service name differs per compose file:
+            # monolith uses `migrate`, cluster uses `migrate-dashboard`).
+            docker compose run --rm migrate || docker compose run --rm migrate-dashboard
             docker image prune -f

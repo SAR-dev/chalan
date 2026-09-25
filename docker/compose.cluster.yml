@@ -10,13 +10,16 @@ x-repmgr-common: &repmgr-common
     retries: 6
 
 x-app-migrate: &app-migrate
-  image: app:latest
+  # APP_IMAGE lets deploys pin an exact image (e.g. ghcr.io/…:<sha>); defaults
+  # to the locally-built app:latest. Runs the same versioned migrations as the
+  # monolith compose (src/lib/db/migrate.ts), not `drizzle-kit push`.
+  image: ${APP_IMAGE:-app:latest}
   env_file: .env
   volumes:
     - uploads_data:/app/uploads
   environment:
     RUN_MIGRATIONS: "true"
-  command: sh -c "node_modules/.bin/drizzle-kit push --force"
+  command: sh -c "node_modules/.bin/tsx src/lib/db/migrate.ts"
   restart: "no"
   networks:
     - app-net
@@ -162,7 +165,7 @@ services:
     <<: *app-migrate
 
   dashboard:
-    image: app:latest
+    image: ${APP_IMAGE:-app:latest}
     container_name: app-dashboard
     env_file: .env
     restart: unless-stopped
@@ -196,7 +199,7 @@ services:
     <<: *app-migrate
 
   merchant:
-    image: app:latest
+    image: ${APP_IMAGE:-app:latest}
     container_name: app-merchant
     env_file: .env
     restart: unless-stopped
@@ -230,7 +233,7 @@ services:
     <<: *app-migrate
 
   rider:
-    image: app:latest
+    image: ${APP_IMAGE:-app:latest}
     container_name: app-rider
     env_file: .env
     restart: unless-stopped
@@ -264,7 +267,7 @@ services:
     <<: *app-migrate
 
   warehouse:
-    image: app:latest
+    image: ${APP_IMAGE:-app:latest}
     container_name: app-warehouse
     env_file: .env
     restart: unless-stopped

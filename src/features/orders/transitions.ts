@@ -10,6 +10,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
 import {
@@ -424,6 +425,38 @@ export const ORDER_TRANSITIONS = {
 
 export type TransitionName = keyof typeof ORDER_TRANSITIONS
 
+const ORDER_DIFF_FIELDS = [
+  "status",
+  "approvedBy",
+  "approvedAt",
+  "pickupRiderId",
+  "assignedAt",
+  "warehouseId",
+  "pickedUpAt",
+  "pickupProofRefs",
+  "receivedAtWarehouseAt",
+  "receivedByWarehouse",
+  "deliveryRiderId",
+  "dispatchedAt",
+  "dispatchedBy",
+  "outForDeliveryAt",
+  "deliveredAt",
+  "deliveryProofRef",
+  "amountCollected",
+  "failedAttemptAt",
+  "failureNote",
+  "deliveryAttempts",
+  "failedResolvedAt",
+  "failedResolvedBy",
+  "returnedAt",
+  "returnReason",
+  "cancelledAt",
+  "cancelledBy",
+  "cancelReason",
+  "codSettledAt",
+  "codSettledBy",
+] as const
+
 const TRANSITION_LABELS: Record<TransitionName, string> = {
   approve: "Approved",
   "assign-pickup-rider": "Assigned pickup rider",
@@ -463,7 +496,10 @@ export async function applyOrderTransition(
     body = parsed.data
   }
 
-  const committed: { order: OrderRow | null } = { order: null }
+  const committed: { order: OrderRow | null; before: OrderRow | null } = {
+    order: null,
+    before: null,
+  }
   const response = await db.transaction(async (tx) => {
     const [orderRow] = await tx
       .select()
@@ -531,17 +567,24 @@ export async function applyOrderTransition(
       }
     }
 
+    committed.before = orderRow
     committed.order = updated
     return NextResponse.json(updated)
   })
 
   if (committed.order) {
+    const diff = diffEntity(
+      committed.before,
+      committed.order,
+      ORDER_DIFF_FIELDS,
+    )
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
       entityType: "order",
       entityId: committed.order.id,
       description: `${TRANSITION_LABELS[name]} order ${committed.order.id}`,
+      metadata: diff ? { diff } : null,
     })
   }
 
@@ -571,7 +614,7 @@ export async function applyBulkOrderTransition(
   if (!me) return unauthorized()
   if (!def.authorize(me)) return forbidden()
 
-  const committed: OrderRow[] = []
+  const committed: { before: OrderRow | null; after: OrderRow }[] = []
   const response = await db.transaction(async (tx) => {
     const rows = await tx
       .select()
@@ -582,6 +625,8 @@ export async function applyBulkOrderTransition(
     if (rows.length === 0) {
       return badRequest("No orders found for the given IDs.")
     }
+
+    const beforeById = new Map(rows.map((row) => [row.id, row]))
 
     let firstFail: GuardError = null
     const updates: { id: string; values: Record<string, unknown> }[] = []
@@ -623,21 +668,25 @@ export async function applyBulkOrderTransition(
       if (row) updated.push(row)
     }
 
-    committed.push(...updated)
+    for (const row of updated) {
+      committed.push({ before: beforeById.get(row.id) ?? null, after: row })
+    }
     return NextResponse.json({ ok: true, count: updated.length })
   })
 
   if (committed.length > 0) {
     await Promise.all(
-      committed.map((o) =>
-        logAudit({
+      committed.map(({ before, after }) => {
+        const diff = diffEntity(before, after, ORDER_DIFF_FIELDS)
+        return logAudit({
           actor: { userId: me.userId, name: me.name, role: me.role },
           action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
           entityType: "order",
-          entityId: o.id,
-          description: `${TRANSITION_LABELS[name]} order ${o.id} (bulk)`,
-        }),
-      ),
+          entityId: after.id,
+          description: `${TRANSITION_LABELS[name]} order ${after.id} (bulk)`,
+          metadata: diff ? { diff } : null,
+        })
+      }),
     )
   }
 

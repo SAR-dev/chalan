@@ -30,7 +30,19 @@ interface AuthContextValue {
     error?: string
     needsActivation?: boolean
     activationEmail?: string
+    // Sign-in was intercepted by Better Auth's two-factor plugin — the caller
+    // must collect a TOTP / recovery code and call verifyTwoFactor().
+    needsTwoFactor?: boolean
   }>
+  verifyTwoFactor: (
+    code: string,
+    method?: "totp" | "backup",
+  ) => Promise<{
+    ok: boolean
+    user?: User
+    error?: string
+  }>
+  refreshUser: () => Promise<void>
   logout: () => Promise<void>
   updateProfileName: (name: string) => Promise<{ ok: boolean; error?: string }>
   updateProfileImage: (
@@ -77,23 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     bootstrap()
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const normalized = email.trim().toLowerCase()
-    const { data, error } = await authClient.signIn.email({
-      email: normalized,
-      password,
-    })
-
-    if (error || !data) {
-      return {
-        ok: false,
-        error: error?.message ?? "Invalid email or password.",
-      }
-    }
-
+  // Shared tail of every successful sign-in: hydrate the app-level User
+  // (role + merchant/rider/warehouse linkage) from /api/users/me and apply
+  // the account gates (deactivation, unverified merchant email).
+  const completeSignIn = useCallback(async () => {
     const res = await fetch("/api/users/me")
     if (!res.ok) {
-      return { ok: false, error: "Could not load your account." }
+      return { ok: false, error: "Could not load your account." } as const
     }
     const user: User = await res.json()
 
@@ -101,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sign the Better Auth session back out — we don't want a session
       // cookie sitting around for a deactivated account.
       await authClient.signOut()
-      return { ok: false, error: "This account has been deactivated." }
+      return { ok: false, error: "This account has been deactivated." } as const
     }
 
     // Merchants must verify their email before they can log in
@@ -112,11 +114,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: "activate-email",
         needsActivation: true,
         activationEmail: user.email,
-      }
+      } as const
     }
 
     setCurrentUser(user)
-    return { ok: true, user }
+    return { ok: true, user } as const
+  }, [])
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const normalized = email.trim().toLowerCase()
+      const { data, error } = await authClient.signIn.email({
+        email: normalized,
+        password,
+      })
+
+      if (error || !data) {
+        return {
+          ok: false,
+          error: error?.message ?? "Invalid email or password.",
+        }
+      }
+
+      // Better Auth removed the session and issued a 2FA challenge instead of
+      // a session — the login page switches to the code step.
+      if ((data as { twoFactorRedirect?: boolean }).twoFactorRedirect) {
+        return { ok: false, needsTwoFactor: true }
+      }
+
+      return completeSignIn()
+    },
+    [completeSignIn],
+  )
+
+  const verifyTwoFactor = useCallback(
+    async (code: string, method: "totp" | "backup" = "totp") => {
+      const trimmed = code.trim()
+      if (!trimmed) {
+        return { ok: false, error: "Enter the verification code." }
+      }
+      const { error } =
+        method === "backup"
+          ? await authClient.twoFactor.verifyBackupCode({ code: trimmed })
+          : await authClient.twoFactor.verifyTotp({ code: trimmed })
+      if (error) {
+        return {
+          ok: false,
+          error:
+            error.message ??
+            (method === "backup"
+              ? "That recovery code is not valid."
+              : "That verification code is not valid."),
+        }
+      }
+      return completeSignIn()
+    },
+    [completeSignIn],
+  )
+
+  const refreshUser = useCallback(async () => {
+    const res = await fetch("/api/users/me")
+    if (res.ok) {
+      const user: User = await res.json()
+      setCurrentUser(user)
+    }
   }, [])
 
   const logout = useCallback(async () => {
@@ -230,6 +291,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         currentUser,
         isReady,
         login,
+        verifyTwoFactor,
+        refreshUser,
         logout,
         updateProfileName,
         updateProfileImage,

@@ -6,6 +6,8 @@
 //
 // Add new vars here as the app grows — group them by concern.
 
+import { parseAllowlist } from "@/lib/ip-allowlist"
+
 type EnvError = { key: string; message: string }
 
 function collect(fn: (errors: EnvError[]) => void): EnvError[] {
@@ -139,6 +141,21 @@ export function validateEnv(): void {
     // limiter uses an in-memory store; validate the URL when provided.
     if (process.env.REDIS_URL) {
       required(e, "REDIS_URL", "Redis connection string (for rate limiting)")
+    }
+
+    // Optional — comma-separated IPs/CIDRs allowed to reach the admin portal
+    // (/dashboard*, /api/admin*). Unset or empty disables the check; format
+    // is light (invalid entries are ignored at match time), but fail boot
+    // when the value yields no usable entry at all.
+    const allowlistRaw = process.env.ADMIN_IP_ALLOWLIST
+    if (allowlistRaw && allowlistRaw.trim() !== "") {
+      const allowlist = parseAllowlist(allowlistRaw)
+      if (!allowlist || allowlist.length === 0) {
+        e.push({
+          key: "ADMIN_IP_ALLOWLIST",
+          message: "Must contain at least one valid IP or CIDR entry.",
+        })
+      }
     }
 
     const provider = oneOf(

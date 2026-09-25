@@ -178,7 +178,7 @@ test.describe("S23. Merchant Balance & Payment", () => {
 })
 
 // ─── Warehouse Reconciliation ─────────────────────────────────────────────────
-test.describe("Warehouse Reconciliation", () => {
+test.describe("S29. Warehouse Reconciliation", () => {
   test("warehouse admin can view reconciliation page", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse/reconciliation")
@@ -188,7 +188,7 @@ test.describe("Warehouse Reconciliation", () => {
 })
 
 // ─── Merchant Pricing ─────────────────────────────────────────────────────────
-test.describe("Merchant Pricing", () => {
+test.describe("S30. Merchant Pricing", () => {
   test("merchant can view pricing page", async ({ page }) => {
     await login(page, CREDS.merchant)
     await skipOnboardingIfNeeded(page)
@@ -199,7 +199,7 @@ test.describe("Merchant Pricing", () => {
 })
 
 // ─── Admin Merchant Management ────────────────────────────────────────────────
-test.describe("Admin Merchant Management", () => {
+test.describe("S31. Admin Merchant Management", () => {
   test("admin can view merchant details", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/merchants")
@@ -220,7 +220,7 @@ test.describe("Admin Merchant Management", () => {
 })
 
 // ─── Admin Rider Management ───────────────────────────────────────────────────
-test.describe("Admin Rider Management", () => {
+test.describe("S32. Admin Rider Management", () => {
   test("admin can view rider list", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/riders")
@@ -237,7 +237,7 @@ test.describe("Admin Rider Management", () => {
 })
 
 // ─── Warehouse Dispatch ───────────────────────────────────────────────────────
-test.describe("Warehouse Dispatch", () => {
+test.describe("S33. Warehouse Dispatch", () => {
   test("warehouse admin can view dispatch desk", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse/dispatch")
@@ -247,7 +247,7 @@ test.describe("Warehouse Dispatch", () => {
 })
 
 // ─── Warehouse Intake ─────────────────────────────────────────────────────────
-test.describe("Warehouse Intake", () => {
+test.describe("S34. Warehouse Intake", () => {
   test("warehouse admin can view intake queue", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse")

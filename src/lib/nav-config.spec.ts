@@ -75,9 +75,9 @@ describe("SUPER_ADMIN_SIDEBAR", () => {
     expect(overview?.exact).toBe(true)
   })
 
-  it("every item has an href starting with /dashboard", () => {
+  it("every item has an href starting with /dashboard (or /help)", () => {
     for (const item of SUPER_ADMIN_SIDEBAR.items) {
-      expect(item.href).toMatch(/^\/dashboard/)
+      expect(item.href).toMatch(/^\/(dashboard|help)/)
     }
   })
 })
@@ -95,9 +95,9 @@ describe("MERCHANT_SIDEBAR", () => {
     expect(labels).toContain("Inbox")
   })
 
-  it("every item has an href starting with /merchant", () => {
+  it("every item has an href starting with /merchant (or /help)", () => {
     for (const item of MERCHANT_SIDEBAR.items) {
-      expect(item.href).toMatch(/^\/merchant/)
+      expect(item.href).toMatch(/^\/(merchant|help)/)
     }
   })
 })
@@ -115,9 +115,9 @@ describe("WAREHOUSE_SIDEBAR", () => {
     expect(labels).toContain("Account")
   })
 
-  it("every item has an href starting with /warehouse", () => {
+  it("every item has an href starting with /warehouse (or /help)", () => {
     for (const item of WAREHOUSE_SIDEBAR.items) {
-      expect(item.href).toMatch(/^\/warehouse/)
+      expect(item.href).toMatch(/^\/(warehouse|help)/)
     }
   })
 })
@@ -132,9 +132,9 @@ describe("RIDER_SIDEBAR", () => {
     expect(labels).toContain("Account")
   })
 
-  it("every item has an href starting with /rider", () => {
+  it("every item has an href starting with /rider (or /help)", () => {
     for (const item of RIDER_SIDEBAR.items) {
-      expect(item.href).toMatch(/^\/rider/)
+      expect(item.href).toMatch(/^\/(rider|help)/)
     }
   })
 })
