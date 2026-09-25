@@ -1,6 +1,7 @@
 "use client"
 
 import { Copy, Loader2, ShieldCheck, ShieldOff } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 import { type FormEvent, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -41,6 +42,7 @@ export function TwoFactorSettings() {
     useState<PasswordPurpose>("enable")
   const [password, setPassword] = useState("")
   const [pendingSecret, setPendingSecret] = useState<string | null>(null)
+  const [pendingUri, setPendingUri] = useState<string | null>(null)
   const [pendingCodes, setPendingCodes] = useState<string[]>([])
   const [code, setCode] = useState("")
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
@@ -51,6 +53,7 @@ export function TwoFactorSettings() {
     setPassword("")
     setCode("")
     setPendingSecret(null)
+    setPendingUri(null)
     setPendingCodes([])
   }
 
@@ -109,6 +112,7 @@ export function TwoFactorSettings() {
         return
       }
       setPendingSecret(totpSecretFromUri(uri))
+      setPendingUri(uri)
       setPendingCodes(codes)
       setPassword("")
       setPanel("verify")
@@ -133,6 +137,7 @@ export function TwoFactorSettings() {
       setRecoveryCodes(pendingCodes)
       setCode("")
       setPendingSecret(null)
+      setPendingUri(null)
       setPendingCodes([])
       setPanel("codes")
       toast.success("Two-factor authentication enabled.")
@@ -284,8 +289,24 @@ export function TwoFactorSettings() {
 
         {panel === "verify" ? (
           <form onSubmit={handleVerifySubmit} className="flex flex-col gap-4">
+            {pendingUri ? (
+              <div className="flex flex-col items-center gap-2">
+                <QRCodeSVG
+                  value={pendingUri}
+                  size={176}
+                  data-testid="two-factor-qr"
+                  className="rounded-lg border bg-white p-2"
+                />
+                <p className="text-muted-foreground text-center text-xs">
+                  Scan with your authenticator app (Google Authenticator, Authy,
+                  1Password…).
+                </p>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="two-factor-secret">Setup key</Label>
+              <Label htmlFor="two-factor-secret">
+                Or enter this setup key manually
+              </Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="two-factor-secret"
@@ -312,7 +333,7 @@ export function TwoFactorSettings() {
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
-                Add this key to your authenticator app, then enter the 6-digit
+                Add the key to your authenticator app, then enter the 6-digit
                 code it shows.
               </p>
             </div>
