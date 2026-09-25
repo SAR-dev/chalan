@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { merchant, user } from "@/lib/db/schema"
 import { merchantWelcomeTemplate } from "@/lib/mail-templates"
@@ -15,6 +16,15 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   if (!token) {
     return NextResponse.redirect(new URL("/login?error=missing-token", req.url))
+  }
+
+  // Better Auth's change-email confirmation link (ROADMAP 5.3) resolves to
+  // this same path: Next.js routes a static segment ahead of the
+  // /api/auth/[...all] catch-all. Those tokens are stateless HS256 JWTs (they
+  // contain dots), never a merchant cuid — hand them to Better Auth's own
+  // handler, which flips `user.email` and redirects back.
+  if (token.includes(".")) {
+    return auth.handler(req)
   }
 
   const now = new Date().toISOString()

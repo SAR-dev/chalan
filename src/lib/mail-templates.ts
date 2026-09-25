@@ -232,6 +232,30 @@ export async function passwordResetTemplate(data: {
 }
 
 // ---------------------------------------------------------------------------
+// Change email verification emails
+// ---------------------------------------------------------------------------
+
+export async function changeEmailTemplate(data: {
+  userName: string
+  newEmail: string
+  verifyUrl: string
+}) {
+  const { html, text } = await buildTemplate({
+    status: "Confirm your new email",
+    greetingName: data.userName,
+    message: `We received a request to change your login email to ${data.newEmail}. Click the button below to confirm the change.`,
+    footnote:
+      "This link expires in 1 hour. If you didn't request this change, you can safely ignore this email — your current email keeps working.",
+    cta: { href: data.verifyUrl, label: "Confirm new email" },
+  })
+  return {
+    subject: `Confirm your new email — ${siteConfig.name}`,
+    html,
+    text,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Order emails
 // ---------------------------------------------------------------------------
 

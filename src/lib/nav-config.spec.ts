@@ -52,6 +52,7 @@ describe("SUPER_ADMIN_SIDEBAR", () => {
   it("has all expected navigation items", () => {
     const labels = SUPER_ADMIN_SIDEBAR.items.map((i) => i.label)
     expect(labels).toContain("Overview")
+    expect(labels).toContain("Users")
     expect(labels).toContain("Admins")
     expect(labels).toContain("Riders")
     expect(labels).toContain("Merchants")

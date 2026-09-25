@@ -70,6 +70,11 @@ type JoinedUser = typeof user.$inferSelect &
     // Global "admins must enroll in 2FA" flag (platform_config), surfaced by
     // /api/users/me so the shells can enforce it. Not a user column.
     twoFactorRequired?: boolean
+    // Portal-mode gate (ROADMAP 5.4): false when this role is outside the
+    // deployment's PORTAL_MODE. Surfaced by /api/users/me so the client can
+    // explain and sign the user out instead of hitting opaque 401s. Not a
+    // user column.
+    portalAllowed?: boolean
   }
 
 export type User = Loosen<JoinedUser>

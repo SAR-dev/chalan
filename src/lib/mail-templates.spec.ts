@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  changeEmailTemplate,
   merchantApprovedTemplate,
   merchantRegisteredTemplate,
   merchantVerifyEmailTemplate,
@@ -114,6 +115,44 @@ describe("passwordResetTemplate", () => {
   it("includes reset URL in plain text", async () => {
     const { text } = await passwordResetTemplate(resetData)
     expect(text).toContain(resetData.resetUrl)
+  })
+})
+
+describe("changeEmailTemplate", () => {
+  const changeData = {
+    userName: "Alice",
+    newEmail: "alice-new@example.com",
+    verifyUrl: "http://localhost:3000/api/auth/verify-email?token=abc123",
+  }
+
+  it("includes site name in subject", async () => {
+    const { subject } = await changeEmailTemplate(changeData)
+    expect(subject).toContain("Confirm your new email")
+  })
+
+  it("includes user name in body", async () => {
+    const { html } = await changeEmailTemplate(changeData)
+    expect(html).toContain("Alice")
+  })
+
+  it("states the new address in body", async () => {
+    const { html } = await changeEmailTemplate(changeData)
+    expect(html).toContain("alice-new@example.com")
+  })
+
+  it("includes confirmation URL in body", async () => {
+    const { html } = await changeEmailTemplate(changeData)
+    expect(html).toContain(changeData.verifyUrl)
+  })
+
+  it("includes expiry footnote", async () => {
+    const { html } = await changeEmailTemplate(changeData)
+    expect(html).toContain("1 hour")
+  })
+
+  it("includes confirmation URL in plain text", async () => {
+    const { text } = await changeEmailTemplate(changeData)
+    expect(text).toContain(changeData.verifyUrl)
   })
 })
 

@@ -3,9 +3,13 @@ import {
   Banknote,
   Bike,
   Building2,
+  Check,
   FileText,
+  LifeBuoy,
   MapPin,
+  MessageSquare,
   Package,
+  ShieldCheck,
   Star,
   Truck,
   Users,
@@ -95,33 +99,57 @@ export const metadata: Metadata = {
 const features = [
   {
     icon: <Package className="size-5" />,
+    iconClass: "bg-chart-1/10 text-chart-1",
     title: "Order Management",
     desc: "Create single or bulk orders with delivery city selection, weight-based pricing, and COD amount tracking.",
   },
   {
     icon: <MapPin className="size-5" />,
+    iconClass: "bg-chart-2/10 text-chart-2",
     title: "Real-time Tracking",
     desc: "Track every parcel from pickup to doorstep with live status updates and public tracking pages.",
   },
   {
     icon: <Truck className="size-5" />,
+    iconClass: "bg-chart-4/10 text-chart-4",
     title: "Rider Fleet",
     desc: "Dedicated pickup and delivery riders with warehouse-assigned routing and cash collection tracking.",
   },
   {
     icon: <Building2 className="size-5" />,
+    iconClass: "bg-chart-5/10 text-chart-5",
     title: "Warehouse Operations",
     desc: "Intake queue, dispatch desk, and COD reconciliation — warehouse admins manage the full flow.",
   },
   {
     icon: <Banknote className="size-5" />,
+    iconClass: "bg-chart-3/10 text-chart-3",
     title: "COD & Payouts",
     desc: "Cash-on-delivery collection, automatic balance tracking, and merchant payout requests with admin approval.",
   },
   {
     icon: <Users className="size-5" />,
+    iconClass: "bg-accent text-accent-foreground",
     title: "Multi-role Dashboard",
     desc: "Separate dashboards for Super Admin, Warehouse Admin, Merchant, and Rider — each sees what they need.",
+  },
+  {
+    icon: <LifeBuoy className="size-5" />,
+    iconClass: "bg-chart-2/10 text-chart-2",
+    title: "Help Center & FAQ",
+    desc: "Step-by-step guides for merchants, riders, and admins, plus a full FAQ — reachable from every page.",
+  },
+  {
+    icon: <ShieldCheck className="size-5" />,
+    iconClass: "bg-chart-1/10 text-chart-1",
+    title: "Account Security",
+    desc: "Optional two-factor authentication with authenticator apps and recovery codes — mandatory for admin teams.",
+  },
+  {
+    icon: <MessageSquare className="size-5" />,
+    iconClass: "bg-chart-5/10 text-chart-5",
+    title: "In-app Support",
+    desc: "Open a support ticket from your dashboard and get replies in-app — no email tag, full history kept.",
   },
 ]
 
@@ -163,6 +191,22 @@ export default async function LandingPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                render={<Link href="/help" />}
+                nativeButton={false}
+              >
+                Help
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link href="/faq" />}
+                nativeButton={false}
+              >
+                FAQ
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 render={<Link href="/login" />}
                 nativeButton={false}
               >
@@ -194,6 +238,15 @@ export default async function LandingPage() {
           />
 
           <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-24 text-center">
+            <Link
+              href="/help"
+              className="border-border bg-background hover:border-primary/40 mx-auto mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors"
+            >
+              <LifeBuoy className="text-primary size-3.5" />
+              New: Help center, FAQ &amp; in-app ticket support
+              <ArrowRight className="text-muted-foreground size-3" />
+            </Link>
+
             <h1 className="mx-auto max-w-3xl text-4xl leading-tight font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
               Ship anything.
               <br />
@@ -226,6 +279,16 @@ export default async function LandingPage() {
                 <Bike className="size-4" />
                 Join as a rider
               </Button>
+              <Button
+                size="lg"
+                variant="ghost"
+                className="gap-2"
+                render={<Link href="/track" />}
+                nativeButton={false}
+              >
+                <MapPin className="size-4" />
+                Track a parcel
+              </Button>
             </div>
 
             <p className="text-muted-foreground mt-4 text-xs">
@@ -234,6 +297,20 @@ export default async function LandingPage() {
                 Sign in
               </Link>
             </p>
+
+            <div className="text-muted-foreground/80 mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
+              {[
+                "Public parcel tracking",
+                "COD & next-day payouts",
+                "Two-factor account security",
+                "Support tickets with in-app replies",
+              ].map((item) => (
+                <span key={item} className="inline-flex items-center gap-1.5">
+                  <Check className="text-primary size-3.5" />
+                  {item}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -254,12 +331,14 @@ export default async function LandingPage() {
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {features.map(({ icon, title, desc }) => (
+              {features.map(({ icon, iconClass, title, desc }) => (
                 <div
                   key={title}
                   className="bg-background rounded-xl border p-6 transition-colors hover:border-primary/30"
                 >
-                  <div className="bg-primary/10 text-primary mb-4 flex size-10 items-center justify-center rounded-lg">
+                  <div
+                    className={`mb-4 flex size-10 items-center justify-center rounded-lg ${iconClass}`}
+                  >
                     {icon}
                   </div>
                   <h3 className="font-semibold">{title}</h3>
@@ -268,6 +347,103 @@ export default async function LandingPage() {
                   </p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Support & Security ── */}
+        <section className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-12 text-center">
+            <p className="text-primary text-xs font-semibold tracking-widest uppercase">
+              Help &amp; security
+            </p>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+              Backed by docs and hardened accounts
+            </h2>
+            <p className="text-muted-foreground mx-auto mt-3 max-w-lg text-sm">
+              Learn the whole flow before you ship — and know who touched what
+              once you do.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="bg-background rounded-xl border p-6 sm:p-8">
+              <div className="bg-chart-2/10 text-chart-2 mb-4 flex size-10 items-center justify-center rounded-lg">
+                <LifeBuoy className="size-5" />
+              </div>
+              <h3 className="font-semibold">Support that answers</h3>
+              <ul className="text-muted-foreground mt-3 flex flex-col gap-2 text-sm leading-relaxed">
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  In-app support tickets — admin replies land in your dashboard
+                </li>
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  Role-based guides for merchants, riders, and admins
+                </li>
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  30-question FAQ covering orders, COD, pricing, and returns
+                </li>
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  Public tracking page — share a link, no account needed
+                </li>
+              </ul>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  render={<Link href="/faq" />}
+                  nativeButton={false}
+                >
+                  Browse the FAQ
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  render={<Link href="/help" />}
+                  nativeButton={false}
+                >
+                  Open the help center
+                </Button>
+              </div>
+            </div>
+
+            <div className="bg-background rounded-xl border p-6 sm:p-8">
+              <div className="bg-chart-1/10 text-chart-1 mb-4 flex size-10 items-center justify-center rounded-lg">
+                <ShieldCheck className="size-5" />
+              </div>
+              <h3 className="font-semibold">Security built in</h3>
+              <ul className="text-muted-foreground mt-3 flex flex-col gap-2 text-sm leading-relaxed">
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  Two-factor authentication (authenticator app + recovery codes)
+                  — optional for merchants, enforced for admin teams
+                </li>
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  Every role and API re-checks permissions server-side
+                </li>
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  Full audit trail of admin actions with before/after diffs
+                </li>
+                <li className="flex gap-2">
+                  <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
+                  Optional IP allowlisting for admin portals
+                </li>
+              </ul>
+              <div className="mt-5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  render={<Link href="/faq" />}
+                  nativeButton={false}
+                >
+                  Security questions in the FAQ
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -354,6 +530,17 @@ export default async function LandingPage() {
               Apply as a rider
             </Button>
           </div>
+          <p className="text-muted-foreground mt-6 text-xs">
+            Questions first?{" "}
+            <Link href="/faq" className="text-primary hover:underline">
+              Read the FAQ
+            </Link>{" "}
+            or{" "}
+            <Link href="/help" className="text-primary hover:underline">
+              browse the guides
+            </Link>
+            .
+          </p>
         </section>
       </main>
 

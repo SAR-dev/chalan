@@ -162,6 +162,12 @@ export function validateEnv(): void {
     // Unset/empty = optional (admins and merchants/riders may still opt in).
     oneOf(e, "ADMIN_2FA_REQUIRED", ["0", "1"], "0")
 
+    // Optional - which portals this deployment serves (ROADMAP 5.4):
+    // "admin" = dashboard + warehouse, "public" = merchant + rider,
+    // "all" = everything (default). Server-only (never NEXT_PUBLIC); read at
+    // runtime by proxy/api-auth, so changing it needs a restart.
+    oneOf(e, "PORTAL_MODE", ["admin", "public", "all"], "all")
+
     const provider = oneOf(
       e,
       "STORAGE_PROVIDER",

@@ -6,6 +6,7 @@ import {
   Loader2,
   Lock,
   LogOut,
+  Mail,
   Monitor,
   Smartphone,
   Table2,
@@ -48,6 +49,10 @@ interface Session {
   userId: string
 }
 
+// Client-side form gate only — Better Auth's /change-email zod schema does
+// the real validation server-side.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function parseDevice(userAgent: string | null) {
   if (!userAgent) return { icon: Globe, label: "Unknown device" }
   const ua = userAgent.toLowerCase()
@@ -77,6 +82,7 @@ export function AccountSettings() {
     updateProfilePhone,
     changePassword,
     updateTableRowsPerPage,
+    refreshUser,
   } = useAuth()
 
   // ── Profile state ────────────────────────────────────────────────────────
@@ -87,6 +93,10 @@ export function AccountSettings() {
   const [editingPhone, setEditingPhone] = useState(false)
   const [phone, setPhone] = useState(currentUser?.phone ?? "")
   const [savingPhone, setSavingPhone] = useState(false)
+
+  // ── Email state ───────────────────────────────────────────────────────────
+  const [newEmail, setNewEmail] = useState("")
+  const [savingEmail, setSavingEmail] = useState(false)
 
   // ── Password state ───────────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState("")
@@ -105,6 +115,20 @@ export function AccountSettings() {
     if (new URLSearchParams(window.location.search).get("setup") === "2fa") {
       setTab("two-factor")
     }
+  }, [])
+
+  // A failed confirmation link (expired / invalid / already-used token) comes
+  // back as ?error=<code> on the callback URL — Better Auth only encodes it
+  // there, so surface it instead of silently landing on the account page.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("error")
+    if (!code) return
+    toast.error(
+      code === "TOKEN_EXPIRED"
+        ? "That verification link has expired. Send a new one."
+        : "That verification link is invalid or has already been used.",
+    )
+    window.history.replaceState({}, "", window.location.pathname)
   }, [])
 
   // ── Rows-per-page state ──────────────────────────────────────────────────
@@ -178,6 +202,36 @@ export function AccountSettings() {
       }
     } finally {
       setSavingPhone(false)
+    }
+  }
+
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = newEmail.trim()
+    if (!EMAIL_PATTERN.test(trimmed) || emailUnchanged) return
+    setSavingEmail(true)
+    try {
+      // Better Auth owns this flow: POST /change-email stores nothing yet —
+      // it emails a one-time confirmation link to the NEW address, and
+      // `user.email` only flips when that link is opened. The merchant's
+      // business email is a separate row and is never touched here.
+      const { error } = await authClient.changeEmail({
+        newEmail: trimmed,
+        // Where the confirmation link drops the user afterwards — a full
+        // navigation, so AuthProvider re-reads /api/users/me on arrival.
+        callbackURL: window.location.pathname,
+      })
+      if (error) {
+        toast.error(error.message ?? "Could not send the verification email.")
+        return
+      }
+      toast.success(`Verification sent to ${trimmed} — check your inbox.`)
+      setNewEmail("")
+      // Re-read /api/users/me so the card always shows whatever the server
+      // has right now (a confirmation clicked in another tab, etc.).
+      await refreshUser()
+    } finally {
+      setSavingEmail(false)
     }
   }
 
@@ -271,6 +325,12 @@ export function AccountSettings() {
   const phoneUnchanged = trimmedPhone === (currentUser?.phone ?? "")
   const phoneInvalid = trimmedPhone.length === 0
 
+  const trimmedEmail = newEmail.trim()
+  const emailUnchanged =
+    trimmedEmail.toLowerCase() === (currentUser?.email ?? "").toLowerCase()
+  const emailInvalid =
+    trimmedEmail.length === 0 || !EMAIL_PATTERN.test(trimmedEmail)
+
   const passwordTooShort = newPassword.length > 0 && newPassword.length < 8
   const passwordMismatch =
     confirmPassword.length > 0 && newPassword !== confirmPassword
@@ -344,18 +404,6 @@ export function AccountSettings() {
                       placeholder="Your name"
                       autoComplete="name"
                     />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="account-email">Email</Label>
-                    <Input
-                      id="account-email"
-                      value={currentUser?.email ?? ""}
-                      disabled
-                      readOnly
-                    />
-                    <p className="text-muted-foreground text-xs">
-                      Your sign-in email cannot be changed here.
-                    </p>
                   </div>
                 </CardContent>
                 <CardFooter className="justify-end">
@@ -446,6 +494,69 @@ export function AccountSettings() {
                   </div>
                 )}
               </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <form onSubmit={handleEmailSubmit} className="contents">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="size-4" />
+                    Email
+                  </CardTitle>
+                  <CardDescription>
+                    This is the email you sign in with — a verification link
+                    goes to the new address and only takes effect once you click
+                    it. Your business email (shown on receipts) is managed
+                    separately and stays unchanged.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="account-current-email">Current email</Label>
+                    <Input
+                      id="account-current-email"
+                      data-testid="email-change-current"
+                      value={currentUser?.email ?? ""}
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="account-new-email">New email</Label>
+                    <Input
+                      id="account-new-email"
+                      data-testid="email-change-input"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      aria-invalid={newEmail.length > 0 && emailInvalid}
+                    />
+                    {newEmail.length > 0 && emailInvalid ? (
+                      <p className="text-destructive text-xs">
+                        Enter a valid email address.
+                      </p>
+                    ) : null}
+                  </div>
+                </CardContent>
+                <CardFooter className="justify-end">
+                  <Button
+                    type="submit"
+                    data-testid="email-change-submit"
+                    disabled={savingEmail || emailInvalid || emailUnchanged}
+                  >
+                    {savingEmail ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Sending
+                      </>
+                    ) : (
+                      "Send verification"
+                    )}
+                  </Button>
+                </CardFooter>
+              </form>
             </Card>
 
             <Card className="lg:col-span-2">

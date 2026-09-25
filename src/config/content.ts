@@ -28,6 +28,11 @@ export const pageContent = {
       description:
         "Create and manage Admin and Warehouse Admin accounts, and control who can set merchant pricing.",
     },
+    users: {
+      title: "Users",
+      description:
+        "Every platform account in one place — reset a password, ban or unban access, with each action written to the audit log.",
+    },
     merchants: {
       title: "Merchants",
       description:

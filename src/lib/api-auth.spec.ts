@@ -67,4 +67,45 @@ describe("requireSession", () => {
     const result = await requireSession()
     expect(result).toBeNull()
   })
+
+  it("returns null when the role is outside PORTAL_MODE", async () => {
+    vi.stubEnv("PORTAL_MODE", "admin")
+    try {
+      sessionResult = { user: { id: "u3" } }
+      dbResult = { userId: "u3", role: "MERCHANT", name: "Blocked Merchant" }
+      const { requireSession } = await import("@/lib/api-auth")
+      const result = await requireSession()
+      expect(result).toBeNull()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it("returns the profile when the role is inside PORTAL_MODE", async () => {
+    vi.stubEnv("PORTAL_MODE", "public")
+    try {
+      sessionResult = { user: { id: "u4" } }
+      dbResult = { userId: "u4", role: "RIDER", name: "Allowed Rider" }
+      const { requireSession } = await import("@/lib/api-auth")
+      const result = await requireSession()
+      expect(result).not.toBeNull()
+      expect(result!.role).toBe("RIDER")
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it("keeps every role allowed when PORTAL_MODE is unset (all)", async () => {
+    vi.stubEnv("PORTAL_MODE", undefined)
+    try {
+      sessionResult = { user: { id: "u5" } }
+      dbResult = { userId: "u5", role: "SUPER_ADMIN", name: "Admin" }
+      const { requireSession } = await import("@/lib/api-auth")
+      const result = await requireSession()
+      expect(result).not.toBeNull()
+      expect(result!.role).toBe("SUPER_ADMIN")
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
 })

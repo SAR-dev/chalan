@@ -38,6 +38,11 @@ export const GET = withErrorHandler(
     if (!isOwner && !isAdmin && !isWarehouseAdmin) {
       return forbidden()
     }
+    // Warehouse admins are scoped to riders at their own hub, same as the
+    // list endpoint and PATCH below.
+    if (isWarehouseAdmin && found.warehouseId !== me.warehouseId) {
+      return forbidden()
+    }
 
     return NextResponse.json(found)
   },

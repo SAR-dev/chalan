@@ -215,3 +215,17 @@ export const SUPPORT_STATUS_TONES: Record<SupportStatus, BadgeTone> = {
   ANSWERED: "info",
   CLOSED: "neutral",
 }
+
+export type UserAccountStatus = "ACTIVE" | "BANNED" | "INACTIVE"
+
+export const USER_STATUS_LABELS: Record<UserAccountStatus, string> = {
+  ACTIVE: "Active",
+  BANNED: "Banned",
+  INACTIVE: "Inactive",
+}
+
+export const USER_STATUS_TONES: Record<UserAccountStatus, BadgeTone> = {
+  ACTIVE: "success",
+  BANNED: "danger",
+  INACTIVE: "neutral",
+}

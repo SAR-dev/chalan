@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PATCH as toggleRiderActive } from "./[id]/active/route"
+import { GET as getRiderCash } from "./[id]/cash/route"
 import { GET as getRider, PATCH as updateRider } from "./[id]/route"
+import { GET as listRiderCash } from "./cash/route"
 import { GET as listRiders } from "./route"
 
 // --- Mocks -----------------------------------------------------------------
@@ -33,6 +35,8 @@ vi.mock("@/lib/db", () => {
     const chain: Record<string, unknown> = {
       from: () => chain,
       where: () => chain,
+      leftJoin: () => chain,
+      groupBy: () => chain,
       limit: () => chain,
       offset: () => chain,
       orderBy: () => chain,
@@ -193,6 +197,24 @@ describe("GET /api/riders/:id", () => {
     const res = await getRider(req("GET"), ctx("rider_2"))
     expect(res.status).toBe(403)
   })
+
+  it("warehouse admin can fetch own warehouse rider", async () => {
+    sessionState.value = warehouseAdmin
+    selectQueue.push([
+      { id: "rider_1", name: "Rider One", warehouseId: "wh_1" },
+    ])
+    const res = await getRider(req("GET"), ctx("rider_1"))
+    expect(res.status).toBe(200)
+  })
+
+  it("warehouse admin forbidden from fetching other warehouse rider", async () => {
+    sessionState.value = warehouseAdmin
+    selectQueue.push([
+      { id: "rider_2", name: "Other Rider", warehouseId: "wh_2" },
+    ])
+    const res = await getRider(req("GET"), ctx("rider_2"))
+    expect(res.status).toBe(403)
+  })
 })
 
 describe("PATCH /api/riders/:id", () => {
@@ -284,5 +306,118 @@ describe("PATCH /api/riders/:id/active", () => {
     selectQueue.push([{ isActive: true, warehouseId: "wh_2" }])
     const res = await toggleRiderActive(req("PATCH"), ctx())
     expect(res.status).toBe(403)
+  })
+})
+
+describe("GET /api/riders/cash", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await listRiderCash()
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for riders", async () => {
+    sessionState.value = riderSession
+    const res = await listRiderCash()
+    expect(res.status).toBe(403)
+  })
+
+  it("merchants get an empty list", async () => {
+    sessionState.value = { role: "MERCHANT", name: "Moe", userId: "u5" }
+    const res = await listRiderCash()
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toEqual([])
+  })
+
+  it("warehouse admin is scoped to their own riders", async () => {
+    sessionState.value = warehouseAdmin
+    selectQueue.push([
+      {
+        riderId: "rider_1",
+        riderName: "R1",
+        totalCollected: 100,
+        totalSubmitted: 40,
+      },
+    ])
+    const res = await listRiderCash()
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toHaveLength(1)
+    expect(json[0]).toMatchObject({ cashOnHand: 60 })
+  })
+
+  it("super admin sees the whole roster", async () => {
+    sessionState.value = admin
+    selectQueue.push([
+      {
+        riderId: "rider_1",
+        riderName: "R1",
+        totalCollected: 10,
+        totalSubmitted: 10,
+      },
+      {
+        riderId: "rider_2",
+        riderName: "R2",
+        totalCollected: 20,
+        totalSubmitted: 0,
+      },
+    ])
+    const res = await listRiderCash()
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toHaveLength(2)
+  })
+})
+
+describe("GET /api/riders/:id/cash", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await getRiderCash(req("GET"), ctx())
+    expect(res.status).toBe(401)
+  })
+
+  it("404 when rider not found", async () => {
+    sessionState.value = admin
+    selectQueue.push([])
+    const res = await getRiderCash(req("GET"), ctx())
+    expect(res.status).toBe(404)
+  })
+
+  it("403 for merchants", async () => {
+    sessionState.value = { role: "MERCHANT", name: "Moe", userId: "u5" }
+    selectQueue.push([{ id: "rider_1", warehouseId: "wh_1" }])
+    const res = await getRiderCash(req("GET"), ctx("rider_1"))
+    expect(res.status).toBe(403)
+  })
+
+  it("403 when a rider asks about someone else", async () => {
+    sessionState.value = riderSession
+    selectQueue.push([{ id: "rider_2", warehouseId: "wh_1" }])
+    const res = await getRiderCash(req("GET"), ctx("rider_2"))
+    expect(res.status).toBe(403)
+  })
+
+  it("403 for a warehouse admin outside their hub", async () => {
+    sessionState.value = warehouseAdmin
+    selectQueue.push([{ id: "rider_2", warehouseId: "wh_2" }])
+    const res = await getRiderCash(req("GET"), ctx("rider_2"))
+    expect(res.status).toBe(403)
+  })
+
+  it("returns cash summary and transactions for own rider", async () => {
+    sessionState.value = riderSession
+    selectQueue.push(
+      [{ id: "rider_1", name: "R1", warehouseId: "wh_1" }],
+      [{ totalCollected: 100, totalSubmitted: 40 }],
+      [{ orderId: "o1", amountCollected: 100, createdAt: "2025-01-02" }],
+      [{ orderId: "o1", amountCollected: 40, confirmedAt: "2025-01-03" }],
+    )
+    const res = await getRiderCash(req("GET"), ctx("rider_1"))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({
+      riderId: "rider_1",
+      cash: { totalCollected: 100, totalSubmitted: 40, cashOnHand: 60 },
+    })
+    expect(json.transactions).toHaveLength(2)
   })
 })
