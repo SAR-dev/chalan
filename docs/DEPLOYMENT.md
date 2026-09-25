@@ -72,7 +72,7 @@ LIMIT 20;
    URLs that Better Auth should trust (comma-separated). Omit for production
    single-instance deployments.
 5. Local disk storage (`STORAGE_PROVIDER=local`) does **not** work on Vercel's
-   ephemeral filesystem. Use `STORAGE_PROVIDER=r2` or `STORAGE_PROVIDER=supabase`
+   ephemeral filesystem. Use `STORAGE_PROVIDER=r2`
    instead.
 6. The app uses `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`,
    `pg_stat_statements`, and `pg_cron` PostgreSQL extensions — if you're
@@ -320,7 +320,7 @@ time for `drizzle-kit push` on first boot).
 compose file, so uploaded files (avatars, delivery proof, pickup-location
 photos) survive container rebuilds and are shared across role containers
 under `STORAGE_PROVIDER=local`. For multi-host or serverless deployments
-(including Vercel), switch to `STORAGE_PROVIDER=r2` or `=supabase` instead —
+   (including Vercel), switch to `STORAGE_PROVIDER=r2` instead —
 see `docs/ENV.md`.
 
 ---

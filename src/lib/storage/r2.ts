@@ -1,4 +1,9 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import {
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3"
 
 // Cloudflare R2 storage backend. Drop-in replacement for lib/storage/local.ts.
 //
@@ -66,4 +71,54 @@ export async function saveR2File(
     path: relativePath,
     publicUrl: `${publicUrl.replace(/\/$/, "")}/${relativePath}`,
   }
+}
+
+export type R2FileEntry = { key: string; size: number; lastModified: Date }
+
+/**
+ * Lists every object in the bucket as provider-relative keys, following
+ * ListObjectsV2 pagination. Keys come back exactly as R2 stores them, which
+ * is what saveR2File used as relativePath.
+ */
+export async function listR2Files(): Promise<R2FileEntry[]> {
+  const bucket = process.env.R2_BUCKET_NAME
+  if (!bucket) throw new Error("Missing env var: R2_BUCKET_NAME")
+
+  const client = getR2Client()
+  const files: R2FileEntry[] = []
+  let continuationToken: string | undefined
+
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        ContinuationToken: continuationToken,
+      }),
+    )
+    for (const item of page.Contents ?? []) {
+      if (!item.Key) continue
+      files.push({
+        key: item.Key,
+        size: item.Size ?? 0,
+        lastModified: item.LastModified ?? new Date(0),
+      })
+    }
+    continuationToken = page.IsTruncated
+      ? page.NextContinuationToken
+      : undefined
+  } while (continuationToken)
+
+  return files.sort((a, b) => a.key.localeCompare(b.key))
+}
+
+/**
+ * Deletes a single object by provider-relative key. R2 treats deleting a
+ * missing key as success, so this is idempotent.
+ */
+export async function deleteR2File(key: string): Promise<void> {
+  const bucket = process.env.R2_BUCKET_NAME
+  if (!bucket) throw new Error("Missing env var: R2_BUCKET_NAME")
+
+  const client = getR2Client()
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }

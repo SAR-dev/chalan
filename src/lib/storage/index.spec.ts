@@ -5,6 +5,12 @@ vi.mock("./local", () => ({
     path: "/local/file.png",
     publicUrl: "/uploads/test/file.png",
   }),
+  listLocalFiles: vi
+    .fn()
+    .mockResolvedValue([
+      { key: "avatars/u1/a.png", size: 1, lastModified: new Date(0) },
+    ]),
+  deleteLocalFile: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock("./r2", () => ({
@@ -12,19 +18,17 @@ vi.mock("./r2", () => ({
     path: "test/file.png",
     publicUrl: "https://pub.r2.dev/test/file.png",
   }),
+  listR2Files: vi
+    .fn()
+    .mockResolvedValue([
+      { key: "avatars/u1/a.png", size: 1, lastModified: new Date(0) },
+    ]),
+  deleteR2File: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock("./supabase", () => ({
-  saveSupabaseFile: vi.fn().mockResolvedValue({
-    path: "test/file.png",
-    publicUrl: "https://supabase.co/storage/test/file.png",
-  }),
-}))
-
-import { saveFile } from "./index"
-import { saveLocalFile } from "./local"
-import { saveR2File } from "./r2"
-import { saveSupabaseFile } from "./supabase"
+import { deleteFile, listFiles, saveFile } from "./index"
+import { deleteLocalFile, listLocalFiles, saveLocalFile } from "./local"
+import { deleteR2File, listR2Files, saveR2File } from "./r2"
 
 describe("saveFile", () => {
   const originalEnv = process.env.STORAGE_PROVIDER
@@ -73,21 +77,6 @@ describe("saveFile", () => {
     expect(result.publicUrl).toContain("r2.dev")
   })
 
-  it("uses supabase provider when STORAGE_PROVIDER=supabase", async () => {
-    process.env.STORAGE_PROVIDER = "supabase"
-    const result = await saveFile(
-      "test/file.png",
-      Buffer.from("data"),
-      "image/png",
-    )
-    expect(saveSupabaseFile).toHaveBeenCalledWith(
-      "test/file.png",
-      Buffer.from("data"),
-      "image/png",
-    )
-    expect(result.publicUrl).toContain("supabase.co")
-  })
-
   it("throws on unknown STORAGE_PROVIDER", async () => {
     process.env.STORAGE_PROVIDER = "ftp"
     await expect(
@@ -99,5 +88,72 @@ describe("saveFile", () => {
     process.env.STORAGE_PROVIDER = "LOCAL"
     await saveFile("test.png", Buffer.from(""), "image/png")
     expect(saveLocalFile).toHaveBeenCalled()
+  })
+})
+
+describe("listFiles", () => {
+  const originalEnv = process.env.STORAGE_PROVIDER
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.STORAGE_PROVIDER
+    } else {
+      process.env.STORAGE_PROVIDER = originalEnv
+    }
+    vi.clearAllMocks()
+  })
+
+  it("defaults to the local provider when STORAGE_PROVIDER is unset", async () => {
+    delete process.env.STORAGE_PROVIDER
+    const files = await listFiles()
+    expect(listLocalFiles).toHaveBeenCalledTimes(1)
+    expect(files).toEqual([
+      { key: "avatars/u1/a.png", size: 1, lastModified: new Date(0) },
+    ])
+  })
+
+  it("dispatches to the r2 provider", async () => {
+    process.env.STORAGE_PROVIDER = "r2"
+    await listFiles()
+    expect(listR2Files).toHaveBeenCalledTimes(1)
+    expect(listLocalFiles).not.toHaveBeenCalled()
+  })
+
+  it("throws on unknown STORAGE_PROVIDER", async () => {
+    process.env.STORAGE_PROVIDER = "ftp"
+    await expect(listFiles()).rejects.toThrow("Unknown STORAGE_PROVIDER")
+  })
+})
+
+describe("deleteFile", () => {
+  const originalEnv = process.env.STORAGE_PROVIDER
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.STORAGE_PROVIDER
+    } else {
+      process.env.STORAGE_PROVIDER = originalEnv
+    }
+    vi.clearAllMocks()
+  })
+
+  it("defaults to the local provider when STORAGE_PROVIDER is unset", async () => {
+    delete process.env.STORAGE_PROVIDER
+    await deleteFile("avatars/u1/a.png")
+    expect(deleteLocalFile).toHaveBeenCalledWith("avatars/u1/a.png")
+  })
+
+  it("dispatches to the r2 provider", async () => {
+    process.env.STORAGE_PROVIDER = "r2"
+    await deleteFile("avatars/u1/a.png")
+    expect(deleteR2File).toHaveBeenCalledWith("avatars/u1/a.png")
+    expect(deleteLocalFile).not.toHaveBeenCalled()
+  })
+
+  it("throws on unknown STORAGE_PROVIDER", async () => {
+    process.env.STORAGE_PROVIDER = "ftp"
+    await expect(deleteFile("a.png")).rejects.toThrow(
+      "Unknown STORAGE_PROVIDER",
+    )
   })
 })
