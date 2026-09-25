@@ -50,7 +50,7 @@ export function OutForDeliveryDialog({
       submitLabel="Confirm, out for delivery"
       submitIcon={<Navigation className="size-4" />}
     >
-      <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 mt-2 mb-4">
+      <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
         <InfoRow icon={User} label="Recipient" value={order.recipientName} />
         <InfoRow icon={Phone} label="Phone" value={order.recipientPhone} />
         <Separator className="my-1" />

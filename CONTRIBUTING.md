@@ -560,6 +560,18 @@ Key differences to know when adding a column or action:
   `csvData` config for a curated column set — an explicit `csv` prop always
   wins over the derived one.
 
+- **Merchant orders support CSV bulk import.** The merchant order table's
+  toolbar has an **Import CSV** entry (`bulk-import-open`) opening the
+  client-only dialog (`src/features/orders/dialogs/bulk-import-dialog.tsx`,
+  with the pure parsing/resolution modules under
+  `src/features/orders/bulk-import/`): download the template, upload or paste
+  up to 50 rows, preview every row, then import **all-or-nothing** through the
+  existing `POST /api/orders/bulk` — the v1 flow deliberately adds no server
+  code, fees or IDs are never accepted from the file, and empty notes are
+  auto-tagged `[CSV import YYYY-MM-DD]` for auditability. The column spec,
+  header aliases, limits and test plan live in `docs/REFACTOR.md` (§3–§10);
+  keep changes to this flow aligned with that document.
+
 - **Optimistic mutations use two-step revalidation.** The bound `mutate()`
   applies the optimistic update with `{ revalidate: false, populateCache: true }`
   so the UI responds instantly. Immediately after, call the SWR top-level

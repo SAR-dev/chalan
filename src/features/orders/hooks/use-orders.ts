@@ -253,6 +253,7 @@ export function useOrders({
       orders?: Order[]
       error?: string
       issues?: Array<{ path: (string | number)[]; message: string }> | null
+      rows?: number[] | null
     }> => {
       const res = await fetch("/api/orders/bulk", {
         method: "POST",
@@ -262,7 +263,12 @@ export function useOrders({
       const resData = await res.json()
       if (!res.ok) {
         const msg = formatError(resData)
-        return { ok: false, error: msg, issues: resData.issues ?? null }
+        return {
+          ok: false,
+          error: msg,
+          issues: resData.issues ?? null,
+          rows: resData.rows ?? null,
+        }
       }
       await mutate()
       _globalMutate(

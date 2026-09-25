@@ -84,7 +84,7 @@ export function PayoutRequestDialog({
       submitIcon={<Wallet className="size-4" />}
       submitDisabled={payableTotal === 0}
     >
-      <div className="grid grid-cols-1 gap-4 pt-2 pb-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="border-border bg-muted/40 rounded-lg border p-4">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground flex items-center gap-2 text-sm">
