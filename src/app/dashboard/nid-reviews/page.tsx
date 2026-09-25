@@ -23,6 +23,14 @@ import type { Merchant } from "@/lib/types"
 
 type NidFilter = "all" | "pending" | "verified" | "rejected"
 
+function formatNidDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+}
+
 export default function NidReviewsPage() {
   const router = useRouter()
   const {
@@ -147,6 +155,7 @@ export default function NidReviewsPage() {
     {
       id: "business",
       header: columnLabels.merchant.business,
+      sortValue: (m) => m.businessName,
       cell: (m) => (
         <CellTwoRow
           primary={<span className="font-medium">{m.businessName}</span>}
@@ -157,25 +166,23 @@ export default function NidReviewsPage() {
     {
       id: "owner",
       header: columnLabels.merchant.owner,
+      sortValue: (m) => m.ownerName,
       cell: (m) => <CellTwoRow primary={m.ownerName} secondary={m.phone} />,
     },
     {
       id: "nidNumber",
       header: "NID Number",
+      sortValue: (m) => m.nidNumber || "—",
       cell: (m) => <span>{m.nidNumber || "—"}</span>,
     },
     {
       id: "submittedAt",
       header: "Submitted",
+      sortValue: (m) =>
+        m.nidSubmittedAt ? formatNidDate(m.nidSubmittedAt) : "—",
       cell: (m) =>
         m.nidSubmittedAt ? (
-          <span>
-            {new Date(m.nidSubmittedAt).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
-          </span>
+          <span>{formatNidDate(m.nidSubmittedAt)}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -312,6 +319,7 @@ export default function NidReviewsPage() {
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={mutate}
             selectedKeys={selectedMerchants}
             onSelectionChange={setSelectedMerchants}
           />

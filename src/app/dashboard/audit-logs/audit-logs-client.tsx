@@ -39,6 +39,7 @@ export function AuditLogsClient({
     sortDir,
     onSortChange,
     isLoading,
+    mutate: refresh,
   } = useAuditLogs({ initialData, initialTotal })
 
   const columns: DataTableColumn<AuditLog>[] = [
@@ -92,6 +93,7 @@ export function AuditLogsClient({
     {
       id: "description",
       header: "Description",
+      sortValue: (l) => l.description,
       cell: (l) => <span className="text-sm">{l.description}</span>,
     },
     {
@@ -135,6 +137,7 @@ export function AuditLogsClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
           />
         </CardContent>
       </Card>

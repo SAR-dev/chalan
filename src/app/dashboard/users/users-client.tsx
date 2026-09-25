@@ -22,10 +22,14 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
-import { UserStatusBadge } from "@/features/users/components/user-status-badge"
+import {
+  UserStatusBadge,
+  userAccountStatus,
+} from "@/features/users/components/user-status-badge"
 import { BanDialog } from "@/features/users/dialogs/ban-dialog"
 import { ResetPasswordDialog } from "@/features/users/dialogs/reset-password-dialog"
 import { type AdminUser, useUsers } from "@/features/users/hooks/use-users"
+import { USER_STATUS_LABELS } from "@/lib/constants"
 
 const TAB_ROLES = ["ALL", "SUPER_ADMIN", "WAREHOUSE_ADMIN", "MERCHANT", "RIDER"]
 
@@ -68,6 +72,7 @@ export function UsersPageClient({
     resetPassword,
     banUser,
     unbanUser,
+    mutate: refresh,
   } = useUsers({ initialData, initialTotal })
   const [tab, setTab] = useState("ALL")
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null)
@@ -115,6 +120,7 @@ export function UsersPageClient({
     {
       id: "status",
       header: columnLabels.user.status,
+      sortValue: (u) => USER_STATUS_LABELS[userAccountStatus(u)],
       cell: (u) => <UserStatusBadge user={u} />,
     },
     {
@@ -221,6 +227,7 @@ export function UsersPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
           />
         </CardContent>
       </Card>

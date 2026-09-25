@@ -75,6 +75,7 @@ export function WarehouseExceptionsPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
@@ -153,6 +154,10 @@ export function WarehouseExceptionsPageClient({
     {
       id: "resolvedBy",
       header: columnLabels.order.resolvedBy,
+      sortValue: (o) =>
+        o.status === "RETURNED"
+          ? (o.failedResolvedBy ?? "Warehouse Admin")
+          : "—",
       cell: (o) =>
         o.status === "RETURNED" ? (
           <CellContent className="text-muted-foreground">
@@ -165,6 +170,8 @@ export function WarehouseExceptionsPageClient({
     {
       id: "returnReason",
       header: columnLabels.order.returnReason,
+      sortValue: (o) =>
+        o.status === "RETURNED" && o.returnReason ? o.returnReason : "—",
       cellClassName: "whitespace-normal align-top",
       cell: (o) =>
         o.status === "RETURNED" && o.returnReason ? (
@@ -288,6 +295,7 @@ export function WarehouseExceptionsPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
           />
         </CardContent>
       </Card>

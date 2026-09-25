@@ -61,6 +61,7 @@ export function WarehouseReconciliationPageClient({
     settleOrderCod,
     bulkSettleCod,
     isLoading,
+    mutate: refresh,
   } = useOrders({ initialData, initialTotal })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
@@ -310,6 +311,7 @@ export function WarehouseReconciliationPageClient({
                 ? "Nothing to reconcile. Delivered parcels appear here until their COD is settled."
                 : "No settlements yet."
             }
+            onRefresh={refresh}
             bulkLoading={bulkBusy}
             selectedKeys={selectedOrders}
             onSelectionChange={setSelectedOrders}

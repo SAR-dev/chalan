@@ -58,6 +58,7 @@ export function RidersPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    mutate: refresh,
   } = useRiders({ initialData, initialTotal })
   const router = useRouter()
   const baseColumns = useRiderColumns({ showWarehouse: true })
@@ -236,6 +237,7 @@ export function RidersPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
           />
         </CardContent>
       </Card>

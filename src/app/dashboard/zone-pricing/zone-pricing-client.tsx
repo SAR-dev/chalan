@@ -25,7 +25,12 @@ import type { ZonePricing } from "@/lib/types"
 
 export function ZonePricingPageClient() {
   const { zones } = useDeliveryZones()
-  const { pricing, isLoading, deletePricing } = useZonePricing()
+  const {
+    pricing,
+    isLoading,
+    deletePricing,
+    mutate: refresh,
+  } = useZonePricing()
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<ZonePricing | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -47,6 +52,7 @@ export function ZonePricingPageClient() {
     {
       id: "fromZone",
       header: "From Zone",
+      sortValue: (o) => zoneName(o.fromZoneId),
       cell: (o) => (
         <CellContent className="font-medium">
           {zoneName(o.fromZoneId)}
@@ -56,6 +62,7 @@ export function ZonePricingPageClient() {
     {
       id: "toZone",
       header: "To Zone",
+      sortValue: (o) => zoneName(o.toZoneId),
       cell: (o) => (
         <CellContent className="font-medium">
           {zoneName(o.toZoneId)}
@@ -65,26 +72,31 @@ export function ZonePricingPageClient() {
     {
       id: "baseRate",
       header: "Base Rate",
+      sortValue: (o) => o.baseRate,
       cell: (o) => <CellContent>{o.baseRate}</CellContent>,
     },
     {
       id: "extraRatePerKg",
       header: "Extra/KG",
+      sortValue: (o) => o.extraRatePerKg,
       cell: (o) => <CellContent>{o.extraRatePerKg}</CellContent>,
     },
     {
       id: "freeWeightKg",
       header: "Free Weight",
+      sortValue: (o) => o.freeWeightKg,
       cell: (o) => <CellContent>{o.freeWeightKg}</CellContent>,
     },
     {
       id: "maxWeightKg",
       header: "Max Weight",
+      sortValue: (o) => o.maxWeightKg,
       cell: (o) => <CellContent>{o.maxWeightKg}</CellContent>,
     },
     {
       id: "codFeePercentage",
       header: "COD Fee %",
+      sortValue: (o) => o.codFeePercentage,
       cell: (o) => <CellContent>{o.codFeePercentage}</CellContent>,
     },
     {
@@ -142,6 +154,7 @@ export function ZonePricingPageClient() {
             data={pricing}
             getRowKey={(o) => o.id}
             loading={isLoading}
+            onRefresh={refresh}
             emptyMessage="No zone pricing yet. Add one to get started."
           />
         </CardContent>

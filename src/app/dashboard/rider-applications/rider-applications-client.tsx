@@ -121,6 +121,7 @@ export function RiderApplicationsPageClient({
     {
       id: "phone",
       header: columnLabels.rider.phone,
+      sortValue: (a) => a.phone,
       cell: (a) => a.phone,
     },
     {
@@ -133,6 +134,7 @@ export function RiderApplicationsPageClient({
     {
       id: "warehouse",
       header: columnLabels.rider.warehouse,
+      sortValue: (a) => a.warehouseName ?? "—",
       cell: (a) => a.warehouseName ?? "—",
     },
     {
@@ -247,6 +249,7 @@ export function RiderApplicationsPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={mutate}
           />
         </CardContent>
       </Card>

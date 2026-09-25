@@ -75,6 +75,7 @@ export function PayoutsPageClient({
     isLoading,
     markPayoutPaid,
     markPayoutsPaid,
+    mutate: refresh,
   } = usePayouts({ initialData, initialTotal })
   const baseColumns = usePayoutRequestColumns({ showMerchantName: true })
   const [tab, setTab] = useState<FilterTab>("PENDING")
@@ -353,6 +354,7 @@ export function PayoutsPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             bulkLoading={bulkBusy}
             selectedKeys={selectedPayouts}
             onSelectionChange={setSelectedPayouts}

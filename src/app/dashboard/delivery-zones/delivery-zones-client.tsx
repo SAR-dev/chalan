@@ -24,7 +24,13 @@ import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-
 import type { DeliveryZone } from "@/lib/types"
 
 export function DeliveryZonesPageClient() {
-  const { zones, isLoading, updateZone, deleteZone } = useDeliveryZones()
+  const {
+    zones,
+    isLoading,
+    updateZone,
+    deleteZone,
+    mutate: refresh,
+  } = useDeliveryZones()
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryZone | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -50,11 +56,13 @@ export function DeliveryZonesPageClient() {
     {
       id: "name",
       header: "Zone name",
+      sortValue: (o) => o.name,
       cell: (o) => <CellContent className="font-medium">{o.name}</CellContent>,
     },
     {
       id: "status",
       header: "Status",
+      sortValue: (o) => (o.isActive ? "Active" : "Inactive"),
       cell: (o) =>
         o.isActive ? (
           <Badge variant="outline" className="gap-1 text-green-600">
@@ -125,6 +133,7 @@ export function DeliveryZonesPageClient() {
             data={zones}
             getRowKey={(o) => o.id}
             loading={isLoading}
+            onRefresh={refresh}
             emptyMessage="No delivery zones yet. Add one to get started."
           />
         </CardContent>

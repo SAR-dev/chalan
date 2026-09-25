@@ -59,6 +59,7 @@ export function IntakePageClient({
     setStatuses,
     isLoading,
     bulkReceiveOrders,
+    mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
@@ -240,6 +241,7 @@ export function IntakePageClient({
               setPage(p)
               setLimit(l)
             }}
+            onRefresh={refresh}
             bulkLoading={bulkBusy}
             selectedKeys={selectedOrders}
             onSelectionChange={setSelectedOrders}

@@ -65,6 +65,7 @@ export default function EmailLogsPage() {
     markAsSentBulk,
     statusFilter: _statusFilter,
     setStatusFilter,
+    mutate: refresh,
   } = useEmailLogs()
   const [tab, setTab] = useState<TabFilter>("ALL")
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -262,6 +263,7 @@ export default function EmailLogsPage() {
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             bulkLoading={bulkBusy}
             selectedKeys={selected}
             onSelectionChange={setSelected}

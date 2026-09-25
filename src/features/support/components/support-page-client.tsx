@@ -81,6 +81,7 @@ export function SupportPageClient({
     onSortChange,
     isLoading,
     closeTicket,
+    mutate: refresh,
   } = useSupport({ initialData, initialTotal })
 
   const [tab, setTab] = useState<FilterTab>("ALL")
@@ -131,6 +132,7 @@ export function SupportPageClient({
           {
             id: "requester",
             header: columnLabels.support.requester,
+            sortValue: (t: SupportTicket) => t.actorName,
             cell: (t: SupportTicket) => (
               <CellTwoRow
                 primary={t.actorName}
@@ -143,6 +145,7 @@ export function SupportPageClient({
     {
       id: "message",
       header: columnLabels.support.message,
+      sortValue: (t) => t.message,
       headClassName: "hidden md:table-cell",
       cellClassName: "hidden md:table-cell",
       cell: (t) => <CellContent>{t.message}</CellContent>,
@@ -153,6 +156,7 @@ export function SupportPageClient({
           {
             id: "reply",
             header: columnLabels.support.reply,
+            sortValue: (t: SupportTicket) => t.adminReply ?? "No reply yet",
             headClassName: "hidden lg:table-cell",
             cellClassName: "hidden lg:table-cell",
             cell: (t: SupportTicket) =>
@@ -282,6 +286,7 @@ export function SupportPageClient({
               serverSortId={sortId}
               serverSortDir={sortDir}
               onSortChange={onSortChange}
+              onRefresh={refresh}
             />
           </div>
         </CardContent>

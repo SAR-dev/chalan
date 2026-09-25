@@ -43,7 +43,7 @@ import {
 import { AssignPickupRiderDialog } from "@/features/orders/dialogs/assign-pickup-rider-dialog"
 import { BulkAssignPickupRiderDialog } from "@/features/orders/dialogs/bulk-assign-pickup-rider-dialog"
 import { BulkDispatchDialog } from "@/features/orders/dialogs/bulk-dispatch-dialog"
-import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
+import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { WarehouseDispatchDialog } from "@/features/orders/dialogs/warehouse-dispatch-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { useRiders } from "@/features/riders/hooks/use-riders"
@@ -78,6 +78,7 @@ export function WarehouseDispatchPageClient({
     setQuery,
     setStatuses,
     isLoading,
+    mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders, warehouseDeliveryRiders } = useRiders()
@@ -102,12 +103,12 @@ export function WarehouseDispatchPageClient({
   )
   const riderName = useCallback(
     (id?: string | null) =>
-      id ? (riders.find((r) => r.id === id)?.name ?? "—") : "—",
+      id ? (riders.find((r) => r.id === id)?.name ?? "â€”") : "â€”",
     [riders],
   )
   const riderPhone = useCallback(
     (id?: string | null) =>
-      id ? (riders.find((r) => r.id === id)?.phone ?? "—") : "—",
+      id ? (riders.find((r) => r.id === id)?.phone ?? "â€”") : "â€”",
     [riders],
   )
 
@@ -178,6 +179,8 @@ export function WarehouseDispatchPageClient({
   const unassignedDeliveryRiderColumn = useMemo<DataTableColumn<Order>>(
     () => ({
       ...deliveryRiderWithPhoneColumn(riderName, riderPhone),
+      sortValue: (o) =>
+        o.deliveryRiderId ? riderName(o.deliveryRiderId) : "Unassigned",
       cell: (o) =>
         o.deliveryRiderId ? (
           <CellTwoRow
@@ -343,6 +346,7 @@ export function WarehouseDispatchPageClient({
               setPage(p)
               setLimit(l)
             }}
+            onRefresh={refresh}
             selectedKeys={selectedOrders}
             onSelectionChange={setSelectedOrders}
             bulkActions={
@@ -419,7 +423,7 @@ export function WarehouseDispatchPageClient({
         onComplete={() => setSelectedOrders(new Set())}
       />
 
-      <OrderDetailsDialog
+      <OrderDetailsDrawer
         orderCode={viewOrderCode}
         open={viewOpen}
         onOpenChange={setViewOpen}

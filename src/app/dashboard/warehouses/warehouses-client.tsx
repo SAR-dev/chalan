@@ -51,6 +51,7 @@ export function WarehousesPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    mutate: refresh,
   } = useWarehouses({ initialData, initialTotal })
   const [editing, setEditing] = useState<Warehouse | null>(null)
   const [editOpen, setEditOpen] = useState(false)
@@ -153,6 +154,7 @@ export function WarehousesPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
           />
         </CardContent>
       </Card>

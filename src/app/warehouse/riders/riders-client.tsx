@@ -46,6 +46,7 @@ export function WarehouseRidersPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    mutate: refresh,
   } = useRiders({ initialData, initialTotal })
   const columns = useRiderColumns()
   const [editingRider, setEditingRider] = useState<Rider | null>(null)
@@ -191,6 +192,7 @@ export function WarehouseRidersPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             onRowClick={handleRowClick}
           />
         </CardContent>

@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
-import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
+import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { formatTk } from "@/lib/pricing"
@@ -63,6 +63,7 @@ export default function MerchantOrdersPage() {
     sortId,
     sortDir,
     onSortChange,
+    mutate: refresh,
   } = useOrders()
 
   const { pickupLocations } = usePickupLocations()
@@ -132,6 +133,8 @@ export default function MerchantOrdersPage() {
     {
       id: "deliveryAddress",
       header: columnLabels.order.deliveryAddress,
+      sortValue: (o) =>
+        [o.deliveryCity, o.deliveryAddress].filter(Boolean).join(", "),
       cell: (o) => {
         const city = o.deliveryCity
         const address = o.deliveryAddress
@@ -159,6 +162,12 @@ export default function MerchantOrdersPage() {
     {
       id: "paymentStatus",
       header: "Payment",
+      sortValue: (o) => {
+        if (o.payoutRequestId) return "Paid"
+        if (o.codSettledAt) return "COD settled"
+        if (o.status === "DELIVERED") return "COD pending"
+        return "Pending"
+      },
       cell: (o) => {
         if (o.payoutRequestId) {
           return (
@@ -304,6 +313,7 @@ export default function MerchantOrdersPage() {
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             initialSortId="createdAt"
             initialSortDir="desc"
             onPageChange={(p, l) => {
@@ -323,7 +333,7 @@ export default function MerchantOrdersPage() {
         }}
       />
 
-      <OrderDetailsDialog
+      <OrderDetailsDrawer
         orderCode={viewOrderCode}
         open={viewOpen}
         onOpenChange={setViewOpen}
