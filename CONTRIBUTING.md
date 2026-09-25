@@ -2463,9 +2463,13 @@ e2e/
     02-business-flows.spec.ts   # order ops, warehouse dispatch/intake/exceptions
     03-onboarding.spec.ts       # merchant onboarding + registration gate
     04-branding.spec.ts         # merchant branding settings
+    05-two-factor.spec.ts       # 2FA enrollment + TOTP login for admins
+    06-support.spec.ts          # support ticket create → admin reply
 ```
 
-**46 tests total** across 4 spec files.
+**51 tests total** across 6 spec files. Every `test.describe` carries a unique
+scenario id in `S<number>. <Name>` format (currently **S1–S37**, no gaps, no
+duplicates).
 
 #### Configuration
 
@@ -2547,29 +2551,36 @@ pnpm exec playwright test --ui    # UI debugger (watch mode)
 
 #### CI/CD pipeline
 
-There is currently **no e2e job** in `.github/workflows/ci.yml` — e2e only runs
-locally (see T3 in `ROADMAP.md`). Adding one requires a PostgreSQL service
-container and a `pnpm build` step; the `webServer` seeds the DB itself.
+CI (`.github/workflows/ci.yml`) runs six jobs on every push/PR: `typecheck`,
+`lint`, `format`, `test` (unit), `build`, and `security` (`pnpm audit
+--audit-level=high` + PR dependency review). **E2E is intentionally not in the
+CI pipeline** — the Playwright suite runs locally only (`pnpm test:e2e` after
+`pnpm build`); its webServer needs a local Postgres + reseed that the CI
+runners don't provision.
 
 #### Writing a new E2E test — checklist
 
 1. **Sign in with the shared helper** — `await login(page, CREDS.merchant)` from
    `e2e/helpers.ts`. Never re-implement the fill/press/wait sequence.
-2. **Use `CREDS` / seed constants** — don't hardcode emails, passwords, codes,
+2. **Name the describe `S<number>. <Scenario>`** — unique serial id; continue
+   from the highest existing number (grep `test.describe("S` across
+   `e2e/specs/` for the current max — currently S1–S37). Never reuse or skip
+   numbers, and never leave a describe unprefixed.
+3. **Use `CREDS` / seed constants** — don't hardcode emails, passwords, codes,
    or IDs in a spec; take them from `e2e/helpers.ts` or
    `src/lib/db/seed/seed-content.ts`.
-3. **Use `data-testid` selectors where possible** — add a `data-testid` to the
+4. **Use `data-testid` selectors where possible** — add a `data-testid` to the
    element and a constant to `e2e/selectors.ts`. Fall back to
    `getByRole`/`getByText` only for elements without a test id (headings,
    generic text); tag buttons, inputs, rows, and dialogs instead of relying on
    role/text matching.
-4. **Make it independent** — the test must work alone, in any order, and
+5. **Make it independent** — the test must work alone, in any order, and
    without depending on another test's side effects.
-5. **Avoid `waitForTimeout`** — use `waitForURL`, `waitForSelector`, or
+6. **Avoid `waitForTimeout`** — use `waitForURL`, `waitForSelector`, or
    `waitForResponse` instead. The suite currently has zero fixed sleeps.
-6. **Assert on visible elements** — after a mutation, assert the resulting row,
+7. **Assert on visible elements** — after a mutation, assert the resulting row,
    status badge, or toast text rather than just the click succeeding.
-7. **Reuse seeded read-only entities** — for scenarios that change state, create
+8. **Reuse seeded read-only entities** — for scenarios that change state, create
    your own data via `page.request` instead of mutating shared seed rows.
 
 ---

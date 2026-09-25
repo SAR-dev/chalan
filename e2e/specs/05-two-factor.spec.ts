@@ -41,7 +41,7 @@ async function disableIfEnrolled(page: Page) {
   }
 }
 
-test.describe("H4. Two-factor authentication for admins", () => {
+test.describe("S37. Two-factor authentication for admins", () => {
   test.afterEach(async ({ page }) => {
     await disableIfEnrolled(page)
   })

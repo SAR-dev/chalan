@@ -5,7 +5,7 @@
 > Completed" entries in older commits).
 >
 > Current health: Build ✅ · Typecheck ✅ · Unit **1018/1018** ✅ · E2E **51/51** ✅ ·
-> `pnpm ci:check` ✅ (606 files) · CI runs typecheck/lint/format/**security-audit**/build/e2e ·
+> `pnpm ci:check` ✅ (606 files) · CI runs typecheck/lint/format/**security-audit**/build ·
 > husky pre-commit (lint-staged) active · dependency tree has **0 high/critical advisories**.
 
 ---

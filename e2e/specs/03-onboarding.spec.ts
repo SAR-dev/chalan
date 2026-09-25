@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { CREDS, login } from "../helpers"
 
 // ─── Onboarding Flow ─────────────────────────────────────────────────────────
-test.describe("Merchant Onboarding Flow", () => {
+test.describe("S35. Merchant Onboarding Flow", () => {
   test("merchant API returns onboardingCompletedAt in self-fetch", async ({
     request,
   }) => {

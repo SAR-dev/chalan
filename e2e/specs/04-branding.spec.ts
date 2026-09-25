@@ -10,7 +10,7 @@ async function skipOnboardingIfNeeded(page: any) {
 }
 
 // ─── Branding Section ────────────────────────────────────────────────────────
-test.describe("Merchant Branding", () => {
+test.describe("S36. Merchant Branding", () => {
   test("merchant can access branding section on settings page", async ({
     page,
   }) => {
