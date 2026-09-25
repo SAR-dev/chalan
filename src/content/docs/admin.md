@@ -49,10 +49,10 @@ Operating tasks for Super Admins running {{APP_NAME}} from the admin console at 
 4. Mark approved requests **Paid** once the transfer is sent. Bulk approve/reject/mark-paid are available for clearing a backlog.
 5. Watch the **History** tab for paid and rejected requests; merchants see the same statuses on their Finance page.
 
-## 7. Reconcile COD
+## 7. Settle COD
 
-1. Open **COD Reconciliation** (`/dashboard/cod-reconciliation`) for a platform-wide view of delivered parcels and their COD state.
-2. Warehouse Admins settle COD on their own console (`/warehouse/reconciliation`) — settlement marks the parcel's cash as accounted for and makes the order payable to the merchant.
+1. Open **COD Settlement** (`/dashboard/cod-settlement`) for a platform-wide view of delivered parcels and their COD state.
+2. Warehouse Admins settle COD on their own console (`/warehouse/cod-settlement`) — settlement marks the parcel's cash as accounted for and makes the order payable to the merchant.
 3. Use **Delivery Performance** (`/dashboard/delivery-performance`) for delivery metrics over time.
 4. Merchant balances (platform charges, payment confirmations, manual adjustments) are managed per merchant at `/dashboard/merchants/<id>/balance` — confirm or reject submitted payments and apply Super Admin adjustments there.
 
@@ -72,4 +72,4 @@ Warehouse Admins run the hub floor at **{{APP_URL}}/warehouse**:
 3. **Order progress** (`/warehouse/orders`) — every parcel touching this hub.
 4. **Riders** (`/warehouse/riders`) — this hub's riders only.
 5. **Exceptions** (`/warehouse/exceptions`) — failed attempts and returns: schedule a reattempt or send the parcel back.
-6. **COD reconciliation** (`/warehouse/reconciliation`) — settle cash on delivered parcels, which unlocks merchant payouts.
+6. **COD settlement** (`/warehouse/cod-settlement`) — settle cash on delivered parcels, which unlocks merchant payouts.

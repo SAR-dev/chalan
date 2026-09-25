@@ -33,7 +33,7 @@ export const HELP_GUIDES: HelpGuide[] = [
     slug: "admin",
     title: "Admin guide",
     description:
-      "Approve merchants, orders, and payouts; manage warehouses, riders, and zone pricing; reconcile COD and read audit logs.",
+      "Approve merchants, orders, and payouts; manage warehouses, riders, and zone pricing; settle COD and read audit logs.",
     file: "admin.md",
   },
 ]

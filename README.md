@@ -24,7 +24,7 @@ Required env: `DATABASE_URL`, `BETTER_AUTH_SECRET` (generate with `openssl rand 
 
 | Role      | Area         | What they do                                             |
 | --------- | ------------ | -------------------------------------------------------- |
-| Admin     | `/dashboard` | Orders, merchants, riders, payouts, team, reconciliation |
+| Admin     | `/dashboard` | Orders, merchants, riders, payouts, team, COD settlement |
 | Merchant  | `/merchant`  | Create orders, track deliveries, request payouts         |
 | Warehouse | `/warehouse` | Intake, dispatch, order progress, hub riders, exceptions |
 | Rider     | `/rider`     | Pickup queue and delivery queue                          |

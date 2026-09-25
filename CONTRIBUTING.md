@@ -474,7 +474,7 @@ Rules:
   persisted in localStorage per table `id`. The exceptions are:
   - Merchant overview (`src/app/merchant/page.tsx`) — paginates client-side from
     the fetched list.
-  - Warehouse reconciliation (`src/app/warehouse/reconciliation/page.tsx`) —
+  - Warehouse COD settlement (`src/app/warehouse/cod-settlement/page.tsx`) —
     filters client-side by tab on the already-fetched orders list.
 - **If tabs change the column set, scope `id` per tab** (e.g.
   `` `warehouse-dispatch-${tab.toLowerCase()}` ``), not one shared id for the

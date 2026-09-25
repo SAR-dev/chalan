@@ -160,7 +160,7 @@ export const order = pgTable(
     merchantNote: text("merchantNote"),
     receiverNote: text("receiverNote"),
 
-    // COD reconciliation — rider settles cash with Warehouse Admin.
+    // COD settlement — rider hands cash to the Warehouse Admin.
     codSettledAt: ts("codSettledAt"),
     codSettledBy: text("codSettledBy"),
     // Payout request this order is attached to. Presence of this field (combined

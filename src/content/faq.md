@@ -107,7 +107,7 @@ When an order is marked **Delivered**, an earning credit of **COD amount − del
 
 ### When do funds become available for payout?
 
-A delivered order becomes payable once the warehouse has **settled its COD** (the COD reconciliation step at the hub). Settled orders show up in the **Available for payout** list on **Finance** (`/merchant/finance`), with the amount you can request.
+A delivered order becomes payable once the warehouse has **settled its COD** (the COD settlement step at the hub). Settled orders show up in the **Available for payout** list on **Finance** (`/merchant/finance`), with the amount you can request.
 
 ### How do I request a payout?
 
@@ -142,7 +142,7 @@ When the warehouse returns a parcel, its status becomes **Returned** and it appe
 
 ### How does collected COD cash become payable to me?
 
-The rider collects the COD amount from the recipient at delivery, the warehouse confirms the cash during **COD reconciliation**, and the settled order moves into **Available for payout** on your Finance page. From there you request a payout as described above.
+The rider collects the COD amount from the recipient at delivery, the warehouse confirms the cash during **COD settlement**, and the settled order moves into **Available for payout** on your Finance page. From there you request a payout as described above.
 
 ---
 

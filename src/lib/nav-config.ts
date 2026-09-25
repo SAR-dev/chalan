@@ -126,8 +126,8 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       group: "Analytics",
     },
     {
-      href: "/dashboard/cod-reconciliation",
-      label: "COD Reconciliation",
+      href: "/dashboard/cod-settlement",
+      label: "COD Settlement",
       icon: Receipt,
       group: "Analytics",
     },
@@ -285,8 +285,8 @@ export const WAREHOUSE_SIDEBAR: SidebarConfig = {
       exact: true,
     },
     {
-      href: "/warehouse/reconciliation",
-      label: "COD reconciliation",
+      href: "/warehouse/cod-settlement",
+      label: "COD Settlement",
       icon: Wallet,
       exact: true,
     },

@@ -177,11 +177,11 @@ test.describe("S23. Merchant Balance & Payment", () => {
   })
 })
 
-// ─── Warehouse Reconciliation ─────────────────────────────────────────────────
-test.describe("S29. Warehouse Reconciliation", () => {
-  test("warehouse admin can view reconciliation page", async ({ page }) => {
+// ─── Warehouse COD Settlement ─────────────────────────────────────────────────
+test.describe("S29. Warehouse COD Settlement", () => {
+  test("warehouse admin can view COD settlement page", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
-    await page.goto("/warehouse/reconciliation")
+    await page.goto("/warehouse/cod-settlement")
     await page.waitForLoadState("networkidle")
     await expect(page.getByRole("heading").first()).toBeVisible()
   })

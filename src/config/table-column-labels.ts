@@ -79,7 +79,7 @@ export const columnLabels = {
     status: "Status",
     actions: "",
   },
-  reconciliation: {
+  codSettlement: {
     cashCollected: "Cash collected",
     platformFee: "Platform fee",
     actions: "",

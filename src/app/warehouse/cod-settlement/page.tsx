@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { deliveryCity, order } from "@/lib/db/schema"
-import { WarehouseReconciliationPageClient } from "./reconciliation-client"
+import { WarehouseSettlementPageClient } from "./cod-settlement-client"
 
 const ORDER_COLUMNS = {
   id: order.id,
@@ -30,7 +30,7 @@ const ORDER_COLUMNS = {
   codSettledBy: order.codSettledBy,
 }
 
-export default async function WarehouseReconciliationPage() {
+export default async function WarehouseSettlementPage() {
   const me = await requireSession()
   if (!me) redirect("/login")
   if (me.role !== "WAREHOUSE_ADMIN") redirect("/login")
@@ -59,9 +59,6 @@ export default async function WarehouseReconciliationPage() {
   ])
 
   return (
-    <WarehouseReconciliationPageClient
-      initialData={rows}
-      initialTotal={total}
-    />
+    <WarehouseSettlementPageClient initialData={rows} initialTotal={total} />
   )
 }

@@ -111,7 +111,7 @@ describe("WAREHOUSE_SIDEBAR", () => {
     expect(labels).toContain("Order progress")
     expect(labels).toContain("Riders")
     expect(labels).toContain("Exceptions")
-    expect(labels).toContain("COD reconciliation")
+    expect(labels).toContain("COD Settlement")
     expect(labels).toContain("Inbox")
     expect(labels).toContain("Account")
   })

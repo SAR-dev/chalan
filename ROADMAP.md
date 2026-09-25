@@ -53,7 +53,7 @@ Functional B2B delivery platform (one instance + one database per customer, no m
 - Multi-role access (Super Admin, Warehouse Admin, Merchant, Rider)
 - Order lifecycle: create → approve → pickup → warehouse → dispatch → deliver → COD → payout
 - Zone-to-zone pricing matrix, delivery cities, warehouses, pickup locations
-- Merchant balance & payout system, COD reconciliation, audit logs
+- Merchant balance & payout system, COD settlement, audit logs
 - Merchant branding, analytics with charts, PWA, onboarding wizard, public tracking
 - 2FA (TOTP) for admins, IP allowlist, audit diffs, support tickets, FAQ/help docs
 - Auto-CSV export on every DataTable, right-side order drawer (admin/warehouse/merchant),

@@ -43,15 +43,15 @@ beforeEach(() => {
 })
 
 async function importPage() {
-  const { WarehouseReconciliationPageClient } = await import(
-    "./reconciliation-client"
+  const { WarehouseSettlementPageClient } = await import(
+    "./cod-settlement-client"
   )
   renderPage(
-    <WarehouseReconciliationPageClient initialData={[]} initialTotal={0} />,
+    <WarehouseSettlementPageClient initialData={[]} initialTotal={0} />,
   )
 }
 
-describe("Warehouse reconciliation — section 8", () => {
+describe("Warehouse COD settlement — section 8", () => {
   it("UNSETTLED tab shows only unsettled DELIVERED orders scoped by warehouse", async () => {
     mockOrdersState = createMockOrders({
       orders: [
@@ -113,7 +113,7 @@ describe("Warehouse reconciliation — section 8", () => {
       ],
     })
     await importPage()
-    expect(screen.getByText(/nothing to reconcile/i)).toBeInTheDocument()
+    expect(screen.getByText(/Nothing to settle/i)).toBeInTheDocument()
   })
 
   it("shows loading state", async () => {

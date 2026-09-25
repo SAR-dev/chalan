@@ -16,7 +16,7 @@ import {
 import { useOrderAnalytics } from "@/features/orders/hooks/use-order-analytics"
 import { formatTk } from "@/lib/pricing"
 
-export default function CodReconciliationPage() {
+export default function CodSettlementPage() {
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined)
   const [dateTo, setDateTo] = useState<string | undefined>(undefined)
 
@@ -30,7 +30,7 @@ export default function CodReconciliationPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="COD Reconciliation"
+        title="COD Settlement"
         description="Track cash-on-delivery collections and settlements."
       >
         <DateRangePicker
