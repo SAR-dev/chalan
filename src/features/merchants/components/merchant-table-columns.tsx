@@ -51,6 +51,7 @@ export function merchantEmailVerifiedColumn(): DataTableColumn<Merchant> {
   return {
     id: "emailVerified",
     header: columnLabels.merchant.emailVerified,
+    sortValue: (m) => (m.emailVerifiedAt ? "Verified" : "Not verified"),
     cell: (m) =>
       m.emailVerifiedAt ? (
         <span className="inline-flex items-center gap-1 text-xs text-chart-2">
@@ -70,6 +71,7 @@ export function merchantPhoneVerifiedColumn(): DataTableColumn<Merchant> {
   return {
     id: "phoneVerified",
     header: "Phone",
+    sortValue: (m) => (m.phoneVerifiedAt ? "Verified" : "Not verified"),
     cell: (m) =>
       m.phoneVerifiedAt ? (
         <span className="inline-flex items-center gap-1 text-xs text-chart-2">
@@ -89,6 +91,12 @@ export function merchantNidVerifiedColumn(): DataTableColumn<Merchant> {
   return {
     id: "nidVerified",
     header: "NID",
+    sortValue: (m) =>
+      m.nidVerifiedAt
+        ? "Verified"
+        : m.nidSubmittedAt
+          ? "Pending"
+          : "Not uploaded",
     cell: (m) =>
       m.nidVerifiedAt ? (
         <span className="inline-flex items-center gap-1 text-xs text-chart-2">

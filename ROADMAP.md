@@ -4,8 +4,8 @@
 > removed from this document** (full audit trail in git history — see "Recently
 > Completed" entries in older commits).
 >
-> Current health: Build ✅ · Typecheck ✅ · Unit **1154/1154** ✅ · E2E **54/54** ✅ ·
-> `pnpm ci:check` ✅ (627 files) · CI runs typecheck/lint/format/**security-audit**/build ·
+> Current health: Build ✅ · Typecheck ✅ · Unit **1215/1215** ✅ · E2E **54/54** ✅ ·
+> `pnpm ci:check` ✅ (631 files) · CI runs typecheck/lint/format/**security-audit**/build ·
 > husky pre-commit (lint-staged) active · dependency tree has **0 high/critical advisories** ·
 > **route-auth-guard** test enforces server-side auth on all 104 API routes.
 
@@ -22,7 +22,7 @@ Sections are listed **in the order they will be worked on**:
 | 5.3  | Change own email address                  | 🟡 Medium | S–M    | ✅      |
 | 5.4  | Portal modes — 3 deployable formats       | 🟡 Medium | M      | ✅      |
 | 5.5  | Notification system                       | 🟡 Medium | L      | ⏳ Next |
-| 5.6  | Storage hygiene — periodic image cleaning | 🟡 Medium | M      | ⏳      |
+| 5.6  | Storage hygiene — periodic image cleaning | 🟡 Medium | M      | ✅      |
 | 5.7  | 1% Improvements (quick wins)              | —         | S      | ⏳      |
 | 5.8  | Analytics & Reporting                     | 🟡 Medium | M      | ⏳      |
 | 5.9  | Mobile Experience                         | 🟡 Medium | M–L    | ⏳      |
@@ -34,9 +34,15 @@ Sections are listed **in the order they will be worked on**:
 maintainability Q, testing/CI/docs T — incl. Redis rate limiting S6, CSRF origin
 checks S9, aria-labels Q7); Phase-5 security slice H1–H4 (CI audit gate + all
 high/critical deps fixed, audit entity diffs, `ADMIN_IP_ALLOWLIST` IP whitelist,
-2FA TOTP with recovery codes + optional require-toggle); FAQ page (`/faq`),
-user documentation (`/help/{merchant,rider,admin}`), support ticket system
-(`support_ticket` + API + UI in all roles); SOC 2 removed by decision.
+2FA TOTP with recovery codes) **plus its hardening follow-ups** (QR-code
+enrollment, dedicated Two-factor tab, download-backup-codes button, require-2FA
+moved from DB to `ADMIN_2FA_REQUIRED` env, merchant/rider opt-in); FAQ page
+(`/faq`), user documentation (`/help/{merchant,rider,admin}`), support ticket
+system (`support_ticket` + API + UI in all roles); **UX/infra passes**: landing
+page redesign (new-feature sections + FAQ/help links), DataTable auto-CSV
+export + fixed refresh button, order details → right-side drawer
+(admin/warehouse/merchant), Supabase **storage** removed (providers: local +
+R2); SOC 2 removed by decision.
 
 ---
 
@@ -47,9 +53,11 @@ Functional B2B delivery platform (one instance + one database per customer, no m
 - Multi-role access (Super Admin, Warehouse Admin, Merchant, Rider)
 - Order lifecycle: create → approve → pickup → warehouse → dispatch → deliver → COD → payout
 - Zone-to-zone pricing matrix, delivery cities, warehouses, pickup locations
-- Merchant balance & payout system, COD reconciliation, audit logs
+- Merchant balance & payout system, COD settlement, audit logs
 - Merchant branding, analytics with charts, PWA, onboarding wizard, public tracking
 - 2FA (TOTP) for admins, IP allowlist, audit diffs, support tickets, FAQ/help docs
+- Auto-CSV export on every DataTable, right-side order drawer (admin/warehouse/merchant),
+  portal modes (`admin|public|all`), orphaned-upload sweep cron
 
 ---
 
@@ -145,24 +153,26 @@ specs; e2e (merchant gets order-status notification → marks read).
 
 ---
 
-## 5.6 Storage hygiene — periodic image cleaning — MEDIUM
+## 5.6 Storage hygiene — periodic image cleaning — MEDIUM ✅
 
-Periodically find and delete **orphaned uploads** (files whose referencing row was
-deleted, or uploads from forms the user abandoned).
+**Done.** `src/lib/upload-sweep.ts` (pure, unit-tested): `IMAGE_URL_COLUMNS`
+registry covering all 10 image columns (`user.image`, merchant logo/NID, rider NID,
+`order.deliveryProofRef` + `pickupProofRefs[]`), URL→key normalization
+(`/uploads/`, `R2_PUBLIC_URL`), orphan rule = unreferenced **AND** older than
+`UPLOAD_SWEEP_MIN_AGE_HOURS` (default 48 — grace period mandatory because
+`ImageUpload` stores on file-select before the form submits).
 
-**Design (DB-driven sweep):**
-
-| Piece           | Design                                                                                                                                                                                                                                                                                                |
-|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Referenced set  | Scan known image columns → normalize stored URLs to provider-relative keys: `user.image`, `merchant.logoUrl`, `merchant.nid{Front,Back,Selfie}Image`, `rider.nid*`, `rider_applications.nid*`, `order.deliveryProofRef`, `order.pickupProofRefs[]`, (any future image column added to this list)      |
-| Storage listing | Add `listFiles()` + `deleteFile(key)` to `src/lib/storage/` for both providers: local = `fs.readdir`/`unlink`, R2 = `ListObjectsV2`/`DeleteObject`                                                             |
-| Orphan rule     | file **not in referenced set** AND **older than grace period** — grace period is mandatory: `ImageUpload` uploads immediately on file select, *before* the form submits, so fresh files are often not yet referenced. Env: `UPLOAD_SWEEP_MIN_AGE_HOURS` (default 48)                                  |
-| Trigger         | new `/api/cron/cleanup-uploads` endpoint authenticated by `CRON_SECRET` (same pattern as the 3 existing cleanup jobs); scheduled where the others are: `pg_cron` (local), cron container (cluster compose), Vercel cron. Response: `{ scanned, orphans, deleted, bytesFreed }`; `?dryRun=1` supported |
-| Safety rails    | age check per file; re-check referenced-set right before each delete (no stale snapshot); log every deletion; never fail the whole job on one file error                                                                                                                                              |
-
-Acceptance: unit tests for URL→key normalization + orphan decision; provider
-specs for `listFiles`/`deleteFile` (local fs); cron endpoint spec (401 without
-secret, dry-run deletes nothing); run `dryRun` for a week before enabling deletes.
+- **Storage layer:** `listFiles()`/`deleteFile(key)` added for **local**
+  (fs, traversal-guarded) and **R2** (`ListObjectsV2`/`DeleteObject`) — Supabase
+  provider was removed from the codebase, so these are the only two
+- **Trigger:** `/api/cron/cleanup-uploads` (CRON_SECRET auth, `?dryRun=1`,
+  `{scanned, orphans, deleted, failed, bytesFreed}`, per-file try/catch,
+  fresh referenced-set re-check right before deletes); scheduled in the cluster
+  cron container (**ships with `?dryRun=1`** — remove after a week of reviewed
+  dry-run logs); pg_cron section documents HTTP-only scheduling (no SQL
+  equivalent); `docs/SETUP.md` cron table + `docs/ENV.md` row added
+- **Tests:** sweep spec (normalization/orphan decisions/min-age), local-fs +
+  R2 provider specs, cron route spec (401, dry-run deletes nothing, happy path)
 
 ---
 
@@ -237,7 +247,7 @@ secret, dry-run deletes nothing); run `dryRun` for a week before enabling delete
 - **Admin surface**: write sites gated to SUPER_ADMIN (or role-appropriate) — 5.1 makes this a *tested invariant*, not a convention
 - **Public tracking**: phone fields masked, no phone-based lookup
 - **No `dangerouslySetInnerHTML`** anywhere in `src`
-- **Spec coverage**: 1018 tests — keep new routes/branches covered (colocated `<resource>.spec.ts`)
+- **Spec coverage**: 1215 tests — keep new routes/branches covered (colocated `<resource>.spec.ts`)
 - **Git history**: no secrets ever committed; sensitive env files gitignored
 
 ---
@@ -250,7 +260,7 @@ secret, dry-run deletes nothing); run `dryRun` for a week before enabling delete
 3. 5.3 Change own email        verification-link flow               ✅ DONE
 4. 5.4 Portal modes            env-driven 3 deployable formats      ✅ DONE
 5. 5.5 Notification system     in-app v1 (email v2 later)           [NEXT]
-6. 5.6 Storage hygiene         periodic orphan-image sweep (dry-run first)
+6. 5.6 Storage hygiene         periodic orphan-image sweep          ✅ DONE (dry-run first)
 7. 5.7 Quick wins              anytime
 8. 5.8–5.11                    medium/low, opportunistic
 9. Phase 6 Backlog             only when their readiness notes match

@@ -36,6 +36,7 @@ export default function RiderPickupQueuePage() {
     setDateFrom,
     dateTo,
     setDateTo,
+    mutate: refresh,
   } = useOrders()
   const { merchants } = useMerchants()
   const { pickupLocations } = usePickupLocations()
@@ -75,6 +76,7 @@ export default function RiderPickupQueuePage() {
     {
       id: "order",
       header: columnLabels.rider.orderId,
+      sortValue: (o) => o.id,
       cell: (o) => (
         <button
           type="button"
@@ -91,6 +93,7 @@ export default function RiderPickupQueuePage() {
     {
       id: "merchant",
       header: columnLabels.rider.merchant,
+      sortValue: (o) => merchantNameFn(o.merchantId),
       cell: (o) => (
         <span className="font-medium">{merchantNameFn(o.merchantId)}</span>
       ),
@@ -98,6 +101,7 @@ export default function RiderPickupQueuePage() {
     {
       id: "merchantPhone",
       header: columnLabels.rider.contact,
+      sortValue: (o) => o.merchantPhone ?? "—",
       cell: (o) => {
         const phone = o.merchantPhone ?? null
         return phone ? (
@@ -112,6 +116,7 @@ export default function RiderPickupQueuePage() {
     {
       id: "pickupAddress",
       header: columnLabels.rider.pickupFrom,
+      sortValue: (o) => pickup(o.pickupLocationId)?.address ?? "—",
       cell: (o) => {
         const p = pickup(o.pickupLocationId)
         return (
@@ -144,6 +149,7 @@ export default function RiderPickupQueuePage() {
     {
       id: "status",
       header: columnLabels.order.status,
+      sortValue: (o) => (o.status !== "APPROVED" ? "Completed" : "Ongoing"),
       cell: (o) => {
         const isCompleted = o.status !== "APPROVED"
         return (
@@ -216,6 +222,7 @@ export default function RiderPickupQueuePage() {
             total={total}
             query={query}
             onQueryChange={setQuery}
+            onRefresh={refresh}
             onPageChange={(p, l) => {
               setPage(p)
               setLimit(l)

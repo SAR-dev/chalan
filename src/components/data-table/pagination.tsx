@@ -148,10 +148,14 @@ export function TableFooter<T>({
           className="size-8"
           data-testid={id ? `table-refresh-${id}` : undefined}
           disabled={refreshing}
-          onClick={() => {
+          onClick={async () => {
+            if (refreshing) return
             setRefreshing(true)
             try {
-              onRefresh?.()
+              await Promise.all([
+                Promise.resolve(onRefresh?.()),
+                new Promise((r) => setTimeout(r, 400)),
+              ])
             } finally {
               setRefreshing(false)
             }
@@ -173,17 +177,19 @@ export function TableFooter<T>({
             <Settings className="size-4" />
           </Button>
         ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleDownloadCsv}
-          disabled={!csv || (!csv.downloadUrl && !csv.parser)}
-          className="gap-1.5"
-        >
-          <Download className="size-4" />
-          <span className="hidden sm:inline">Download CSV</span>
-          <span className="sm:hidden">CSV</span>
-        </Button>
+        {csv ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleDownloadCsv}
+            disabled={!csv.downloadUrl && !csv.parser}
+            className="gap-1.5"
+          >
+            <Download className="size-4" />
+            <span className="hidden sm:inline">Download CSV</span>
+            <span className="sm:hidden">CSV</span>
+          </Button>
+        ) : null}
       </div>
     </div>
   )

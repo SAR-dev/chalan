@@ -224,6 +224,7 @@ export default function DashboardSettingsPage() {
     {
       id: "from",
       header: "Sender",
+      sortValue: (c) => `${c.fromName} <${c.fromEmail}>`,
       cell: (c) => (
         <span className="text-muted-foreground text-sm">
           {c.fromName} &lt;{c.fromEmail}&gt;
@@ -381,6 +382,7 @@ export default function DashboardSettingsPage() {
             getRowKey={(c) => c.id}
             initialSortId="status"
             loading={mailLoading}
+            onRefresh={loadMailConfigs}
             emptyMessage="No mail configs yet. Add one to start sending emails."
           />
         </CardContent>

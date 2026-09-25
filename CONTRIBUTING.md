@@ -474,7 +474,7 @@ Rules:
   persisted in localStorage per table `id`. The exceptions are:
   - Merchant overview (`src/app/merchant/page.tsx`) — paginates client-side from
     the fetched list.
-  - Warehouse reconciliation (`src/app/warehouse/reconciliation/page.tsx`) —
+  - Warehouse COD settlement (`src/app/warehouse/cod-settlement/page.tsx`) —
     filters client-side by tab on the already-fetched orders list.
 - **If tabs change the column set, scope `id` per tab** (e.g.
   `` `warehouse-dispatch-${tab.toLowerCase()}` ``), not one shared id for the
@@ -552,9 +552,25 @@ Key differences to know when adding a column or action:
   `setStatuses(...)` is called in a `useEffect` on tab change and always resets `page` to 1.
   The DataTable `data` prop receives the same filtered array, so the tab count badge
   and the visible row count always agree.
-- **CSV export** is present only on the Admin orders table (`csvData` +
-  `csv` props). Warehouse and rider tables omit it — those roles don't need
-  a data export.
+- **CSV export** is derived automatically on every table. Columns with a string
+  header and a `sortValue` extractor are exported (all rows matching the
+  current search/filter/sort), mirroring the user's column-visibility settings;
+  the footer hides the "Download CSV" button when nothing is exportable (no
+  such columns, or no rows). The Admin orders table keeps an explicit `csv` +
+  `csvData` config for a curated column set — an explicit `csv` prop always
+  wins over the derived one.
+
+- **Merchant orders support CSV bulk import.** The merchant order table's
+  toolbar has an **Import CSV** entry (`bulk-import-open`) opening the
+  client-only dialog (`src/features/orders/dialogs/bulk-import-dialog.tsx`,
+  with the pure parsing/resolution modules under
+  `src/features/orders/bulk-import/`): download the template, upload or paste
+  up to 50 rows, preview every row, then import **all-or-nothing** through the
+  existing `POST /api/orders/bulk` — the v1 flow deliberately adds no server
+  code, fees or IDs are never accepted from the file, and empty notes are
+  auto-tagged `[CSV import YYYY-MM-DD]` for auditability. The column spec,
+  header aliases, limits and test plan live in `docs/REFACTOR.md` (§3–§10);
+  keep changes to this flow aligned with that document.
 
 - **Optimistic mutations use two-step revalidation.** The bound `mutate()`
   applies the optimistic update with `{ revalidate: false, populateCache: true }`
@@ -1583,14 +1599,18 @@ Example structure to mirror: **merchants** (rich).
      (persisted to localStorage) and shows a settings gear in the toolbar.
    - **`serverPaginated`** — enables server-side pagination. The hook manages
      `page`, `limit`, `query`, and `statuses` state; the DataTable handles
-     page navigation, search input, and CSV export via props.
+     page navigation, search input, and CSV export. The CSV export is derived
+     from the rendered columns (string header + `sortValue`) unless the page
+     passes an explicit `csv` prop, and the footer hides the button when
+     nothing is exportable.
    - **`pinnedColumns`** — array of column IDs to pin to the left side.
      Pinned columns stay fixed during horizontal scroll, are always visible,
      and cannot be hidden via the settings dialog. Always pin the first
      (primary identifier) column: `"order"`, `"name"`, `"tracking"`, etc.
 
    `DataTable`'s toolbar places the search input on the top-right and the
-   settings gear + CSV download in the footer. Don't rebuild that layout per
+   settings gear + CSV download (when the table has anything exportable) in
+   the footer. Don't rebuild that layout per
    page. Don't pass a `pageSize` prop unless this table genuinely needs a
    different size than the rest of the app — it already defaults to the
    signed-in account's saved preference (Account settings → Tables, 1-250,

@@ -38,6 +38,7 @@ export function downloadCsv(filename: string, content: string): void {
   const link = document.createElement("a")
   const ts = timestampPrefix()
   const base = filename.endsWith(".csv") ? filename.slice(0, -4) : filename
+  link.href = url
   link.download = `${ts}_${base}.csv`
   document.body.appendChild(link)
   link.click()

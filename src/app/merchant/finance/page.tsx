@@ -36,13 +36,18 @@ export default function MerchantFinancePage() {
     merchantPayableTotal,
     merchantPayableAmount,
     isLoading: isLoadingOrders,
+    mutate: refreshOrders,
   } = useOrders({
     payablePage,
     payableLimit,
     payableDateFrom: dateFrom,
     payableDateTo: dateTo,
   })
-  const { merchantPayoutRequests, isLoading: isLoadingPayouts } = usePayouts()
+  const {
+    merchantPayoutRequests,
+    isLoading: isLoadingPayouts,
+    mutate: refreshPayouts,
+  } = usePayouts()
   const requestColumns = usePayoutRequestColumns()
 
   const isActive = currentMerchant?.status === "ACTIVE"
@@ -274,6 +279,7 @@ export default function MerchantFinancePage() {
               getRowKey={(o) => o.id}
               initialSortId="tracking"
               loading={isLoadingOrders}
+              onRefresh={refreshOrders}
               serverPaginated
               total={merchantPayableTotal}
               onPageChange={(page, limit) => {
@@ -317,6 +323,7 @@ export default function MerchantFinancePage() {
               initialSortId="requested"
               initialSortDir="desc"
               loading={isLoadingPayouts}
+              onRefresh={refreshPayouts}
             />
           )}
         </CardContent>

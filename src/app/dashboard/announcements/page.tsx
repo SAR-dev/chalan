@@ -56,6 +56,7 @@ export default function AnnouncementsPage() {
     isLoading,
     isActive: _isActive,
     setIsActive,
+    mutate: refresh,
   } = useAnnouncements()
 
   const [tab, setTab] = useState<TabFilter>("ALL")
@@ -141,6 +142,10 @@ export default function AnnouncementsPage() {
     {
       id: "targetRoles",
       header: "Audience",
+      sortValue: (a) =>
+        (a.targetRoles ?? [])
+          .map((role: string) => ANNOUNCEMENT_TARGET_ROLE_LABELS[role] ?? role)
+          .join(", "),
       headClassName: "hidden md:table-cell",
       cellClassName: "hidden md:table-cell",
       cell: (a) => (
@@ -292,6 +297,7 @@ export default function AnnouncementsPage() {
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             bulkLoading={bulkBusy}
             selectedKeys={selected}
             onSelectionChange={setSelected}

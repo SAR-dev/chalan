@@ -1,6 +1,6 @@
 "use client"
 
-import { Ban, ExternalLink, Package } from "lucide-react"
+import { Ban, ExternalLink, Package, Upload } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -15,8 +15,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
+import { BulkImportDialog } from "@/features/orders/dialogs/bulk-import-dialog"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
-import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
+import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { formatTk } from "@/lib/pricing"
@@ -63,6 +64,7 @@ export default function MerchantOrdersPage() {
     sortId,
     sortDir,
     onSortChange,
+    mutate: refresh,
   } = useOrders()
 
   const { pickupLocations } = usePickupLocations()
@@ -71,6 +73,7 @@ export default function MerchantOrdersPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [viewOrderCode, setViewOrderCode] = useState<string | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const _pickup = (id: string) => pickupLocations.find((p) => p.id === id)
 
@@ -132,6 +135,8 @@ export default function MerchantOrdersPage() {
     {
       id: "deliveryAddress",
       header: columnLabels.order.deliveryAddress,
+      sortValue: (o) =>
+        [o.deliveryCity, o.deliveryAddress].filter(Boolean).join(", "),
       cell: (o) => {
         const city = o.deliveryCity
         const address = o.deliveryAddress
@@ -159,6 +164,12 @@ export default function MerchantOrdersPage() {
     {
       id: "paymentStatus",
       header: "Payment",
+      sortValue: (o) => {
+        if (o.payoutRequestId) return "Paid"
+        if (o.codSettledAt) return "COD settled"
+        if (o.status === "DELIVERED") return "COD pending"
+        return "Pending"
+      },
       cell: (o) => {
         if (o.payoutRequestId) {
           return (
@@ -254,43 +265,54 @@ export default function MerchantOrdersPage() {
             searchable
             searchColumns={["order", "receiver"]}
             toolbarLeft={
-              <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-                <TabsList>
-                  <TabsTrigger value="ACTIVE">
-                    Active
-                    {counts.active > 0 && (
-                      <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
-                        {counts.active}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="PENDING">
-                    Pending
-                    {counts.pending > 0 && (
-                      <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
-                        {counts.pending}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="IN_PROGRESS">
-                    In progress
-                    {counts.inProgress > 0 && (
-                      <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
-                        {counts.inProgress}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="ISSUES">
-                    Issues
-                    {counts.issues > 0 && (
-                      <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
-                        {counts.issues}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="ALL">All</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="flex flex-wrap items-center gap-2">
+                <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
+                  <TabsList>
+                    <TabsTrigger value="ACTIVE">
+                      Active
+                      {counts.active > 0 && (
+                        <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
+                          {counts.active}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="PENDING">
+                      Pending
+                      {counts.pending > 0 && (
+                        <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
+                          {counts.pending}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="IN_PROGRESS">
+                      In progress
+                      {counts.inProgress > 0 && (
+                        <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
+                          {counts.inProgress}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="ISSUES">
+                      Issues
+                      {counts.issues > 0 && (
+                        <span className="bg-primary/15 text-primary ml-1.5 rounded-full px-1.5 text-[10px] font-semibold">
+                          {counts.issues}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="ALL">All</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="bulk-import-open"
+                  onClick={() => setImportOpen(true)}
+                >
+                  <Upload className="size-4" />
+                  Import CSV
+                </Button>
+              </div>
             }
             columns={columns}
             data={orders}
@@ -304,6 +326,7 @@ export default function MerchantOrdersPage() {
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             initialSortId="createdAt"
             initialSortDir="desc"
             onPageChange={(p, l) => {
@@ -323,7 +346,7 @@ export default function MerchantOrdersPage() {
         }}
       />
 
-      <OrderDetailsDialog
+      <OrderDetailsDrawer
         orderCode={viewOrderCode}
         open={viewOpen}
         onOpenChange={setViewOpen}
@@ -331,6 +354,8 @@ export default function MerchantOrdersPage() {
           viewOrderCode ? `/merchant/orders/${viewOrderCode}` : undefined
         }
       />
+
+      <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )
 }

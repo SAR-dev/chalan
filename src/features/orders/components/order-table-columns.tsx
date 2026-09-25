@@ -20,6 +20,12 @@ import { OrderStatusBadge } from "./order-status-badge"
 // Column factory functions — each owns one visual design
 // ---------------------------------------------------------------------------
 
+/** Plain-text form of the city + address pair rendered by the delivery
+ * city/address cells, used for CSV export and search. */
+function deliveryCityAddress(o: Order): string {
+  return [o.deliveryCity, o.deliveryAddress].filter(Boolean).join(", ")
+}
+
 export interface OrderCodeColumnOptions {
   subtitle?: "merchant" | "none"
   merchantName?: (id: string) => string
@@ -68,6 +74,7 @@ export function merchantColumn(
   return {
     id: "merchant",
     header: columnLabels.order.merchant,
+    sortValue: (o) => merchantName(o.merchantId),
     cell: (o) => <CellContent>{merchantName(o.merchantId)}</CellContent>,
   }
 }
@@ -79,6 +86,7 @@ export function merchantPhoneColumn(
   return {
     id: "merchantPhone",
     header: columnLabels.order.merchantPhone,
+    sortValue: (o) => merchantPhone(o.merchantId),
     cell: (o) => (
       <CellContent className="text-muted-foreground">
         {merchantPhone(o.merchantId)}
@@ -92,6 +100,7 @@ export function recipientNameColumn(): DataTableColumn<Order> {
   return {
     id: "receiver",
     header: columnLabels.order.receiver,
+    sortValue: (o) => o.recipientName,
     cell: (o) => (
       <CellContent>
         <CellTwoRow
@@ -108,6 +117,7 @@ export function recipientPhoneColumn(): DataTableColumn<Order> {
   return {
     id: "recipientPhone",
     header: columnLabels.order.recipientPhone,
+    sortValue: (o) => o.recipientPhone,
     cell: (o) => (
       <CellContent className="text-muted-foreground">
         {o.recipientPhone}
@@ -123,6 +133,10 @@ export function pickupRiderColumn(
   return {
     id: "pickupRider",
     header: columnLabels.order.pickupRider,
+    sortValue: (o) => {
+      const name = riderName(o.pickupRiderId)
+      return typeof name === "string" ? name : null
+    },
     cell: (o) => <CellContent>{riderName(o.pickupRiderId)}</CellContent>,
   }
 }
@@ -134,6 +148,10 @@ export function deliveryRiderColumn(
   return {
     id: "deliveryRider",
     header: columnLabels.order.deliveryRider,
+    sortValue: (o) => {
+      const name = riderName(o.deliveryRiderId)
+      return typeof name === "string" ? name : null
+    },
     cell: (o) => <CellContent>{riderName(o.deliveryRiderId)}</CellContent>,
   }
 }
@@ -146,6 +164,7 @@ export function pickupRiderWithPhoneColumn(
   return {
     id: "pickupRider",
     header: columnLabels.order.pickupRider,
+    sortValue: (o) => riderName(o.pickupRiderId),
     cell: (o) => (
       <CellTwoRow
         primary={riderName(o.pickupRiderId)}
@@ -163,6 +182,7 @@ export function deliveryRiderWithPhoneColumn(
   return {
     id: "deliveryRider",
     header: columnLabels.order.deliveryRider,
+    sortValue: (o) => riderName(o.deliveryRiderId),
     cell: (o) => (
       <CellTwoRow
         primary={riderName(o.deliveryRiderId)}
@@ -191,6 +211,7 @@ export function deliveryTypeColumn(): DataTableColumn<Order> {
   return {
     id: "deliveryType",
     header: columnLabels.order.deliveryType,
+    sortValue: (o) => o.deliveryType,
     cell: (o) => (
       <CellContent className="text-muted-foreground">
         {o.deliveryType}
@@ -206,6 +227,7 @@ export function warehouseColumn(
   return {
     id: "warehouse",
     header: columnLabels.order.warehouse,
+    sortValue: (o) => warehouseName(o.warehouseId),
     cell: (o) => {
       const name = warehouseName(o.warehouseId)
       return name === "—" ? (
@@ -224,6 +246,7 @@ export function warehouseCityColumn(
   return {
     id: "warehouseCity",
     header: columnLabels.order.warehouseCity,
+    sortValue: (o) => warehouseCity(o.warehouseId),
     cell: (o) => {
       const city = warehouseCity(o.warehouseId)
       return city === "—" ? (
@@ -240,6 +263,7 @@ export function deliveryCityColumn(): DataTableColumn<Order> {
   return {
     id: "deliveryCity",
     header: columnLabels.order.deliveryCity,
+    sortValue: (o) => deliveryCityAddress(o),
     cell: (o) => (
       <CellTwoRow
         primary={o.deliveryCity || "—"}
@@ -254,6 +278,7 @@ export function deliveryAddressColumn(): DataTableColumn<Order> {
   return {
     id: "deliveryAddressOnly",
     header: columnLabels.order.deliveryAddressOnly,
+    sortValue: (o) => deliveryCityAddress(o),
     cell: (o) => (
       <CellTwoRow
         primary={o.deliveryCity || "—"}
@@ -335,6 +360,7 @@ export function merchantNoteColumn(): DataTableColumn<Order> {
   return {
     id: "merchantNote",
     header: columnLabels.order.merchantNote,
+    sortValue: (o) => o.merchantNote,
     cell: (o) =>
       o.merchantNote ? (
         <span
@@ -354,6 +380,7 @@ export function receiverNoteColumn(): DataTableColumn<Order> {
   return {
     id: "receiverNote",
     header: columnLabels.order.receiverNote,
+    sortValue: (o) => o.receiverNote,
     cell: (o) =>
       o.receiverNote ? (
         <span
@@ -375,6 +402,7 @@ export function pickupLabelColumn(
   return {
     id: "pickupLabel",
     header: columnLabels.order.pickupLabel,
+    sortValue: (o) => pickupLocation(o.pickupLocationId)?.label ?? "—",
     cell: (o) => {
       const p = pickupLocation(o.pickupLocationId)
       if (!p)
@@ -391,6 +419,7 @@ export function pickupAddressColumn(
   return {
     id: "pickupAddress",
     header: columnLabels.order.pickupAddress,
+    sortValue: (o) => pickupLocation(o.pickupLocationId)?.address ?? "—",
     cell: (o) => {
       const p = pickupLocation(o.pickupLocationId)
       return <CellContent>{p?.address ?? "—"}</CellContent>
@@ -447,6 +476,12 @@ export function returnReasonColumn(): DataTableColumn<Order> {
   return {
     id: "returnReason",
     header: columnLabels.order.returnReason,
+    sortValue: (o) =>
+      o.status === "RETURNED"
+        ? `Returned by ${o.failedResolvedBy ?? "Warehouse Admin"}${
+            o.returnReason ? ` — ${o.returnReason}` : ""
+          }`
+        : "See order details for attempt history",
     cell: (o) =>
       o.status === "RETURNED" ? (
         <CellContent className="text-muted-foreground">
@@ -466,6 +501,7 @@ export function settledByColumn(): DataTableColumn<Order> {
   return {
     id: "settledBy",
     header: columnLabels.order.settledBy,
+    sortValue: (o) => (o.codSettledAt ? (o.codSettledBy ?? "Admin") : "—"),
     cell: (o) =>
       o.codSettledAt ? (
         <CellContent>{o.codSettledBy ?? "Admin"}</CellContent>

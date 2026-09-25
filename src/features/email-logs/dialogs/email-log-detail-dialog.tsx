@@ -44,7 +44,7 @@ export function EmailLogDetailDialog({
       onConfirm={() => onOpenChange(false)}
       fullWidthButtons
     >
-      <div className="flex flex-col gap-3 py-2">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3 text-sm">
           <Clock className="text-muted-foreground size-4 shrink-0" />
           <span>{formatTimestamp(log.createdAt)}</span>

@@ -83,6 +83,7 @@ export function TeamPageClient({
     toggleAccountActive,
     updateAccountWarehouse,
     isLoading,
+    mutate: refresh,
   } = useTeam({ initialData, initialTotal })
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false)
@@ -139,6 +140,7 @@ export function TeamPageClient({
     {
       id: "name",
       header: "Name",
+      sortValue: (u) => u.name,
       cell: (u) => (
         <CellTwoRow
           primary={<span className="font-medium">{u.name}</span>}
@@ -149,11 +151,14 @@ export function TeamPageClient({
     {
       id: "role",
       header: "Role",
+      sortValue: (u) =>
+        u.role === "SUPER_ADMIN" ? "Super Admin" : "Warehouse Admin",
       cell: (u) => <RoleBadge role={u.role} />,
     },
     {
       id: "contact",
       header: "Contact",
+      sortValue: (u) => u.email,
       headClassName: "hidden sm:table-cell",
       cellClassName: "hidden sm:table-cell",
       cell: (u) => <CellTwoRow primary={u.email} secondary={u.phone} />,
@@ -161,6 +166,8 @@ export function TeamPageClient({
     {
       id: "warehouse",
       header: "Warehouse",
+      sortValue: (u) =>
+        u.role !== "WAREHOUSE_ADMIN" ? "-" : warehouseName(u.warehouseId),
       cell: (u) => {
         if (u.role !== "WAREHOUSE_ADMIN")
           return <span className="text-muted-foreground">-</span>
@@ -181,6 +188,7 @@ export function TeamPageClient({
       id: "status",
       header: "Status",
       align: "right",
+      sortValue: (u) => (u.isActive ? "Active" : "Disabled"),
       cell: (u) => (
         <div className="flex justify-end">
           <StatusToggle
@@ -219,6 +227,7 @@ export function TeamPageClient({
             serverPaginated
             total={total}
             query={query}
+            onRefresh={refresh}
             onPageChange={(p, l) => {
               setPage(p)
               setLimit(l)

@@ -86,6 +86,7 @@ export function MerchantsPageClient({
     suspendMerchants,
     reactivateMerchant,
     reactivateMerchants,
+    mutate: refresh,
   } = useMerchants({ initialData, initialTotal })
   const [tab, setTab] = useState<FilterTab>("ALL")
   const [selectedMerchants, setSelectedMerchants] = useState<Set<string>>(
@@ -216,6 +217,7 @@ export function MerchantsPageClient({
     {
       id: "emailVerified",
       header: columnLabels.merchant.emailVerified,
+      sortValue: (m) => (m.emailVerifiedAt ? "Verified" : "Not verified"),
       cell: (m) =>
         m.emailVerifiedAt ? (
           <span className="inline-flex items-center gap-1 text-xs text-chart-2">
@@ -232,6 +234,7 @@ export function MerchantsPageClient({
     {
       id: "phoneVerified",
       header: "Phone",
+      sortValue: (m) => (m.phoneVerifiedAt ? "Verified" : "Not verified"),
       cell: (m) =>
         m.phoneVerifiedAt ? (
           <span className="inline-flex items-center gap-1 text-xs text-chart-2">
@@ -248,6 +251,12 @@ export function MerchantsPageClient({
     {
       id: "nidVerified",
       header: "NID",
+      sortValue: (m) =>
+        m.nidVerifiedAt
+          ? "Verified"
+          : m.nidSubmittedAt
+            ? "Pending"
+            : "Not uploaded",
       cell: (m) =>
         m.nidVerifiedAt ? (
           <span className="inline-flex items-center gap-1 text-xs text-chart-2">
@@ -520,6 +529,7 @@ export function MerchantsPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             bulkLoading={bulkBusy}
             selectedKeys={selectedMerchants}
             onSelectionChange={setSelectedMerchants}

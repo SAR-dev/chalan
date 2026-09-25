@@ -77,7 +77,7 @@ export function CreateWarehouseDialog() {
       submitting={submitting}
       submitLabel="Create"
     >
-      <div className="grid grid-cols-1 gap-4 pt-2">
+      <div className="grid grid-cols-1 gap-4">
         <FormErrors errors={Object.keys(errors).length > 0 ? errors : null} />
 
         <div className="flex flex-col gap-2">

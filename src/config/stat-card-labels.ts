@@ -96,7 +96,7 @@ export const statCardLabels = {
       returned: { label: "Returned" },
       totalExceptions: { label: "Total exceptions" },
     },
-    reconciliation: {
+    codSettlement: {
       awaitingSettlement: { label: "Waiting to be settled" },
       cashToCollect: { label: "Cash to collect" },
       settledCash: { label: "Cash settled" },

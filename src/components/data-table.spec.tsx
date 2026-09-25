@@ -2,12 +2,18 @@
 
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
+import { downloadCsv } from "@/lib/csv"
 
 vi.mock("@/features/account/hooks/use-auth", () => ({
   useAuth: () => ({ currentUser: null }),
 }))
+
+vi.mock("@/lib/csv", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/csv")>()
+  return { ...actual, downloadCsv: vi.fn() }
+})
 
 type Item = { id: string; name: string; value: number }
 
@@ -39,6 +45,10 @@ function getKey(row: Item) {
 }
 
 describe("DataTable", () => {
+  beforeEach(() => {
+    vi.mocked(downloadCsv).mockClear()
+  })
+
   it("renders all rows", () => {
     render(<DataTable columns={columns} data={data} getRowKey={getKey} />)
     expect(screen.getByText("Alice")).toBeInTheDocument()
@@ -213,6 +223,22 @@ describe("DataTable", () => {
     expect(screen.queryByText(/\d+\u2013\d+ of \d+/)).not.toBeInTheDocument()
   })
 
+  it("calls onRefresh once when the refresh button is clicked", async () => {
+    const user = userEvent.setup()
+    const onRefresh = vi.fn()
+    render(
+      <DataTable
+        id="refresh-test"
+        columns={columns}
+        data={data}
+        getRowKey={getKey}
+        onRefresh={onRefresh}
+      />,
+    )
+    await user.click(screen.getByLabelText("Refresh table"))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+  })
+
   // ---- Bulk selection tests ----
 
   it("renders checkboxes when selectable is true", () => {
@@ -370,10 +396,64 @@ describe("DataTable", () => {
         columns={columns}
         data={data}
         getRowKey={getKey}
-        bulkActions={[{ label: "Delete", onClick: vi.fn() }]}
+        bulkActions={[{ label: "Delete", onClick: onSelectionChange }]}
         selectedKeys={new Set([...newKeys])}
         onSelectionChange={onSelectionChange}
       />,
     )
+  })
+
+  // ---- Derived CSV export ----
+
+  it("shows the CSV button and exports derived rows", async () => {
+    const user = userEvent.setup()
+    render(
+      <DataTable
+        id="csv-table"
+        columns={columns}
+        data={data}
+        getRowKey={getKey}
+      />,
+    )
+    await user.click(screen.getByRole("button", { name: /download csv/i }))
+    expect(downloadCsv).toHaveBeenCalledTimes(1)
+    const [filename, content] = vi.mocked(downloadCsv).mock.calls[0]
+    expect(filename).toContain("csv-table")
+    expect(content).toContain("Name,Value")
+    expect(content).toContain("Charlie,20")
+    expect(content).toContain("Alice,30")
+    expect(content).toContain("Bob,10")
+  })
+
+  it("hides the CSV button when the table has no rows", () => {
+    render(
+      <DataTable
+        id="csv-empty"
+        columns={columns}
+        data={[]}
+        getRowKey={getKey}
+      />,
+    )
+    expect(
+      screen.queryByRole("button", { name: /download csv/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("hides the CSV button when no column is exportable", () => {
+    const nonExportableColumns: DataTableColumn<Item>[] = [
+      { id: "name", header: <span>Name</span>, cell: (r) => r.name },
+      { id: "value", header: "Value", cell: (r) => r.value },
+    ]
+    render(
+      <DataTable
+        id="csv-non-exportable"
+        columns={nonExportableColumns}
+        data={data}
+        getRowKey={getKey}
+      />,
+    )
+    expect(
+      screen.queryByRole("button", { name: /download csv/i }),
+    ).not.toBeInTheDocument()
   })
 })

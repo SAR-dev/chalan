@@ -32,7 +32,7 @@ import { statCardLabels } from "@/config/stat-card-labels"
 import { useOrderColumns } from "@/features/orders/components/order-table-columns"
 import { ApproveOrderDialog } from "@/features/orders/dialogs/approve-order-dialog"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
-import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
+import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import type { Order } from "@/lib/types"
 
@@ -80,6 +80,7 @@ export function OrdersPageClient({
     sortId,
     sortDir,
     onSortChange,
+    mutate: refresh,
   } = useOrders({ initialData, initialTotal })
   const baseColumns = useOrderColumns()
   const [tab, setTab] = useState<FilterTab>("PENDING")
@@ -392,6 +393,7 @@ export function OrdersPageClient({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             total={total}
             query={query}
             onQueryChange={setQuery}
@@ -482,7 +484,7 @@ export function OrdersPageClient({
         }}
       />
 
-      <OrderDetailsDialog
+      <OrderDetailsDrawer
         orderCode={viewOrderCode}
         open={viewOpen}
         onOpenChange={setViewOpen}

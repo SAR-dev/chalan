@@ -26,7 +26,13 @@ import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import type { DeliveryCity } from "@/lib/types"
 
 export function DeliveryCitiesPageClient() {
-  const { cities, isLoading, toggleCity, deleteCity } = useDeliveryCities()
+  const {
+    cities,
+    isLoading,
+    toggleCity,
+    deleteCity,
+    mutate: refresh,
+  } = useDeliveryCities()
   const { zones } = useDeliveryZones()
   const { warehouses } = useWarehouses()
   const [createOpen, setCreateOpen] = useState(false)
@@ -63,11 +69,13 @@ export function DeliveryCitiesPageClient() {
     {
       id: "name",
       header: "City name",
+      sortValue: (o) => o.name,
       cell: (o) => <CellContent className="font-medium">{o.name}</CellContent>,
     },
     {
       id: "zone",
       header: "Zone",
+      sortValue: (o) => (o.zoneId ? zoneName(o.zoneId) : "—"),
       cell: (o) => (
         <CellContent>{o.zoneId ? zoneName(o.zoneId) : "—"}</CellContent>
       ),
@@ -75,6 +83,7 @@ export function DeliveryCitiesPageClient() {
     {
       id: "warehouse",
       header: "Warehouse",
+      sortValue: (o) => (o.warehouseId ? warehouseName(o.warehouseId) : "—"),
       cell: (o) => (
         <CellContent>
           {o.warehouseId ? warehouseName(o.warehouseId) : "—"}
@@ -84,6 +93,7 @@ export function DeliveryCitiesPageClient() {
     {
       id: "status",
       header: "Status",
+      sortValue: (o) => (o.isActive ? "Active" : "Inactive"),
       cell: (o) =>
         o.isActive ? (
           <Badge variant="outline" className="gap-1 text-green-600">
@@ -154,6 +164,7 @@ export function DeliveryCitiesPageClient() {
             data={cities}
             getRowKey={(o) => o.id}
             loading={isLoading}
+            onRefresh={refresh}
             emptyMessage="No delivery cities yet. Add one to get started."
           />
         </CardContent>

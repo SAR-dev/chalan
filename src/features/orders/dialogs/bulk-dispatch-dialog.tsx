@@ -73,7 +73,7 @@ export function BulkDispatchDialog({
       submitIcon={<Truck className="size-4" />}
       submitDisabled={deliveryRiders.length === 0 || !riderId}
     >
-      <div className="grid grid-cols-1 gap-4 pt-2 pb-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="border-border bg-muted/40 flex items-center gap-3 rounded-lg border p-4">
           <Package className="text-muted-foreground size-5" />
           <p className="text-sm font-medium">

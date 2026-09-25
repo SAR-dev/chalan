@@ -46,7 +46,7 @@ import type { Order } from "@/lib/types"
 
 type FilterTab = "UNSETTLED" | "SETTLED"
 
-export function WarehouseReconciliationPageClient({
+export function WarehouseSettlementPageClient({
   initialData,
   initialTotal,
 }: {
@@ -61,6 +61,7 @@ export function WarehouseReconciliationPageClient({
     settleOrderCod,
     bulkSettleCod,
     isLoading,
+    mutate: refresh,
   } = useOrders({ initialData, initialTotal })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
@@ -194,7 +195,7 @@ export function WarehouseReconciliationPageClient({
     deliveryRiderColumn(riderName),
     {
       id: "collected",
-      header: columnLabels.reconciliation.cashCollected,
+      header: columnLabels.codSettlement.cashCollected,
       align: "right",
       sortable: true,
       sortValue: (o) => o.amountCollected ?? o.productCost,
@@ -248,29 +249,29 @@ export function WarehouseReconciliationPageClient({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={pageContent.warehouse.reconciliation.title(
+        title={pageContent.warehouse.codSettlement.title(
           currentUser?.name.split(" ")[0] ?? "Admin",
         )}
-        description={pageContent.warehouse.reconciliation.description}
+        description={pageContent.warehouse.codSettlement.description}
       />
 
       <StatCardList
         items={[
           {
             label:
-              statCardLabels.warehouse.reconciliation.awaitingSettlement.label,
+              statCardLabels.warehouse.codSettlement.awaitingSettlement.label,
             value: unsettledCount,
             icon: HandCoins,
             tone: "bg-chart-3/15 text-chart-3",
           },
           {
-            label: statCardLabels.warehouse.reconciliation.cashToCollect.label,
+            label: statCardLabels.warehouse.codSettlement.cashToCollect.label,
             value: formatTk(unsettledCash),
             icon: Banknote,
             tone: "bg-chart-1/15 text-chart-1",
           },
           {
-            label: statCardLabels.warehouse.reconciliation.settledCash.label,
+            label: statCardLabels.warehouse.codSettlement.settledCash.label,
             value: formatTk(settledCash),
             icon: Wallet,
             tone: "bg-chart-2/15 text-chart-2",
@@ -282,7 +283,7 @@ export function WarehouseReconciliationPageClient({
         <CardContent className="p-0">
           <DataTable
             pinnedColumns={["order"]}
-            id="warehouse-reconciliation"
+            id="warehouse-settlement"
             searchable
             searchColumns={[
               "order",
@@ -307,9 +308,10 @@ export function WarehouseReconciliationPageClient({
             loading={isLoading}
             emptyMessage={
               tab === "UNSETTLED"
-                ? "Nothing to reconcile. Delivered parcels appear here until their COD is settled."
+                ? "Nothing to settle. Delivered parcels appear here until their COD is settled."
                 : "No settlements yet."
             }
+            onRefresh={refresh}
             bulkLoading={bulkBusy}
             selectedKeys={selectedOrders}
             onSelectionChange={setSelectedOrders}

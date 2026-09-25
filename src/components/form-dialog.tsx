@@ -157,12 +157,12 @@ export function FormDialog({
             onSubmit={onSubmit}
             className="flex flex-1 flex-col gap-4 min-h-0"
           >
-            <DialogContentBody>{children}</DialogContentBody>
+            <DialogContentBody className="py-4">{children}</DialogContentBody>
             {footerNode}
           </form>
         ) : (
           <>
-            <DialogContentBody>{children}</DialogContentBody>
+            <DialogContentBody className="py-4">{children}</DialogContentBody>
             {footerNode}
           </>
         )}

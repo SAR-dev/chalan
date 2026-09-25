@@ -1,6 +1,8 @@
 # TODO: CSV Bulk Order Import
 
-> Status: **v1 ready to implement.** v1.1, v1.2 and v2 are scoped but not started.
+> Status: **v1 shipped.** M1–M3 are complete (template + parser + resolver,
+> dialog + wiring, e2e `S40` + docs). v1.1, v1.2 and v2 are scoped but not
+> started.
 > Primary user: Merchant (`/merchant`). Pricing, balance ledger, guards and
 > `MAX_BULK_ORDERS` stay in the existing `POST /api/orders/bulk` write path.
 > v1 adds a CSV front-end to it with **no server changes**.
@@ -212,8 +214,8 @@ gap. A merchant-provided note is never modified.
 | edit   | `src/app/merchant/orders/page.tsx`                   | `bulk-import-open` button + dialog wiring                                                     |
 | edit   | `e2e/selectors.ts`                                   | constants from §5                                                                             |
 | edit   | `package.json`                                       | add `papaparse` (+ `@types/papaparse` if not bundled)                                         |
-| edit   | `docs/REFACTOR.md` §10                               | replace open question with "decided: CSV v1 client-side import (see TODO.md)"                 |
 | edit   | `CONTRIBUTING.md`                                    | one paragraph in the orders section pointing at the import flow                               |
+| edit   | `docs/REFACTOR.md` header                            | flip status to "v1 shipped" when milestones are green                                         |
 
 ## 9. Security and limits (v1)
 
@@ -238,7 +240,9 @@ gap. A merchant-provided note is never modified.
 - `template.spec.ts`: headers match §3.2; template round-trips through `csv-parse` to
   1 valid row; error CSV re-parses cleanly.
 
-**E2E (Playwright, data-testid policy)**, new `e2e/specs/05-bulk-import.spec.ts`:
+**E2E (Playwright, data-testid policy)**, new `e2e/specs/09-bulk-import.spec.ts`
+(describe block `S40. CSV bulk import` — S39 is the current max; continue the
+`S<number>` serial from there):
 - Upload path: login as merchant, open dialog, `setInputFiles` with an in-memory CSV
   (1 valid + 1 invalid row). Preview shows 1 valid / 1 error and `bulk-import-confirm`
   is disabled. Re-upload a fixed file, counts read 2 valid / 0 errors, confirm enabled,
@@ -256,7 +260,7 @@ gap. A merchant-provided note is never modified.
 |----|--------------------------|-----------------------------------------------------------------------------------------------|--------|---------------------------------------------------|
 | M1 | Template + parser + resolver | `template.ts`, `csv-parse.ts`, `resolve-rows.ts`, papaparse dep, unit tests               | M      | All specs green; template round-trips             |
 | M2 | Dialog + wiring          | State machine `idle → done`, lookups, preview table, error CSV, submit, entry button, testids | M      | Upload/paste, preview, import works end to end    |
-| M3 | E2E + docs               | Playwright spec (§10), `REFACTOR.md` §10, `CONTRIBUTING.md`, `pnpm ci:check` + `pnpm ci:test` | S      | E2E green; docs updated                           |
+| M3 | E2E + docs               | Playwright spec (§10), `CONTRIBUTING.md` pointer, status flip in this file's header, `pnpm ci:check` + `pnpm ci:test` | S      | E2E green; docs updated                           |
 
 ## 12. Accepted v1 risks
 
@@ -328,10 +332,13 @@ appear, rows remain importable).
 The only version that needs a migration. The pieces are tightly coupled; ship together.
 
 **Server**
-- **Prisma model `BulkOrderRequest`:** `id`, `merchantId`, `idempotencyKey`,
-  `requestHash` (sha256 of canonical JSON body), `response` (Json snapshot),
-  `createdAt`; `@@unique([merchantId, idempotencyKey])`, `@@index([createdAt])`.
-  Written **only on success**, in the same transaction as the orders.
+- **Drizzle table `bulk_order_request`** (new module under
+  `src/lib/db/schema.postgres/` + barrel export; apply with `pnpm db:push` and
+  regenerate with `pnpm db:generate`): `id` (text PK, `createId()`), `merchantId`
+  (text), `idempotencyKey` (text), `requestHash` (sha256 of canonical JSON body),
+  `response` (jsonb snapshot), `createdAt` (ts); **unique index** on
+  `(merchantId, idempotencyKey)` + index on `createdAt`. Written **only on
+  success**, in the same transaction as the orders.
 - **`POST /api/orders/bulk` order of checks:** auth/guards, rate limit, idempotency
   replay, validation, duplicate guard, create.
     1. Optional `Idempotency-Key` header (UUID); malformed returns `400`.

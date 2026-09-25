@@ -83,7 +83,11 @@ export interface DataTableProps<T> {
   emptyMessage?: React.ReactNode
   onRowClick?: (row: T) => void
   className?: string
-  /** Enables a "Download CSV" button in the toolbar. */
+  /** Enables a "Download CSV" button in the footer. When omitted, a CSV
+   * export is derived automatically from the rendered columns that have a
+   * string header and a `sortValue` extractor, covering every row matching
+   * the current search/filter. The button is hidden when nothing is
+   * exportable — no such columns, or no rows. */
   csv?: DataTableCsv<T>
   /** Full dataset for CSV export when using server-side pagination.
    * When provided, `scope: "all"` exports from this array instead of

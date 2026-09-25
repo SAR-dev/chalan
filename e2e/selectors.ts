@@ -70,7 +70,19 @@ export const orders = {
   selectAll: "[data-testid='select-all']",
   selectRow: (id: string) => `[data-testid='select-${id}']`,
   searchInput: "[data-testid='orders-search']",
+  merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
   tab: (name: string) => `[data-testid='tab-${name}']`,
+  // CSV bulk import (§5 of docs/REFACTOR.md)
+  bulkImportOpen: "[data-testid='bulk-import-open']",
+  bulkImportTemplate: "[data-testid='bulk-import-template']",
+  bulkImportFile: "[data-testid='bulk-import-file']",
+  bulkImportPaste: "[data-testid='bulk-import-paste']",
+  bulkImportLoading: "[data-testid='bulk-import-loading']",
+  bulkImportSummary: "[data-testid='bulk-import-summary']",
+  bulkImportPreview: "[data-testid='bulk-import-preview']",
+  bulkImportRow: (line: number) => `[data-testid='bulk-import-row-${line}']`,
+  bulkImportErrorExport: "[data-testid='bulk-import-error-export']",
+  bulkImportConfirm: "[data-testid='bulk-import-confirm']",
 }
 
 // ─── Order Form ──────────────────────────────────────────────────────────────
@@ -122,7 +134,7 @@ export const warehouse = {
   intakeTable: "[data-testid='warehouse-intake']",
   dispatchTable: "[data-testid='warehouse-dispatch']",
   exceptionsTable: "[data-testid='warehouse-exceptions']",
-  reconciliationTable: "[data-testid='warehouse-reconciliation']",
+  settlementTable: "[data-testid='warehouse-settlement']",
   receiveButton: "[data-testid='receive-parcel']",
   dispatchButton: "[data-testid='dispatch-parcel']",
   settleButton: "[data-testid='settle-cod']",

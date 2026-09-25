@@ -37,6 +37,7 @@ export default function WarehouseAdminWarehousesPageClient() {
     sortDir,
     onSortChange,
     isLoading,
+    mutate: refresh,
   } = useWarehouses()
   const rows = useMemo<WarehouseRow[]>(
     () =>
@@ -111,6 +112,7 @@ export default function WarehouseAdminWarehousesPageClient() {
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
           />
         </CardContent>
       </Card>

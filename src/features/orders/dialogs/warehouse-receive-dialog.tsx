@@ -61,7 +61,7 @@ export function WarehouseReceiveDialog({
       submittingLabel="Logging in"
       submitLabel="Receive parcel"
     >
-      <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 mt-2 mb-4">
+      <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
         <InfoRow
           icon={WarehouseIcon}
           label="Receiving warehouse"

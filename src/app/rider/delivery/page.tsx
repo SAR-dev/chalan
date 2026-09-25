@@ -49,6 +49,7 @@ export default function RiderDeliveryQueuePage() {
     setDateFrom,
     dateTo,
     setDateTo,
+    mutate: refresh,
   } = useOrders()
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -88,6 +89,7 @@ export default function RiderDeliveryQueuePage() {
     {
       id: "order",
       header: columnLabels.rider.order,
+      sortValue: (o) => o.id,
       cell: (o) => (
         <button
           type="button"
@@ -104,6 +106,7 @@ export default function RiderDeliveryQueuePage() {
     {
       id: "receiver",
       header: columnLabels.rider.contact,
+      sortValue: (o) => o.recipientName,
       cell: (o) => (
         <div className="flex flex-col">
           <span className="font-medium">{o.recipientName}</span>
@@ -114,6 +117,8 @@ export default function RiderDeliveryQueuePage() {
     {
       id: "destination",
       header: columnLabels.rider.destination,
+      sortValue: (o) =>
+        [o.deliveryCity, o.deliveryAddress].filter(Boolean).join(", "),
       cell: (o) => (
         <div className="flex flex-col">
           <span className="underline decoration-dotted underline-offset-4">
@@ -149,6 +154,7 @@ export default function RiderDeliveryQueuePage() {
       id: "collectible",
       header: columnLabels.order.collectible,
       align: "right",
+      sortValue: (o) => formatTk(o.productCost),
       cell: (o) => (
         <span className="tabular-nums">{formatTk(o.productCost)}</span>
       ),
@@ -156,6 +162,13 @@ export default function RiderDeliveryQueuePage() {
     {
       id: "status",
       header: columnLabels.order.status,
+      sortValue: (o) =>
+        o.status === "DELIVERED" ||
+        o.status === "FAILED_ATTEMPT" ||
+        o.status === "RETURNED" ||
+        o.status === "CANCELLED"
+          ? "Completed"
+          : "Ongoing",
       cell: (o) => {
         const isCompleted =
           o.status === "DELIVERED" ||
@@ -239,6 +252,7 @@ export default function RiderDeliveryQueuePage() {
             total={total}
             query={query}
             onQueryChange={setQuery}
+            onRefresh={refresh}
             onPageChange={(p, l) => {
               setPage(p)
               setLimit(l)

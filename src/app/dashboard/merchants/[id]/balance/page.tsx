@@ -74,6 +74,7 @@ export default function MerchantBalancePage({
     confirmPayment,
     rejectPayment,
     adjustBalance,
+    mutate: refresh,
   } = useMerchantBalance(merchantId)
 
   const merchant = merchants.find((m) => m.id === merchantId)
@@ -183,6 +184,7 @@ export default function MerchantBalancePage({
     {
       id: "note",
       header: "Description",
+      sortValue: (t) => t.note ?? "—",
       cellClassName: "text-sm text-muted-foreground",
       cell: (t) => t.note ?? "—",
     },
@@ -222,6 +224,10 @@ export default function MerchantBalancePage({
     {
       id: "reviewedBy",
       header: "Confirmed by",
+      sortValue: (t) =>
+        t.status === "SETTLED" && t.type === "PAYMENT_CONFIRMED"
+          ? (t.reviewedBy ?? "—")
+          : "—",
       cellClassName: "text-sm text-muted-foreground",
       cell: (t) =>
         t.status === "SETTLED" && t.type === "PAYMENT_CONFIRMED"
@@ -386,6 +392,7 @@ export default function MerchantBalancePage({
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}
+            onRefresh={refresh}
             getRowKey={(t) => t.id}
             emptyMessage="No transactions yet."
           />

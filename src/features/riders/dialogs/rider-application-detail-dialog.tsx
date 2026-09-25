@@ -134,7 +134,7 @@ export function RiderApplicationDetailDialog({
         </DialogHeader>
 
         <DialogContentBody>
-          <div className="flex flex-col gap-4 pb-4">
+          <div className="flex flex-col gap-4 py-4">
             {/* Personal Info */}
             <div className="grid gap-3 sm:grid-cols-2">
               <div>

@@ -49,6 +49,7 @@ import {
 import type {
   DataTableBulkAction,
   DataTableColumn,
+  DataTableCsv,
   DataTableProps,
   SortDir,
 } from "./types"
@@ -448,6 +449,30 @@ export function DataTable<T>({
     return copy
   }, [filtered, columns, sortId, sortDir, serverPaginated, data])
 
+  // Explicit `csv` config always wins. Otherwise derive an export from the
+  // rendered columns that carry a string header and a `sortValue` extractor,
+  // so the footer button only appears when there is something to export.
+  // `scope: "all"` sources from `sorted`: every row matching the current
+  // search/filter (the loaded rows, when server-paginated — no new API
+  // endpoints for the rest).
+  const effectiveCsv = React.useMemo<DataTableCsv<T> | undefined>(() => {
+    if (csv) return csv
+    const exportable = filteredColumns.filter(
+      (c) => typeof c.header === "string" && typeof c.sortValue === "function",
+    )
+    if (exportable.length === 0 || sorted.length === 0) return undefined
+    return {
+      headers: exportable.map((c) => c.header as string),
+      parser: (row) =>
+        exportable.map((c) => {
+          const value = c.sortValue?.(row)
+          return typeof value === "boolean" ? String(value) : value
+        }),
+      scope: "all",
+      filename: id ?? "table-export",
+    }
+  }, [csv, filteredColumns, sorted, id])
+
   const totalPages = paginated
     ? Math.max(
         1,
@@ -507,10 +532,6 @@ export function DataTable<T>({
       selectAllRef.current.indeterminate = someVisibleSelected
     }
   }, [someVisibleSelected])
-
-  React.useEffect(() => {
-    if (!loading) setRefreshing(false)
-  }, [loading])
 
   function handleSelectAll() {
     if (allVisibleSelected) {
@@ -583,15 +604,15 @@ export function DataTable<T>({
   }
 
   function handleDownloadCsv() {
-    if (!csv) return
-    if (csv.downloadUrl) {
-      window.open(csv.downloadUrl, "_blank")
+    if (!effectiveCsv) return
+    if (effectiveCsv.downloadUrl) {
+      window.open(effectiveCsv.downloadUrl, "_blank")
       return
     }
-    if (!csv.parser) return
-    const source = csvData ?? (csv.scope === "page" ? visible : sorted)
-    const content = toCsv(source.map(csv.parser), csv.headers)
-    downloadCsv(csv.filename ?? "export", content)
+    if (!effectiveCsv.parser) return
+    const source = csvData ?? (effectiveCsv.scope === "page" ? visible : sorted)
+    const content = toCsv(source.map(effectiveCsv.parser), effectiveCsv.headers)
+    downloadCsv(effectiveCsv.filename ?? "export", content)
   }
 
   const displayTotal = serverPaginated ? (serverTotal ?? 0) : sorted.length
@@ -831,7 +852,7 @@ export function DataTable<T>({
           onRefresh={onRefresh}
           id={id}
           setSettingsOpen={setSettingsOpen}
-          csv={csv}
+          csv={effectiveCsv}
           handleDownloadCsv={handleDownloadCsv}
         />
       ) : null}

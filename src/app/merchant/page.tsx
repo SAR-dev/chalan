@@ -30,7 +30,7 @@ import { MerchantStatusBadge } from "@/features/merchants/components/merchant-st
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
-import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
+import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrderAnalytics } from "@/features/orders/hooks/use-order-analytics"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { formatTk } from "@/lib/pricing"
@@ -50,7 +50,7 @@ const IN_PROGRESS_STATUSES = [
 export default function MerchantOverviewPage() {
   const { currentUser } = useAuth()
   const { currentMerchant } = useMerchants()
-  const { orders, isLoading } = useOrders()
+  const { orders, isLoading, mutate: refreshOrders } = useOrders()
   const { analytics, isLoading: analyticsLoading } = useOrderAnalytics()
 
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
@@ -349,6 +349,7 @@ export default function MerchantOverviewPage() {
             getRowKey={(o) => o.id}
             initialSortId="order"
             loading={isLoading}
+            onRefresh={refreshOrders}
             emptyMessage={
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <div className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full">
@@ -378,7 +379,7 @@ export default function MerchantOverviewPage() {
         }}
       />
 
-      <OrderDetailsDialog
+      <OrderDetailsDrawer
         orderCode={viewOrderCode}
         open={viewOpen}
         onOpenChange={setViewOpen}

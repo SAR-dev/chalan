@@ -46,7 +46,7 @@ export const pageContent = {
     warehouses: {
       title: "Warehouses",
       description:
-        "Manage the warehouse hubs parcels are routed through, dispatched from, and reconciled at.",
+        "Manage the warehouse hubs parcels are routed through, dispatched from, and settled at.",
     },
     payouts: {
       title: "Merchant payouts",
@@ -119,8 +119,8 @@ export const pageContent = {
       description: (warehouseName: string) =>
         `Resolve failed delivery attempts at ${warehouseName} — re-attempt the delivery or close the parcel as a return.`,
     },
-    reconciliation: {
-      title: (firstName: string) => `COD reconciliation, ${firstName}`,
+    codSettlement: {
+      title: (firstName: string) => `COD settlement, ${firstName}`,
       description:
         "Match collected cash against delivered orders. The platform keeps delivery charge and security money; COD amount becomes payable to the merchant.",
     },

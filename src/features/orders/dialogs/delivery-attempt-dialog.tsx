@@ -103,7 +103,7 @@ export function DeliveryAttemptDialog({
         )
       }
     >
-      <div className="grid grid-cols-1 gap-4 pt-2 pb-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
           <InfoRow icon={User} label="Recipient" value={order.recipientName} />
           <InfoRow icon={Phone} label="Phone" value={order.recipientPhone} />

@@ -161,5 +161,6 @@ export function useUsers({
     resetPassword,
     banUser,
     unbanUser,
+    mutate,
   }
 }
