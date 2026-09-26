@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  accountActivationTemplate,
   changeEmailTemplate,
   merchantApprovedTemplate,
   merchantRegisteredTemplate,
@@ -237,5 +238,95 @@ describe("XSS protection via esc()", () => {
   it("escapes ampersand and quotes in recipient name", async () => {
     const { html } = await orderApprovedTemplate(xssData)
     expect(html).toContain("John &amp; &quot;Jane&quot;")
+  })
+})
+
+describe("merchant branding in emails", () => {
+  const branded = {
+    ownerName: "Bob Smith",
+    businessName: "Acme Corp",
+    verificationUrl: "http://localhost:3000/verify?token=abc",
+    logoUrl: "https://cdn.example.com/logo.png",
+    brandColor: "#10b981",
+    hidePlatformBranding: true,
+  }
+
+  it("embeds the merchant logo with the merchant name as alt text", async () => {
+    const { html } = await merchantRegisteredTemplate(branded)
+    expect(html).toContain("https://cdn.example.com/logo.png")
+    expect(html).toContain('alt="Acme Corp"')
+  })
+
+  it("uses the brand color as the accent", async () => {
+    const { html } = await merchantRegisteredTemplate(branded)
+    expect(html).toContain("#10b981")
+  })
+
+  it("drops the platform footer when hidePlatformBranding is set", async () => {
+    const { html, text } = await merchantRegisteredTemplate(branded)
+    expect(html).not.toContain("automated message")
+    expect(text).not.toContain("automated message")
+  })
+
+  it("keeps the platform footer by default", async () => {
+    const { html, text } = await merchantRegisteredTemplate({
+      ownerName: "Bob Smith",
+      businessName: "Acme Corp",
+      verificationUrl: "http://localhost:3000/verify?token=abc",
+    })
+    expect(html).toContain("automated message")
+    expect(text).toContain("automated message")
+  })
+
+  it("falls back to the platform accent for invalid brand colors", async () => {
+    const { html } = await merchantRegisteredTemplate({
+      ...branded,
+      brandColor: "not-a-color",
+    })
+    expect(html).toContain("#2563eb")
+    expect(html).not.toContain("not-a-color")
+  })
+
+  it("order emails carry branding fields", async () => {
+    const { html, text } = await orderApprovedTemplate({
+      ...data,
+      logoUrl: "https://cdn.example.com/logo.png",
+      brandColor: "#ef4444",
+      hidePlatformBranding: true,
+    })
+    expect(html).toContain("https://cdn.example.com/logo.png")
+    expect(html).toContain("#ef4444")
+    expect(html).not.toContain("automated message")
+    expect(text).not.toContain("automated message")
+  })
+})
+
+describe("accountActivationTemplate", () => {
+  it("includes the activation link as the CTA", async () => {
+    const { html, text } = await accountActivationTemplate({
+      userName: "Amy Staff",
+      contextName: "Acme Corp",
+      activationUrl: "http://localhost:3000/activate?token=raw-token",
+    })
+    expect(html).toContain("Activate your account")
+    expect(html).toContain("http://localhost:3000/activate?token=raw-token")
+    expect(text).toContain("http://localhost:3000/activate?token=raw-token")
+  })
+
+  it("mentions the inviting context when provided", async () => {
+    const { html } = await accountActivationTemplate({
+      userName: "Amy",
+      contextName: "Acme Corp",
+      activationUrl: "http://localhost:3000/activate?token=t",
+    })
+    expect(html).toContain("Acme Corp")
+  })
+
+  it("states the 24h expiry footnote", async () => {
+    const { html } = await accountActivationTemplate({
+      userName: "Amy",
+      activationUrl: "http://localhost:3000/activate?token=t",
+    })
+    expect(html).toContain("24 hours")
   })
 })

@@ -1,5 +1,11 @@
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { siteConfig } from "@/config/site"
+import {
+  accountStatus,
+  issueActivationToken,
+  sendActivationEmail,
+} from "@/lib/activation"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
@@ -48,6 +54,7 @@ export const GET = withErrorHandler(async (req: Request) => {
         role: profile.role,
         phone: profile.phone,
         isActive: profile.isActive,
+        activatedAt: profile.activatedAt,
         warehouseId: profile.warehouseId,
       },
       user: {
@@ -94,6 +101,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     role: p.role,
     phone: p.phone,
     isActive: p.isActive,
+    status: accountStatus(p),
     warehouseId: p.warehouseId,
   }))
 
@@ -132,13 +140,28 @@ export const POST = withErrorHandler(async (req: Request) => {
     return badRequest("Failed to create the team member")
   }
 
+  // WAREHOUSE_ADMIN accounts start PENDING: login is rejected until the
+  // invitee clicks the emailed activation link and sets their own password
+  // (ROADMAP 5.2). The temporary password above seeds the credential.
+  const pendingActivation = newRole === "WAREHOUSE_ADMIN"
+
   await db.insert(profile).values({
     userId: created.user.id,
     role: newRole,
     phone,
-    isActive: true,
+    isActive: !pendingActivation,
     warehouseId: newRole === "WAREHOUSE_ADMIN" ? (warehouseId ?? null) : null,
   })
+
+  if (pendingActivation) {
+    const rawToken = await issueActivationToken(created.user.id)
+    await sendActivationEmail({
+      to: email,
+      userName: name,
+      contextName: siteConfig.name,
+      rawToken,
+    })
+  }
 
   // Keep warehouse.managedBy in sync so the assigned warehouse reflects its
   // new manager (and is no longer offered as "unassigned" elsewhere).
@@ -154,6 +177,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       role: profile.role,
       phone: profile.phone,
       isActive: profile.isActive,
+      activatedAt: profile.activatedAt,
       warehouseId: profile.warehouseId,
     })
     .from(profile)
@@ -176,6 +200,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       role: profileRow.role,
       phone: profileRow.phone,
       isActive: profileRow.isActive,
+      status: accountStatus(profileRow),
       warehouseId: profileRow.warehouseId,
     },
     { status: 201 },

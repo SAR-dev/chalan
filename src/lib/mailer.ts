@@ -168,7 +168,17 @@ export async function sendMail(
   }
   const { maxRetries = 2, baseDelayMs = 1000, onRetry } = options
 
-  const config = await getSmtpConfig()
+  // A missing/broken SMTP config would otherwise throw before the retry loop
+  // and vanish without an email_log row — log it as a FAILED attempt so the
+  // admin Email Logs page (and the e2e activation flow) can see the message.
+  let config: Awaited<ReturnType<typeof getSmtpConfig>>
+  try {
+    config = await getSmtpConfig()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await logEmail(payload, "FAILED", 0, message)
+    throw err
+  }
   const mailOptions: SendMailOptions = {
     from: `"${config.fromName || siteConfig.name}" <${config.fromEmail}>`,
     ...payload,

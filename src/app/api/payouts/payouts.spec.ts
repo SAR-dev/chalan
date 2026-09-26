@@ -155,6 +155,29 @@ describe("POST /api/payouts", () => {
     expect(res.status).toBe(403)
   })
 
+  it("403 for a moderator without the Finance grant", async () => {
+    sessionState.value = {
+      ...merchantSession,
+      isModerator: true,
+      moderatorPermissions: ["/merchant/orders"],
+    }
+    const res = await createPayout(req("POST", undefined, validBody))
+    expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.error).toContain("Finance")
+  })
+
+  it("lets a moderator holding the Finance grant through the nav gate", async () => {
+    sessionState.value = {
+      ...merchantSession,
+      isModerator: true,
+      moderatorPermissions: ["/merchant/finance"],
+    }
+    selectQueue.push([])
+    const res = await createPayout(req("POST", undefined, validBody))
+    expect(res.status).toBe(400)
+  })
+
   it("400 when no payable orders", async () => {
     sessionState.value = merchantSession
     selectQueue.push([])

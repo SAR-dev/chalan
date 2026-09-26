@@ -200,11 +200,57 @@ export const settings = {
 }
 
 // ─── Branding ────────────────────────────────────────────────────────────────
+// --- Merchants (moderators) + staff activation (S41/S42) ---
+export const moderators = {
+  card: "[data-testid='moderators-card']",
+  empty: "[data-testid='moderators-empty']",
+  add: "[data-testid='add-moderator']",
+  nameInput: "[data-testid='moderator-name']",
+  emailInput: "[data-testid='moderator-email']",
+  passwordInput: "[data-testid='moderator-password']",
+  createSubmit: "[data-testid='create-moderator-submit']",
+  grant: (slug: string) => `[data-testid='grant-${slug}']`,
+  row: "[data-testid='moderator-row']",
+  status: "[data-testid='moderator-status']",
+  resend: "[data-testid='resend-activation']",
+  deactivate: "[data-testid='deactivate-moderator']",
+  reactivate: "[data-testid='reactivate-moderator']",
+  edit: "[data-testid='edit-moderator']",
+  saveAccess: "[data-testid='save-moderator-access']",
+  quotaFull: "[data-testid='quota-full']",
+}
+
+export const activation = {
+  password: "[data-testid='activate-password']",
+  confirm: "[data-testid='activate-confirm']",
+  submit: "[data-testid='activate-submit']",
+  error: "[data-testid='activate-error']",
+}
+
+export const merchantQuota = {
+  card: "[data-testid='moderator-quota-card']",
+  input: "[data-testid='moderator-quota-input']",
+  save: "[data-testid='moderator-quota-save']",
+}
+
+export const team = {
+  pendingBadge: "[data-testid='team-status-pending']",
+  resend: "[data-testid='team-resend-activation']",
+  createSubmit: "[data-testid='create-account-submit']",
+}
+
 export const branding = {
   section: "[data-testid='branding-section']",
   colorInput: "[data-testid='brand-color-input']",
   hideToggle: "[data-testid='hide-branding-toggle']",
   saveButton: "[data-testid='save-branding']",
+  preview: "[data-testid='branding-preview']",
+  previewButton: "[data-testid='preview-button']",
+  previewChip: "[data-testid='preview-chip']",
+  contrastWarning: "[data-testid='brand-contrast-warning']",
+  trackBrand: "[data-testid='track-brand']",
+  trackBrandLogo: "[data-testid='track-brand-logo']",
+  trackAccent: "[data-testid='track-accent']",
 }
 
 // ─── Audit logs ──────────────────────────────────────────────────────────────

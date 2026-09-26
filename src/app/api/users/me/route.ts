@@ -60,6 +60,13 @@ function serializeUser(
     warehouseId: row.warehouseId,
     merchantId: row.merchantId,
     riderId: row.riderId,
+    isModerator: row.isModerator,
+    moderatorPermissions: row.moderatorPermissions ?? null,
+    activatedAt: row.activatedAt ?? null,
+    // PENDING staff (created by an owner/admin, activation link not yet
+    // clicked) - the login page shows the "check your email" panel instead
+    // of the generic deactivated error.
+    pendingActivation: row.isActive === false && !row.activatedAt,
     emailVerifiedAt: merchantEmailVerifiedAt ?? null,
     twoFactorEnabled: twoFactor?.twoFactorEnabled ?? false,
     twoFactorRequired: twoFactor?.twoFactorRequired ?? false,
@@ -90,6 +97,9 @@ export const GET = withErrorHandler(async () => {
       warehouseId: profile.warehouseId,
       merchantId: profile.merchantId,
       riderId: profile.riderId,
+      isModerator: profile.isModerator,
+      moderatorPermissions: profile.moderatorPermissions,
+      activatedAt: profile.activatedAt,
       createdAt: profile.createdAt,
     })
     .from(profile)
@@ -176,6 +186,9 @@ export const PATCH = withErrorHandler(async (req: Request) => {
         warehouseId: profile.warehouseId,
         merchantId: profile.merchantId,
         riderId: profile.riderId,
+        isModerator: profile.isModerator,
+        moderatorPermissions: profile.moderatorPermissions,
+        activatedAt: profile.activatedAt,
         createdAt: profile.createdAt,
       })
       .from(profile)

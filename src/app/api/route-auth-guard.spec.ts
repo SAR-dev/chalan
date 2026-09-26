@@ -37,6 +37,9 @@ const PUBLIC_ALLOWLIST = new Set<string>([
   "auth/verify-email/route.ts",
   // Liveness probe for the Docker HEALTHCHECK — intentionally unauthenticated.
   "health/route.ts",
+  // Staff account activation link target: single-use 24h token in the body,
+  // no session possible (merchant moderators + warehouse admins).
+  "activate/route.ts",
   // Unverified merchants resend their activation email from the login page.
   "merchants/resend-verification/route.ts",
   // Public tracking page lets a recipient note their own parcel (rate-limited).

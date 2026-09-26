@@ -9,13 +9,21 @@ import { email } from "../selectors"
 const PASSWORD = "testpass123"
 const SITE_ORIGIN = "http://localhost:3000"
 
-/** Skip onboarding if the merchant landed on /welcome (fresh accounts do). */
+/** Skip onboarding for a freshly registered merchant. The shell redirects
+ *  incomplete merchants to /welcome asynchronously, so navigate to /merchant
+ *  and wait for that decision instead of checking the URL immediately. */
 async function skipOnboardingIfNeeded(page: Page) {
-  if (page.url().includes("/welcome")) {
-    await page.getByRole("button", { name: /skip for now/i }).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+  await page.goto("/merchant")
+  await page.waitForLoadState("networkidle").catch(() => {})
+  const skip = page.getByRole("button", { name: /skip for now/i })
+  try {
+    await skip.waitFor({ state: "visible", timeout: 5_000 })
+  } catch {
+    return // already onboarded
   }
+  await skip.click()
+  await page.waitForURL(/\/merchant/, { timeout: 15_000 })
+  await page.waitForLoadState("networkidle")
 }
 
 /**

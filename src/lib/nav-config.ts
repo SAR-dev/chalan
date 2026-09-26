@@ -269,6 +269,74 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
   ],
 }
 
+// ─── Merchant moderator nav grants (ROADMAP 5.2) ────────────────────────────
+//
+// Moderator access is modeled as grants over the MERCHANT_SIDEBAR hrefs.
+// The owner's own access is unrestricted; every other MERCHANT profile with
+// `isModerator` only reaches the hrefs listed in `moderatorPermissions`.
+
+/** Href a moderator can always reach (landing + self-service + public docs). */
+export const MERCHANT_MODERATOR_ALWAYS_HREFS: readonly string[] = [
+  "/merchant",
+  "/merchant/account",
+  "/help",
+]
+
+/** Hrefs that are never grantable to moderators (owner-only surfaces —
+ *  the moderator-management UI lives under Business Settings). */
+export const MERCHANT_OWNER_ONLY_HREFS: readonly string[] = [
+  "/merchant/settings",
+]
+
+/** The nav subjects our permission helpers reason about (the `me` shape from
+ *  requireSession / the `User` shape from /api/users/me both satisfy this). */
+export interface NavPermissionSubject {
+  role?: string | null
+  isModerator?: boolean | null
+  moderatorPermissions?: string[] | null
+}
+
+/** Sidebar items offered as grant checkboxes: everything except the
+ *  always-on and owner-only entries. */
+export function merchantGrantableNavItems(): SidebarNavItem[] {
+  return MERCHANT_SIDEBAR.items.filter(
+    (item) =>
+      !MERCHANT_MODERATOR_ALWAYS_HREFS.includes(item.href) &&
+      !MERCHANT_OWNER_ONLY_HREFS.includes(item.href),
+  )
+}
+
+/** Sidebar items for a merchant user: the owner sees the full nav; a
+ *  moderator sees always-on items plus the granted ones. */
+export function merchantVisibleNavItems(
+  user: NavPermissionSubject | null | undefined,
+): SidebarNavItem[] {
+  if (!user || user.role !== "MERCHANT" || !user.isModerator) {
+    return MERCHANT_SIDEBAR.items
+  }
+  const granted = new Set(user.moderatorPermissions ?? [])
+  return MERCHANT_SIDEBAR.items.filter(
+    (item) =>
+      MERCHANT_MODERATOR_ALWAYS_HREFS.includes(item.href) ||
+      (!MERCHANT_OWNER_ONLY_HREFS.includes(item.href) &&
+        granted.has(item.href)),
+  )
+}
+
+/** Server-side nav gate for sensitive endpoints. Owners and non-merchant
+ *  roles always pass; moderators need the href granted — owner-only hrefs
+ *  never pass for a moderator, even if a stale grant claims them. */
+export function hasNavPermission(
+  user: NavPermissionSubject | null | undefined,
+  href: string,
+): boolean {
+  if (!user) return false // fail closed for a missing subject
+  if (user.role !== "MERCHANT") return true
+  if (!user.isModerator) return true
+  if (MERCHANT_OWNER_ONLY_HREFS.includes(href)) return false
+  return (user.moderatorPermissions ?? []).includes(href)
+}
+
 export const WAREHOUSE_SIDEBAR: SidebarConfig = {
   brandIcon: SiteIcon,
   roleLabel: "Warehouse",

@@ -41,6 +41,7 @@ function LoginForm() {
   const [submitting, setSubmitting] = useState(false)
   const [needsActivation, setNeedsActivation] = useState(false)
   const [activationEmail, setActivationEmail] = useState("")
+  const [canResendActivation, setCanResendActivation] = useState(true)
   const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">(
     "idle",
   )
@@ -67,6 +68,8 @@ function LoginForm() {
       setSuccess(
         "Your email has been verified and your account is now active. You can now sign in.",
       )
+    } else if (successParam === "activated") {
+      setSuccess("Your account is activated. Sign in with your new password.")
     }
   }, [searchParams])
 
@@ -74,6 +77,7 @@ function LoginForm() {
     e.preventDefault()
     setError(null)
     setNeedsActivation(false)
+    setCanResendActivation(true)
     setSubmitting(true)
     const result = await login(email, password)
     if (result.ok && result.user) {
@@ -89,6 +93,7 @@ function LoginForm() {
     } else if (result.needsActivation && result.activationEmail) {
       setNeedsActivation(true)
       setActivationEmail(result.activationEmail)
+      setCanResendActivation(result.canResend !== false)
       setSubmitting(false)
     } else {
       setError(result.error ?? "Unable to sign in.")
@@ -341,7 +346,12 @@ function LoginForm() {
                                 . Check your inbox and click the link to
                                 activate your account.
                               </p>
-                              {resendStatus === "sent" ? (
+                              {!canResendActivation ? (
+                                <p className="text-amber-700 dark:text-amber-300 mt-1 text-xs">
+                                  Ask the person who invited you to resend the
+                                  activation email.
+                                </p>
+                              ) : resendStatus === "sent" ? (
                                 <p className="text-amber-600 dark:text-amber-400 mt-1 text-xs font-medium">
                                   Verification email sent! Check your inbox.
                                 </p>

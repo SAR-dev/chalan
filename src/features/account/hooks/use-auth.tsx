@@ -44,6 +44,8 @@ interface AuthContextValue {
     error?: string
     needsActivation?: boolean
     activationEmail?: string
+    /** False when the activation email must be re-sent by the account owner/admin (invited staff). */
+    canResend?: boolean
     // Sign-in was intercepted by Better Auth's two-factor plugin — the caller
     // must collect a TOTP / recovery code and call verifyTwoFactor().
     needsTwoFactor?: boolean
@@ -97,6 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // instance never served) — clear it and tell the user why.
             if (await rejectIfPortalUnavailable(user)) {
               toast.error(PORTAL_UNAVAILABLE_ERROR)
+            } else if (user.isActive === false) {
+              // Stale session for a pending/deactivated account (requireSession
+              // 401s everything anyway) — drop it and explain.
+              await authClient.signOut()
+              toast.error(
+                user.pendingActivation
+                  ? "Activate your account from the emailed link first."
+                  : "This account has been deactivated.",
+              )
             } else {
               setCurrentUser(user)
             }
@@ -129,6 +140,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sign the Better Auth session back out — we don't want a session
       // cookie sitting around for a deactivated account.
       await authClient.signOut()
+      // Invited staff (moderator / warehouse admin) who never clicked their
+      // activation link: point them at the email instead of "deactivated".
+      // Resending is the account owner's/admin's job — not self-service.
+      if (user.pendingActivation) {
+        return {
+          ok: false,
+          error: "pending-activation",
+          needsActivation: true,
+          activationEmail: user.email,
+          canResend: false,
+        } as const
+      }
       return { ok: false, error: "This account has been deactivated." } as const
     }
 
@@ -140,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: "activate-email",
         needsActivation: true,
         activationEmail: user.email,
+        canResend: true,
       } as const
     }
 

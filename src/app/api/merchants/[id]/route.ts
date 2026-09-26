@@ -5,8 +5,10 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { hasNavPermission } from "@/lib/nav-config"
 import {
   merchantBrandingSchema,
+  merchantModeratorQuotaSchema,
   merchantProfileSchema,
   parseBody,
 } from "@/lib/validation"
@@ -43,6 +45,7 @@ export const GET = withErrorHandler(
         freeWeightKg: merchant.freeWeightKg,
         maxWeightKg: merchant.maxWeightKg,
         codFeePercentage: merchant.codFeePercentage,
+        maxModerators: merchant.maxModerators,
         nidSubmittedAt: merchant.nidSubmittedAt,
         nidVerifiedAt: merchant.nidVerifiedAt,
         nidVerifiedBy: merchant.nidVerifiedBy,
@@ -86,15 +89,30 @@ export const PATCH = withErrorHandler(
       return forbidden()
     }
 
-    // Try profile schema first (businessName, email, phone, address), then branding schema.
+    // Sensitive surface (settings/branding): moderators never pass —
+    // Business Settings is not a grantable nav section (ROADMAP 5.2).
+    if (isOwner && !hasNavPermission(me, "/merchant/settings")) {
+      return forbidden("Business settings are owner-only.")
+    }
+
+    // Try profile schema first (businessName, email, phone, address), then
+    // branding, then the admin-managed moderator quota.
     const { data: body, error: bodyError } = await parseBody(
       req,
-      merchantProfileSchema.or(merchantBrandingSchema),
+      // Quota FIRST: branding is all-optional and would otherwise match a
+      // quota-only body first, stripping maxModerators from the parsed data.
+      merchantModeratorQuotaSchema
+        .or(merchantProfileSchema)
+        .or(merchantBrandingSchema),
     )
     if (bodyError) return bodyError
 
     const profileParsed = merchantProfileSchema.safeParse(body)
     const brandingParsed = merchantBrandingSchema.safeParse(body)
+    const quotaParsed = merchantModeratorQuotaSchema.safeParse(body)
+    if (quotaParsed.success && !isAdmin) {
+      return forbidden("Only administrators can change the moderator quota.")
+    }
 
     const updates: Record<string, unknown> = {}
 
@@ -114,6 +132,10 @@ export const PATCH = withErrorHandler(
         updates.hidePlatformBranding = hidePlatformBranding
     }
 
+    if (quotaParsed.success) {
+      updates.maxModerators = quotaParsed.data.maxModerators
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
         { error: "No valid fields to update" },
@@ -128,6 +150,18 @@ export const PATCH = withErrorHandler(
       .returning()
 
     if (!updated) return notFound()
+
+    // Moderator quota is admin-only and always audited (ROADMAP 5.2).
+    if (quotaParsed.success) {
+      await logAudit({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: "MODERATOR_QUOTA_CHANGED",
+        entityType: "merchant",
+        entityId: updated.id,
+        description: `Set moderator quota for ${updated.businessName} to ${updates.maxModerators}`,
+        metadata: { maxModerators: updates.maxModerators },
+      })
+    }
 
     // Only admins editing a merchant they don't own need an audit trail.
     if (me.role !== "MERCHANT" && profileParsed.success) {

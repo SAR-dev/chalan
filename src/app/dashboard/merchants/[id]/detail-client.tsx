@@ -10,6 +10,7 @@ import {
   MapPin,
   Phone,
   User,
+  Users,
   XCircle,
 } from "lucide-react"
 import { useState } from "react"
@@ -19,6 +20,7 @@ import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
@@ -78,6 +80,36 @@ export function MerchantDetailClient({
 
   const [rejectReason, setRejectReason] = useState("")
   const [reviewing, setReviewing] = useState(false)
+  const [maxModerators, setMaxModerators] = useState(
+    initialMerchant.maxModerators ?? 3,
+  )
+  const [savingQuota, setSavingQuota] = useState(false)
+
+  async function handleSaveQuota() {
+    const value = Number(maxModerators)
+    if (!Number.isInteger(value) || value < 0 || value > 20) {
+      toast.error("Quota must be a whole number between 0 and 20.")
+      return
+    }
+    setSavingQuota(true)
+    try {
+      const res = await fetch(`/api/merchants/${merchant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxModerators: value }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not save the moderator quota.")
+        return
+      }
+      setMerchant((prev) => ({ ...prev, ...data }))
+      toast.success(`Moderator quota set to ${value}.`)
+      mutate()
+    } finally {
+      setSavingQuota(false)
+    }
+  }
 
   async function handleNidReview(action: "approve" | "reject") {
     if (action === "reject" && !rejectReason.trim()) {
@@ -314,6 +346,48 @@ export function MerchantDetailClient({
                 <VerificationBadge
                   verified={Boolean(merchant.emailVerifiedAt)}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="moderator-quota-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="size-4" />
+                Moderator quota
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <p className="text-muted-foreground text-xs">
+                Max active + pending staff logins for this merchant (0-20).
+                Deactivating a moderator frees a slot.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={maxModerators}
+                  onChange={(e) => setMaxModerators(Number(e.target.value))}
+                  className="w-24"
+                  data-testid="moderator-quota-input"
+                  aria-label="Moderator quota"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSaveQuota}
+                  disabled={savingQuota}
+                  data-testid="moderator-quota-save"
+                >
+                  {savingQuota ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Saving
+                    </>
+                  ) : (
+                    "Save quota"
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>

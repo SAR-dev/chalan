@@ -21,6 +21,8 @@ export const requireSession = cache(async () => {
       warehouseId: profile.warehouseId,
       merchantId: profile.merchantId,
       riderId: profile.riderId,
+      isModerator: profile.isModerator,
+      moderatorPermissions: profile.moderatorPermissions,
       createdAt: profile.createdAt,
       name: user.name,
     })
@@ -30,6 +32,12 @@ export const requireSession = cache(async () => {
     .limit(1)
 
   if (!row) return null
+
+  // Deactivated / pending accounts get no API access at all (ROADMAP 5.2).
+  // PENDING staff (isActive=false, never activated) and disabled team members
+  // are treated as unauthenticated — every route surfaces 401 and the client
+  // runs the standard automatic-logout redirect.
+  if (row.isActive === false) return null
 
   // Portal-mode gate (ROADMAP 5.4): roles outside this deployment's
   // PORTAL_MODE are treated as unauthenticated (routes surface 401), so a

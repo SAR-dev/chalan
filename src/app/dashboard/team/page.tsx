@@ -1,5 +1,6 @@
 import { eq, inArray, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
+import { accountStatus } from "@/lib/activation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { profile, user, warehouse } from "@/lib/db/schema"
@@ -27,6 +28,7 @@ export default async function TeamPage() {
         role: profile.role,
         phone: profile.phone,
         isActive: profile.isActive,
+        activatedAt: profile.activatedAt,
         warehouseId: profile.warehouseId,
       })
       .from(profile)
@@ -44,9 +46,15 @@ export default async function TeamPage() {
       .orderBy(warehouse.name),
   ])
 
+  // TeamMember.status is derived (never stored) — same rule as the API.
+  const initialData = teamRows.map((row) => ({
+    ...row,
+    status: accountStatus(row),
+  }))
+
   return (
     <TeamPageClient
-      initialData={teamRows as any}
+      initialData={initialData}
       initialTotal={total}
       initialWarehouses={warehouseRows}
     />

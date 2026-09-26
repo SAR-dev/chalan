@@ -65,6 +65,8 @@ export interface FormDialogProps {
   fullWidthButtons?: boolean
   /** Hide the default footer entirely. */
   hideFooter?: boolean
+  /** data-testid for the default submit button (E2E selector policy). */
+  submitTestId?: string
 }
 
 /**
@@ -95,12 +97,14 @@ export function FormDialog({
   onCancel,
   fullWidthButtons = false,
   hideFooter = false,
+  submitTestId,
 }: FormDialogProps) {
   const buttonWidth = fullWidthButtons ? "w-full sm:w-auto" : undefined
 
   const submitButton = (
     <Button
       type={onSubmit ? "submit" : "button"}
+      data-testid={submitTestId}
       onClick={onSubmit ? undefined : onConfirm}
       disabled={submitting || submitDisabled}
       variant={submitVariant}
@@ -150,7 +154,10 @@ export function FormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger ? <DialogTrigger render={trigger} /> : null}
-      <DialogContent className={cn(SIZE_CLASS[size], className)}>
+      <DialogContent
+        className={cn(SIZE_CLASS[size], className)}
+        data-testid="form-dialog"
+      >
         {header}
         {onSubmit ? (
           <form

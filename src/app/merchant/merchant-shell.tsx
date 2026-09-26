@@ -9,8 +9,8 @@ import {
   XCircle,
 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useMemo } from "react"
 import { DataErrorBanner } from "@/components/data-error-banner"
 import { MerchantSidebar } from "@/components/navigation/merchant-sidebar"
 import { MobileHeader } from "@/components/navigation/mobile-header"
@@ -20,7 +20,12 @@ import { AnnouncementBanner } from "@/features/announcements/components/announce
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { loginPathWithNext } from "@/lib/auth-redirect"
-import { MERCHANT_SIDEBAR } from "@/lib/nav-config"
+import { brandThemeVars } from "@/lib/brand-color"
+import {
+  isNavItemActive,
+  MERCHANT_SIDEBAR,
+  merchantVisibleNavItems,
+} from "@/lib/nav-config"
 import { cn } from "@/lib/utils"
 
 // Merchant monitors: merchants, orders, pickup-locations.
@@ -173,10 +178,20 @@ function MerchantPickupLocationAlert() {
 
 export function MerchantShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
   const { currentMerchant, isLoading: isMerchantLoading } = useMerchants()
   const { pickupLocations, isLoading: isPickupLocationsLoading } =
     usePickupLocations()
+  // Filtered nav for MobileHeader (moderators see granted items only). Hooks
+  // must stay above the early returns below — React error #310 otherwise.
+  const navConfig = useMemo(
+    () => ({
+      ...MERCHANT_SIDEBAR,
+      items: merchantVisibleNavItems(currentUser),
+    }),
+    [currentUser],
+  )
 
   useEffect(() => {
     if (!isReady) return
@@ -199,6 +214,19 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
     }
   }, [isReady, currentUser, currentMerchant, isMerchantLoading, router])
 
+  // Moderator route guard (ROADMAP 5.2, enforcement layer 2): a moderator
+  // who opens a non-granted /merchant route is sent to their landing page.
+  // The nav already renders only granted items; this closes direct URLs.
+  useEffect(() => {
+    if (!currentUser?.isModerator || !pathname) return
+    if (pathname !== "/merchant" && !pathname.startsWith("/merchant/")) return
+    const items = merchantVisibleNavItems(currentUser)
+    const allowed = items.some((item) => isNavItemActive(item, pathname))
+    if (!allowed) {
+      router.replace(items[0]?.href ?? "/merchant")
+    }
+  }, [currentUser, pathname, router])
+
   if (!isReady || !currentUser || currentUser.role !== "MERCHANT") {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
@@ -211,13 +239,22 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
   const hasPickupLocations = pickupLocations.some(
     (p) => p.merchantId === currentMerchant?.id,
   )
+  // Portal-wide brand theming: buttons, links, badges, tabs and focus rings
+  // take the merchant's color. Invalid hex falls back to the theme defaults.
+  const brandVars = currentMerchant?.brandColor
+    ? brandThemeVars(currentMerchant.brandColor)
+    : undefined
 
   return (
-    <div className="bg-background flex min-h-screen">
+    <div
+      className="bg-background flex min-h-screen"
+      style={brandVars as React.CSSProperties | undefined}
+      data-testid="merchant-portal"
+    >
       <MerchantSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileHeader
-          config={MERCHANT_SIDEBAR}
+          config={navConfig}
           logoUrl={currentMerchant?.logoUrl ?? undefined}
           brandColor={currentMerchant?.brandColor ?? undefined}
           hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}

@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm"
-import { boolean, index, integer, pgTable, text } from "drizzle-orm/pg-core"
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+} from "drizzle-orm/pg-core"
 import { profileRoles } from "./enums"
 import { ts } from "./helpers"
 
@@ -33,6 +40,11 @@ export const user = pgTable(
     banExpires: ts("banExpires"),
     // Required by the better-auth two-factor plugin (ROADMAP H4)
     twoFactorEnabled: boolean("twoFactorEnabled").default(false),
+    // Account-activation flow (ROADMAP 5.2): SHA-256 hash of the single-use
+    // token emailed to invited staff (moderators, warehouse admins). The raw
+    // token never touches the database; cleared on successful activation.
+    activationToken: text("activationToken"),
+    activationTokenExpiresAt: ts("activationTokenExpiresAt"),
   },
   (t) => [
     index("user_name_trgm_idx").using("gin", sql`${t.name} gin_trgm_ops`),
@@ -153,6 +165,14 @@ export const profile = pgTable(
     warehouseId: text("warehouseId"), // WAREHOUSE_ADMIN: the warehouse they manage
     merchantId: text("merchantId"), // MERCHANT: their merchant business
     riderId: text("riderId"), // RIDER: their rider profile
+    // Merchant moderator accounts (ROADMAP 5.2). `isModerator` distinguishes
+    // staff from the merchant owner; `moderatorPermissions` holds the nav
+    // hrefs the owner granted (jsonb array, null for owners). `activatedAt`
+    // is set once the invitee clicks their activation link — null + isActive
+    // false = PENDING, non-null + isActive false = DEACTIVATED.
+    isModerator: boolean("isModerator").notNull().default(false),
+    moderatorPermissions: jsonb("moderatorPermissions").$type<string[]>(),
+    activatedAt: ts("activatedAt"),
     createdAt: ts("createdAt").notNull().defaultNow(),
   },
   (t) => [

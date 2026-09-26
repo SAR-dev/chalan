@@ -341,6 +341,58 @@ describe("PATCH /api/merchants/:id", () => {
     )
     expect(res.status).toBe(400)
   })
+
+  it("403 for a moderator (Business Settings is owner-only)", async () => {
+    sessionState.value = {
+      ...merchantSession,
+      isModerator: true,
+      moderatorPermissions: ["/merchant/orders"],
+    }
+    const res = await updateMerchant(
+      req("PATCH", undefined, { brandColor: "#10b981" }),
+      ctx(),
+    )
+    expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.error).toContain("owner-only")
+    expect(updatePayloads).toHaveLength(0)
+  })
+
+  it("admin sets the moderator quota (audited)", async () => {
+    sessionState.value = superAdmin
+    updateResult.push({ id: "m_1", businessName: "Acme", maxModerators: 5 })
+    const res = await updateMerchant(
+      req("PATCH", undefined, { maxModerators: 5 }),
+      ctx(),
+    )
+    expect(res.status).toBe(200)
+    expect(updatePayloads[0]).toMatchObject({ maxModerators: 5 })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "MODERATOR_QUOTA_CHANGED",
+        metadata: { maxModerators: 5 },
+      }),
+    )
+  })
+
+  it("403 when the merchant owner tries to set the quota", async () => {
+    sessionState.value = merchantSession
+    const res = await updateMerchant(
+      req("PATCH", undefined, { maxModerators: 5 }),
+      ctx(),
+    )
+    expect(res.status).toBe(403)
+    expect(updatePayloads).toHaveLength(0)
+  })
+
+  it("400 for a quota outside 0-20", async () => {
+    sessionState.value = superAdmin
+    const res = await updateMerchant(
+      req("PATCH", undefined, { maxModerators: 25 }),
+      ctx(),
+    )
+    expect(res.status).toBe(400)
+  })
 })
 
 describe("PATCH /api/merchants/:id/approve", () => {

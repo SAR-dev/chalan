@@ -1,13 +1,17 @@
 "use client"
 
 import {
+  AlertTriangle,
   Building2,
   CheckCircle2,
   FileText,
   Loader2,
+  Mail,
   MapPin,
   Palette,
+  PanelLeft,
   Phone,
+  Store,
   Tag,
   User,
   XCircle,
@@ -35,8 +39,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { pageContent } from "@/config/content"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
+import { ModeratorsCard } from "@/features/merchants/components/moderators-card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { PickupLocationsManager } from "@/features/pickup-locations/components/pickup-locations-manager"
+import { brandThemeVars, lowContrastSides } from "@/lib/brand-color"
 import { formatTk } from "@/lib/pricing"
 import { merchantProfileSchema, validateFormData } from "@/lib/validation"
 
@@ -94,6 +100,20 @@ export default function MerchantSettingsPage() {
     () => currentMerchant?.hidePlatformBranding ?? false,
   )
   const [savingBranding, setSavingBranding] = useState(false)
+
+  // Live preview + WCAG warning (warn, never block) — reflect unsaved edits.
+  const previewVars = brandThemeVars(brandColor)
+  const lowContrast = lowContrastSides(brandColor)
+  const contrastSides =
+    lowContrast.length === 2
+      ? "light and dark"
+      : lowContrast[0] === "light"
+        ? "light"
+        : "dark"
+  const contrastMessage =
+    lowContrast.length > 0
+      ? `Low contrast: this color as text on ${contrastSides} backgrounds is under the WCAG AA 4.5:1 threshold. Buttons and badges using it as a background stay readable.`
+      : null
 
   useEffect(() => {
     if (!currentMerchant) return
@@ -285,14 +305,99 @@ export default function MerchantSettingsPage() {
                   Branding
                 </CardTitle>
                 <CardDescription>
-                  Customize how your business appears in the sidebar and emails.
+                  Customize how your business appears in the sidebar, order
+                  tracking, and emails.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-6">
+                {/* Live preview — uses unsaved values via inline theme vars */}
+                <div
+                  className="border-border bg-card rounded-lg border p-4"
+                  style={previewVars as React.CSSProperties | undefined}
+                  data-testid="branding-preview"
+                >
+                  <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-widest uppercase">
+                    Preview
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt=""
+                        data-testid="preview-logo"
+                        className="bg-muted h-10 w-16 shrink-0 rounded-md border p-1 object-contain"
+                      />
+                    ) : (
+                      <div
+                        className="bg-primary text-primary-foreground flex h-10 w-16 shrink-0 items-center justify-center rounded-md border text-xs font-semibold"
+                        data-testid="preview-logo-placeholder"
+                      >
+                        Logo
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {currentMerchant.businessName}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span
+                          className="bg-primary text-primary-foreground rounded-md px-2.5 py-1 text-xs font-medium"
+                          data-testid="preview-chip"
+                        >
+                          Badge
+                        </span>
+                        <button
+                          type="button"
+                          className="bg-primary text-primary-foreground rounded-md px-3 py-1 text-xs font-medium"
+                          data-testid="preview-button"
+                        >
+                          Sample button
+                        </button>
+                        <span className="text-primary text-xs font-medium underline underline-offset-4">
+                          Link
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-border mt-4 border-t pt-3">
+                    <p className="text-muted-foreground mb-1.5 text-xs font-medium">
+                      Where this appears:
+                    </p>
+                    <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                      <li className="flex items-center gap-1.5">
+                        <PanelLeft className="size-3.5" />
+                        Merchant sidebar
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <Store className="size-3.5" />
+                        Order tracking page
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <Mail className="size-3.5" />
+                        Customer emails
+                      </li>
+                    </ul>
+                  </div>
+
+                  {contrastMessage && (
+                    <div
+                      className="border-amber-500/30 bg-amber-500/10 mt-3 flex items-start gap-2 rounded-md border px-3 py-2"
+                      data-testid="brand-contrast-warning"
+                    >
+                      <AlertTriangle className="text-amber-600 mt-0.5 size-3.5 shrink-0" />
+                      <p className="text-amber-700 text-xs leading-relaxed">
+                        {contrastMessage}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex flex-col gap-2">
                   <Label>Business logo</Label>
                   <p className="text-muted-foreground text-xs">
-                    Upload a logo to replace the platform icon in the sidebar.
+                    Shown in the sidebar, on the public order tracking page, and
+                    in emails.
                   </p>
                   <ImageUpload
                     value={logoUrl}
@@ -307,7 +412,8 @@ export default function MerchantSettingsPage() {
                 <div className="flex flex-col gap-2">
                   <Label>Brand color</Label>
                   <p className="text-muted-foreground text-xs">
-                    Choose a color for the sidebar and accent elements.
+                    Applied to buttons, links, badges, and focus rings across
+                    your portal.
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     {BRAND_PRESETS.map((preset) => (
@@ -376,6 +482,8 @@ export default function MerchantSettingsPage() {
                 </Button>
               </CardFooter>
             </Card>
+
+            <ModeratorsCard merchantId={currentMerchant.id} />
 
             <PickupLocationsManager merchantId={currentMerchant.id} />
           </div>

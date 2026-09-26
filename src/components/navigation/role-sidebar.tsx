@@ -46,6 +46,7 @@ export function RoleSidebar({
 
   return (
     <aside
+      data-testid="sidebar"
       className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden md:flex"
       style={sidebarStyle}
     >

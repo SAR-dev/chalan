@@ -51,20 +51,37 @@ export async function login(
   options: { waitFor?: RegExp; timeout?: number } = {},
 ): Promise<void> {
   await page.context().clearCookies()
-  // Stay put when we were already redirected here (e.g. /login?next=...) so
-  // the return path survives the sign-in.
-  if (!page.url().includes("/login")) {
+  // Already on /login (e.g. ?next=... or ?success=...): reload so the fills
+  // below hit a freshly hydrated form. The reload keeps the query string, so
+  // the return path survives sign-in.
+  if (page.url().includes("/login")) {
+    await page.reload()
+  } else {
     await page.goto("/login")
   }
+
+  // Signing out of an app page (clearCookies) can leave requests in flight that
+  // 401 and trigger the app's automatic-logout client redirect — which would
+  // remount the form mid-fill. Let that settle first (bounded).
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {})
 
   const emailInput = page.locator(auth.loginEmail)
   const passwordInput = page.locator(auth.loginPassword)
 
-  await emailInput.fill(cred.email)
-  // Wait for the form to become submittable instead of sleeping a fixed amount —
-  // the password field is enabled once the email passes client-side validation.
-  await passwordInput.waitFor({ state: "visible" })
-  await passwordInput.fill(cred.password)
+  // Fill + verify in a loop: if a late remount wipes the values, re-fill.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await emailInput.fill(cred.email)
+    // Wait for the form to become submittable instead of sleeping a fixed
+    // amount — the password field is enabled once the email passes validation.
+    await passwordInput.waitFor({ state: "visible" })
+    await passwordInput.fill(cred.password)
+    const [emailValue, passwordValue] = await Promise.all([
+      emailInput.inputValue(),
+      passwordInput.inputValue(),
+    ])
+    if (emailValue === cred.email && passwordValue === cred.password) break
+  }
+
   await passwordInput.press("Enter")
 
   await page.waitForURL(options.waitFor ?? AUTHENTICATED_URL, {

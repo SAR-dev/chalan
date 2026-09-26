@@ -109,6 +109,20 @@ export function useTeam({
     [mutate, _globalMutate],
   )
 
+  const resendActivation = useCallback(async (id: string) => {
+    const res = await fetch(`${KEY}/${id}/resend-activation`, {
+      method: "POST",
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      return {
+        ok: false,
+        error: formatError(data, "Failed to resend the activation email."),
+      }
+    }
+    return { ok: true }
+  }, [])
+
   const togglePricingPermission = useCallback(
     async (id: string) => {
       const res = await fetch(`${KEY}/${id}/pricing`, { method: "PATCH" })
@@ -165,6 +179,7 @@ export function useTeam({
     mutate,
     createAccount,
     toggleAccountActive,
+    resendActivation,
     togglePricingPermission,
     updateAccountWarehouse,
   }

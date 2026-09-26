@@ -36,7 +36,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" data-testid="confirm-dialog">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -46,6 +46,7 @@ export function ConfirmDialog({
             variant="outline"
             disabled={loading}
             onClick={() => onOpenChange(false)}
+            data-testid="cancel-button"
           >
             {cancelLabel}
           </Button>
@@ -53,6 +54,7 @@ export function ConfirmDialog({
             variant={variant === "destructive" ? "destructive" : "default"}
             disabled={loading}
             onClick={onConfirm}
+            data-testid="confirm-button"
           >
             {loading && <Loader2 className="size-4 animate-spin" />}
             {confirmLabel}

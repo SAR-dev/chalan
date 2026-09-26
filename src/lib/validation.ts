@@ -476,6 +476,43 @@ export const teamCreateSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
+// ─── Merchant moderators (ROADMAP 5.2) ─────────────────────────────────────
+
+export const moderatorCreateSchema = z.object({
+  name: requiredString("Name"),
+  email: z.email("A valid email is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  permissions: z
+    .array(z.string())
+    .min(1, "Grant access to at least one section"),
+})
+
+export const moderatorUpdateSchema = z
+  .object({
+    permissions: z
+      .array(z.string())
+      .min(1, "Grant access to at least one section")
+      .optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => v.permissions !== undefined || v.isActive !== undefined, {
+    error: "Nothing to update",
+  })
+
+export const activationSchema = z.object({
+  token: requiredString("Activation token"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+})
+
+/** SUPER_ADMIN-managed moderator quota (0–20) on the merchant detail page. */
+export const merchantModeratorQuotaSchema = z.object({
+  maxModerators: z
+    .number()
+    .int("Quota must be a whole number")
+    .min(0, "Quota cannot be negative")
+    .max(20, "Quota cannot exceed 20"),
+})
+
 export const announcementRoles = PROFILE_ROLES
 
 export const warehouseAssignSchema = z.object({

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login } from "../helpers"
+import { branding } from "../selectors"
 
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
@@ -100,5 +101,34 @@ test.describe("S36. Merchant Branding", () => {
       await expect(page.locator("aside").first()).toBeVisible()
     }
     // Test passes if login works - the branding fields are in the API response
+  })
+
+  test("branding preview shows live sample and where it appears", async ({
+    page,
+  }) => {
+    await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
+
+    await page.goto("/merchant/settings")
+    await page.waitForLoadState("networkidle")
+
+    await expect(page.locator(branding.preview)).toBeVisible()
+    await expect(page.locator(branding.previewButton)).toBeVisible()
+    await expect(page.locator(branding.previewChip)).toBeVisible()
+    await expect(page.getByText("Where this appears:")).toBeVisible()
+  })
+
+  test("public tracking page shows the order's merchant branding", async ({
+    page,
+  }) => {
+    // ORD-100001E is seeded for merchant1 (logo + brand color)
+    await page.goto("/track/ORD-100001E")
+    await page.waitForLoadState("networkidle")
+
+    await expect(page.locator(branding.trackBrand)).toContainText(
+      "Fulfilled by Merchant 1 Business",
+    )
+    await expect(page.locator(branding.trackBrandLogo)).toBeVisible()
+    await expect(page.locator(branding.trackAccent)).toBeVisible()
   })
 })

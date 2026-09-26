@@ -20,6 +20,7 @@ import {
   payoutRequestStatuses,
 } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
+import { hasNavPermission } from "@/lib/nav-config"
 import {
   paginateResponse,
   parsePagination,
@@ -183,6 +184,11 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can request payouts")
+  }
+  // Payout requests are the Finance surface — moderators need the grant
+  // (ROADMAP 5.2 hard server checks).
+  if (!hasNavPermission(me, "/merchant/finance")) {
+    return forbidden("You don't have access to Finance.")
   }
 
   const limited = await rateLimitByIp(req, "payouts", 10, 60)
