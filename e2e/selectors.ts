@@ -72,7 +72,7 @@ export const orders = {
   searchInput: "[data-testid='orders-search']",
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
   tab: (name: string) => `[data-testid='tab-${name}']`,
-  // CSV bulk import (§5 of docs/REFACTOR.md)
+  // CSV bulk import (§5 of docs/CSV-IMPORT.md)
   bulkImportOpen: "[data-testid='bulk-import-open']",
   bulkImportTemplate: "[data-testid='bulk-import-template']",
   bulkImportFile: "[data-testid='bulk-import-file']",

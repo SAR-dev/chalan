@@ -571,7 +571,7 @@ Key differences to know when adding a column or action:
   existing `POST /api/orders/bulk` — the v1 flow deliberately adds no server
   code, fees or IDs are never accepted from the file, and empty notes are
   auto-tagged `[CSV import YYYY-MM-DD]` for auditability. The column spec,
-  header aliases, limits and test plan live in `docs/REFACTOR.md` (§3–§10);
+  header aliases, limits and test plan live in `docs/CSV-IMPORT.md` (§3–§7);
   keep changes to this flow aligned with that document.
 
 - **Optimistic mutations use two-step revalidation.** The bound `mutate()`

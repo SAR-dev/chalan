@@ -1,8 +1,8 @@
-# TODO: CSV Bulk Order Import
+# CSV Bulk Order Import
 
 > Status: **v1 shipped.** M1–M3 are complete (template + parser + resolver,
-> dialog + wiring, e2e `S40` + docs). v1.1, v1.2 and v2 are scoped but not
-> started.
+> page + parcel-card preview, e2e `S40` + docs). v1.1, v1.2 and v2 are scoped but not
+> started. Completed v1 sections (files/test-plan/milestones) were removed once shipped — see git history for them.
 > Primary user: Merchant (`/merchant`). Pricing, balance ledger, guards and
 > `MAX_BULK_ORDERS` stay in the existing `POST /api/orders/bulk` write path.
 > v1 adds a CSV front-end to it with **no server changes**.
@@ -217,82 +217,6 @@ No import-tracking table. When `merchant_note` is empty, the import sets it to
 "did that batch go through?", which is also the recovery path for the v1 network-timeout
 gap. A merchant-provided note is never modified.
 
-## 8. Files (v1)
-
-| Action | Path                                                 | Notes                                                                                         |
-|--------|------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| add    | `src/features/orders/bulk-import/template.ts`        | `orderImportHeaders`, `headerAliases`, `buildTemplateCsv()`, `buildErrorCsv(rows)` using `toCsv` |
-| add    | `src/features/orders/bulk-import/csv-parse.ts`       | Papa wrapper to typed `RawOrderRow[]` with `__line`; encoding/BOM/header/row-limit/size guards (pure) |
-| add    | `src/features/orders/bulk-import/resolve-rows.ts`    | name-to-ID mapping + normalization + `orderCreateSchema` validation (pure)                    |
-| add    | `src/features/orders/bulk-import/*.spec.ts`          | colocated unit tests                                                                          |
-| add    | `src/app/merchant/orders/import/page.tsx`            | dedicated import page: header + Back link, inactive/verification gating (§5)                  |
-| add    | `src/app/merchant/orders/import/import-client.tsx`   | the `idle → error` state machine, lookups, submit + navigation (§5)                            |
-| add    | `src/app/merchant/orders/import/components/*`        | `import-input-card.tsx`, `import-preview-card.tsx` (editable parcel-card list §5)             |
-| add    | `src/app/merchant/orders/import/row-to-parcel.ts`    | pure CSV ⇄ `ParcelState` adapter (label/name lookup, camelCase ↔ header) + spec                |
-| add    | `src/features/orders/quote-parcel.ts`                | pure per-parcel charge quote shared by order-create and the import preview + spec             |
-| edit   | `src/app/merchant/orders/page.tsx`                   | `bulk-import-open` toolbar button → links to `/merchant/orders/import`                        |
-| edit   | `src/app/merchant/orders/new/page.tsx`               | `bulk-import-open` header button → links to `/merchant/orders/import`                         |
-| edit   | `e2e/selectors.ts`                                   | constants from §5                                                                             |
-| edit   | `package.json`                                       | add `papaparse` (+ `@types/papaparse` if not bundled)                                         |
-| edit   | `CONTRIBUTING.md`                                    | one paragraph in the orders section pointing at the import flow                               |
-| edit   | `docs/REFACTOR.md` header                            | flip status to "v1 shipped" when milestones are green                                         |
-
-## 9. Security and limits (v1)
-
-- No new write path and no server changes. The existing route's auth, merchant ACTIVE +
-  `canPlaceOrders` guards, and `rateLimitByIp("orders-bulk", 10, 60)` apply unchanged.
-- Limits: 50 rows / 2 MB per import (client-enforced); server enforces 50/request.
-- PII: no file upload; JSON only, to an authenticated merchant endpoint. No import
-  state is persisted client-side in v1.
-- No `dangerouslySetInnerHTML` in the preview; render field values as text.
-- Error CSV download reuses `downloadCsv` (BOM + timestamped name).
-
-## 10. Test plan (v1)
-
-**Unit (Vitest, colocated):**
-- `csv-parse.spec.ts`: happy path; quoted commas/newlines; BOM; non-UTF-8 detection
-  (fatal decode, U+FFFD); missing-header error; alias mapping; TSV paste; row limit;
-  size limit; empty-row skip; `__line` with a multi-line quoted field.
-- `resolve-rows.spec.ts`: name resolution (case/whitespace); phone normalization
-  (`+88017...`, `017-1234-5678`, Bangla numerals); numeric parsing (`1,5`, `৳1,200`,
-  Bangla numerals); note auto-tag only when empty; zod flattening with row numbers;
-  overweight flag.
-- `template.spec.ts`: headers match §3.2; template round-trips through `csv-parse` to
-  1 valid row; error CSV re-parses cleanly.
-
-**E2E (Playwright, data-testid policy)**, new `e2e/specs/09-bulk-import.spec.ts`
-(describe block `S40. CSV bulk import` — S39 is the current max; continue the
-`S<number>` serial from there):
-- Upload path: login as merchant, open `/merchant/orders/import`, `setInputFiles` with an in-memory CSV
-  (1 valid + 1 invalid row). Preview shows 1 valid / 1 error and `bulk-import-confirm`
-  is disabled. Re-upload a fixed file, counts read 2 valid / 0 errors, confirm enabled,
-  import, toast and orders appear in the list. Template button visibility asserted.
-- Blocked import: with at least 1 error the confirm button stays disabled and the
-  error CSV still downloads.
-- Inline edit: fill the invalid row's phone input (`#phone-row-{line}` — the card
-  inputs use the parcel's stable `row-{line}` id), and the summary flips to
-  2 valid / 0 errors with confirm enabled.
-- Each test creates its own rows via the import page; no shared-seed mutation.
-
-**Verification checklist (before PR):** `pnpm ci:check` + `pnpm ci:test`.
-
-## 11. Milestones (v1)
-
-| #  | Milestone                | Scope                                                                                         | Effort | Done when                                         |
-|----|--------------------------|-----------------------------------------------------------------------------------------------|--------|---------------------------------------------------|
-| M1 | Template + parser + resolver | `template.ts`, `csv-parse.ts`, `resolve-rows.ts`, papaparse dep, unit tests               | M      | All specs green; template round-trips             |
-| M2 | Dialog + wiring          | State machine `idle → done`, lookups, preview parcel cards, error CSV, submit, entry button, testids | M      | Upload, preview, import works end to end    |
-| M3 | E2E + docs               | Playwright spec (§10), `CONTRIBUTING.md` pointer, status flip in this file's header, `pnpm ci:check` + `pnpm ci:test` | S      | E2E green; docs updated                           |
-
-## 12. Accepted v1 risks
-
-1. **Network timeout after submit has an unknown outcome.** Mitigated by the warning
-   message and the `[CSV import]` tag; fixed by idempotency in v1.2.
-2. **Re-uploading the same file creates duplicate orders.** Mitigated by the count on
-   the Import button; fixed in v1.1.
-
----
-
 # v1.1: Duplicate protection and faster fixing
 
 Ship this first after v1: accidental double-imports are the biggest real-world risk.
@@ -333,7 +257,7 @@ No migration needed.
   to CSV rows and offer **Skip these rows** or **Import anyway**.
 - **Inline fix:** rows are edited in place in the preview cards and revalidate live.
 - **Show only errors** toggle.
-- **Fee estimates:** `estimate-fees.ts` fetches `GET /api/zone-pricing` once per dialog
+- **Fee estimates:** `estimate-fees.ts` fetches `GET /api/zone-pricing` once per page
   open and computes estimated fees per valid row with `calcDeliveryCharge`/`calcCodFee`.
   Summary adds `Est. fees ৳X · Total COD ৳Y`, labeled "Est."; omitted if the fetch
   fails, never blocks import.
@@ -455,3 +379,4 @@ duplicates.
 | Retry safety                 | v1: none (accepted risk). v1.2: client-generated `Idempotency-Key` per chunk + `BulkOrderRequest`    |
 | Resume storage               | v2: `sessionStorage` checkpoint                                                                      |
 | Audit tagging                | Auto-tag empty notes with `[CSV import YYYY-MM-DD]`; no import-tracking table                        |
+
