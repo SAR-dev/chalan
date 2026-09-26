@@ -5,6 +5,7 @@ import { dbRead } from "@/lib/db"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
 import { buildWarehouseOrderScope } from "@/lib/db/order-scope"
 import { deliveryCity, order } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { WarehouseOrdersPageClient } from "./orders-client"
 
 const ORDER_COLUMNS = {
@@ -29,7 +30,7 @@ const ORDER_COLUMNS = {
 
 export default async function WarehouseOrdersPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "WAREHOUSE_ADMIN") redirect("/login")
   if (!me.warehouseId) redirect("/login")
 

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { deliveryCity, order } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { WarehouseDispatchPageClient } from "./dispatch-client"
 
 const ORDER_COLUMNS = {
@@ -47,7 +48,7 @@ const ORDER_COLUMNS = {
 
 export default async function WarehouseDispatchPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "WAREHOUSE_ADMIN") redirect("/login")
   if (!me.warehouseId) redirect("/login")
 

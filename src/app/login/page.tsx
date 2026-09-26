@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
+import { safeNextPath } from "@/lib/auth-redirect"
 
 const LOGIN_EMAIL_PLACEHOLDER = "you@email.com"
 
@@ -50,11 +51,15 @@ function LoginForm() {
   const [twoFactorError, setTwoFactorError] = useState<string | null>(null)
   const [verifyingTwoFactor, setVerifyingTwoFactor] = useState(false)
 
+  // Where to land after a successful sign-in: ?next= (set by automatic-logout
+  // redirects) wins over the role's home page.
+  const nextPath = safeNextPath(searchParams.get("next"))
+
   useEffect(() => {
     if (isReady && currentUser) {
-      router.replace(homeForRole(currentUser.role))
+      router.replace(nextPath ?? homeForRole(currentUser.role))
     }
-  }, [isReady, currentUser, router])
+  }, [isReady, currentUser, router, nextPath])
 
   useEffect(() => {
     const successParam = searchParams.get("success")
@@ -72,9 +77,9 @@ function LoginForm() {
     setSubmitting(true)
     const result = await login(email, password)
     if (result.ok && result.user) {
-      router.replace(homeForRole(result.user.role))
+      router.replace(nextPath ?? homeForRole(result.user.role))
     } else if (result.ok) {
-      router.replace("/dashboard")
+      router.replace(nextPath ?? "/dashboard")
     } else if (result.needsTwoFactor) {
       // Password accepted — Better Auth is waiting for the second factor.
       setTwoFactorStep(true)
@@ -100,9 +105,9 @@ function LoginForm() {
       twoFactorRecovery ? "backup" : "totp",
     )
     if (result.ok && result.user) {
-      router.replace(homeForRole(result.user.role))
+      router.replace(nextPath ?? homeForRole(result.user.role))
     } else if (result.ok) {
-      router.replace("/dashboard")
+      router.replace(nextPath ?? "/dashboard")
     } else {
       setTwoFactorError(result.error ?? "Unable to verify the code.")
       setVerifyingTwoFactor(false)

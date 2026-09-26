@@ -9,7 +9,6 @@ import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import {
   type ImportParseResult,
   parseImportFile,
-  parseImportText,
 } from "@/features/orders/bulk-import/csv-parse"
 import {
   type ResolvedRow,
@@ -20,16 +19,18 @@ import {
 import {
   buildErrorCsv,
   buildTemplateCsv,
-  type OrderImportHeader,
 } from "@/features/orders/bulk-import/template"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { downloadCsv } from "@/lib/csv"
 import { formatError } from "@/lib/validation"
+import type { ParcelState } from "../new/types"
 import { ImportInputCard } from "./components/import-input-card"
 import { ImportPreviewCard } from "./components/import-preview-card"
-import type { ImportPhase, InputSource } from "./types"
+import { parcelStateToRawPatch } from "./row-to-parcel"
+import type { ImportPhase } from "./types"
 
 const NETWORK_ERROR =
   "We couldn't confirm the import. Check your orders list before retrying."
@@ -37,30 +38,28 @@ const NETWORK_ERROR =
 const LOADING_MERCHANT =
   "Still loading your merchant data. Try again in a moment."
 
-const PASTE_DEBOUNCE_MS = 400
+const EMPTY_FILTER_MESSAGE = "No errors — all rows are valid."
 
-export function ImportClient() {
+interface ImportClientProps {
+  phase: ImportPhase
+  setPhase: (phase: ImportPhase) => void
+}
+
+export function ImportClient({ phase, setPhase }: ImportClientProps) {
   const router = useRouter()
   const { currentMerchant } = useMerchants()
   const { pickupLocations } = usePickupLocations()
   const { cities } = useDeliveryCities()
+  const { pricing: zonePricing } = useZonePricingPublic()
   const { createOrders } = useOrders()
 
-  const [phase, setPhase] = useState<ImportPhase>("idle")
   const [parseError, setParseError] = useState<string | null>(null)
   const [rows, setRows] = useState<ResolvedRow[]>([])
-  const [source, setSource] = useState<InputSource | null>(null)
-  const [pasteText, setPasteText] = useState("")
+  const [sourceFileName, setSourceFileName] = useState<string | null>(null)
+  const [errorsOnly, setErrorsOnly] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
   const [serverErrors, setServerErrors] = useState<Record<number, string[]>>({})
   const submittingRef = useRef(false)
-  const pasteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (pasteTimerRef.current) clearTimeout(pasteTimerRef.current)
-    }
-  }, [])
 
   const myLocations = currentMerchant
     ? pickupLocations.filter((p) => p.merchantId === currentMerchant.id)
@@ -77,7 +76,7 @@ export function ImportClient() {
     }
   }, [currentMerchant, pickupLocations, cities, maxWeightKg])
 
-  // A paste can resolve before the lookups finish loading (e.g. the cities
+  // A file can resolve before the lookups finish loading (e.g. the cities
   // fetch on first visit), which would strand rows with stale "unknown city"
   // errors. Re-resolve every parsed row whenever the lookups change.
   useEffect(() => {
@@ -97,12 +96,12 @@ export function ImportClient() {
   const isPreview =
     phase === "preview" || phase === "submitting" || phase === "error"
 
+  const rowHasError = (row: ResolvedRow) =>
+    row.errors.length > 0 || (serverErrors[row.line]?.length ?? 0) > 0
   const validCount = rows.filter((row) => row.errors.length === 0).length
-  const errorCount = rows.filter(
-    (row) => row.errors.length > 0 || (serverErrors[row.line]?.length ?? 0) > 0,
-  ).length
+  const errorCount = rows.filter(rowHasError).length
+  const visibleRows = errorsOnly ? rows.filter(rowHasError) : rows
   const hasServerErrors = Object.keys(serverErrors).length > 0
-  const summary = `${validCount} valid · ${errorCount} ${errorCount === 1 ? "error" : "errors"}`
   const confirmDisabled =
     phase === "submitting" || errorCount > 0 || validCount === 0
   const showConfirm =
@@ -110,13 +109,19 @@ export function ImportClient() {
     phase === "submitting" ||
     (phase === "error" && !hasServerErrors)
   const alertMessage = phase === "idle" ? parseError : banner
+  const emptyMessage = errorsOnly ? EMPTY_FILTER_MESSAGE : undefined
 
-  function applyResult(result: ImportParseResult, from: InputSource) {
+  function resetPreview() {
+    setRows([])
+    setSourceFileName(null)
+    setServerErrors({})
+    setBanner(null)
+    setErrorsOnly(false)
+  }
+
+  function applyResult(result: ImportParseResult) {
     if (!result.ok) {
-      setRows([])
-      setSource(null)
-      setServerErrors({})
-      setBanner(null)
+      resetPreview()
       setParseError(result.error)
       setPhase("idle")
       return
@@ -130,61 +135,41 @@ export function ImportClient() {
     setServerErrors({})
     setBanner(null)
     setRows(resolveRows(result.rows, lookups))
-    setSource(from)
+    setErrorsOnly(false)
     setPhase("preview")
   }
 
-  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const element = event.target
-    const file = element.files?.[0]
-    element.value = ""
-    if (!file) return
+  async function processFile(file: File) {
+    setSourceFileName(file.name)
     setPhase("parsing")
     setParseError(null)
     try {
       const buffer = await file.arrayBuffer()
-      applyResult(
-        parseImportFile({ name: file.name, size: file.size, buffer }),
-        "file",
-      )
+      applyResult(parseImportFile({ name: file.name, size: file.size, buffer }))
     } catch {
-      applyResult(
-        {
-          ok: false,
-          error:
-            "Could not read this file. Re-save it as CSV UTF-8 and try again.",
-        },
-        "file",
-      )
+      applyResult({
+        ok: false,
+        error:
+          "Could not read this file. Re-save it as CSV UTF-8 and try again.",
+      })
     }
   }
 
-  function handlePasteChange(value: string) {
-    setPasteText(value)
-    if (pasteTimerRef.current) clearTimeout(pasteTimerRef.current)
-    pasteTimerRef.current = setTimeout(() => {
-      pasteTimerRef.current = null
-      if (submittingRef.current) return
-      if (!value.trim()) {
-        if (source === "paste") {
-          setRows([])
-          setSource(null)
-          setServerErrors({})
-          setBanner(null)
-          setParseError(null)
-          setPhase("idle")
-        }
-        return
-      }
-      setPhase("parsing")
-      setParseError(null)
-      applyResult(parseImportText(value), "paste")
-    }, PASTE_DEBOUNCE_MS)
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const element = event.target
+    const file = element.files?.[0]
+    element.value = ""
+    if (!file) return
+    void processFile(file)
   }
 
-  function handleCellChange(
+  function handleFileDrop(file: File) {
+    void processFile(file)
+  }
+
+  function handleParcelChange(
     line: number,
-    field: OrderImportHeader,
+    key: keyof ParcelState,
     value: string,
   ) {
     if (!lookups) return
@@ -192,12 +177,36 @@ export function ImportClient() {
       prev.map((row) =>
         row.line === line
           ? resolveRow(
-              { __line: row.line, values: { ...row.raw, [field]: value } },
+              {
+                __line: row.line,
+                values: {
+                  ...row.raw,
+                  ...parcelStateToRawPatch(
+                    key,
+                    value,
+                    row.raw,
+                    myLocations,
+                    cities,
+                  ),
+                },
+              },
               lookups,
             )
           : row,
       ),
     )
+  }
+
+  function handleRemoveRow(line: number) {
+    setRows((prev) => prev.filter((row) => row.line !== line))
+  }
+
+  function handleJumpToError() {
+    const target = rows.find(rowHasError)
+    if (!target) return
+    document
+      .querySelector(`[data-testid="bulk-import-row-${target.line}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" })
   }
 
   function handleTemplateDownload() {
@@ -211,20 +220,15 @@ export function ImportClient() {
   }
 
   function handleErrorCsvDownload() {
-    const errorRows = rows
-      .filter(
-        (row) =>
-          row.errors.length > 0 || (serverErrors[row.line]?.length ?? 0) > 0,
-      )
-      .map((row) => ({
-        values: row.raw,
-        error: [...row.errors, ...(serverErrors[row.line] ?? [])].join(" "),
-      }))
+    const errorRows = rows.filter(rowHasError).map((row) => ({
+      values: row.raw,
+      error: [...row.errors, ...(serverErrors[row.line] ?? [])].join(" "),
+    }))
     downloadCsv("order-import-errors", buildErrorCsv(errorRows))
   }
 
   function handleCancel() {
-    router.push("/merchant/orders")
+    router.back()
   }
 
   async function handleConfirm() {
@@ -286,11 +290,12 @@ export function ImportClient() {
       <ImportInputCard
         phase={phase}
         canImport={canImport}
-        pasteText={pasteText}
         myLocations={myLocations}
         cities={cities}
+        sourceFileName={sourceFileName}
+        sourceRowCount={rows.length}
         onFileChange={handleFileChange}
-        onPasteChange={handlePasteChange}
+        onFileDrop={handleFileDrop}
         onTemplateDownload={handleTemplateDownload}
       />
 
@@ -307,16 +312,24 @@ export function ImportClient() {
       ) : isPreview && lookups ? (
         <ImportPreviewCard
           phase={phase}
-          rows={rows}
+          rows={visibleRows}
           serverErrors={serverErrors}
-          summary={summary}
           validCount={validCount}
           errorCount={errorCount}
+          errorsOnly={errorsOnly}
+          emptyMessage={emptyMessage}
           showConfirm={showConfirm}
           confirmDisabled={confirmDisabled}
-          lookups={lookups}
-          onCellChange={handleCellChange}
+          myLocations={myLocations}
+          deliveryCities={cities}
+          zonePricing={zonePricing}
+          currentMerchant={currentMerchant}
+          maxWeightKg={lookups.maxWeightKg}
+          onParcelChange={handleParcelChange}
+          onRemoveRow={handleRemoveRow}
+          onErrorsOnlyChange={setErrorsOnly}
           onErrorCsvDownload={handleErrorCsvDownload}
+          onJumpToError={handleJumpToError}
           onConfirm={handleConfirm}
           onCancel={handleCancel}
         />

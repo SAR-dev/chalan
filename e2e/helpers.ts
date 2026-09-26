@@ -51,7 +51,11 @@ export async function login(
   options: { waitFor?: RegExp; timeout?: number } = {},
 ): Promise<void> {
   await page.context().clearCookies()
-  await page.goto("/login")
+  // Stay put when we were already redirected here (e.g. /login?next=...) so
+  // the return path survives the sign-in.
+  if (!page.url().includes("/login")) {
+    await page.goto("/login")
+  }
 
   const emailInput = page.locator(auth.loginEmail)
   const passwordInput = page.locator(auth.loginPassword)

@@ -3,11 +3,12 @@ import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { profile, user } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { UsersPageClient } from "./users-client"
 
 export default async function UsersPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "SUPER_ADMIN") redirect("/login")
 
   const limit = 20

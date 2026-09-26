@@ -19,6 +19,7 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { loginPathWithNext } from "@/lib/auth-redirect"
 import { MERCHANT_SIDEBAR } from "@/lib/nav-config"
 import { cn } from "@/lib/utils"
 
@@ -180,7 +181,9 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady) return
     if (!currentUser) {
-      router.replace("/login")
+      router.replace(
+        loginPathWithNext(window.location.pathname + window.location.search),
+      )
     } else if (currentUser.role !== "MERCHANT") {
       router.replace("/dashboard")
     } else if (isMerchantLoading || !currentMerchant) {

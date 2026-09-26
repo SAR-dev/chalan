@@ -11,9 +11,9 @@
 
 ## 1. Goal, scope and versions
 
-**Goal:** A merchant downloads a CSV template, fills it (or pastes rows from a
-spreadsheet), previews and validates row by row, and creates all orders in one
-request. **Nothing is imported until the whole file is error-free (all-or-nothing).**
+**Goal:** A merchant downloads a CSV template, fills it, previews and validates row
+by row, and creates all orders in one request. **Nothing is imported until the whole
+file is error-free (all-or-nothing).**
 
 **Key simplification:** v1 caps imports at `MAX_BULK_ORDERS` (50), so an import is a
 single request to the existing endpoint. That gives real server-side atomicity (one
@@ -29,7 +29,7 @@ partial-failure screens. Those return in v1.2 only if larger imports are needed.
 | v3      | Only if requested                       | varies                    | n/a  |
 
 **Non-goals (all versions up to v2):**
-- Excel (`.xlsx`): CSV and paste only. Workaround: "Save as CSV UTF-8" or copy/paste.
+- Excel (`.xlsx`): CSV upload only (browse or drag & drop). Workaround: "Save as CSV UTF-8".
 - Admin/warehouse-initiated import: merchant-only, same as `POST /api/orders/bulk`.
 - Editing existing orders or status changes: import always creates `PENDING` orders.
 - Importing fees, status or IDs: every fee is computed server-side.
@@ -55,8 +55,8 @@ partial-failure screens. Those return in v1.2 only if larger imports are needed.
 
 # v1: Import up to 50 orders (client-only)
 
-**Flow:** download template, upload CSV or paste rows, preview with validation, fix
-and re-upload (or edit the pasted text) until clean, import in one request.
+**Flow:** download template, upload a CSV, preview with validation, fix and
+re-upload (or replace the file) until clean, import in one request.
 
 ## 3. CSV format spec
 
@@ -111,8 +111,8 @@ as `headerAliases`.
 
 ### 3.4 Parsing rules
 
-- **Inputs:** a `.csv` file **or** pasted text (TSV/CSV from Excel/Google Sheets).
-  Both feed the same parser; Papa runs with `delimiter: ""` (auto-detect) and `header: true`.
+- **Inputs:** a `.csv` file only (browse or drag & drop).
+  Papa runs with `delimiter: ""` (auto-detect) and `header: true`.
 - **Encoding (files only):** decode the `ArrayBuffer` with
   `new TextDecoder("utf-8", { fatal: true })`; strip BOM. Reject the file if decoding
   throws or the result contains U+FFFD. Message: *"This file doesn't look like valid
@@ -128,10 +128,10 @@ as `headerAliases`.
 ## 4. Architecture
 
 ```
-CSV file / pasted text ──decode+parse──▶ rows[]
+CSV file ──decode+parse──▶ rows[]
    ──resolve──▶ IDs (pickup location, delivery city)     [GET lookups, cached SWR]
    ──validate──▶ per-row { ok } | { errors: ["Row 14: ..."] }   [orderCreateSchema]
-   ──preview──▶ table + summary
+   ──preview──▶ parcel cards + summary
    ──confirm──▶ POST /api/orders/bulk (one request, ≤ 50 rows)
    ──result──▶ success toast, or error with server row errors mapped to CSV rows
 ```
@@ -151,22 +151,25 @@ toolbar and the `/merchant/orders/new` header — navigate to the dedicated page
 **`/merchant/orders/import`**. There is no modal anymore.
 
 **Page:** `src/app/merchant/orders/import/`. `page.tsx` owns the header (Back
-to `/merchant/orders`) plus the inactive/verification gating, `import-client.tsx`
-owns the state machine, and `components/` holds `import-input-card.tsx` (file,
-paste, template, lookup lists), `import-preview-card.tsx` (summary + actions)
-and `import-preview-table.tsx` (the editable table). Never render the flow
-inline in another page file.
+to `/merchant/orders`), the inactive/verification gating and the step indicator,
+`import-client.tsx` owns the state machine, and `components/` holds
+`import-steps.tsx` (Provide rows → Review & fix → Import),
+`import-input-card.tsx` (file dropzone, source bar, template, lookup lists),
+`import-preview-card.tsx` (summary + toolbar + the editable parcel-card list +
+actions) and `row-to-parcel.ts` (the CSV ⇄ `ParcelState` adapter). The preview
+reuses the order-create `ParcelCard` — never a visual fork of it. Never render
+the flow inline in another page file.
 
-Sections, top to bottom: **input card → preview (or parsing spinner) → error
-banner area**.
+Sections, top to bottom: **step indicator → input card → preview (or parsing
+spinner) → error banner area**.
 
 States: `idle → parsing → preview → submitting → done | error`.
 
 | State      | Content                                                                                                                                                                                                                                  |
 |------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| idle       | Input card: file input (accept `.csv`), "Paste rows from Excel/Google Sheets" textarea, **Download template**, constraints hint (50 rows, 2 MB), plain list of the merchant's valid pickup locations and active cities. No pickup locations: show "Add a pickup location first" with a link, and disable file/paste inputs. Parse errors render in the error banner area. |
-| parsing    | spinner (`bulk-import-loading`) in place of the preview card; the input card stays mounted so pasting never loses focus.                                                                                                                   |
-| preview    | Preview card: summary (`bulk-import-summary`): `N valid · M errors`. **Editable table** (`bulk-import-preview`, no virtualization at 50 rows): row #, recipient, phone, pickup, city, address, weight, COD, type, map link, note, per-row errors in red. **Every data cell is inline-editable:** click a cell → its control appears → the edit writes back into the row's raw values and re-runs `resolveRow` for that row only, so the row re-validates and the summary counts update immediately; Enter/blur commits a text edit, Escape cancels; `delivery_city`, `delivery_type` and `pickup_location` use selects (active cities / STANDARD-FRAGILE / the merchant's locations). Invalid rows stay marked with a red border + message until fixed, `__line` and row order never change, and server-error rows keep their server message until re-submitted. Footer: **Download error CSV** (only if M>0), **Import N orders** (**disabled until M=0 and N>0**), **Cancel** (navigates back to `/merchant/orders`). Pasted text stays in the textarea so it can be edited and re-parsed in place. |
+| idle       | Input card: dashed **dropzone** ("Drop your CSV here or click to browse") wired to the hidden `bulk-import-file` input, **Download template** (full width on mobile) + constraints hint (50 rows, 2 MB, UTF-8 CSV), and a closed `<details>` "Where do my values need to match?" holding the merchant's valid pickup locations and active cities. No pickup locations: show "Add a pickup location first" with a link, and disable the dropzone. Parse errors render in the error banner area. |
+| parsing    | spinner (`bulk-import-loading`) in place of the preview card; the input card stays mounted so the source bar never jumps. |
+| preview    | Input card collapses to a **source bar**: file icon, `{fileName} · {N} rows` and a **Replace file** button. Preview card: summary (`bulk-import-summary`): `N valid · M errors`. Toolbar: **All / Errors only** segmented filter (`bulk-import-filter-all` / `bulk-import-filter-errors`), plus **Jump to first error** (`bulk-import-jump-error`) and **Download error CSV** (both only when M>0). **Editable parcel cards** (`bulk-import-preview`, no virtualization at 50 rows): one card per CSV row — the same `ParcelCard` the order-create page uses (`Parcel N` header with live COD + delivery charges from zone pricing, recipient, phone, city, address, map link, pickup, weight, COD, type, note, and the row's errors in red below the fields). Every row sits in a `bulk-import-row-{line}` wrapper; when more than one row remains, the card's trash button removes that row from the batch. **Every field is editable in place:** the edit writes back into the row's raw values and re-runs `resolveRow` for that row only, so the row re-validates and the summary counts update immediately as you type; `pickup_location`, `delivery_city` and `delivery_type` use selects (the merchant's locations / active cities / STANDARD-FRAGILE) and their IDs map back to CSV names. Invalid rows stay marked until fixed, `__line` and row order never change, and server-error rows keep their server message until re-submitted. Sticky footer: the fix/ready reason, **Cancel** (navigates back to `/merchant/orders`) and **Import N orders** (**disabled until M=0 and N>0**). Replacing the file re-parses in place; there is no paste path. |
 | submitting | Import button disabled, spinner. A `useRef` "submitting" flag is set synchronously on first click, before any state update, to block double-submit.                                                                                       |
 | done       | Success toast "N orders created", mutate SWR keys (`/api/orders`, `.../counts`, `.../payable`), then `router.push("/merchant/orders")` so the merchant lands on the freshly-created list.                                                   |
 | error      | Toast via `formatOrderError`; the page stays open with a banner in the error banner area. Server `rows: [...]` errors (e.g. overweight) are mapped back to CSV row numbers and shown. Retry is **not** offered for validation failures. On network error or timeout, show: *"We couldn't confirm the import. Check your orders list before retrying."* |
@@ -184,17 +187,17 @@ cleanly with no partial state.
 |-----------------------------|----------------------------------|
 | `bulk-import-open`          | toolbar entry button             |
 | `bulk-import-template`      | Download template button         |
-| `bulk-import-file`          | file input                       |
-| `bulk-import-paste`         | paste textarea                   |
+| `bulk-import-file`          | hidden file input (target of the dropzone / Replace file) |
 | `bulk-import-loading`       | parsing spinner                  |
 | `bulk-import-summary`       | preview summary                  |
-| `bulk-import-preview`       | preview table container          |
-| `bulk-import-row-{line}`    | one preview row (physical line)  |
+| `bulk-import-preview`       | preview parcel-card list container |
+| `bulk-import-row-{line}`    | one preview row wrapper (physical line) |
+| `bulk-import-filter-all`    | "All" preview filter toggle      |
+| `bulk-import-filter-errors` | "Errors only" preview filter toggle |
+| `bulk-import-jump-error`    | Jump to first error button       |
 | `bulk-import-error-export`  | Download error CSV button        |
 | `bulk-import-confirm`       | Import button                    |
 | `bulk-import-cancel`        | Cancel button (back to the list) |
-| `bulk-import-cell-{line}-{field}`       | one editable cell (display state) |
-| `bulk-import-cell-input-{line}-{field}` | the cell's input/select while editing |
 
 ## 6. Mapping and validation (v1)
 
@@ -224,7 +227,9 @@ gap. A merchant-provided note is never modified.
 | add    | `src/features/orders/bulk-import/*.spec.ts`          | colocated unit tests                                                                          |
 | add    | `src/app/merchant/orders/import/page.tsx`            | dedicated import page: header + Back link, inactive/verification gating (§5)                  |
 | add    | `src/app/merchant/orders/import/import-client.tsx`   | the `idle → error` state machine, lookups, submit + navigation (§5)                            |
-| add    | `src/app/merchant/orders/import/components/*`        | `import-input-card.tsx`, `import-preview-card.tsx`, `import-preview-table.tsx` (editable §5)   |
+| add    | `src/app/merchant/orders/import/components/*`        | `import-input-card.tsx`, `import-preview-card.tsx` (editable parcel-card list §5)             |
+| add    | `src/app/merchant/orders/import/row-to-parcel.ts`    | pure CSV ⇄ `ParcelState` adapter (label/name lookup, camelCase ↔ header) + spec                |
+| add    | `src/features/orders/quote-parcel.ts`                | pure per-parcel charge quote shared by order-create and the import preview + spec             |
 | edit   | `src/app/merchant/orders/page.tsx`                   | `bulk-import-open` toolbar button → links to `/merchant/orders/import`                        |
 | edit   | `src/app/merchant/orders/new/page.tsx`               | `bulk-import-open` header button → links to `/merchant/orders/import`                         |
 | edit   | `e2e/selectors.ts`                                   | constants from §5                                                                             |
@@ -239,7 +244,7 @@ gap. A merchant-provided note is never modified.
 - Limits: 50 rows / 2 MB per import (client-enforced); server enforces 50/request.
 - PII: no file upload; JSON only, to an authenticated merchant endpoint. No import
   state is persisted client-side in v1.
-- No `dangerouslySetInnerHTML` in the preview; render cells as text.
+- No `dangerouslySetInnerHTML` in the preview; render field values as text.
 - Error CSV download reuses `downloadCsv` (BOM + timestamped name).
 
 ## 10. Test plan (v1)
@@ -262,11 +267,11 @@ gap. A merchant-provided note is never modified.
   (1 valid + 1 invalid row). Preview shows 1 valid / 1 error and `bulk-import-confirm`
   is disabled. Re-upload a fixed file, counts read 2 valid / 0 errors, confirm enabled,
   import, toast and orders appear in the list. Template button visibility asserted.
-- Paste path: paste rows into `bulk-import-paste`, same preview.
 - Blocked import: with at least 1 error the confirm button stays disabled and the
   error CSV still downloads.
-- Inline edit: click the invalid row's cell (`bulk-import-cell-{line}-{field}`),
-  type the fix, and the summary flips to 2 valid / 0 errors with confirm enabled.
+- Inline edit: fill the invalid row's phone input (`#phone-row-{line}` — the card
+  inputs use the parcel's stable `row-{line}` id), and the summary flips to
+  2 valid / 0 errors with confirm enabled.
 - Each test creates its own rows via the import page; no shared-seed mutation.
 
 **Verification checklist (before PR):** `pnpm ci:check` + `pnpm ci:test`.
@@ -276,7 +281,7 @@ gap. A merchant-provided note is never modified.
 | #  | Milestone                | Scope                                                                                         | Effort | Done when                                         |
 |----|--------------------------|-----------------------------------------------------------------------------------------------|--------|---------------------------------------------------|
 | M1 | Template + parser + resolver | `template.ts`, `csv-parse.ts`, `resolve-rows.ts`, papaparse dep, unit tests               | M      | All specs green; template round-trips             |
-| M2 | Dialog + wiring          | State machine `idle → done`, lookups, preview table, error CSV, submit, entry button, testids | M      | Upload/paste, preview, import works end to end    |
+| M2 | Dialog + wiring          | State machine `idle → done`, lookups, preview parcel cards, error CSV, submit, entry button, testids | M      | Upload, preview, import works end to end    |
 | M3 | E2E + docs               | Playwright spec (§10), `CONTRIBUTING.md` pointer, status flip in this file's header, `pnpm ci:check` + `pnpm ci:test` | S      | E2E green; docs updated                           |
 
 ## 12. Accepted v1 risks
@@ -326,7 +331,7 @@ No migration needed.
 - Summary becomes `N valid · M errors · D possible duplicates`.
 - Handle `409 LIKELY_DUPLICATE` from the server (two-tabs case): map `duplicates[].index`
   to CSV rows and offer **Skip these rows** or **Import anyway**.
-- **Inline fix:** error cells are click-to-edit and revalidate live.
+- **Inline fix:** rows are edited in place in the preview cards and revalidate live.
 - **Show only errors** toggle.
 - **Fee estimates:** `estimate-fees.ts` fetches `GET /api/zone-pricing` once per dialog
   open and computes estimated fees per valid row with `calcDeliveryCharge`/`calcCodFee`.
@@ -416,9 +421,9 @@ duplicates.
 - **Accessibility:** keyboard editing of error cells (Enter to edit, Escape to cancel,
   Tab to move); `aria-live="polite"` progress announcements; focus moves to the summary
   when parsing completes and to the result heading when submission ends.
-- **Mobile:** horizontal scroll with sticky row #/error column; buttons at least 44 px.
+- **Mobile:** preview cards stack vertically (no horizontal scroll); buttons at least 44 px.
 - **Ease-of-use extras:** `example` column in the error CSV (correct format), click-to-copy
-  pickup locations and cities, any-cell inline editing.
+  pickup locations and cities.
 - **Encoding and file checks:** mojibake regex `/à¦|à§/`, and the separate
   `idle-mismatch` "wrong file entirely" screen when 2 or fewer required headers are
   recognized (3-6 recognized keeps the missing-headers error).
@@ -445,7 +450,7 @@ duplicates.
 | Row cap                      | v1: 50 rows / 2 MB (single request). v1.2: 500 rows via chunking                                     |
 | Fee estimates                | v1.1; omitted gracefully if zone pricing can't be fetched                                            |
 | Template sample row          | Dynamic (merchant's first pickup location + an active city)                                          |
-| Excel                        | Not supported; CSV + paste-from-spreadsheet only                                                     |
+| Excel                        | Not supported; CSV upload only (browse/drag-drop); no paste                                         |
 | Duplicate policy             | v1.1: warn, never hard-block; server guard 5 min, cross-import lookback 24 h, strong within 10 min   |
 | Retry safety                 | v1: none (accepted risk). v1.2: client-generated `Idempotency-Key` per chunk + `BulkOrderRequest`    |
 | Resume storage               | v2: `sessionStorage` checkpoint                                                                      |

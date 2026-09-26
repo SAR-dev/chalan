@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { rider } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { WarehouseRidersPageClient } from "./riders-client"
 
 const RIDER_COLUMNS = {
@@ -23,7 +24,7 @@ const RIDER_COLUMNS = {
 
 export default async function WarehouseRidersPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "WAREHOUSE_ADMIN") redirect("/login")
   if (!me.warehouseId) redirect("/login")
 

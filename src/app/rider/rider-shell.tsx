@@ -8,6 +8,7 @@ import { MobileHeader } from "@/components/navigation/mobile-header"
 import { RiderSidebar } from "@/components/navigation/rider-sidebar"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
+import { loginPathWithNext } from "@/lib/auth-redirect"
 import { RIDER_SIDEBAR } from "@/lib/nav-config"
 
 // Rider monitors: riders, orders, merchants, warehouses, pickup-locations.
@@ -26,7 +27,9 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady) return
     if (!currentUser) {
-      router.replace("/login")
+      router.replace(
+        loginPathWithNext(window.location.pathname + window.location.search),
+      )
     } else if (currentUser.role !== "RIDER") {
       router.replace(homeForRole(currentUser.role))
     }

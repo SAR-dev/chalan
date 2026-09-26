@@ -76,18 +76,16 @@ export const orders = {
   bulkImportOpen: "[data-testid='bulk-import-open']",
   bulkImportTemplate: "[data-testid='bulk-import-template']",
   bulkImportFile: "[data-testid='bulk-import-file']",
-  bulkImportPaste: "[data-testid='bulk-import-paste']",
   bulkImportLoading: "[data-testid='bulk-import-loading']",
   bulkImportSummary: "[data-testid='bulk-import-summary']",
   bulkImportPreview: "[data-testid='bulk-import-preview']",
   bulkImportRow: (line: number) => `[data-testid='bulk-import-row-${line}']`,
+  bulkImportFilterAll: "[data-testid='bulk-import-filter-all']",
+  bulkImportFilterErrors: "[data-testid='bulk-import-filter-errors']",
+  bulkImportJumpError: "[data-testid='bulk-import-jump-error']",
   bulkImportErrorExport: "[data-testid='bulk-import-error-export']",
   bulkImportConfirm: "[data-testid='bulk-import-confirm']",
   bulkImportCancel: "[data-testid='bulk-import-cancel']",
-  bulkImportCell: (line: number, field: string) =>
-    `[data-testid='bulk-import-cell-${line}-${field}']`,
-  bulkImportCellInput: (line: number, field: string) =>
-    `[data-testid='bulk-import-cell-input-${line}-${field}']`,
 }
 
 // ─── Order Form ──────────────────────────────────────────────────────────────

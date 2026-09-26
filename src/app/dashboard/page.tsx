@@ -10,11 +10,12 @@ import {
   rider,
   warehouse,
 } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { OverviewPageClient } from "./overview-client"
 
 export default async function OverviewPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "SUPER_ADMIN") redirect("/login")
 
   const [

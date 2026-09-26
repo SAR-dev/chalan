@@ -3,11 +3,12 @@ import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { AuditLogsClient } from "./audit-logs-client"
 
 export default async function AuditLogsPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "SUPER_ADMIN") redirect("/login")
 
   const limit = 20

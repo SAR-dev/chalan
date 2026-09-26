@@ -160,8 +160,8 @@ describe("isNavItemActive", () => {
   })
 
   it("matches non-exact items by prefix", () => {
-    const orders = MERCHANT_SIDEBAR.items.find((i) => i.label === "Orders")!
-    expect(isNavItemActive(orders, "/merchant/orders")).toBe(true)
-    expect(isNavItemActive(orders, "/merchant/orders/ORD-1")).toBe(true)
+    expect(isNavItemActive(newOrder, "/merchant/orders/new/anything")).toBe(
+      true,
+    )
   })
 })

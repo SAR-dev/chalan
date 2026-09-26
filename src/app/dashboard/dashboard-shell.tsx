@@ -8,6 +8,7 @@ import { MobileHeader } from "@/components/navigation/mobile-header"
 import { Sidebar } from "@/components/navigation/sidebar"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
+import { loginPathWithNext } from "@/lib/auth-redirect"
 import { dashboardSidebarForRole } from "@/lib/nav-config"
 import { twoFactorEnforcementPath } from "@/lib/two-factor"
 
@@ -43,7 +44,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady) return
     if (!currentUser) {
-      router.replace("/login")
+      router.replace(loginPathWithNext(pathname + window.location.search))
     } else if (currentUser.role !== "SUPER_ADMIN") {
       router.replace(homeForRole(currentUser.role))
     } else if (twoFactorSetupPath) {

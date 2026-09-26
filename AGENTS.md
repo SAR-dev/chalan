@@ -145,6 +145,11 @@ currently S1–S37 across 6 files / 51 tests).
 - API routes: `requireSession()` returns `null` if unauthorized
 - Client components: use `useAuth()` hook
 - Layout shells (`dashboard-shell.tsx`, `warehouse-shell.tsx`) handle async auth init — NOT redundant
+- Automatic logouts redirect to `/login?next=<current page>`: server pages via
+  `loginRedirectPath()` (reads the proxy-forwarded `x-pathname` header), shells
+  via `loginPathWithNext()`; the login page validates `next` with
+  `safeNextPath()` (same-site path only) and lands there after password/2FA
+  sign-in. Intentional logout and role-mismatch redirects use plain `/login`.
 
 ### Mutations (3-step error pipeline)
 

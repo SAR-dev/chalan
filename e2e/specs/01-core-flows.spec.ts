@@ -21,7 +21,7 @@ test.describe("S1. Full Order Lifecycle", () => {
     await page.waitForLoadState("networkidle")
 
     // Select pickup location
-    await page.locator("#pickup").click()
+    await page.locator("[id^='pickup-']").first().click()
     await page.getByRole("option").first().click()
 
     // Fill recipient details
@@ -248,5 +248,37 @@ test.describe("S28. Auth", () => {
     await page.locator("[data-testid='login-password']").fill("wrongpass")
     await page.getByRole("button", { name: /sign in/i }).click()
     await expect(page.getByRole("alert")).toBeVisible({ timeout: 10_000 })
+  })
+
+  test("server-side logout redirects with next= and returns there after login", async ({
+    page,
+  }) => {
+    await page.context().clearCookies()
+    await page.goto("/dashboard/audit-logs")
+    await page.waitForURL(/\/login\?next=/, { timeout: 15_000 })
+    expect(
+      decodeURIComponent(new URL(page.url()).searchParams.get("next")!),
+    ).toBe("/dashboard/audit-logs")
+
+    await login(page, CREDS.superAdmin)
+    expect(page.url()).toContain("/dashboard/audit-logs")
+  })
+
+  test("expired session in-app redirects with next= and returns there after login", async ({
+    page,
+  }) => {
+    await login(page, CREDS.merchant)
+    await page.goto("/merchant/finance")
+    await page.waitForLoadState("networkidle")
+
+    await page.context().clearCookies()
+    await page.reload()
+    await page.waitForURL(/\/login\?next=/, { timeout: 15_000 })
+    expect(
+      decodeURIComponent(new URL(page.url()).searchParams.get("next")!),
+    ).toContain("/merchant/finance")
+
+    await login(page, CREDS.merchant, { waitFor: /\/merchant/ })
+    expect(page.url()).toContain("/merchant/finance")
   })
 })

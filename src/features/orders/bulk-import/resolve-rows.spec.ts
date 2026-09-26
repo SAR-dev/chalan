@@ -205,6 +205,57 @@ describe("row validation", () => {
   })
 })
 
+describe("field-level error attribution (inline cell errors)", () => {
+  it("attributes an invalid phone to the recipient_phone cell", () => {
+    const [resolved] = resolveRows(
+      [validRow({ recipient_phone: "12345" }, 6)],
+      lookups,
+    )
+    expect(Object.keys(resolved.fieldErrors)).toEqual(["recipient_phone"])
+    expect(resolved.fieldErrors.recipient_phone).toContain(
+      "Invalid Bangladeshi phone number",
+    )
+    expect(resolved.errors).toHaveLength(1)
+  })
+
+  it("attributes an unknown delivery city to the delivery_city cell", () => {
+    const [resolved] = resolveRows(
+      [
+        validRow(
+          { delivery_city: "Nowhere", pickup_location: "Ghost Shop" },
+          7,
+        ),
+      ],
+      lookups,
+    )
+    expect(resolved.fieldErrors.delivery_city).toBe(
+      'Unknown delivery city "Nowhere".',
+    )
+    expect(resolved.fieldErrors.pickup_location).toBe(
+      'Unknown pickup location "Ghost Shop".',
+    )
+    expect(resolved.fieldErrors.recipient_phone).toBeUndefined()
+    expect(resolved.errors).toEqual([
+      'Row 7: Unknown pickup location "Ghost Shop".',
+      'Row 7: Unknown delivery city "Nowhere".',
+    ])
+  })
+
+  it("attributes overweight rows to parcel_weight_kg and stays empty when valid", () => {
+    const [overweight] = resolveRows(
+      [validRow({ parcel_weight_kg: "50" }, 9)],
+      lookups,
+    )
+    expect(overweight.fieldErrors.parcel_weight_kg).toBe(
+      "Parcel weight exceeds the 10 KG limit.",
+    )
+    expect(Object.keys(overweight.fieldErrors)).toEqual(["parcel_weight_kg"])
+
+    const [clean] = resolveRows([validRow()], lookups)
+    expect(clean.fieldErrors).toEqual({})
+  })
+})
+
 describe("single-row re-resolution (editable preview)", () => {
   it("re-validates one edited cell without touching line or raw cells", () => {
     const original = resolveRow(

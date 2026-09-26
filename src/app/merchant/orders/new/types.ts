@@ -3,6 +3,7 @@ import type { DeliveryType } from "@/lib/types"
 
 export interface ParcelState {
   id: string
+  pickupLocationId: string
   recipientName: string
   recipientPhone: string
   deliveryCityId: string

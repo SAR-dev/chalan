@@ -233,10 +233,12 @@ export function proxy(req: NextRequest) {
   const csp = buildCsp(nonce)
 
   // Forward the nonce + CSP to the server so Next applies the nonce to its
-  // inline hydration scripts; then set the same CSP for the browser.
+  // inline hydration scripts; then set the same CSP for the browser. The
+  // current path goes along so unauthenticated redirects can build /login?next=.
   const requestHeaders = new Headers(req.headers)
   requestHeaders.set("x-nonce", nonce)
   requestHeaders.set("content-security-policy", csp)
+  requestHeaders.set("x-pathname", pathname + req.nextUrl.search)
 
   const response = NextResponse.next({ request: { headers: requestHeaders } })
   response.headers.set("content-security-policy", csp)

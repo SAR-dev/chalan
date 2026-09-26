@@ -139,31 +139,6 @@ test.describe("S40. CSV bulk import", () => {
     await expect(page.getByText(recipientB).first()).toBeVisible()
   })
 
-  test("merchant pastes spreadsheet rows into the preview", async ({
-    page,
-  }) => {
-    await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
-    await openOrdersPage(page)
-    await openImportPage(page)
-
-    const stamp = Date.now()
-    const recipient = `E2E Paste ${stamp}`
-    await page
-      .locator(orders.bulkImportPaste)
-      .fill(delimited([orderRow(recipient)], "\t", "\n"))
-
-    await expect(page.locator(orders.bulkImportSummary)).toHaveText(
-      "1 valid · 0 errors",
-    )
-    await expect(page.locator(orders.bulkImportRow(2))).toBeVisible()
-    await expect(page.locator(orders.bulkImportConfirm)).toBeEnabled()
-
-    await page.locator(orders.bulkImportCancel).click()
-    await page.waitForURL("**/merchant/orders")
-    await expect(page.locator(orders.bulkImportPreview)).toBeHidden()
-  })
-
   test("errors block the import and the error CSV downloads", async ({
     page,
   }) => {
@@ -221,18 +196,21 @@ test.describe("S40. CSV bulk import", () => {
     )
     await expect(page.locator(orders.bulkImportConfirm)).toBeDisabled()
 
-    const invalidRow = page.locator(orders.bulkImportRow(3))
-    await invalidRow
-      .locator(orders.bulkImportCell(3, "recipient_phone"))
-      .click()
-    await page
-      .locator(orders.bulkImportCellInput(3, "recipient_phone"))
-      .fill("01712345679")
-    await page.keyboard.press("Enter")
+    // Errors-only filter narrows the preview to the offending row, All restores it
+    await page.locator(orders.bulkImportFilterErrors).click()
+    await expect(page.locator(orders.bulkImportRow(3))).toBeVisible()
+    await expect(page.locator(orders.bulkImportRow(2))).toBeHidden()
+    await page.locator(orders.bulkImportFilterAll).click()
+    await expect(page.locator(orders.bulkImportRow(2))).toBeVisible()
+    await expect(page.locator(orders.bulkImportRow(3))).toBeVisible()
 
-    await expect(
-      page.locator(orders.bulkImportCell(3, "recipient_phone")),
-    ).toHaveText("01712345679")
+    // The preview renders the order-create parcel cards, so the phone number
+    // is a real input (`phone-{row-{line}}`) that re-resolves the row as you
+    // type — no commit step.
+    await page.locator("#phone-row-3").fill("01712345679")
+
+    await expect(page.locator(orders.bulkImportRow(3))).toBeVisible()
+    await expect(page.locator("#phone-row-3")).toHaveValue("01712345679")
     await expect(page.locator(orders.bulkImportSummary)).toHaveText(
       "2 valid · 0 errors",
     )

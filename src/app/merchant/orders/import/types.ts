@@ -5,5 +5,3 @@ export type ImportPhase =
   | "submitting"
   | "done"
   | "error"
-
-export type InputSource = "file" | "paste"
