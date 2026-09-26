@@ -83,6 +83,11 @@ export const orders = {
   bulkImportRow: (line: number) => `[data-testid='bulk-import-row-${line}']`,
   bulkImportErrorExport: "[data-testid='bulk-import-error-export']",
   bulkImportConfirm: "[data-testid='bulk-import-confirm']",
+  bulkImportCancel: "[data-testid='bulk-import-cancel']",
+  bulkImportCell: (line: number, field: string) =>
+    `[data-testid='bulk-import-cell-${line}-${field}']`,
+  bulkImportCellInput: (line: number, field: string) =>
+    `[data-testid='bulk-import-cell-input-${line}-${field}']`,
 }
 
 // ─── Order Form ──────────────────────────────────────────────────────────────

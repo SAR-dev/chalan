@@ -36,7 +36,21 @@ export interface SidebarNavItem {
   label: string
   icon: LucideIcon
   exact?: boolean
+  /** Extra pathnames that also mark this item active (each matched as an
+   * exact path or a path prefix), e.g. New Order covering the import page. */
+  activePaths?: string[]
   group?: string
+}
+
+/** Whether a nav item should render as active for the current pathname. */
+export function isNavItemActive(
+  item: SidebarNavItem,
+  pathname: string,
+): boolean {
+  const matches = (path: string) =>
+    pathname === path || pathname.startsWith(`${path}/`)
+  if (item.activePaths?.some((path) => matches(path))) return true
+  return item.exact ? pathname === item.href : matches(item.href)
 }
 
 export interface SidebarConfig {
@@ -213,7 +227,12 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
       icon: Package,
       exact: true,
     },
-    { href: "/merchant/orders/new", label: "New Order", icon: PackagePlus },
+    {
+      href: "/merchant/orders/new",
+      label: "New Order",
+      icon: PackagePlus,
+      activePaths: ["/merchant/orders/import"],
+    },
     { href: "/merchant/finance", label: "Finance", icon: Wallet },
     { href: "/merchant/pricing", label: "Pricing", icon: Tag, exact: true },
     {

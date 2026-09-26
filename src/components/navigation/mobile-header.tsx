@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sheet"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { BRAND_NAME } from "@/lib/constants"
-import type { SidebarConfig } from "@/lib/nav-config"
+import { isNavItemActive, type SidebarConfig } from "@/lib/nav-config"
 import { cn, initials } from "@/lib/utils"
 
 const navLinkClass =
@@ -105,9 +105,7 @@ export function MobileHeader({
           {/* Nav — closes the drawer on navigation */}
           <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
             {navItems.map((item) => {
-              const active = item.exact
-                ? pathname === item.href
-                : pathname === item.href || pathname.startsWith(`${item.href}/`)
+              const active = isNavItemActive(item, pathname)
               const Icon = item.icon
               return (
                 <Link

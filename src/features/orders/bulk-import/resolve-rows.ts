@@ -1,9 +1,9 @@
 /**
  * Row resolution and validation for bulk order import (§6). Pure module: the
- * dialog injects the lookup maps (pickup locations, active cities) and the
- * merchant's `maxWeightKg`. Each row is normalized per §3.2, mapped to IDs,
- * auto-tagged per §7, then validated with `orderCreateSchema`; errors come
- * back as `Row N: ...` instructions via the `formatError` pattern.
+ * import page injects the lookup maps (pickup locations, active cities) and
+ * the merchant's `maxWeightKg`. Each row is normalized per §3.2, mapped to
+ * IDs, auto-tagged per §7, then validated with `orderCreateSchema`; errors
+ * come back as `Row N: ...` instructions via the `formatError` pattern.
  */
 
 import type { CreateOrderInput, DeliveryType } from "@/lib/types"
@@ -87,7 +87,15 @@ function csvImportTag(): string {
   return `[CSV import ${year}-${month}-${day}]`
 }
 
-function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
+/**
+ * Normalizes, resolves and validates one row. The editable preview calls this
+ * for the single row a cell edit changed, so fixing a cell re-validates that
+ * row (and only that row) without disturbing line numbers or row order.
+ */
+export function resolveRow(
+  row: RawOrderRow,
+  lookups: ResolveLookups,
+): ResolvedRow {
   const { values } = row
   const line = row.__line
   const errors: string[] = []

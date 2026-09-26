@@ -15,12 +15,12 @@ export async function seedUsers() {
   const [rifat] = await db
     .select()
     .from(user)
-    .where(eq(user.email, "warehouse.admin01@email.com"))
+    .where(eq(user.email, "warehouse.admin1@email.com"))
     .limit(1)
   const [maliha] = await db
     .select()
     .from(user)
-    .where(eq(user.email, "warehouse.admin02@email.com"))
+    .where(eq(user.email, "warehouse.admin2@email.com"))
     .limit(1)
   if (rifat) {
     await db

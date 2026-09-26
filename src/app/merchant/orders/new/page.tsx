@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, Plus } from "lucide-react"
+import { ArrowLeft, Plus, Upload } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
@@ -247,6 +247,15 @@ export default function NewOrderPage() {
         >
           <ArrowLeft className="size-4" />
           Back
+        </Button>
+        <Button
+          variant="outline"
+          render={<Link href="/merchant/orders/import" />}
+          nativeButton={false}
+          data-testid="bulk-import-open"
+        >
+          <Upload className="size-4" />
+          Import CSV
         </Button>
       </PageHeader>
 

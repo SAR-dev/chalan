@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import type { RawOrderRow } from "./csv-parse"
-import { normalizeNumber, normalizePhone, resolveRows } from "./resolve-rows"
+import {
+  normalizeNumber,
+  normalizePhone,
+  resolveRow,
+  resolveRows,
+} from "./resolve-rows"
 import { type OrderImportHeader, orderImportHeaders } from "./template"
 
 const lookups = {
@@ -197,5 +202,50 @@ describe("row validation", () => {
     )
     expect(rows.every((r) => r.errors.length === 0)).toBe(true)
     expect(rows[1].input.recipientName).toBe("Jane")
+  })
+})
+
+describe("single-row re-resolution (editable preview)", () => {
+  it("re-validates one edited cell without touching line or raw cells", () => {
+    const original = resolveRow(
+      validRow({ recipient_phone: "12345" }, 5),
+      lookups,
+    )
+    expect(original.errors).toHaveLength(1)
+
+    const edited = resolveRow(
+      {
+        __line: original.line,
+        values: { ...original.raw, recipient_phone: "01712345678" },
+      },
+      lookups,
+    )
+    expect(edited.errors).toEqual([])
+    expect(edited.line).toBe(5)
+    expect(edited.raw.recipient_phone).toBe("01712345678")
+    expect(edited.input.recipientPhone).toBe("01712345678")
+    expect(edited.raw.recipient_name).toBe(original.raw.recipient_name)
+  })
+
+  it("turns a raw cell edit into a fresh lookup error", () => {
+    const [resolved] = resolveRows([validRow({}, 4)], lookups)
+    const edited = resolveRow(
+      {
+        __line: resolved.line,
+        values: { ...resolved.raw, delivery_city: "Nowhere" },
+      },
+      lookups,
+    )
+    expect(edited.errors).toEqual(['Row 4: Unknown delivery city "Nowhere".'])
+    expect(edited.input.deliveryCityId).toBe("")
+  })
+
+  it("keeps an auto-tagged note stable across a re-resolve", () => {
+    const [resolved] = resolveRows([validRow({ merchant_note: "" })], lookups)
+    const again = resolveRow(
+      { __line: resolved.line, values: { ...resolved.raw } },
+      lookups,
+    )
+    expect(again.input.merchantNote).toBe(resolved.input.merchantNote)
   })
 })

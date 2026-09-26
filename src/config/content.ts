@@ -183,6 +183,11 @@ export const pageContent = {
       description:
         "Add one or more parcels and watch delivery charges update live as you enter details.",
     },
+    importOrders: {
+      title: "Import orders from CSV",
+      description:
+        "Download the template, fill in one row per order, then preview and fix every row before importing.",
+    },
     finance: {
       title: "Finances & payouts",
       description:

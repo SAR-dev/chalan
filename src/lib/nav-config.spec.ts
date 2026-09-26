@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   dashboardSidebarForRole,
   homeForRole,
+  isNavItemActive,
   MERCHANT_SIDEBAR,
   RIDER_SIDEBAR,
   SUPER_ADMIN_SIDEBAR,
@@ -137,5 +138,30 @@ describe("RIDER_SIDEBAR", () => {
     for (const item of RIDER_SIDEBAR.items) {
       expect(item.href).toMatch(/^\/(rider|help)/)
     }
+  })
+})
+
+describe("isNavItemActive", () => {
+  const newOrder = MERCHANT_SIDEBAR.items.find((i) => i.label === "New Order")!
+
+  it("New Order also activates for the import page", () => {
+    expect(newOrder.activePaths).toContain("/merchant/orders/import")
+    expect(isNavItemActive(newOrder, "/merchant/orders/new")).toBe(true)
+    expect(isNavItemActive(newOrder, "/merchant/orders/import")).toBe(true)
+    expect(isNavItemActive(newOrder, "/merchant/orders")).toBe(false)
+    expect(isNavItemActive(newOrder, "/merchant/finance")).toBe(false)
+  })
+
+  it("matches exact items only on their own path", () => {
+    const pricing = MERCHANT_SIDEBAR.items.find((i) => i.label === "Pricing")!
+    expect(pricing.exact).toBe(true)
+    expect(isNavItemActive(pricing, "/merchant/pricing")).toBe(true)
+    expect(isNavItemActive(pricing, "/merchant/pricing/edit")).toBe(false)
+  })
+
+  it("matches non-exact items by prefix", () => {
+    const orders = MERCHANT_SIDEBAR.items.find((i) => i.label === "Orders")!
+    expect(isNavItemActive(orders, "/merchant/orders")).toBe(true)
+    expect(isNavItemActive(orders, "/merchant/orders/ORD-1")).toBe(true)
   })
 })

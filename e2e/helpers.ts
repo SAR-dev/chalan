@@ -7,12 +7,12 @@ import { auth } from "./selectors"
  */
 export const CREDS = {
   superAdmin: {
-    email: "admin01@email.com",
+    email: "admin1@email.com",
     password: "12qwaszx",
     home: "/dashboard",
   },
   warehouseAdmin: {
-    email: "warehouse.admin01@email.com",
+    email: "warehouse.admin1@email.com",
     password: "12qwaszx",
     home: "/warehouse",
   },

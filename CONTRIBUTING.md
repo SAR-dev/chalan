@@ -561,11 +561,13 @@ Key differences to know when adding a column or action:
   wins over the derived one.
 
 - **Merchant orders support CSV bulk import.** The merchant order table's
-  toolbar has an **Import CSV** entry (`bulk-import-open`) opening the
-  client-only dialog (`src/features/orders/dialogs/bulk-import-dialog.tsx`,
-  with the pure parsing/resolution modules under
-  `src/features/orders/bulk-import/`): download the template, upload or paste
-  up to 50 rows, preview every row, then import **all-or-nothing** through the
+  toolbar has an **Import CSV** entry (`bulk-import-open`) that navigates to
+  the dedicated page `/merchant/orders/import` (state machine in
+  `src/app/merchant/orders/import/import-client.tsx`, with the pure
+  parsing/resolution modules under `src/features/orders/bulk-import/`):
+  download the template, upload or paste up to 50 rows, preview every row in an
+  **editable** table (click any cell to fix it in place), then import
+  **all-or-nothing** through the
   existing `POST /api/orders/bulk` — the v1 flow deliberately adds no server
   code, fees or IDs are never accepted from the file, and empty notes are
   auto-tagged `[CSV import YYYY-MM-DD]` for auditability. The column spec,
@@ -2517,8 +2519,8 @@ All seeded accounts share the password `12qwaszx`:
 
 | Role           | Email                        | Password       |
 | -------------- | ---------------------------- | -------------- |
-| Super admin    | `admin01@email.com`          | `12qwaszx`     |
-| Warehouse admin| `warehouse.admin01@email.com`| `12qwaszx`     |
+| Super admin    | `admin1@email.com`          | `12qwaszx`     |
+| Warehouse admin| `warehouse.admin1@email.com`| `12qwaszx`     |
 | Merchant       | `merchant1@email.com`          | `12qwaszx`    |
 | Rider          | `rider1@email.com`             | `12qwaszx`    |
 | Demo merchant  | `demo@kikuya.com`            | `12qwaszx`      |

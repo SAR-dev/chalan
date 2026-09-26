@@ -15,7 +15,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
-import { BulkImportDialog } from "@/features/orders/dialogs/bulk-import-dialog"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
@@ -73,7 +72,6 @@ export default function MerchantOrdersPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [viewOrderCode, setViewOrderCode] = useState<string | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
 
   const _pickup = (id: string) => pickupLocations.find((p) => p.id === id)
 
@@ -306,8 +304,9 @@ export default function MerchantOrdersPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  render={<Link href="/merchant/orders/import" />}
+                  nativeButton={false}
                   data-testid="bulk-import-open"
-                  onClick={() => setImportOpen(true)}
                 >
                   <Upload className="size-4" />
                   Import CSV
@@ -354,8 +353,6 @@ export default function MerchantOrdersPage() {
           viewOrderCode ? `/merchant/orders/${viewOrderCode}` : undefined
         }
       />
-
-      <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )
 }

@@ -119,8 +119,8 @@ reseeds the DB (`pnpm db:seed:full`) and starts `pnpm start` — build must be
 done first.
 
 **Credentials (seeded — all passwords `12qwaszx`):**
-- Super Admin: `admin01@email.com` / `12qwaszx`
-- Warehouse Admin: `warehouse.admin01@email.com` / `12qwaszx`
+- Super Admin: `admin1@email.com` / `12qwaszx`
+- Warehouse Admin: `warehouse.admin1@email.com` / `12qwaszx`
 - Merchant: `merchant1@email.com` / `12qwaszx`
 - Rider: `rider1@email.com` / `12qwaszx`
 

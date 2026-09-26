@@ -19,27 +19,27 @@ export const SEED_PASSWORD = "12qwaszx"
 export const SEED_USER_CREDENTIALS = {
   // Admins
   admin1: {
-    email: "admin01@email.com",
+    email: "admin1@email.com",
     password: SEED_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin2: {
-    email: "admin02@email.com",
+    email: "admin2@email.com",
     password: SEED_PASSWORD,
     role: "SUPER_ADMIN",
   },
   admin3: {
-    email: "admin03@email.com",
+    email: "admin3@email.com",
     password: SEED_PASSWORD,
     role: "SUPER_ADMIN",
   },
   warehouseAdmin1: {
-    email: "warehouse.admin01@email.com",
+    email: "warehouse.admin1@email.com",
     password: SEED_PASSWORD,
     role: "WAREHOUSE_ADMIN",
   },
   warehouseAdmin2: {
-    email: "warehouse.admin02@email.com",
+    email: "warehouse.admin2@email.com",
     password: SEED_PASSWORD,
     role: "WAREHOUSE_ADMIN",
   },

@@ -67,8 +67,9 @@ function csvFile(
   }
 }
 
-async function openImportDialog(page: any) {
+async function openImportPage(page: any) {
   await page.locator(orders.bulkImportOpen).click()
+  await page.waitForURL("**/merchant/orders/import")
   await expect(page.locator(orders.bulkImportTemplate)).toBeVisible()
 }
 
@@ -88,7 +89,7 @@ test.describe("S40. CSV bulk import", () => {
     await login(page, CREDS.merchant)
     await skipOnboardingIfNeeded(page)
     await openOrdersPage(page)
-    await openImportDialog(page)
+    await openImportPage(page)
 
     const stamp = Date.now()
     const recipientA = `E2E Import A ${stamp}`
@@ -127,6 +128,7 @@ test.describe("S40. CSV bulk import", () => {
     await expect(toast(page, "2 orders created")).toBeVisible({
       timeout: 15_000,
     })
+    await page.waitForURL("**/merchant/orders")
     await expect(page.locator(orders.bulkImportConfirm)).toBeHidden()
 
     // The list is server-sorted and paginated, so search for the new rows.
@@ -143,7 +145,7 @@ test.describe("S40. CSV bulk import", () => {
     await login(page, CREDS.merchant)
     await skipOnboardingIfNeeded(page)
     await openOrdersPage(page)
-    await openImportDialog(page)
+    await openImportPage(page)
 
     const stamp = Date.now()
     const recipient = `E2E Paste ${stamp}`
@@ -157,7 +159,8 @@ test.describe("S40. CSV bulk import", () => {
     await expect(page.locator(orders.bulkImportRow(2))).toBeVisible()
     await expect(page.locator(orders.bulkImportConfirm)).toBeEnabled()
 
-    await page.keyboard.press("Escape")
+    await page.locator(orders.bulkImportCancel).click()
+    await page.waitForURL("**/merchant/orders")
     await expect(page.locator(orders.bulkImportPreview)).toBeHidden()
   })
 
@@ -167,7 +170,7 @@ test.describe("S40. CSV bulk import", () => {
     await login(page, CREDS.merchant)
     await skipOnboardingIfNeeded(page)
     await openOrdersPage(page)
-    await openImportDialog(page)
+    await openImportPage(page)
 
     const stamp = Date.now()
     const recipient = `E2E Blocked ${stamp}`
@@ -191,5 +194,48 @@ test.describe("S40. CSV bulk import", () => {
     await page.locator(orders.bulkImportErrorExport).click()
     const download = await downloadPromise
     expect(download.suggestedFilename()).toContain(".csv")
+  })
+
+  test("merchant fixes an invalid row inline in the editable preview", async ({
+    page,
+  }) => {
+    await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
+    await openOrdersPage(page)
+    await openImportPage(page)
+
+    const stamp = Date.now()
+    const recipientA = `E2E Inline A ${stamp}`
+    const recipientB = `E2E Inline B ${stamp}`
+
+    await page
+      .locator(orders.bulkImportFile)
+      .setInputFiles(
+        csvFile("bulk-import-inline.csv", [
+          orderRow(recipientA),
+          orderRow(recipientB, { 2: "12345" }),
+        ]),
+      )
+    await expect(page.locator(orders.bulkImportSummary)).toHaveText(
+      "1 valid · 1 error",
+    )
+    await expect(page.locator(orders.bulkImportConfirm)).toBeDisabled()
+
+    const invalidRow = page.locator(orders.bulkImportRow(3))
+    await invalidRow
+      .locator(orders.bulkImportCell(3, "recipient_phone"))
+      .click()
+    await page
+      .locator(orders.bulkImportCellInput(3, "recipient_phone"))
+      .fill("01712345679")
+    await page.keyboard.press("Enter")
+
+    await expect(
+      page.locator(orders.bulkImportCell(3, "recipient_phone")),
+    ).toHaveText("01712345679")
+    await expect(page.locator(orders.bulkImportSummary)).toHaveText(
+      "2 valid · 0 errors",
+    )
+    await expect(page.locator(orders.bulkImportConfirm)).toBeEnabled()
   })
 })

@@ -105,7 +105,7 @@ describe("GET /api/admin/users", () => {
     selectQueue.push(
       [{ count: 2 }],
       [
-        { id: "u1", name: "Admin01", email: "admin01@email.com" },
+        { id: "u1", name: "Admin01", email: "admin1@email.com" },
         { id: "u2", name: "Owner 2", email: "merchant2@email.com" },
       ],
     )
@@ -267,7 +267,7 @@ describe("PATCH /api/admin/users/[id]/ban", () => {
 
   it("400 when banning your own account", async () => {
     sessionState.value = admin
-    selectQueue.push([{ id: "u1", email: "admin01@email.com" }])
+    selectQueue.push([{ id: "u1", email: "admin1@email.com" }])
     const res = await banUser(
       req("PATCH", undefined, { reason: "Terms violation" }),
       ctx("u1"),
