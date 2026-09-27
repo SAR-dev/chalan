@@ -16,6 +16,7 @@ import { siteConfig } from "@/config/site"
 import { decryptSecret } from "@/lib/crypto"
 import { db, dbRead } from "@/lib/db"
 import { emailLog, mailConfig } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { redactAndTruncate } from "@/lib/redact"
 
 export interface MailPayload {
@@ -155,7 +156,7 @@ async function logEmail(
       textBody: textBody ? boundForLog(textBody) : null,
     })
   } catch (dbErr) {
-    console.error("[mailer] Failed to write email_log entry:", dbErr)
+    logger.error("Failed to write email_log entry", { err: dbErr })
   }
 }
 
@@ -175,13 +176,15 @@ export async function sendMail(
   // it carries password-reset/activation links (ROADMAP P0.7). Writing those to
   // stdout put live tokens in container logs, CI output and log aggregators.
   if (text) {
-    console.log(
-      `[mailer] Sending to ${payload.to} | Subject: ${payload.subject}\n---\n${redactAndTruncate(text)}\n---`,
-    )
+    logger.info("Sending email", {
+      to: payload.to,
+      subject: payload.subject,
+      body: redactAndTruncate(text),
+    })
   }
 
   if (process.env.MAIL_DISABLED === "1") {
-    console.log(`[mailer] MAIL_DISABLED=1, skipping send to ${payload.to}`)
+    logger.info("MAIL_DISABLED=1, skipping send", { to: payload.to })
     return
   }
   const { maxRetries = 2, baseDelayMs = 1000, onRetry } = options
@@ -213,20 +216,22 @@ export async function sendMail(
     try {
       const transport = await getTransporter()
       await transport.sendMail(mailOptions)
-      console.log(`[mailer] Email sent to ${payload.to} (attempt ${attempt})`)
+      logger.info("Email sent", { to: payload.to, attempt })
       await logEmail(payload, "SENT", attempt)
       return
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
-      console.error(
-        `[mailer] Attempt ${attempt}/${totalAttempts} failed:`,
-        lastError.message,
-      )
+      logger.warn("Email attempt failed", {
+        to: payload.to,
+        attempt,
+        totalAttempts,
+        err: lastError,
+      })
 
       if (attempt === totalAttempts) break
 
       const delay = baseDelayMs * 2 ** (attempt - 1)
-      console.log(`[mailer] Retrying in ${delay}ms…`)
+      logger.info("Retrying email", { to: payload.to, attempt, delayMs: delay })
       onRetry?.(attempt, lastError)
       await sleep(delay)
     }

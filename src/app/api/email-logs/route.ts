@@ -30,6 +30,10 @@ export const GET = withErrorHandler(async (req: Request) => {
   }
   const where = conditions.length ? and(...conditions) : undefined
 
+  // `body` / `textBody` are deliberately NOT selected here (ROADMAP P3): they
+  // are the bulk of the row payload and only the detail view needs them, so
+  // every page of the list used to ship a full email preview per row. They are
+  // fetched on demand from `GET /api/email-logs/[id]`.
   let q = db
     .select({
       id: emailLog.id,
@@ -38,8 +42,6 @@ export const GET = withErrorHandler(async (req: Request) => {
       status: emailLog.status,
       attempts: emailLog.attempts,
       error: emailLog.error,
-      body: emailLog.body,
-      textBody: emailLog.textBody,
       createdAt: emailLog.createdAt,
       updatedAt: emailLog.updatedAt,
       markedSentBy: emailLog.markedSentBy,

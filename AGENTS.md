@@ -11,6 +11,8 @@ Instructions for AI agents working in this codebase.
 | Lint + format | `pnpm ci:fix` |
 | Check all | `pnpm ci:check` |
 | Unit tests | `pnpm test:unit:run` |
+| Coverage (enforces floors) | `pnpm test:coverage` |
+| Real-DB tests (opt-in) | `pnpm db:migrate` + `INTEGRATION_DATABASE_URL=… pnpm test:integration` |
 | E2E tests | `pnpm test:e2e` |
 | Full CI | `pnpm ci:test` |
 
@@ -102,6 +104,22 @@ src/app/api/admin/mail-config/route.ts     → src/app/api/admin/mail-config/mai
 
 Feature hooks (`src/features/*/hooks/*.ts`) are NOT unit tested directly. They are tested via API route specs and E2E tests.
 
+### Integration tests — `*.integration.spec.ts`, real DB
+
+Anything only Postgres can prove (unique indexes, CHECK/FK behaviour, the
+migration ledger, the advisory lock, session timezone) belongs in
+`src/lib/db/integration.spec.ts`. Rules:
+
+- The whole suite is gated on `process.env.INTEGRATION_DATABASE_URL` — use
+  `const suite = url ? describe : describe.skip` so a normal `pnpm test:unit:run`
+  never touches a database.
+- Connect with a plain `pg` `Client`; do NOT import `@/lib/db` (it reads env
+  and opens pools at import time).
+- Every fixture row is tagged with a per-run suffix and registered for cleanup
+  in `afterEach`, so the suite is safe against a seeded dev database.
+- Run it with `pnpm test:integration`; CI has an `integration` job that migrates
+  a throwaway Postgres first.
+
 ### E2E tests — Playwright with data-testid selectors
 
 ```bash
@@ -135,7 +153,7 @@ you can tag. When fixing or writing e2e tests, prefer/convert to test ids.
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
 describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique with no gaps or duplicates (suite is
-currently S1-S53 across 20 files / 86 tests).
+currently S1-S54 across 21 files / 87 tests).
 
 ## Coding Patterns
 
@@ -165,7 +183,19 @@ currently S1-S53 across 20 files / 86 tests).
 
 // Business logic error
 { error: "Inactive merchant" }
+
+// Unhandled 500 (from withErrorHandler) — requestId also in the x-request-id header
+{ error: "Internal server error", requestId: "…" }
 ```
+
+### Logging (structured)
+
+Use `logger` from `src/lib/logger.ts` — never `console.*` in the request/error
+path. Every line is JSON (`level`, `time`, `msg`, fields); pass an `err` field
+for errors and add context (`logger.error("msg", { requestId, merchantId, err })`).
+`withErrorHandler` already logs unhandled errors with `{ requestId, method,
+path }` and returns the id in the response. `x-request-id` is minted/forwarded
+by `src/proxy.ts` (or on demand via `getRequestId(req)`).
 
 ### Error Formatter Pattern
 
@@ -239,6 +269,14 @@ function formatOrderError(data: {
 - Run `biome check --write .` before committing
 - Import order: `@/` aliases before relative imports
 - Biome handles all formatting (no Prettier)
+
+### Coverage
+
+- `pnpm test:coverage` runs the unit suite under `@vitest/coverage-v8` and
+  fails if statements/branches/functions/lines drop below the floors in
+  `vitest.config.ts` (48 / 41 / 37 / 49). A CI `coverage` job enforces it.
+- Raise the floors as tests land — they are a regression guard, not a target.
+  New code should come with tests, not with a lowered threshold.
 
 ## DataTable Pattern
 

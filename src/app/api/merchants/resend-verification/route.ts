@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { rateLimitByIp } from "@/lib/rate-limit"
@@ -75,14 +76,13 @@ export const POST = withErrorHandler(async (req: Request) => {
       maxRetries: 3,
       baseDelayMs: 1000,
       onRetry: (attempt, err) =>
-        console.warn(
-          `[mailer] Retry ${attempt} for verification email (${row.email}):`,
-          err.message,
-        ),
+        logger.warn("Verification email retry", {
+          attempt,
+          to: row.email,
+          err,
+        }),
     },
-  ).catch((err) =>
-    console.error("[mailer] Resend verification email failed:", err),
-  )
+  ).catch((err) => logger.error("Resend verification email failed", { err }))
 
   return NextResponse.json({ success: true })
 })

@@ -100,10 +100,11 @@ failover-safe connection routing):
 
 | Service  | Host port | Role                                                                             |
 | -------- | --------- | -------------------------------------------------------------------------------- |
-| `pg-0`   | 5432      | Primary (writes)                                                                 |
-| `pg-1`   | 5433      | Standby (used for `DATABASE_URL_READ_ONLY`)                                      |
-| `pgpool` | 5434      | Stable endpoint — always routes writes to the current primary, survives failover |
-| `app`    | 3000      | The Next.js server, healthcheck at `/api/health`                                 |
+| `pg-0`   | 25432     | Primary (writes)                                                                 |
+| `pg-1`   | 25433     | Standby (used for `DATABASE_URL_READ_ONLY`)                                      |
+| `pgpool` | 25434     | Stable endpoint — always routes writes to the current primary, survives failover |
+| `app`    | 3000      | The Next.js server, healthcheck at `/api/ready`                                 |
+| `cron`   | —         | Schedules the `/api/cron/*` jobs against `app`                                   |
 
 ### Start everything
 
@@ -118,8 +119,8 @@ both Postgres nodes to be healthy.
 > **Direct-to-node for debugging:**
 >
 > ```env
-> DATABASE_URL=postgresql://app:<PASSWORD>@localhost:5432/app          # pg-0 (primary)
-> DATABASE_URL_READ_ONLY=postgresql://app:<PASSWORD>@localhost:5433/app # pg-1 (standby)
+> DATABASE_URL=postgresql://app:<PASSWORD>@localhost:25432/app          # pg-0 (primary)
+> DATABASE_URL_READ_ONLY=postgresql://app:<PASSWORD>@localhost:25433/app # pg-1 (standby)
 > ```
 >
 > This works for dev but breaks on failover — the ports are bound to specific
@@ -195,6 +196,24 @@ docker compose -f docker/compose.cluster.yml build
 # 2. Start everything
 docker compose -f docker/compose.cluster.yml up -d
 ```
+
+### Automated deploy (GitHub Actions)
+
+`.github/workflows/deploy.yml` runs **after** the CI workflow completes on
+`main` and only when it succeeded (`workflow_run` + `conclusion == 'success'`),
+so a red CI run can never reach production. It builds and pushes the image
+tagged with the exact commit CI validated, then over SSH:
+
+1. `docker compose pull`, then brings up the database/redis services.
+2. Takes a pre-migration `pg_dump` into `backups/` — `set -euo pipefail` aborts
+   the deploy if the dump fails, so it never migrates unbacked.
+3. Runs `docker compose run --rm migrate`; a failure fails the job (there is no
+   `||` fallback) and the app services are never rolled out.
+4. Rolls out the app and prunes old images.
+
+The host's compose file is chosen by `COMPOSE_FILE` (default
+`docker/compose.cluster.yml`; set `COMPOSE_FILE=docker/compose.monolith.yml` on
+a single-instance host).
 
 ### Services
 
@@ -315,9 +334,15 @@ Each container's `NEXT_PUBLIC_SITE_URL` should be set to its own subdomain
 
 ## Health checks
 
-Every app container (single- or multi-instance) exposes `GET /api/health` and
-is checked every 10s with a 60s startup grace period (`start_period`, to allow
-time for `drizzle-kit push` on first boot).
+Every app container (single- or multi-instance) exposes two probes:
+
+- **`GET /api/health`** — liveness: 200 as soon as the process serves requests
+  (no DB/Redis dependency).
+- **`GET /api/ready`** — readiness: runs `SELECT 1` and, when `REDIS_URL` is
+  configured, `PING`; returns 503 when a required dependency is unreachable
+  (short timeout). This is what the Docker healthchecks point at.
+
+Both are checked every 10s with a 60s startup grace period (`start_period`).
 
 ---
 
@@ -357,8 +382,9 @@ service — without it, the endpoints reject every request with 401.
 
 - **App container never becomes healthy** — check logs with
   `docker compose logs app` (or the relevant role container). The most common
-  cause is `migrate` failing on `drizzle-kit push`; verify `DATABASE_URL` is
-  reachable from inside the container, not just from your host.
+  cause is the `migrate` service failing (`src/lib/db/migrate.ts`); verify
+  `DATABASE_URL` is reachable from inside the container, not just from your
+  host.
 - **`cloudflared` never starts** — it waits on `service_healthy` for an app
   container, so an unhealthy app container will block it indefinitely.
 - **Cron requests get 401** — `CRON_SECRET` isn't set, or doesn't match

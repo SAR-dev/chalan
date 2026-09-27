@@ -3,7 +3,7 @@ import "dotenv/config"
 import { createHash, createHmac } from "node:crypto"
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
-import { login } from "../helpers"
+import { login, waitForAppReady } from "../helpers"
 import { email } from "../selectors"
 
 const PASSWORD = "testpass123"
@@ -14,7 +14,7 @@ const SITE_ORIGIN = "http://localhost:3000"
  *  and wait for that decision instead of checking the URL immediately. */
 async function skipOnboardingIfNeeded(page: Page) {
   await page.goto("/merchant")
-  await page.waitForLoadState("networkidle").catch(() => {})
+  await waitForAppReady(page).catch(() => {})
   const skip = page.getByRole("button", { name: /skip for now/i })
   try {
     await skip.waitFor({ state: "visible", timeout: 5_000 })
@@ -23,7 +23,7 @@ async function skipOnboardingIfNeeded(page: Page) {
   }
   await skip.click()
   await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-  await page.waitForLoadState("networkidle")
+  await waitForAppReady(page)
 }
 
 /**

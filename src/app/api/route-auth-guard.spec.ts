@@ -37,6 +37,8 @@ const PUBLIC_ALLOWLIST = new Set<string>([
   "auth/verify-email/route.ts",
   // Liveness probe for the Docker HEALTHCHECK — intentionally unauthenticated.
   "health/route.ts",
+  // Readiness probe (DB/Redis) for load balancers / Docker healthchecks.
+  "ready/route.ts",
   // Staff account activation link target: single-use 24h token in the body,
   // no session possible (merchant moderators + warehouse admins).
   "activate/route.ts",

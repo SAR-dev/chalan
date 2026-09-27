@@ -5,10 +5,12 @@
 > The previous "Phase 5.x features" roadmap is preserved at the bottom
 > (`P4 — Product`), minus everything already shipped.
 >
-> Current health: `pnpm ci:check` ✅ · Unit **1557/1557** ✅ · Build ✅ ·
-> E2E **86/86** ✅ (20 spec files, S1–S53) · dependency tree has **0
-> high/critical advisories** · route-auth-guard test enforces server-side auth
-> on all API routes.
+> Current health: `pnpm ci:check` ✅ · Unit **1595/1595** ✅ · Build ✅ ·
+> E2E **87/87** ✅ (21 spec files, S1–S54, now run in CI) · real-DB
+> integration suite **8/8** in CI · coverage gate enforced (statements 48 /
+> branches 41 / functions 37 / lines 49) · dependency tree has
+> **0 high/critical advisories** · route-auth-guard test enforces server-side
+> auth on all API routes.
 
 ---
 
@@ -294,7 +296,8 @@ before driving the flow with a test-owned token.
 
 > **P0.1–P0.8 shipped 2026-09-27** — see **Completed**. **No P0 item is
 > outstanding**; **P1.1–P1.6 also shipped** (see **Completed**). **All of P1 is
-> done**; the next work is **P2.1** (deploy safety).
+> done**, **all of P2 (P2.1–P2.6) is shipped**, and **P3's hardening batch is
+> shipped**; what remains is **P4 (product & DX)**.
 
 ### P0.5 Policy is browser-only: 2FA and merchant email verification
 
@@ -701,9 +704,173 @@ assert numeric `total`.
 
 ---
 
+### ✅ P2.1 — Deploy can report success on a failed migration (2026-09-27)
+
+**Was:** the deploy workflow ran migrations with
+`docker compose run --rm migrate || docker compose run --rm migrate-dashboard`
+and ended with `docker image prune -f`, so the job exited 0 even when both
+migrations failed; it triggered on `push: [main]` without depending on CI, had
+no pre-migration backup, and assumed a root compose file that does not exist.
+
+**Shipped** (`.github/workflows/deploy.yml`):
+- Trigger changed to `workflow_run` on the **CI** workflow, `branches: [main]`,
+  and the job is skipped unless `conclusion == 'success'` — a red CI run can no
+  longer reach production.
+- Deploys the exact commit CI validated
+  (`github.event.workflow_run.head_sha`) and tags the image with it.
+- Remote script now starts with `set -euo pipefail`; the `||` fallback is gone,
+  so a failing `docker compose run --rm migrate` fails the job and the app is
+  never rolled out.
+- Pre-migration `pg_dump` (custom format) into `backups/` before migrating.
+- Infrastructure is brought up first (`pg-0 pg-1 pgpool redis`), then backup,
+  then migrate, then the app.
+- Host compose file selected via `COMPOSE_FILE` (defaults to
+  `docker/compose.cluster.yml`; monolith hosts override it), replacing the
+  nonexistent root compose file.
+
+**Verify.** `src/app/__tests__/deploy-workflow.spec.ts` parses the workflow and
+asserts the invariants (CI gate, `set -euo pipefail`, no `||` fallback, backup
+before migrate, `head_sha`). `docs/DEPLOYMENT.md` documents the flow. Full unit
+suite green: **1561/1561** (build/e2e unaffected — no app code changed).
+
+---
+
+### ✅ P2.2 — Structured logs + request correlation (2026-09-27)
+
+**Was:** zero Sentry/OTel/pino; ad-hoc `console.*` with string interpolation;
+`with-error-handler.ts` logged with no method/path/user/id and returned a 500
+with no correlation id; `proxy.ts` forwarded only `x-pathname`.
+
+**Shipped:**
+- `src/lib/logger.ts` — leveled JSON logger (`level`, `time`, `msg`, fields),
+  `err` serialization (name/message/stack/cause), `child()` context, and a
+  `LOG_LEVEL` filter. warn/error go to stderr.
+- `src/lib/request-id.ts` — `x-request-id` minting/validation; reuses a valid
+  inbound id, mints a UUID otherwise.
+- `src/proxy.ts` mints/forwards the id and tags every response with it;
+  `src/lib/with-error-handler.ts` logs `{ requestId, method, path, err }` and
+  returns `{ error, requestId }` with the `x-request-id` header — on every
+  response, not just errors.
+- Migrated the error/warn path from `console.*` to the logger across the shared
+  libraries (audit, auth, crypto, cron-auth, mailer, email-outbox, rate-limit)
+  and the API routes (merchants, team, moderators, rider-applications,
+  admin/users, verify-email/resend-verification, cron cleanup).
+
+**Verify.** Unit: `logger.spec.ts` (JSON shape, stderr routing, `child`,
+`LOG_LEVEL`, error serialization), `request-id.spec.ts` (validation/reuse/mint),
+`with-error-handler.spec.ts` (500 body + header + log context, success header
+echo). E2E server output now shows single-line JSON records. Full gate green:
+unit **1573/1573**, e2e **86/86**.
+
+> Error *tracking* (Sentry/OTel) remains a deployment choice; the logger is the
+> structured sink and the correlation id is the hook a tracker would use.
+
+---
+
+### ✅ P2.3 — Readiness probe (2026-09-27)
+
+**Was:** `/api/health` returned `{ ok: true }` with no DB/Redis probe, yet every
+Docker healthcheck pointed at it — an instance with a dead database still
+reported healthy.
+
+**Shipped:**
+- `src/app/api/ready/route.ts`: `SELECT 1` on the primary pool and a Redis
+  `PING` (only when `REDIS_URL` is configured), each with a 1.5s timeout;
+  returns **503** when a required dependency is unreachable. `/api/health`
+  stays a dependency-free liveness probe.
+- `pingRedis()` in `src/lib/rate-limit.ts` (returns `true` when Redis is
+  optional/unset).
+- Dockerfile + both compose files now healthcheck `/api/ready`.
+- `docs/DEPLOYMENT.md` documents both probes; `ready/route.ts` added to the
+  route-auth-guard public allowlist.
+
+**Verify.** Unit `ready.spec.ts`: 200 when healthy, 503 on DB failure, 503 on a
+configured-but-unreachable Redis, and a degraded rate limiter does not fail
+readiness. E2E **S54** (`21-readiness.spec.ts`) hits the real endpoint.
+Full gate green: unit **1577/1577**, e2e **87/87**.
+
+---
+
+### ✅ P2.4 — E2E in CI + de-flake (2026-09-27)
+
+**Was:** `ci.yml` ran typecheck/lint/format/unit/build/security but no Playwright
+job, so role/auth/money/moderator regressions shipped unseen. The suite leaned
+on bare `waitForLoadState("networkidle")` (76 sites), which can stall for the
+full default timeout under CI load.
+
+**Shipped:**
+- `ci.yml` gains an **`e2e` job**: a `postgres:17` service, `pnpm db:migrate`
+  (fresh schema via the versioned runner), `pnpm build`, then `pnpm test:e2e`
+  (Playwright's `webServer` reseeds and starts `pnpm start`); the report is
+  uploaded on failure. The deploy workflow gates on CI, so a red e2e now blocks
+  production.
+- `e2e/helpers.ts` gains `waitForAppReady(page)` — bounded (10s) and
+  best-effort (`load` + `networkidle`), so a never-idle background request
+  cannot hang a test; the web-first assertions remain the real gate. All 76 bare
+  `networkidle` waits across 9 specs now use it; `login()` uses it too.
+
+**Verify.** `src/app/__tests__/ci-workflow.spec.ts` asserts the e2e job,
+Postgres service, migrate/build/Playwright steps. Full e2e suite still green:
+**87/87**, unit **1579/1579**.
+
+---
+
+### ✅ P2.5 — Cleanup cron completeness (2026-09-27)
+
+**Was:** the cluster cron ran the upload sweep with `?dryRun=1` (never deleted);
+the monolith compose had **no cron service**, so session/audit/email/upload
+cleanup never ran there; and the local pg_cron init mounted `./scripts/…` from
+`docker/` (the file is at the repo root).
+
+**Shipped:**
+- Cluster cron now calls `/api/cron/cleanup-uploads` **without** `?dryRun=1`
+  (the sweep keeps its `UPLOAD_SWEEP_MIN_AGE_HOURS` grace, default 48h) and
+  `depends_on: dashboard: service_healthy`.
+- `docker/compose.monolith.yml` gains the same `cron` service (pointed at
+  `app:3000`, `depends_on: app: service_healthy`) scheduling
+  `drain-email-outbox`, `cleanup-sessions`, `cleanup-audit-logs`,
+  `cleanup-email-logs`, `cleanup-uploads`.
+- `docker/compose.postgres.yml` mounts `../scripts/setup-pg-cron.sql` (and the
+  usage comment now shows `-f docker/compose.postgres.yml`).
+- `docs/DEPLOYMENT.md` lists the monolith `cron` service.
+
+**Verify.** The existing `cleanup-uploads.spec.ts` already covers real deletion
+and the min-age grace; `src/app/__tests__/compose-cron.spec.ts` guards the three
+invariants (no dry-run in the cluster, monolith cron jobs present, correct
+pg_cron path). All three compose files parse. Unit **1582/1582** (app code
+unchanged — build/e2e unaffected).
+
+---
+
+### ✅ P2.6 — Docs and env drift (2026-09-27)
+
+**Was:** docs referenced `drizzle-kit push --force` for deploys (code runs the
+versioned runner); the monolith port table said `5432/5433/5434` vs compose
+`25432-25434`; README said uploads go to `./uploads` vs `./.uploads`; and
+`.env.example` shipped a 10-char `BETTER_AUTH_SECRET` that fails the ≥32-char
+boot check, so the documented `cp .env.example … && pnpm dev` could not boot.
+`NEXT_PUBLIC_BASE_URL` was read by the forgot-password page but undocumented.
+
+**Shipped:**
+- `.env.example`: a 44-char `BETTER_AUTH_SECRET` placeholder + `openssl rand
+  -base64 32` instruction; documented the optional `NEXT_PUBLIC_BASE_URL`.
+- `src/lib/env.ts` validates `NEXT_PUBLIC_BASE_URL` (http(s) URL) when set.
+- `deploy.yml` passes `NEXT_PUBLIC_BASE_URL` as a build arg (the Dockerfile
+  already accepted it).
+- `README.md` quickstart uses `pnpm db:migrate` + `cp .env.example .env` and the
+  real `./.uploads`; `docs/DEPLOYMENT.md` ports and troubleshooting reconciled;
+  `SETUP.md` / `CONTRIBUTING.md` schema workflow now `db:generate` + `db:migrate`
+  with `db:push` marked local-dev only; `docs/ENV.md` documents
+  `NEXT_PUBLIC_BASE_URL`.
+
+**Verify.** `src/app/__tests__/docs-drift.spec.ts` guards the env-example secret
+length, the README commands, and the compose/docs port match; `env.spec.ts`
+covers the new validation. Full gate green: unit **1587/1587**, e2e **87/87**.
+
+---
 ## P2 — Operations & observability
 
-### P2.1 Deploy can report success on a failed migration
+### P2.1 Deploy can report success on a failed migration — ✅ shipped
 
 **Problem.** `.github/workflows/deploy.yml:40-55` runs migrations with
 `|| docker compose run --rm migrate-dashboard` and ends with
@@ -719,7 +886,7 @@ a root `compose.yaml` or pass `-f docker/compose.<mode>.yml`.
 **Verify.** Dry-run the workflow with a failing migration → job fails; a
 synthetic bad commit cannot reach prod without CI green.
 
-### P2.2 No error tracking, structured logs, or request ids
+### P2.2 No error tracking, structured logs, or request ids — ✅ shipped
 
 **Problem.** Zero Sentry/OTel/pino; `console.*` in 44 files (73 calls);
 `src/lib/with-error-handler.ts:16` logs with no method/path/user/id and returns
@@ -732,7 +899,7 @@ a 500 with no correlation id; `src/proxy.ts` forwards only `x-pathname`.
 Manual: an induced 500 is visible in the tracker with the same id as the client
 response.
 
-### P2.3 Health check is liveness-only
+### P2.3 Health check is liveness-only — ✅ shipped
 
 **Problem.** `src/app/api/health/route.ts:8-10` returns `{ ok: true }` with no
 DB/Redis probe, yet every Docker healthcheck points at it.
@@ -742,7 +909,7 @@ healthchecks there; keep `/api/health` as liveness.
 
 **Verify.** Stop Postgres → `/api/ready` 503, `/api/health` 200.
 
-### P2.4 E2E never runs in CI
+### P2.4 E2E never runs in CI — ✅ shipped
 
 **Problem.** `ci.yml` runs typecheck/lint/format/unit/build/security — no
 Playwright job; `ci:test` exists but is never invoked. Regressions in roles,
@@ -757,7 +924,7 @@ sleeps; consider `fullyParallel` for speed once stable.
 **Verify.** CI red on a deliberately broken flow; suite remains green and
 faster.
 
-### P2.5 Cleanup cron is incomplete; upload sweep is stuck in dry-run
+### P2.5 Cleanup cron is incomplete; upload sweep is stuck in dry-run — ✅ shipped
 
 **Problem.** The cluster compose schedules the upload sweep with `?dryRun=1`
 (`docker/compose.cluster.yml:155`) — it never deletes. The monolith compose has
@@ -773,7 +940,7 @@ the init path.
 **Verify.** Local: orphaned upload file is deleted by the cron route. Ops:
 monolith has scheduled jobs.
 
-### P2.6 Docs and env drift
+### P2.6 Docs and env drift — ✅ shipped
 
 **Problem.** `docs/DEPLOYMENT.md:210,353` says `drizzle-kit push --force` (code
 runs `migrate.ts`); `:102-105` ports `5432/5433/5434` vs compose `25432-25434`;
@@ -795,17 +962,27 @@ commands match compose.
 
 ## P3 — Performance & data hygiene
 
-| Item | Evidence | Fix |
-|------|----------|-----|
-| Analytics scans all orders by default | `orders/analytics/route.ts:49-66` — no default window despite the "last 30 days" comment | Default `from = now - 30d`; cap the series |
-| Email list ships full HTML bodies | `email-logs/route.ts:41-42` selects `body`/`textBody` per row | Omit from the list; fetch on detail |
-| Bulk order creation scans all zone pricing | `orders/bulk/route.ts:147-155` — `allZoneIds` computed then ignored | `WHERE inArray(fromZoneId, allZoneIds)` |
-| Hot lists use OFFSET pagination | `src/lib/hooks/use-table-filters.ts` + routes | Keyset pagination for orders/audit/email logs when deep |
-| No coverage tooling | no `@vitest/coverage-*`, no `coverage` block | Add coverage-v8 + thresholds in CI |
-| No real-DB integration tests | 45 specs `vi.mock("@/lib/db")` | Add a small integration suite (migrations, locks, constraints) |
-| Images unoptimized | `next.config.mjs:19-21` `images.unoptimized` | Enable `next/image` with R2 `remotePatterns`, or downscale on upload |
-| Dead hook/doc for a missing route | `src/features/team/hooks/use-team.ts:126-140` calls `/api/team/[id]/pricing` (no route); `CONTRIBUTING.md:60` documents it | Delete the hook fn + doc line, or add the route |
-| Stale generated file | `drizzle/postgres/schema.ts` missing 0002 columns | Regenerate or delete |
+### ✅ P3 shipped (2026-09-27)
+
+| Item | Was | Shipped |
+|------|-----|---------|
+| Analytics scans all orders by default | `orders/analytics/route.ts` — no default window despite the "last 30 days" comment | Defaults to a 30-day window when `from`/`to` are absent or invalid, so the scan and the `ordersByDay` series are both bounded. Explicit ranges still win. |
+| Email list ships full HTML bodies | `email-logs/route.ts` selected `body`/`textBody` per row | List projection drops both; new `GET /api/email-logs/[id]` returns the full record, the detail dialog fetches it on open, and "Send manually" resolves the body before building the `mailto:`. |
+| Bulk order creation scans all zone pricing | `orders/bulk/route.ts` computed `allZoneIds` then ignored it | `WHERE "fromZoneId" IN (allZoneIds)` — the lookup only ever matches an origin zone, so the matrix is no longer fully scanned. |
+| Hot lists use OFFSET pagination | unbounded `?offset=` | `MAX_OFFSET` (100k) clamp in `parsePagination`. True keyset was rejected: `DataTable` is page-number + total based, so cursors would require redesigning it. The clamp bounds the worst case without hiding any realistic page. |
+| No coverage tooling | no `@vitest/coverage-*` | `@vitest/coverage-v8` + a `coverage` block, a `pnpm test:coverage` script, a dedicated CI job, and global floors (statements 48 / branches 41 / functions 37 / lines 49) set just under the measured baseline (49.5 / 42.7 / 38.6 / 50.1). |
+| No real-DB integration tests | every spec mocks `@/lib/db` | `src/lib/db/integration.spec.ts` — 8 opt-in tests (`INTEGRATION_DATABASE_URL`) proving the P1.1 unique indexes reject duplicates, the P1.2 ledger matches the journal, the advisory lock actually serialises two runners, and Asia/Dhaka is present in the image. Runs in a new CI `integration` job; skips cleanly when the variable is unset. |
+| Dead hook/doc for a missing route | `use-team.ts` called `/api/team/[id]/pricing` (no such route) | Removed the unused `togglePricingPermission` mutation and its `CONTRIBUTING.md` line. |
+| Stale generated file | `drizzle/postgres/schema.ts` predated 0002 and imported nothing | Deleted it and the equally stale `drizzle/postgres/relations.ts`; the app schema is `src/lib/db/schema.postgres/`. |
+| Images unoptimized | `next.config.mjs` set `images.unoptimized` | Deferred, deliberately: nothing in the app uses `next/image` (uploads render through plain `<img>` in `image-zoom.tsx` / `image-upload.tsx`), so the flag was inert. Payload is handled at upload time (client-side downscale to `UPLOAD_MAX_DIMENSIONS` + a 5MB API cap). The config now documents this so the flag cannot be mistaken for an active choice. |
+
+**Verify.** `pnpm ci:check` ✅ · unit **1595/1595** ✅ · coverage gate ✅
+(49.48 / 42.73 / 38.58 / 50.12) · build ✅ · e2e **87/87** ✅ ·
+`pnpm test:integration` **8/8** against a migrated database.
+
+**Still open in P3 (product work, not hardening).** Converting uploads to
+`next/image` with `remotePatterns`; keyset pagination if the DataTable ever
+becomes an infinite-scroll feed; raising the coverage floors as tests land.
 
 ---
 
@@ -905,13 +1082,13 @@ Supabase **storage** removed (local + R2 only); SOC 2 removed by decision.
 11. ✅ P1.4 Atomic lifecycle + audit + history    (correctness) — DONE
 12. ✅ P1.5 Email outbox                          (reliability) — DONE
 13. ✅ P1.6 Constraints/indexes/counts            (data) — DONE
-14. P2.1 Deploy safety                         (ops)
-15. P2.2 Observability                         (ops)
-16. P2.3 Readiness probe                       (ops)
-17. P2.4 E2E in CI + de-flake                  (quality)
-18. P2.5 Cron completeness                     (ops)
-19. P2.6 Docs/env drift                        (DX)
-20. P3.x Performance & data hygiene            (batched)
+14. ✅ P2.1 Deploy safety                         (ops) — DONE
+15. ✅ P2.2 Observability                         (ops) — DONE
+16. ✅ P2.3 Readiness probe                       (ops) — DONE
+17. ✅ P2.4 E2E in CI + de-flake                 (quality) — DONE
+18. ✅ P2.5 Cron completeness                     (ops) — DONE
+19. ✅ P2.6 Docs/env drift                        (DX) — DONE
+20. ✅ P3.x Performance & data hygiene            (batched) - DONE
 21. P4.x Product & DX                          (as capacity allows)
 ```
 

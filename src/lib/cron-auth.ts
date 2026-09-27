@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto"
+import { logger } from "@/lib/logger"
 
 /**
  * Constant-time string comparison. Hashes both sides to a fixed width first
@@ -23,7 +24,7 @@ function safeEqual(a: string, b: string): boolean {
 export function isAuthorizedCron(req: Request): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) {
-    console.error("[cron] CRON_SECRET is not set")
+    logger.error("CRON_SECRET is not set")
     return false
   }
   const auth = req.headers.get("authorization")

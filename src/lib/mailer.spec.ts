@@ -98,7 +98,7 @@ describe("sendMail", () => {
 
   // ROADMAP P0.7 — a live token in stdout is a live token in the log
   // aggregator, in `docker logs`, and in CI output.
-  it("redacts link tokens from the console log", async () => {
+  it("redacts link tokens from the structured console log", async () => {
     mockSendMail.mockResolvedValueOnce({ messageId: "789" })
     const logs: string[] = []
     const logSpy = vi.spyOn(console, "log").mockImplementation((...args) => {
@@ -114,10 +114,15 @@ describe("sendMail", () => {
     } finally {
       logSpy.mockRestore()
     }
-    const printed = logs.join("\n")
-    expect(printed).toContain("[mailer] Sending to leak@test.com")
-    expect(printed).toContain("token=[redacted]")
-    expect(printed).not.toContain("super-secret-token-123")
+    const records = logs.map((line) => JSON.parse(line))
+    const sending = records.find((r) => r.msg === "Sending email")
+    expect(sending).toMatchObject({
+      level: "info",
+      to: "leak@test.com",
+      subject: "Reset your password",
+    })
+    expect(sending.body).toContain("token=[redacted]")
+    expect(logs.join("\n")).not.toContain("super-secret-token-123")
   })
 
   it("keeps the activation link in email_log (bounded) for the admin log view", async () => {

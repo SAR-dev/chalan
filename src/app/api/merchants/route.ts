@@ -14,6 +14,7 @@ import {
 } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
 import { enqueueEmail, flushEmailOutbox } from "@/lib/email-outbox"
+import { logger } from "@/lib/logger"
 import { merchantRegisteredTemplate } from "@/lib/mail-templates"
 import {
   paginateResponse,
@@ -213,7 +214,7 @@ async function deleteUserQuietly(userId: string): Promise<void> {
   try {
     await db.delete(user).where(eq(user.id, userId))
   } catch (err) {
-    console.error("[merchants] orphan user cleanup failed:", err)
+    logger.error("Orphan user cleanup failed", { err })
   }
 }
 
@@ -268,7 +269,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       body: { name: ownerName, email, password, role: "MERCHANT" as "user" },
     })
   } catch (err) {
-    console.error("[merchants] Failed to create user account:", err)
+    logger.error("Failed to create user account", { err })
     return badRequest("Could not create user account")
   }
 
@@ -314,7 +315,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     })
   } catch (err) {
     await deleteUserQuietly(created.user.id)
-    console.error("[merchants] Failed to store merchant:", err)
+    logger.error("Failed to store merchant", { err })
     return NextResponse.json(
       { error: "Could not create the merchant. Please try again." },
       { status: 500 },

@@ -57,11 +57,10 @@ src/app/
   api/team/route.ts                   GET list, POST create (staff accounts)
   api/team/[id]/active/route.ts       PATCH — toggle active
   api/team/[id]/warehouse/route.ts    PATCH — reassign warehouse
-  api/team/[id]/pricing/route.ts      PATCH — toggle pricing permission
   api/announcements/active/route.ts   GET active announcements for current role
   api/audit-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/route.ts             GET list (Admin/Super Admin only)
-  api/email-logs/[id]/route.ts        PATCH mark failed email as sent
+  api/email-logs/[id]/route.ts        GET detail (bodies), PATCH mark failed email as sent
   api/cron/cleanup-sessions/route.ts  DELETE expired sessions (hourly)
   api/cron/cleanup-audit-logs/route.ts  DELETE old audit log entries (daily)
   api/cron/cleanup-email-logs/route.ts  DELETE old sent email logs (daily)
@@ -1887,18 +1886,18 @@ done; don't add a second `logAudit()` call in the route wrapper.
 ## Applying schema changes
 
 The DB connection string lives in `.env.development.local` (not `.env`). The
-project uses `dotenv-cli` to load it when running DB scripts — the `db:push`,
-`setup`, etc. npm scripts already include `dotenv -e .env.development.local`:
+project uses `dotenv-cli` to load it when running DB scripts — the `db:migrate`,
+`db:generate`, `setup`, etc. npm scripts load the env automatically:
 
 ```bash
-pnpm db:push
+pnpm db:migrate
 pnpm db:admin
 ```
 
 If you need to run a raw command that requires the env, use `dotenv-cli`:
 
 ```bash
-pnpm dotenv -e .env.development.local -- drizzle-kit push
+pnpm dotenv -e .env.development.local -- drizzle-kit generate
 ```
 
 **When you add or change a column, update the matching module in `src/lib/db/schema.postgres/`**
@@ -1906,21 +1905,25 @@ pnpm dotenv -e .env.development.local -- drizzle-kit push
 `@/lib/db/schema`.
 
 ```bash
-# Push schema to the database
-pnpm db:push
-
-# Generate migration files (for production migrations)
+# Generate a migration file from the schema diff
 pnpm db:generate
+
+# Apply pending migrations (versioned, idempotent, advisory-locked)
+pnpm db:migrate
 
 # Open Drizzle Studio (visual DB browser)
 pnpm db:studio
 ```
 
-- `pnpm db:push` applies the schema to the database. A `NOT NULL` add
-  fails if existing rows violate it — backfill first or give the column a default.
+- `pnpm db:generate` writes the new `drizzle/postgres/000N_*.sql`; commit it
+  together with the schema change, then `pnpm db:migrate` applies it. `db:push`
+  diffs the live schema and is **local-dev only** — never run it against a
+  deployed database.
+- A `NOT NULL` add fails if existing rows violate it — backfill in the migration
+  (or give the column a default).
 - The seed is **idempotent** — it skips rows that already exist. After changing
   seed values for existing ids, either reset the data or run a targeted `UPDATE`.
-- `pnpm db:admin` creates a superadmin account — run after `pnpm db:push`.
+- `pnpm db:admin` creates a superadmin account — run after `pnpm db:migrate`.
 - **After every schema edit**, run `pnpm ci:check` and `pnpm ci:test` (typecheck,
   lint, format, unit tests, build, E2E tests) to catch any errors from the schema change.
 

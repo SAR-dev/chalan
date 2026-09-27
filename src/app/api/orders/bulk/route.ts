@@ -145,7 +145,9 @@ export const POST = withErrorHandler(async (req: Request) => {
     origZoneByName[c.name] = c.zoneId
   }
 
-  // Fetch all relevant zone pricing
+  // Fetch only the pricing rows whose origin zone is relevant (ROADMAP P3):
+  // `allZoneIds` is the union of the origin and destination zones, and the
+  // lookup below always matches `fromZoneId` against an origin zone.
   const allZoneIds = [
     ...new Set([
       ...Object.values(origZoneByName),
@@ -153,7 +155,10 @@ export const POST = withErrorHandler(async (req: Request) => {
     ]),
   ]
   const allZonePricing = allZoneIds.length
-    ? await dbRead.select().from(zonePricing)
+    ? await dbRead
+        .select()
+        .from(zonePricing)
+        .where(inArray(zonePricing.fromZoneId, allZoneIds))
     : []
 
   const created = await db.transaction(async (tx) => {

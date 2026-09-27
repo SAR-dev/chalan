@@ -3,6 +3,7 @@ import { admin, twoFactor } from "better-auth/plugins"
 import { siteConfig } from "@/config/site"
 import { pool } from "@/lib/db"
 import { enqueueEmail, flushEmailOutbox } from "@/lib/email-outbox"
+import { logger } from "@/lib/logger"
 import {
   changeEmailTemplate,
   passwordResetTemplate,
@@ -39,7 +40,7 @@ export async function handlePasswordReset({
     await enqueueEmail({ to: user.email, ...template })
     void flushEmailOutbox()
   } catch (err) {
-    console.error("[email-outbox] Password reset enqueue failed:", err)
+    logger.error("Password reset enqueue failed", { err })
   }
 }
 
@@ -66,7 +67,7 @@ export async function handleEmailChangeVerification({
     await enqueueEmail({ to: user.email, ...template })
     void flushEmailOutbox()
   } catch (err) {
-    console.error("[email-outbox] Change email enqueue failed:", err)
+    logger.error("Change email enqueue failed", { err })
   }
 }
 

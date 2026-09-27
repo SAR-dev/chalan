@@ -123,6 +123,9 @@ export type Order = Loosen<typeof order.$inferSelect> & {
 export type PayoutRequest = Loosen<typeof payoutRequest.$inferSelect>
 export type SupportTicket = Loosen<typeof supportTicket.$inferSelect>
 export type EmailLog = Loosen<typeof emailLog.$inferSelect>
+// The list endpoint omits the HTML/plain-text bodies (they dominate the payload
+// and are only needed by the detail view), so list rows are a projection.
+export type EmailLogListItem = Omit<EmailLog, "body" | "textBody">
 export type AuditLog = Loosen<typeof auditLog.$inferSelect>
 export type MerchantBalance = Loosen<typeof merchantBalance.$inferSelect>
 export type BalanceTransaction = Loosen<typeof balanceTransaction.$inferSelect>

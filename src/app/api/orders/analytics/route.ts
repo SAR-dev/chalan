@@ -9,6 +9,15 @@ import { businessDate } from "@/lib/db/time-sql"
 import { parseDateRange } from "@/lib/pagination"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
+const ANALYTICS_DEFAULT_WINDOW_DAYS = 30
+
+/** Start (inclusive) of the default analytics window: now − 30 days, in UTC. */
+function analyticsDefaultWindowStart(): string {
+  return new Date(
+    Date.now() - ANALYTICS_DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString()
+}
+
 export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
@@ -38,15 +47,21 @@ export const GET = withErrorHandler(async (req: Request) => {
       : eq(order.id, "")
   }
 
-  // Apply date range filter
+  // Apply date range filter.
+  //
+  // Without an explicit range the endpoint used to aggregate over every order
+  // ever created — an unbounded scan plus an unbounded `ordersByDay` series
+  // (one row per business day since the table's creation). Default to the
+  // documented "last 30 days" window instead (ROADMAP P3). Callers that
+  // genuinely want a wider range still pass `from`/`to` explicitly.
   const dateRange = parseDateRange(req)
-  if (dateRange) {
-    const dateClause = and(
-      gte(order.createdAt, dateRange.from.toISOString()),
-      lte(order.createdAt, dateRange.to.toISOString()),
-    )
-    where = where ? and(where, dateClause) : dateClause
-  }
+  const dateClause = dateRange
+    ? and(
+        gte(order.createdAt, dateRange.from.toISOString()),
+        lte(order.createdAt, dateRange.to.toISOString()),
+      )
+    : gte(order.createdAt, analyticsDefaultWindowStart())
+  where = where ? and(where, dateClause) : dateClause
 
   // 1. Orders by day (last 30 days or date range). The day is the business
   // (Asia/Dhaka) calendar day, not the DB session day (ROADMAP P1.3).

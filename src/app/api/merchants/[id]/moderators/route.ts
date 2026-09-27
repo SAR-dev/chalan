@@ -20,6 +20,7 @@ import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
 import { flushEmailOutbox } from "@/lib/email-outbox"
+import { logger } from "@/lib/logger"
 import { hasNavPermission, merchantGrantableNavItems } from "@/lib/nav-config"
 import { moderatorCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -122,7 +123,7 @@ export const POST = withErrorHandler(
         body: { name, email, password, role: "MERCHANT" as "user" },
       })
     } catch (err) {
-      console.error("[moderators] createUser failed:", err)
+      logger.error("createUser failed", { err })
       return badRequest(
         "Could not create the moderator (is the email already in use?)",
       )
@@ -132,10 +133,7 @@ export const POST = withErrorHandler(
       try {
         await db.delete(user).where(eq(user.id, created.user.id))
       } catch (cleanupErr) {
-        console.error(
-          `[moderators] orphan cleanup failed (${reason}):`,
-          cleanupErr,
-        )
+        logger.error("Orphan cleanup failed", { reason, err: cleanupErr })
       }
     }
 
@@ -202,7 +200,7 @@ export const POST = withErrorHandler(
         return { kind: "created" as const, businessName }
       })
     } catch (err) {
-      console.error("[moderators] activation setup failed:", err)
+      logger.error("activation setup failed", { err })
       await cleanupUser("transaction failure")
       return NextResponse.json(
         { error: "Could not finish creating the moderator." },

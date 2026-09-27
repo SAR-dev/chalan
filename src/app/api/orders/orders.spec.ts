@@ -365,14 +365,16 @@ describe("GET /api/orders/analytics", () => {
     expect(res.status).toBe(401)
   })
 
-  it("super admin gets platform-wide analytics (no where clause)", async () => {
+  it("super admin gets platform-wide analytics scoped only by the default 30-day window", async () => {
     sessionState.value = admin
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(whereCalls).toHaveLength(4)
-    expect(whereCalls.every((w) => w === undefined)).toBe(true)
+    // No merchant/warehouse scope, but the default window still bounds the scan
+    // (ROADMAP P3) — so a where clause is present on every aggregate.
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
     expect(json).toMatchObject({
       ordersByDay: [],
       ordersByStatus: [],
@@ -464,7 +466,7 @@ describe("GET /api/orders/analytics", () => {
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
-  it("ignores invalid date range params", async () => {
+  it("ignores invalid date range params and falls back to the default window", async () => {
     sessionState.value = admin
     pushEmptyAnalytics()
     const res = await analytics(
@@ -472,7 +474,7 @@ describe("GET /api/orders/analytics", () => {
     )
     expect(res.status).toBe(200)
     expect(whereCalls).toHaveLength(4)
-    expect(whereCalls.every((w) => w === undefined)).toBe(true)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
   it("computes aggregates from query results", async () => {

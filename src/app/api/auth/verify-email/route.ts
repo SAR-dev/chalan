@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { merchant, user } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { merchantWelcomeTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { hashVerifyToken } from "@/lib/verify-token"
@@ -89,7 +90,7 @@ export const GET = withErrorHandler(async (req: Request) => {
         businessName: _updated.businessName,
         dashboardUrl,
       })),
-    }).catch((err) => console.error("[mailer] Welcome email failed:", err))
+    }).catch((err) => logger.error("Welcome email failed", { err }))
   }
 
   return NextResponse.redirect(

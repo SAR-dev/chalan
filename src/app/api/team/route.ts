@@ -14,6 +14,7 @@ import { db, dbRead } from "@/lib/db"
 import { profile, profileRoles, user, warehouse } from "@/lib/db/schema"
 import { enumValue } from "@/lib/db-helpers"
 import { flushEmailOutbox } from "@/lib/email-outbox"
+import { logger } from "@/lib/logger"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import type { TeamMember } from "@/lib/types"
 import { parseBody, teamCreateSchema } from "@/lib/validation"
@@ -137,7 +138,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       body: { name, email, password, role: newRole as "user" },
     })
   } catch (err) {
-    console.error("[team] Failed to create user account:", err)
+    logger.error("Failed to create user account", { err })
     return badRequest("Failed to create the team member")
   }
 
@@ -203,7 +204,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     })
   } catch (err) {
     await deleteUserQuietly(created.user.id)
-    console.error("[team] Failed to store team member:", err)
+    logger.error("Failed to store team member", { err })
     return NextResponse.json(
       { error: "Could not create the team member. Please try again." },
       { status: 500 },
@@ -254,6 +255,6 @@ async function deleteUserQuietly(userId: string): Promise<void> {
   try {
     await db.delete(user).where(eq(user.id, userId))
   } catch (err) {
-    console.error("[team] orphan user cleanup failed:", err)
+    logger.error("Orphan user cleanup failed", { err })
   }
 }

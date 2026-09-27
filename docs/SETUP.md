@@ -190,12 +190,10 @@ pnpm install
 # 2. make env vars available to the CLI
 set -a && . ./.env.development.local && set +a
 
-# 3. push schema
-#    Interactive (default):
-pnpm db:push
-#    Non-interactive (CI / scripts) — dotenv wrapper is required so drizzle-kit
-#    sees the DATABASE_URL from .env.development.local:
-pnpm dotenv -e .env.development.local -- drizzle-kit push --force
+# 3. apply schema migrations (versioned, idempotent)
+#    The runner takes a database-wide advisory lock and records a content-hash
+#    ledger; `db:push` is local-dev only and never used for deployments.
+pnpm db:migrate
 
 # 4. create superadmin account
 pnpm db:admin

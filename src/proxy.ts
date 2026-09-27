@@ -28,7 +28,19 @@ import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import { resolveClientIp } from "@/lib/client-ip"
 import { ipAllowed, parseAllowlist } from "@/lib/ip-allowlist"
+import { logger } from "@/lib/logger"
 import { parsePortalMode, portalPageAllowed } from "@/lib/portal-mode"
+import { REQUEST_ID_HEADER, resolveRequestId } from "@/lib/request-id"
+
+/** Attach the correlation id to a response (headers are normally mutable). */
+function withRequestId(res: Response, requestId: string): Response {
+  try {
+    res.headers.set(REQUEST_ID_HEADER, requestId)
+  } catch {
+    // Immutable headers — ignore.
+  }
+  return res
+}
 
 // ---------------------------------------------------------------------------
 // CSP (Content-Security-Policy)
@@ -92,10 +104,10 @@ function roleGuard(pathname: string, req: NextRequest): NextResponse | null {
 
   // Validate the env var at runtime so misconfigured deploys fail loudly.
   if (!ROLE_PREFIXES[ALLOWED_ROLE]) {
-    console.error(
-      `[proxy] Invalid ALLOWED_ROLE="${ALLOWED_ROLE}". ` +
-        `Must be one of: ${Object.keys(ROLE_PREFIXES).join(", ")}`,
-    )
+    logger.error("Invalid ALLOWED_ROLE", {
+      allowedRole: ALLOWED_ROLE,
+      valid: Object.keys(ROLE_PREFIXES),
+    })
     return null
   }
 
@@ -189,6 +201,9 @@ function uploadRateLimit(ip: string): boolean {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // Correlation id for this request: reuse a valid inbound one, else mint.
+  const requestId = resolveRequestId(req.headers.get(REQUEST_ID_HEADER))
+
   // 1. Admin IP allowlist — reject non-listed IPs before anything else.
   //    /api/admin only enters the matcher for this check, so pass allowed
   //    requests through without the page-route CSP nonce.
@@ -196,22 +211,29 @@ export function proxy(req: NextRequest) {
     if (ADMIN_IP_ALLOWLIST) {
       const ip = proxyClientIp(req)
       if (!ip || !ipAllowed(ip, ADMIN_IP_ALLOWLIST)) {
-        console.warn(
-          `[proxy] Admin IP allowlist denied ${ip ?? "unknown"} for ${pathname}`,
+        logger.warn("Admin IP allowlist denied", {
+          ip,
+          path: pathname,
+          requestId,
+        })
+        return withRequestId(
+          new Response("Forbidden", { status: 403 }),
+          requestId,
         )
-        return new Response("Forbidden", { status: 403 })
       }
     }
-    if (pathname.startsWith("/api/admin")) return NextResponse.next()
+    if (pathname.startsWith("/api/admin")) {
+      return withRequestId(NextResponse.next(), requestId)
+    }
   }
 
   // 2. Role-based access guard
   const guard = roleGuard(pathname, req)
-  if (guard) return guard
+  if (guard) return withRequestId(guard, requestId)
 
   // 3. Portal-mode guard — pages of a disabled portal 404.
   const portal = portalModeGuard(pathname)
-  if (portal) return portal
+  if (portal) return withRequestId(portal, requestId)
 
   // 4. Upload rate limiting
   if (req.method === "POST" && pathname === "/api/uploads") {
@@ -219,9 +241,12 @@ export function proxy(req: NextRequest) {
     // No resolvable IP → skip the limiter rather than share one "unknown"
     // bucket across every visitor (cross-tenant DoS).
     if (ip && !uploadRateLimit(ip)) {
-      return NextResponse.json(
-        { error: "Too many uploads. Please wait a moment and try again." },
-        { status: 429 },
+      return withRequestId(
+        NextResponse.json(
+          { error: "Too many uploads. Please wait a moment and try again." },
+          { status: 429 },
+        ),
+        requestId,
       )
     }
   }
@@ -237,9 +262,11 @@ export function proxy(req: NextRequest) {
   requestHeaders.set("x-nonce", nonce)
   requestHeaders.set("content-security-policy", csp)
   requestHeaders.set("x-pathname", pathname + req.nextUrl.search)
+  requestHeaders.set(REQUEST_ID_HEADER, requestId)
 
   const response = NextResponse.next({ request: { headers: requestHeaders } })
   response.headers.set("content-security-policy", csp)
+  response.headers.set(REQUEST_ID_HEADER, requestId)
   return response
 }
 

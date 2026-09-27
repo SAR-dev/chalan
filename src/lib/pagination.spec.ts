@@ -2,6 +2,7 @@ import { type Column } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import {
   MAX_LIMIT,
+  MAX_OFFSET,
   paginateResponse,
   parseDateRange,
   parsePagination,
@@ -18,6 +19,13 @@ describe("parsePagination", () => {
   it("caps limit at MAX_LIMIT", () => {
     const req = new Request(`http://localhost?limit=${MAX_LIMIT + 1}&offset=0`)
     expect(parsePagination(req)).toEqual({ limit: MAX_LIMIT, offset: 0 })
+  })
+
+  it("clamps offset at MAX_OFFSET (ROADMAP P3)", () => {
+    const req = new Request(
+      `http://localhost?limit=10&offset=${MAX_OFFSET + 5_000_000}`,
+    )
+    expect(parsePagination(req)).toEqual({ limit: 10, offset: MAX_OFFSET })
   })
 
   it("returns undefined for invalid params", () => {

@@ -2,14 +2,14 @@ import "dotenv/config"
 
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
-import { CREDS, login } from "../helpers"
+import { CREDS, login, waitForAppReady } from "../helpers"
 import { branding, tracking } from "../selectors"
 
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
     await page.getByRole("button", { name: /skip for now/i }).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   }
 }
 
@@ -22,7 +22,7 @@ test.describe("S36. Merchant Branding", () => {
     await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // Verify branding section is visible
     await expect(page.getByTestId("branding-section")).toBeVisible()
@@ -39,7 +39,7 @@ test.describe("S36. Merchant Branding", () => {
     await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // Set brand color
     const colorInput = page.getByTestId("brand-color-input")
@@ -48,7 +48,7 @@ test.describe("S36. Merchant Branding", () => {
 
     // Save branding
     await page.getByTestId("save-branding").click()
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   })
 
   test("merchant can toggle hide platform branding", async ({ page }) => {
@@ -56,7 +56,7 @@ test.describe("S36. Merchant Branding", () => {
     await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // Toggle hide branding
     const toggle = page.getByTestId("hide-branding-toggle")
@@ -64,7 +64,7 @@ test.describe("S36. Merchant Branding", () => {
 
     // Save branding
     await page.getByTestId("save-branding").click()
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   })
 
   test("branding API returns fields for merchant", async ({ request }) => {
@@ -113,7 +113,7 @@ test.describe("S36. Merchant Branding", () => {
     await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     await expect(page.locator(branding.preview)).toBeVisible()
     await expect(page.locator(branding.previewButton)).toBeVisible()
@@ -126,7 +126,7 @@ test.describe("S36. Merchant Branding", () => {
   }) => {
     // ORD-100001E is seeded for merchant1 (logo + brand color)
     await page.goto("/track/ORD-100001E")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     await expect(page.locator(branding.trackBrand)).toContainText(
       "Fulfilled by Merchant 1 Business",
@@ -173,7 +173,7 @@ test.describe("S43. Public tracking token", () => {
 
     // Token link: full page + an enabled receiver-note form.
     await page.goto(`/track/${token}`)
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.locator(branding.trackBrand)).toContainText(
       "Fulfilled by",
     )
@@ -182,7 +182,7 @@ test.describe("S43. Public tracking token", () => {
     // Human order code (parcel label / typed search): readable, but the write
     // affordance is withheld.
     await page.goto(`/track/${id}`)
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.locator(tracking.noteLocked)).toBeVisible()
     await expect(page.locator(tracking.noteInput)).toHaveCount(0)
   })

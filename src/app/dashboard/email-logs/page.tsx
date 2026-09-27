@@ -28,12 +28,15 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { EmailLogDetailDialog } from "@/features/email-logs/dialogs/email-log-detail-dialog"
-import { useEmailLogs } from "@/features/email-logs/hooks/use-email-logs"
+import {
+  fetchEmailLog,
+  useEmailLogs,
+} from "@/features/email-logs/hooks/use-email-logs"
 import {
   EMAIL_LOG_STATUS_LABELS,
   EMAIL_LOG_STATUS_TONES,
 } from "@/lib/constants"
-import type { EmailLog } from "@/lib/types"
+import type { EmailLogListItem } from "@/lib/types"
 
 type TabFilter = "ALL" | "SENT" | "FAILED"
 
@@ -71,7 +74,7 @@ export default function EmailLogsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null)
+  const [selectedLog, setSelectedLog] = useState<EmailLogListItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
   async function handleBulkMarkAsSent(ids: string[]) {
@@ -87,12 +90,12 @@ export default function EmailLogsPage() {
     setBulkBusy(false)
   }
 
-  async function openDetail(log: EmailLog) {
+  async function openDetail(log: EmailLogListItem) {
     setSelectedLog(log)
     setDetailOpen(true)
   }
 
-  async function handleMarkAsSent(log: EmailLog) {
+  async function handleMarkAsSent(log: EmailLogListItem) {
     setBusy(log.id)
     try {
       const result = await markAsSent(log.id)
@@ -106,7 +109,22 @@ export default function EmailLogsPage() {
     }
   }
 
-  const columns: DataTableColumn<EmailLog>[] = [
+  // The list rows omit the plain-text body, so the mailto link can only be
+  // built after fetching the record.
+  async function handleSendManually(log: EmailLogListItem) {
+    setBusy(log.id)
+    try {
+      const detail = await fetchEmailLog(log.id)
+      const body = detail?.textBody
+        ? `&body=${encodeURIComponent(detail.textBody)}`
+        : ""
+      window.location.href = `mailto:${log.to}?subject=${encodeURIComponent(log.subject)}${body}`
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const columns: DataTableColumn<EmailLogListItem>[] = [
     {
       id: "details",
       header: "",
@@ -188,15 +206,14 @@ export default function EmailLogsPage() {
                       Mark as sent
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      render={
-                        <a
-                          href={`mailto:${l.to}?subject=${encodeURIComponent(l.subject)}${l.textBody ? `&body=${encodeURIComponent(l.textBody)}` : ""}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        />
-                      }
+                      onClick={() => handleSendManually(l)}
+                      disabled={busy === l.id}
                     >
-                      <Mail className="size-3.5" />
+                      {busy === l.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Mail className="size-3.5" />
+                      )}
                       Send manually
                     </DropdownMenuItem>
                   </>
@@ -272,7 +289,10 @@ export default function EmailLogsPage() {
                 label: "Mark as sent",
                 icon: <Send className="size-4" />,
                 disabled: bulkBusy,
-                onClick: async (rows: EmailLog[], clear: () => void) => {
+                onClick: async (
+                  rows: EmailLogListItem[],
+                  clear: () => void,
+                ) => {
                   await handleBulkMarkAsSent(
                     rows.filter((l) => l.status === "FAILED").map((l) => l.id),
                   )

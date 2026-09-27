@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
@@ -71,12 +72,13 @@ export const POST = withErrorHandler(
         maxRetries: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, err) =>
-          console.warn(
-            `[mailer] Retry ${attempt} for verification email (${current.email}):`,
-            err.message,
-          ),
+          logger.warn("Verification email retry", {
+            attempt,
+            to: current.email,
+            err,
+          }),
       },
-    ).catch((err) => console.error("[mailer] Verification email failed:", err))
+    ).catch((err) => logger.error("Verification email failed", { err }))
 
     return NextResponse.json({ success: true })
   },

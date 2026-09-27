@@ -80,6 +80,24 @@ export function validateEnv(): void {
 
     required(e, "NEXT_PUBLIC_SITE_URL", "App base URL")
 
+    // Optional — absolute base URL for browser auth API calls
+    // (forgot-password page). Unset = same-origin. When set it must be a
+    // valid http(s) URL, or the reset request would POST to a broken target.
+    const publicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL
+    if (publicBaseUrl) {
+      try {
+        const parsed = new URL(publicBaseUrl)
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          throw new Error("unsupported protocol")
+        }
+      } catch {
+        e.push({
+          key: "NEXT_PUBLIC_BASE_URL",
+          message: "Must be a valid http(s) URL.",
+        })
+      }
+    }
+
     // A deploy with NEXT_PUBLIC_ENV=development in production would silently
     // disable Vercel Analytics and keep localhost in trustedOrigins, so make
     // sure that var is explicitly validated rather than left to its fallback.

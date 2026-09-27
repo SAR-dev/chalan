@@ -7,6 +7,7 @@ import { db, dbRead } from "@/lib/db"
 import { profile, rider, riderStatuses, user, warehouse } from "@/lib/db/schema"
 import { isUniqueViolation } from "@/lib/db-errors"
 import { enumValues } from "@/lib/db-helpers"
+import { logger } from "@/lib/logger"
 import {
   paginateResponse,
   parsePagination,
@@ -26,7 +27,7 @@ async function deleteUserQuietly(userId: string): Promise<void> {
   try {
     await db.delete(user).where(eq(user.id, userId))
   } catch (err) {
-    console.error("[rider-applications] orphan user cleanup failed:", err)
+    logger.error("Orphan user cleanup failed", { err })
   }
 }
 
@@ -80,7 +81,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       body: { name, email, password, role: "RIDER" as "user" },
     })
   } catch (err) {
-    console.error("[rider-applications] Failed to create user account:", err)
+    logger.error("Failed to create user account", { err })
     return badRequest("Could not create the rider account")
   }
 
@@ -135,7 +136,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       await deleteUserQuietly(createdUser.user.id)
       return badRequest("An application with this email already exists.")
     }
-    console.error("[rider-applications] Failed to store application:", err)
+    logger.error("Failed to store application", { err })
     await deleteUserQuietly(createdUser.user.id)
     return NextResponse.json(
       { error: "Could not store the application. Please try again." },

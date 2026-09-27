@@ -23,6 +23,8 @@ const OPTIONAL_VARS = [
   "R2_BUCKET_NAME",
   "R2_PUBLIC_URL",
   "SMTP_SECRET_KEY",
+  "NEXT_PUBLIC_BASE_URL",
+  "TRUSTED_PROXY_HOPS",
 ]
 
 function allKeys() {
@@ -174,6 +176,18 @@ describe("validateEnv", () => {
     for (const hops of ["nginx", "-1", "1.5", "99"]) {
       setEnv({ ...baseEnv(), TRUSTED_PROXY_HOPS: hops })
       expect(() => validateEnv(), hops).toThrow("TRUSTED_PROXY_HOPS")
+    }
+  })
+
+  it("accepts an absolute NEXT_PUBLIC_BASE_URL", () => {
+    setEnv({ ...baseEnv(), NEXT_PUBLIC_BASE_URL: "https://api.example.com" })
+    expect(validateEnv()).toBeUndefined()
+  })
+
+  it("rejects a malformed NEXT_PUBLIC_BASE_URL", () => {
+    for (const value of ["not-a-url", "ftp://example.com"]) {
+      setEnv({ ...baseEnv(), NEXT_PUBLIC_BASE_URL: value })
+      expect(() => validateEnv(), value).toThrow("NEXT_PUBLIC_BASE_URL")
     }
   })
 })

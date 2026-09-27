@@ -2,7 +2,7 @@ import "dotenv/config"
 
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
-import { CREDS, login } from "../helpers"
+import { CREDS, login, waitForAppReady } from "../helpers"
 import {
   activation,
   dialog,
@@ -18,7 +18,7 @@ import {
  *  redirect to /welcome is async, so wait for it deterministically. */
 async function skipOnboardingIfNeeded(page: Page) {
   await page.goto("/merchant")
-  await page.waitForLoadState("networkidle").catch(() => {})
+  await waitForAppReady(page).catch(() => {})
   const skip = page.getByRole("button", { name: /skip for now/i })
   try {
     await skip.waitFor({ state: "visible", timeout: 5_000 })
@@ -27,7 +27,7 @@ async function skipOnboardingIfNeeded(page: Page) {
   }
   await skip.click()
   await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-  await page.waitForLoadState("networkidle")
+  await waitForAppReady(page)
 }
 
 const toast = (page: Page, text: string) =>
@@ -176,7 +176,7 @@ test.describe("S41. Merchant moderator accounts", () => {
     // Admin caps this merchant at 2 moderator slots.
     await login(page, CREDS.superAdmin)
     await page.goto(`/dashboard/merchants/${QUOTA_MERCHANT_ID}`)
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await page.locator(merchantQuota.input).fill("2")
     await page.locator(merchantQuota.save).click()
     await expect(toast(page, "Moderator quota set to 2.")).toBeVisible()
@@ -185,7 +185,7 @@ test.describe("S41. Merchant moderator accounts", () => {
     await login(page, CREDS.merchant)
     await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/settings")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.locator(moderators.card)).toBeVisible()
 
     await page.locator(moderators.add).click()
@@ -255,7 +255,7 @@ test.describe("S41. Merchant moderator accounts", () => {
 
     // The moderator can create an order (New Order grant → CSV import).
     await page.goto("/merchant/orders")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await page.locator(orders.bulkImportOpen).click()
     await page.waitForURL("**/merchant/orders/import")
     const recipient = `E2E Mod Order ${stamp}`
@@ -281,7 +281,7 @@ test.describe("S41. Merchant moderator accounts", () => {
     await login(page, CREDS.merchant)
     await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/settings")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     const row = page.locator(moderators.row).filter({ hasText: modEmail })
     await row.locator(moderators.deactivate).click()
@@ -310,7 +310,7 @@ test.describe("S42. Warehouse admin activation", () => {
   }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/team")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // Create a Warehouse Admin with a temporary password.
     await page.getByRole("button", { name: /create warehouse admin/i }).click()
@@ -342,7 +342,7 @@ test.describe("S42. Warehouse admin activation", () => {
     // The roster now shows an active member (no Pending/resend anymore).
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/team")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     const row = page.locator("tr").filter({ hasText: WA_EMAIL })
     await expect(row.locator(team.pendingBadge)).toHaveCount(0)
   })

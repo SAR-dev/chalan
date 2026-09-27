@@ -1,6 +1,7 @@
 import Redis from "ioredis"
 import { NextResponse } from "next/server"
 import { resolveClientIp } from "@/lib/client-ip"
+import { logger } from "@/lib/logger"
 
 interface RateLimitEntry {
   count: number
@@ -93,10 +94,8 @@ function getRedis(): Redis | null {
   if (!url) {
     if (process.env.NODE_ENV === "production" && !warnedNoRedisInProduction) {
       warnedNoRedisInProduction = true
-      console.warn(
-        "[rate-limit] REDIS_URL is not set in production — rate limits are " +
-          "per-instance and can be bypassed. Set REDIS_URL (see " +
-          "docs/DEPLOYMENT.md).",
+      logger.warn(
+        "REDIS_URL is not set in production — rate limits are per-instance and can be bypassed. Set REDIS_URL (see docs/DEPLOYMENT.md).",
       )
     }
     return null
@@ -107,10 +106,32 @@ function getRedis(): Redis | null {
       enableOfflineQueue: false,
     })
     redis.on("error", (err) => {
-      console.warn("[rate-limit] Redis connection error:", err.message)
+      logger.warn("Redis connection error", { err })
     })
   }
   return redis
+}
+
+/**
+ * Readiness probe (ROADMAP P2.3): PING the configured Redis. Returns `true`
+ * when no Redis is configured (it is optional for single-instance deploys) and
+ * `false` when a configured Redis cannot answer within `timeoutMs`.
+ */
+export async function pingRedis(timeoutMs = 1500): Promise<boolean> {
+  const redis = getRedis()
+  if (!redis) return true
+  try {
+    const pong = await Promise.race([
+      redis.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("redis ping timeout")), timeoutMs),
+      ),
+    ])
+    return pong === "PONG"
+  } catch (err) {
+    logger.warn("Redis readiness ping failed", { err })
+    return false
+  }
 }
 
 /**
@@ -152,10 +173,7 @@ export async function rateLimit(
       }
       return null
     } catch (err) {
-      console.warn(
-        "[rate-limit] Redis request failed, degrading to in-memory:",
-        err instanceof Error ? err.message : err,
-      )
+      logger.warn("Redis request failed, degrading to in-memory", { err })
     }
   }
   return memoryLimit(key, max, window)
@@ -205,18 +223,18 @@ export async function rateLimitByIp(
 ): Promise<NextResponse | null> {
   const resolved = resolveClientIp(req.headers)
   if (resolved.ignoredHeaders) {
-    console.warn(
-      `[rate-limit] Ignoring client-supplied IP headers on "${prefix}" — set ` +
-        "TRUSTED_PROXY_HOPS if this deployment has a reverse proxy.",
-    )
+    logger.warn("Ignoring client-supplied IP headers", {
+      prefix,
+      hint: "set TRUSTED_PROXY_HOPS if this deployment has a reverse proxy",
+    })
   }
   if (!resolved.ip) {
     if (options.failClosed) {
       if (!warnedNoIp) {
         warnedNoIp = true
-        console.warn(
-          `[rate-limit] "${prefix}" cannot resolve a client IP and is running ` +
-            "fail-closed (all unresolvable requests share one bucket).",
+        logger.warn(
+          "Rate limit cannot resolve a client IP; running fail-closed (all unresolvable requests share one bucket)",
+          { prefix },
         )
       }
       return rateLimit(`${prefix}:${NO_IP_BUCKET}`, max, window)

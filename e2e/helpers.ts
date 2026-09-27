@@ -87,5 +87,22 @@ export async function login(
   await page.waitForURL(options.waitFor ?? AUTHENTICATED_URL, {
     timeout: options.timeout ?? 15_000,
   })
-  await page.waitForLoadState("networkidle")
+  await waitForAppReady(page)
+}
+
+/**
+ * Wait for a page to settle after navigation.
+ *
+ * `networkidle` can hang when a background request (SWR polling, streaming)
+ * never goes quiet, so the wait is bounded and best-effort — the web-first
+ * assertions that follow are the real gate. This replaces bare
+ * `waitForLoadState("networkidle")` calls that could stall for the full default
+ * timeout under CI load (ROADMAP P2.4).
+ */
+export async function waitForAppReady(
+  page: Page,
+  timeout = 10_000,
+): Promise<void> {
+  await page.waitForLoadState("load").catch(() => {})
+  await page.waitForLoadState("networkidle", { timeout }).catch(() => {})
 }

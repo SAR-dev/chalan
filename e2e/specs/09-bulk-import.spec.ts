@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { CREDS, login } from "../helpers"
+import { CREDS, login, waitForAppReady } from "../helpers"
 import { orders } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
@@ -7,7 +7,7 @@ async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
     await page.getByRole("button", { name: /skip for now/i }).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   }
 }
 
@@ -75,7 +75,7 @@ async function openImportPage(page: any) {
 
 async function openOrdersPage(page: any) {
   await page.goto("/merchant/orders")
-  await page.waitForLoadState("networkidle")
+  await waitForAppReady(page)
 }
 
 const toast = (page: any, text: string) =>

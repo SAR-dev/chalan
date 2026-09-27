@@ -17,6 +17,16 @@ const nextConfig = {
     root: __dirname,
   },
   images: {
+    // Uploads are served from a *dynamic* origin (local `./.uploads` or a
+    // Cloudflare R2 public base URL) and are rendered through plain `<img>` in
+    // `src/components/image-zoom.tsx` / `image-upload.tsx` — not `next/image`.
+    // So this flag is currently inert; it is kept so that a future switch to
+    // `next/image` cannot silently half-enable the optimizer (which would then
+    // reject those dynamic hosts without `remotePatterns`).
+    //
+    // Payload size is handled at upload time instead: the uploader
+    // downscales client-side to `UPLOAD_MAX_DIMENSIONS` and the API caps
+    // uploads at 5MB. Moving to `next/image` is tracked in ROADMAP (P3).
     unoptimized: true,
   },
   async redirects() {

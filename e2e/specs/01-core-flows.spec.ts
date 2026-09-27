@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { CREDS, login } from "../helpers"
+import { CREDS, login, waitForAppReady } from "../helpers"
 import { help } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
@@ -7,7 +7,7 @@ async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
     await page.getByRole("button", { name: /skip for now/i }).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   }
 }
 
@@ -18,7 +18,7 @@ test.describe("S1. Full Order Lifecycle", () => {
     await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/orders/new")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // Select pickup location
     await page.locator("[id^='pickup-']").first().click()
@@ -41,12 +41,12 @@ test.describe("S1. Full Order Lifecycle", () => {
 
     // Submit order
     await page.getByRole("button", { name: /confirm/i }).click()
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // Admin views orders
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/orders")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   })
 })
 
@@ -55,7 +55,7 @@ test.describe("S6. Merchant Suspend & Reactivate", () => {
   test("admin views merchant list", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/merchants")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByText(/merchants/i).first()).toBeVisible()
   })
 })
@@ -66,12 +66,12 @@ test.describe("S8. Warehouse Operations", () => {
     await login(page, CREDS.warehouseAdmin)
 
     await page.goto("/warehouse")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     // The page title or heading should be visible
     await expect(page.getByRole("heading").first()).toBeVisible()
 
     await page.goto("/warehouse/dispatch")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 })
@@ -81,7 +81,7 @@ test.describe("S10. Payout Lifecycle", () => {
   test("admin views payout queue", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/payouts")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 })
@@ -92,15 +92,15 @@ test.describe("S12. Zone Pricing Management", () => {
     await login(page, CREDS.superAdmin)
 
     await page.goto("/dashboard/delivery-zones")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
 
     await page.goto("/dashboard/zone-pricing")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
 
     await page.goto("/dashboard/delivery-cities")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 })
@@ -109,7 +109,7 @@ test.describe("S12. Zone Pricing Management", () => {
 test.describe("S16. Rider Dashboard", () => {
   test("rider sees stats and task sections", async ({ page }) => {
     await login(page, CREDS.rider)
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // The page header should be visible
     await expect(page.getByRole("heading").first()).toBeVisible({
@@ -123,7 +123,7 @@ test.describe("S17. Rider Pickup Flow", () => {
   test("rider views pickup queue", async ({ page }) => {
     await login(page, CREDS.rider)
     await page.goto("/rider/pickup")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 })
@@ -133,7 +133,7 @@ test.describe("S18. Rider Delivery Flow", () => {
   test("rider views delivery queue", async ({ page }) => {
     await login(page, CREDS.rider)
     await page.goto("/rider/delivery")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 })
@@ -142,7 +142,7 @@ test.describe("S18. Rider Delivery Flow", () => {
 test.describe("S19. Landing Page", () => {
   test("renders hero, features, and calculator", async ({ page }) => {
     await page.goto("/")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     await expect(page.getByText(/ship anything/i)).toBeVisible()
     await expect(page.getByText(/track everything/i)).toBeVisible()
@@ -163,7 +163,7 @@ test.describe("S21. Public Tracking", () => {
 test.describe("S22. Delivery Fee Calculator", () => {
   test("calculator shows estimates", async ({ page }) => {
     await page.goto("/")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     await expect(page.getByText("Delivery Fee Calculator")).toBeVisible()
     await page.locator("#calc-weight").fill("2")
@@ -199,7 +199,7 @@ test.describe("S9. Team Management", () => {
   test("admin views team list", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/team")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 })
@@ -211,15 +211,15 @@ test.describe("S26. Merchant Dashboard", () => {
     await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/finance")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
 
     await page.goto("/merchant/pricing")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
 
     await page.goto("/merchant/orders")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 })
@@ -269,7 +269,7 @@ test.describe("S28. Auth", () => {
   }) => {
     await login(page, CREDS.merchant)
     await page.goto("/merchant/finance")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     await page.context().clearCookies()
     await page.reload()

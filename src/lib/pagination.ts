@@ -3,6 +3,19 @@ import { businessRangeBound } from "@/lib/timezone"
 
 export const MAX_LIMIT = 100
 
+/**
+ * Deepest row offset a list request may ask for.
+ *
+ * The DataTable is page-number + total based, so true keyset (cursor)
+ * pagination is not an option without redesigning it — every list endpoint
+ * keeps OFFSET. What *is* fixable is the unbounded case: `?offset=100000000`
+ * makes Postgres walk (and discard) that many index entries on a hot table,
+ * which is a cheap way for one caller to burn I/O. Clamping bounds the worst
+ * case while leaving every realistic page reachable (100k rows deep at the
+ * default page size).
+ */
+export const MAX_OFFSET = 100_000
+
 export interface PaginatedResponse<T> {
   data: T[]
   total: number
@@ -27,7 +40,10 @@ export function parsePagination(req: Request): {
       Number.isFinite(limit) && limit > 0
         ? Math.min(limit, MAX_LIMIT)
         : undefined,
-    offset: Number.isFinite(offset) && offset >= 0 ? offset : undefined,
+    offset:
+      Number.isFinite(offset) && offset >= 0
+        ? Math.min(offset, MAX_OFFSET)
+        : undefined,
   }
 }
 

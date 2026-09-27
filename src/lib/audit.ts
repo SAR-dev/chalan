@@ -1,5 +1,6 @@
 import { db } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import type { Role } from "@/lib/types"
 
 // Centralized audit-log entry point. This is the only place that should
@@ -81,6 +82,6 @@ export async function logAudit(
   try {
     await db.insert(auditLog).values(values)
   } catch (err) {
-    console.error("[audit] Failed to write audit log entry:", err)
+    logger.error("Failed to write audit log entry", { err })
   }
 }

@@ -1,6 +1,7 @@
 import { and, eq, inArray, lt, lte } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { emailOutbox } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { sendMail } from "@/lib/mailer"
 
 // =============================================================================
@@ -161,6 +162,6 @@ export async function flushEmailOutbox(limit = 20): Promise<void> {
   try {
     await drainEmailOutbox({ limit })
   } catch (err) {
-    console.error("[email-outbox] flush failed:", err)
+    logger.error("Email outbox flush failed", { err })
   }
 }

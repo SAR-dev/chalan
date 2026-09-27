@@ -131,10 +131,11 @@ deletes.
 
 ## App
 
-| Variable               | Required | Default       | Description                                     |
-| ---------------------- | -------- | ------------- | ----------------------------------------------- |
-| `NEXT_PUBLIC_SITE_URL` | **Yes**  | —             | Canonical public URL for SEO, OG tags, sitemaps |
-| `NEXT_PUBLIC_ENV`      | **Yes**  | `development` | One of: `development`, `production`             |
+| Variable                | Required | Default       | Description                                                                                         |
+| ----------------------- | -------- | ------------- | --------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SITE_URL`  | **Yes**  | —             | Canonical public URL for SEO, OG tags, sitemaps                                                     |
+| `NEXT_PUBLIC_ENV`       | **Yes**  | `development` | One of: `development`, `production`                                                                 |
+| `NEXT_PUBLIC_BASE_URL`  | No       | (same origin) | Absolute base URL for browser auth API calls (`forgot-password`). Must be a valid http(s) URL when set. |
 
 ---
 

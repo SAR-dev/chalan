@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 import { totpSecretFromUri } from "@/lib/two-factor"
-import { CREDS, type E2ECredential, login } from "../helpers"
+import { CREDS, type E2ECredential, login, waitForAppReady } from "../helpers"
 import { auth, twoFactor } from "../selectors"
 import { totp } from "../totp"
 
@@ -8,10 +8,10 @@ const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider|welcome)/
 
 async function openTwoFactorTab(page: Page, path = "/dashboard/account") {
   await page.goto(path)
-  await page.waitForLoadState("networkidle")
+  await waitForAppReady(page)
   await page.locator(auth.accountTwoFactorTab).click()
   // Let /api/users/me settle so status/policy assertions see fresh flags.
-  await page.waitForLoadState("networkidle")
+  await waitForAppReady(page)
   await expect(page.locator(twoFactor.status)).toBeVisible()
 }
 
@@ -20,7 +20,7 @@ async function skipOnboardingIfNeeded(page: Page) {
   if (page.url().includes("/welcome")) {
     await page.getByRole("button", { name: /skip for now/i }).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   }
 }
 
@@ -132,7 +132,7 @@ test.describe("S37. Two-factor authentication", () => {
     await page.locator(twoFactor.loginSubmit).click()
 
     await page.waitForURL(AUTHENTICATED_URL, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     expect(page.url()).toContain("/dashboard")
 
     // ── Disable again (leaves the seeded admin clean) ─────────────────────
@@ -188,7 +188,7 @@ test.describe("S37. Two-factor authentication", () => {
     await page.locator(twoFactor.loginInput).fill(totp(secret))
     await page.locator(twoFactor.loginSubmit).click()
     await page.waitForURL(AUTHENTICATED_URL, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await skipOnboardingIfNeeded(page)
 
     // ── Disable again (leaves the seeded merchant clean) ──────────────────

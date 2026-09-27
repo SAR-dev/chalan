@@ -123,23 +123,6 @@ export function useTeam({
     return { ok: true }
   }, [])
 
-  const togglePricingPermission = useCallback(
-    async (id: string) => {
-      const res = await fetch(`${KEY}/${id}/pricing`, { method: "PATCH" })
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        return {
-          ok: false,
-          error: formatError(data, "Failed to toggle pricing permission."),
-        }
-      }
-      await mutate()
-      _globalMutate((key: string) => key === KEY)
-      _globalMutate((key: string) => key.startsWith(_WAREHOUSES_KEY))
-      return { ok: true }
-    },
-    [mutate, _globalMutate],
-  )
   const updateAccountWarehouse = useCallback(
     async (id: string, warehouseId: string | null) => {
       const res = await fetch(`${KEY}/${id}/warehouse`, {
@@ -180,7 +163,6 @@ export function useTeam({
     createAccount,
     toggleAccountActive,
     resendActivation,
-    togglePricingPermission,
     updateAccountWarehouse,
   }
 }

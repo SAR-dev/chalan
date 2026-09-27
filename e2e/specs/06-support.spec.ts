@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { CREDS, login } from "../helpers"
+import { CREDS, login, waitForAppReady } from "../helpers"
 import { support } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
@@ -7,7 +7,7 @@ async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
     await page.getByRole("button", { name: /skip for now/i }).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
   }
 }
 
@@ -20,7 +20,7 @@ test.describe("S24. Support tickets", () => {
     await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/support")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     await expect(page.getByTestId("support-tickets")).toBeVisible()
 
     const subject = `E2E payout question ${Date.now()}`
@@ -37,7 +37,7 @@ test.describe("S24. Support tickets", () => {
 
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/support")
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     const adminRow = page
       .locator(support.rowByTableId("support-tickets"))

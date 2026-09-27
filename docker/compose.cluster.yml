@@ -142,9 +142,10 @@ services:
         condition: service_healthy
 
   # ── Cron container ──────────────────────────────────────────────────────
-  # Runs HTTP-based cleanup jobs against the dashboard API.
-  # If pg_cron is configured (see pg-0 comment above), this container can
-  # be removed — pg_cron handles cleanup natively inside PostgreSQL.
+  # Runs HTTP-based cleanup jobs against the dashboard API. If pg_cron is
+  # configured (see pg-0 comment above), this container can be removed — pg_cron
+  # handles the SQL-only cleanups natively; the upload sweep stays here because
+  # it touches object storage.
   cron:
     image: alpine:3.20
     container_name: app-cron
@@ -157,12 +158,15 @@ services:
         0 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-sessions >> /var/log/cron.log 2>&1
         30 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-audit-logs >> /var/log/cron.log 2>&1
         0 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-email-logs >> /var/log/cron.log 2>&1
-        30 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-uploads?dryRun=1 >> /var/log/cron.log 2>&1
+        30 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-uploads >> /var/log/cron.log 2>&1
         CRONTAB
         crond -f -l 2
       "
     networks:
       - app-net
+    depends_on:
+      dashboard:
+        condition: service_healthy
 
   # ---------------------------------------------------------------------
   # Dashboard app
@@ -190,7 +194,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/ready"]
       interval: 10s
       timeout: 5s
       start_period: 60s
@@ -223,7 +227,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/ready"]
       interval: 10s
       timeout: 5s
       start_period: 60s
@@ -256,7 +260,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/ready"]
       interval: 10s
       timeout: 5s
       start_period: 60s
@@ -289,7 +293,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/ready"]
       interval: 10s
       timeout: 5s
       start_period: 60s

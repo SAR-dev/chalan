@@ -116,10 +116,13 @@ describe("handlePasswordReset", () => {
       url: "/reset?token=999",
     })
 
-    expect(spy).toHaveBeenCalledWith(
-      "[email-outbox] Password reset enqueue failed:",
-      expect.any(Error),
-    )
+    // Structured log: one JSON line naming the failure and the error.
+    const record = JSON.parse(spy.mock.calls.at(-1)?.[0] as string)
+    expect(record).toMatchObject({
+      level: "error",
+      msg: "Password reset enqueue failed",
+      err: { message: "DB down" },
+    })
     spy.mockRestore()
   })
 })
