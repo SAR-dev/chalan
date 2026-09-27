@@ -2574,12 +2574,15 @@ pnpm exec playwright test --ui    # UI debugger (watch mode)
 
 #### CI/CD pipeline
 
-CI (`.github/workflows/ci.yml`) runs six jobs on every push/PR: `typecheck`,
-`lint`, `format`, `test` (unit), `build`, and `security` (`pnpm audit
---audit-level=high` + PR dependency review). **E2E is intentionally not in the
-CI pipeline** — the Playwright suite runs locally only (`pnpm test:e2e` after
-`pnpm build`); its webServer needs a local Postgres + reseed that the CI
-runners don't provision.
+CI (`.github/workflows/ci.yml`) runs eight jobs on every push/PR: `typecheck`,
+`lint`, `format`, `test` (unit), `build`, `security` (`pnpm audit
+--audit-level=high` + PR dependency review), `coverage` (`pnpm test:coverage`
+against the floors in `vitest.config.ts`), and `integration` (`pnpm test:integration`
+against a `postgres:17` service, after `pnpm db:migrate`). **E2E is intentionally
+not in the CI pipeline** — the Playwright suite runs locally only (`pnpm test:e2e`
+after `pnpm build`); its webServer needs a local Postgres + reseed that the CI
+runners don't provision. Run it yourself before merging anything that changes
+auth, money, roles or the order lifecycle.
 
 #### Writing a new E2E test — checklist
 

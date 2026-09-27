@@ -175,13 +175,18 @@ export async function sendMail(
   // Log the plain-text version for debugging — redacted and truncated, because
   // it carries password-reset/activation links (ROADMAP P0.7). Writing those to
   // stdout put live tokens in container logs, CI output and log aggregators.
-  if (text) {
-    logger.info("Sending email", {
-      to: payload.to,
-      subject: payload.subject,
-      body: redactAndTruncate(text),
-    })
-  }
+  //
+  // ROADMAP P4.4: redaction alone still shipped customer message content (and
+  // names, addresses, order details) into stdout on *every* send. The body is
+  // now opt-in via `LOG_EMAIL_BODY=1`; by default only the envelope is logged.
+  // The full body remains available in the admin-only `email_log` table.
+  logger.info("Sending email", {
+    to: payload.to,
+    subject: payload.subject,
+    ...(text && process.env.LOG_EMAIL_BODY === "1"
+      ? { body: redactAndTruncate(text) }
+      : {}),
+  })
 
   if (process.env.MAIL_DISABLED === "1") {
     logger.info("MAIL_DISABLED=1, skipping send", { to: payload.to })

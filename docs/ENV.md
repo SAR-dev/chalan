@@ -57,6 +57,7 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 | ------------------ | ------------ | ------- | ----------------------------------------------------------------------------- |
 | `SMTP_SECRET_KEY`  | **Yes** (prod) | —     | 64-hex-char AES-256-GCM key for SMTP passwords at rest. `openssl rand -hex 32` |
 | `MAIL_DISABLED`    | No           | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)            |
+| `LOG_EMAIL_BODY`   | No           | —       | Set to `1` to add the (redacted + truncated) message body to the `Sending email` log line. **Off by default** — the body carries customer content, so stdout stays envelope-only (ROADMAP P4.4). The full body is always available in the admin-only Email Logs page. |
 
 ---
 

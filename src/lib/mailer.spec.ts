@@ -51,6 +51,7 @@ describe("sendMail", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     insertCalls.length = 0
+    delete process.env.LOG_EMAIL_BODY
   })
 
   it("skips send when MAIL_DISABLED=1", async () => {
@@ -98,7 +99,7 @@ describe("sendMail", () => {
 
   // ROADMAP P0.7 — a live token in stdout is a live token in the log
   // aggregator, in `docker logs`, and in CI output.
-  it("redacts link tokens from the structured console log", async () => {
+  it("omits the body from the console log unless LOG_EMAIL_BODY=1", async () => {
     mockSendMail.mockResolvedValueOnce({ messageId: "789" })
     const logs: string[] = []
     const logSpy = vi.spyOn(console, "log").mockImplementation((...args) => {
@@ -116,11 +117,37 @@ describe("sendMail", () => {
     }
     const records = logs.map((line) => JSON.parse(line))
     const sending = records.find((r) => r.msg === "Sending email")
+    // Envelope only: P4.4 moved the body behind an opt-in flag.
     expect(sending).toMatchObject({
       level: "info",
       to: "leak@test.com",
       subject: "Reset your password",
     })
+    expect(sending).not.toHaveProperty("body")
+    expect(logs.join("\n")).not.toContain("super-secret-token-123")
+  })
+
+  it("redacts link tokens from the body when LOG_EMAIL_BODY=1", async () => {
+    process.env.LOG_EMAIL_BODY = "1"
+    mockSendMail.mockResolvedValueOnce({ messageId: "790" })
+    const logs: string[] = []
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args) => {
+      logs.push(args.join(" "))
+    })
+    const { sendMail } = await import("@/lib/mailer")
+    try {
+      await sendMail({
+        to: "leak@test.com",
+        subject: "Reset your password",
+        text: "Reset: http://localhost:3000/reset-password?token=super-secret-token-123&next=/dashboard",
+      })
+    } finally {
+      logSpy.mockRestore()
+      delete process.env.LOG_EMAIL_BODY
+    }
+    const records = logs.map((line) => JSON.parse(line))
+    const sending = records.find((r) => r.msg === "Sending email")
+    // Even opted in, a live token must never reach stdout.
     expect(sending.body).toContain("token=[redacted]")
     expect(logs.join("\n")).not.toContain("super-secret-token-123")
   })
