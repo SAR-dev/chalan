@@ -1,4 +1,5 @@
 import { type Column } from "drizzle-orm"
+import { businessRangeBound } from "@/lib/timezone"
 
 export const MAX_LIMIT = 100
 
@@ -61,9 +62,14 @@ export function parseStatusFilter(
 
 /**
  * Parse `?from=` and `?to=` query parameters for date-range filtering.
- * Returns `{ from: Date, to: Date }` when both are valid ISO dates,
- * or `null` when either is absent/invalid. `to` is set to the end of the
- * day (23:59:59.999) so the filter is inclusive.
+ *
+ * `from`/`to` are business-local (`Asia/Dhaka`) calendar days. The range is
+ * inclusive: `from` is the first millisecond of the `from` day and `to` is the
+ * last millisecond of the `to` day, both converted to UTC. Parsing a `to` of
+ * `2025-01-15` on a UTC server used to end at 23:59:59.999Z — 05:59 into the
+ * next Dhaka day — so "today" leaked into tomorrow (ROADMAP P1.3).
+ *
+ * Returns `null` when either parameter is absent or invalid.
  */
 export function parseDateRange(req: Request): {
   from: Date
@@ -73,10 +79,10 @@ export function parseDateRange(req: Request): {
   const fromRaw = url.searchParams.get("from")?.trim()
   const toRaw = url.searchParams.get("to")?.trim()
   if (!fromRaw || !toRaw) return null
-  const from = new Date(fromRaw)
-  const to = new Date(toRaw)
-  if (isNaN(from.getTime()) || isNaN(to.getTime())) return null
-  to.setHours(23, 59, 59, 999)
+
+  const from = businessRangeBound(fromRaw, "start")
+  const to = businessRangeBound(toRaw, "end")
+  if (!from || !to) return null
   return { from, to }
 }
 

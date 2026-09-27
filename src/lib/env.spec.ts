@@ -162,4 +162,18 @@ describe("validateEnv", () => {
     })
     expect(validateEnv()).toBeUndefined()
   })
+
+  it("accepts a sane TRUSTED_PROXY_HOPS value", () => {
+    for (const hops of ["0", "1", "2"]) {
+      setEnv({ ...baseEnv(), TRUSTED_PROXY_HOPS: hops })
+      expect(validateEnv()).toBeUndefined()
+    }
+  })
+
+  it("rejects a non-numeric or negative TRUSTED_PROXY_HOPS", () => {
+    for (const hops of ["nginx", "-1", "1.5", "99"]) {
+      setEnv({ ...baseEnv(), TRUSTED_PROXY_HOPS: hops })
+      expect(() => validateEnv(), hops).toThrow("TRUSTED_PROXY_HOPS")
+    }
+  })
 })

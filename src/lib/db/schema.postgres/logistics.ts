@@ -5,8 +5,9 @@ import {
   index,
   pgTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
-import { ts } from "./helpers"
+import { money, ts } from "./helpers"
 import { warehouse } from "./warehouses"
 
 // =============================================================================
@@ -75,8 +76,8 @@ export const zonePricing = pgTable(
     toZoneId: text("toZoneId")
       .notNull()
       .references(() => deliveryZone.id, { onDelete: "cascade" }),
-    baseRate: doublePrecision("baseRate").notNull().default(0),
-    extraRatePerKg: doublePrecision("extraRatePerKg").notNull().default(0),
+    baseRate: money("baseRate").notNull().default(0),
+    extraRatePerKg: money("extraRatePerKg").notNull().default(0),
     freeWeightKg: doublePrecision("freeWeightKg").notNull().default(1),
     maxWeightKg: doublePrecision("maxWeightKg").notNull().default(10),
     codFeePercentage: doublePrecision("codFeePercentage").notNull().default(1),
@@ -86,5 +87,9 @@ export const zonePricing = pgTable(
   (t) => [
     index("zone_pricing_from_idx").on(t.fromZoneId),
     index("zone_pricing_to_idx").on(t.toZoneId),
+    // P1.1: the matrix is keyed by the zone pair. Without this, two
+    // concurrent upserts could each insert a row for the same pair and order
+    // pricing would silently pick an arbitrary one of them.
+    uniqueIndex("zone_pricing_pair_uniq").on(t.fromZoneId, t.toZoneId),
   ],
 )

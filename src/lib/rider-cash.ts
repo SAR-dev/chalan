@@ -1,5 +1,6 @@
 import { type SQL, sql } from "drizzle-orm"
 import type { dbRead } from "@/lib/db"
+import { sumMoney, sumMoneyFiltered } from "@/lib/db/money-sql"
 import { order } from "@/lib/db/schema"
 
 /**
@@ -23,8 +24,11 @@ export async function cashOnHand(
 }> {
   const [row] = await db
     .select({
-      totalCollected: sql<number>`coalesce(sum(${order.amountCollected}), 0)`,
-      totalSubmitted: sql<number>`coalesce(sum(case when ${order.codSettledAt} is not null then ${order.amountCollected} else 0 end), 0)`,
+      totalCollected: sumMoney(order.amountCollected),
+      totalSubmitted: sumMoneyFiltered(
+        order.amountCollected,
+        sql`${order.codSettledAt} is not null`,
+      ),
     })
     .from(order)
     .where(scope)

@@ -166,7 +166,7 @@ export default function MerchantOverviewPage() {
               size="sm"
               render={
                 <a
-                  href={`/track/${o.id}`}
+                  href={`/track/${o.trackingToken ?? o.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 />

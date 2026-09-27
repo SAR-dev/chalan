@@ -4,6 +4,8 @@ import {
   accountStatus,
   countModeratorSlots,
   issueActivationToken,
+  lockModeratorQuota,
+  ModeratorQuotaError,
   sendActivationEmail,
 } from "@/lib/activation"
 import { requireSession } from "@/lib/api-auth"
@@ -17,6 +19,7 @@ import { logAudit } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
+import { flushEmailOutbox } from "@/lib/email-outbox"
 import { hasNavPermission, merchantGrantableNavItems } from "@/lib/nav-config"
 import { moderatorCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -106,30 +109,13 @@ export const POST = withErrorHandler(
       return badRequest(`Invalid access grants: ${invalid.join(", ")}`)
     }
 
-    const [merchantRow] = await dbRead
-      .select({
-        maxModerators: merchant.maxModerators,
-        businessName: merchant.businessName,
-      })
-      .from(merchant)
-      .where(eq(merchant.id, id))
-      .limit(1)
-    if (!merchantRow) return notFound()
-
-    // Quota: ACTIVE + PENDING moderators occupy a slot (pending reserves it
-    // so no account can exist that could never activate).
-    const used = await countModeratorSlots(id)
-    if (used >= merchantRow.maxModerators) {
-      return NextResponse.json(
-        {
-          error: `Moderator limit reached (${used}/${merchantRow.maxModerators}). Deactivate a moderator to free a slot.`,
-        },
-        { status: 403 },
-      )
-    }
-
     // Admin-chosen temporary password; the invitee replaces it when they
     // click the activation link. Better Auth hashes it on create.
+    //
+    // The auth user must exist before the transaction (Better Auth owns its own
+    // connection), so the quota is claimed AFTER it — inside the same tx as the
+    // profile insert, under a row lock. A full quota therefore leaves a user
+    // row to clean up rather than an orphan moderator.
     let created
     try {
       created = await auth.api.createUser({
@@ -142,43 +128,104 @@ export const POST = withErrorHandler(
       )
     }
 
-    try {
-      await db.insert(profile).values({
-        userId: created.user.id,
-        role: "MERCHANT",
-        merchantId: id,
-        isActive: false,
-        isModerator: true,
-        moderatorPermissions: permissions,
-      })
-      const rawToken = await issueActivationToken(created.user.id)
-      await sendActivationEmail({
-        to: email,
-        userName: name,
-        contextName: merchantRow.businessName,
-        rawToken,
-      })
-    } catch (err) {
-      console.error("[moderators] activation setup failed:", err)
+    const cleanupUser = async (reason: string) => {
       try {
         await db.delete(user).where(eq(user.id, created.user.id))
       } catch (cleanupErr) {
-        console.error("[moderators] orphan cleanup failed:", cleanupErr)
+        console.error(
+          `[moderators] orphan cleanup failed (${reason}):`,
+          cleanupErr,
+        )
       }
+    }
+
+    let outcome:
+      | { kind: "created"; businessName: string }
+      | { kind: "quota"; used: number; max: number }
+      | { kind: "not_found" }
+
+    try {
+      outcome = await db.transaction(async (tx) => {
+        // Quota: ACTIVE + PENDING moderators occupy a slot (pending reserves
+        // it so no account can exist that could never activate). Locked, so
+        // two concurrent invites can't both claim the last slot.
+        let businessName: string
+        try {
+          const quota = await lockModeratorQuota(tx, id)
+          if (!quota) return { kind: "not_found" as const }
+          const [row] = await tx
+            .select({ businessName: merchant.businessName })
+            .from(merchant)
+            .where(eq(merchant.id, id))
+            .limit(1)
+          businessName = row?.businessName ?? ""
+        } catch (err) {
+          if (err instanceof ModeratorQuotaError) {
+            return { kind: "quota" as const, used: err.used, max: err.max }
+          }
+          throw err
+        }
+
+        await tx.insert(profile).values({
+          userId: created.user.id,
+          role: "MERCHANT",
+          merchantId: id,
+          isActive: false,
+          isModerator: true,
+          moderatorPermissions: permissions,
+        })
+        const rawToken = await issueActivationToken(created.user.id, tx)
+        // Enqueue the invite email in the same transaction (ROADMAP P1.5), so
+        // the account and its email commit together.
+        await sendActivationEmail(
+          {
+            to: email,
+            userName: name,
+            contextName: businessName,
+            rawToken,
+          },
+          tx,
+        )
+        // Audit inside the tx: a crash can no longer lose the trail
+        // (ROADMAP P1.4).
+        await logAudit(
+          {
+            actor: { userId: me.userId, name: me.name, role: me.role },
+            action: "MODERATOR_CREATED",
+            entityType: "profile",
+            entityId: created.user.id,
+            description: `Created moderator account for ${name} (${email})`,
+            metadata: { merchantId: id, permissions },
+          },
+          tx,
+        )
+        return { kind: "created" as const, businessName }
+      })
+    } catch (err) {
+      console.error("[moderators] activation setup failed:", err)
+      await cleanupUser("transaction failure")
       return NextResponse.json(
         { error: "Could not finish creating the moderator." },
         { status: 500 },
       )
     }
 
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "MODERATOR_CREATED",
-      entityType: "profile",
-      entityId: created.user.id,
-      description: `Created moderator account for ${name} (${email})`,
-      metadata: { merchantId: id, permissions },
-    })
+    if (outcome.kind === "not_found") {
+      await cleanupUser("merchant vanished")
+      return notFound()
+    }
+    if (outcome.kind === "quota") {
+      await cleanupUser("quota full")
+      return NextResponse.json(
+        {
+          error: `Moderator limit reached (${outcome.used}/${outcome.max}). Deactivate a moderator to free a slot.`,
+        },
+        { status: 403 },
+      )
+    }
+
+    // Best-effort immediate delivery; the cron retries anything left behind.
+    await flushEmailOutbox()
 
     return NextResponse.json(
       {

@@ -26,6 +26,7 @@
 
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { resolveClientIp } from "@/lib/client-ip"
 import { ipAllowed, parseAllowlist } from "@/lib/ip-allowlist"
 import { parsePortalMode, portalPageAllowed } from "@/lib/portal-mode"
 
@@ -139,12 +140,10 @@ function isAdminPath(pathname: string): boolean {
 }
 
 function proxyClientIp(req: NextRequest): string | null {
-  const forwarded = req.headers.get("x-forwarded-for")
-  const first = forwarded?.split(",")[0]?.trim()
-  if (first) return first
-  const real = req.headers.get("x-real-ip")?.trim()
-  if (real) return real
-  return null
+  // Same trusted-proxy rule as the API rate limiter (ROADMAP P0.6): forwarding
+  // headers are only believed when the deployment declares its proxy hops, so a
+  // client cannot forge its way past ADMIN_IP_ALLOWLIST.
+  return resolveClientIp(req.headers).ip
 }
 
 // ---------------------------------------------------------------------------
@@ -216,8 +215,7 @@ export function proxy(req: NextRequest) {
 
   // 4. Upload rate limiting
   if (req.method === "POST" && pathname === "/api/uploads") {
-    const forwarded = req.headers.get("x-forwarded-for")
-    const ip = forwarded?.split(",")[0]?.trim()
+    const ip = proxyClientIp(req)
     // No resolvable IP → skip the limiter rather than share one "unknown"
     // bucket across every visitor (cross-tenant DoS).
     if (ip && !uploadRateLimit(ip)) {

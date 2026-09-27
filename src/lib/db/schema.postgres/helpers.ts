@@ -1,4 +1,4 @@
-import { pgSequence, timestamp } from "drizzle-orm/pg-core"
+import { numeric, pgSequence, timestamp } from "drizzle-orm/pg-core"
 
 // =============================================================================
 // Shared column helpers
@@ -10,6 +10,20 @@ import { pgSequence, timestamp } from "drizzle-orm/pg-core"
 // represented everywhere else (React state, server/client boundaries, etc.).
 export const ts = (name: string) =>
   timestamp(name, { mode: "string", withTimezone: true })
+
+// Money is stored as exact decimal, never as a binary float (ROADMAP P0.8).
+// `double precision` cannot represent 0.1 exactly, so a ledger of such values
+// drifts and can never be audited exactly; P0.4's rounding + reconciliation
+// test only *bounds* that drift. `mode: "number"` keeps the TypeScript side a
+// `number` (drizzle converts the string node-postgres returns for numeric), so
+// no call site needs a conversion layer.
+//
+// Only money uses this. Weights (`parcelWeightKg`, `maxWeightKg`,
+// `freeWeightKg`) and percentages (`codFeePercentage`, …) stay `double
+// precision` — they are measurements/ratios, not amounts, and a scale of 2
+// would throw away meaningful precision (e.g. 0.125 kg).
+export const money = (name: string) =>
+  numeric(name, { precision: 14, scale: 2, mode: "number" })
 
 // =============================================================================
 // Sequences for human-readable entity IDs

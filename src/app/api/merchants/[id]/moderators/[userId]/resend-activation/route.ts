@@ -8,8 +8,9 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api-response"
-import { dbRead } from "@/lib/db"
+import { db, dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
+import { flushEmailOutbox } from "@/lib/email-outbox"
 import { hasNavPermission } from "@/lib/nav-config"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -54,13 +55,20 @@ export const POST = withErrorHandler(
       return badRequest("This account is already activated.")
     }
 
-    const rawToken = await issueActivationToken(userId)
-    await sendActivationEmail({
-      to: target.email,
-      userName: target.name,
-      contextName: target.businessName,
-      rawToken,
+    // Token re-issue + outbox row commit together (ROADMAP P1.5).
+    await db.transaction(async (tx) => {
+      const rawToken = await issueActivationToken(userId, tx)
+      await sendActivationEmail(
+        {
+          to: target.email,
+          userName: target.name,
+          contextName: target.businessName,
+          rawToken,
+        },
+        tx,
+      )
     })
+    await flushEmailOutbox()
 
     return NextResponse.json({ ok: true })
   },

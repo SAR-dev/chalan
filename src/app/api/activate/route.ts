@@ -16,7 +16,9 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // session — the single-use, 24h token in the body IS the authorization.
 // Shared by merchant moderators and warehouse-admin invites.
 export const POST = withErrorHandler(async (req: Request) => {
-  const limited = await rateLimitByIp(req, "activate", 10, 60)
+  const limited = await rateLimitByIp(req, "activate", 10, 60, {
+    failClosed: true,
+  })
   if (limited) return limited
 
   const parsed = await parseBody(req, activationSchema)

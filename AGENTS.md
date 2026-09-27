@@ -135,7 +135,7 @@ you can tag. When fixing or writing e2e tests, prefer/convert to test ids.
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
 describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique with no gaps or duplicates (suite is
-currently S1-S42 across 10 files / 65 tests).
+currently S1-S53 across 20 files / 86 tests).
 
 ## Coding Patterns
 

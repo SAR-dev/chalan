@@ -17,6 +17,7 @@ import { seedPayoutRequests } from "./payouts"
 import { seedPickupLocations } from "./pickup-locations"
 import { seedPlatformConfig } from "./platform-config"
 import { seedRiders } from "./riders"
+import { assertSeedPasswordAllowed } from "./seed-content/credentials"
 import { seedUsers } from "./users"
 import { seedWarehouses } from "./warehouses"
 import { seedZonePricing } from "./zone-pricing"
@@ -25,6 +26,7 @@ async function main() {
   console.log(`=== ${siteConfig.name} full seed starting ===\n`)
 
   try {
+    assertSeedPasswordAllowed()
     await cleanDatabase()
 
     // Base entities (same as db:seed)

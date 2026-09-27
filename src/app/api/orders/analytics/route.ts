@@ -3,7 +3,9 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
 import { dbRead } from "@/lib/db"
+import { sumMoney, sumMoneyFiltered } from "@/lib/db/money-sql"
 import { order } from "@/lib/db/schema"
+import { businessDate } from "@/lib/db/time-sql"
 import { parseDateRange } from "@/lib/pagination"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -46,24 +48,24 @@ export const GET = withErrorHandler(async (req: Request) => {
     where = where ? and(where, dateClause) : dateClause
   }
 
-  // 1. Orders by day (last 30 days or date range)
+  // 1. Orders by day (last 30 days or date range). The day is the business
+  // (Asia/Dhaka) calendar day, not the DB session day (ROADMAP P1.3).
   // NOTE: Postgres returns bigint (count) and numeric (avg) as JS *strings*
   // through node-postgres. `sql<number>` is a TypeScript-only assertion and
   // does not coerce at runtime, so every aggregate must be cast explicitly —
   // otherwise Recharts receives strings and its path/axis math yields NaN,
   // rendering blank charts.
+  const dayExpr = businessDate(order.createdAt)
   const ordersByDay = await dbRead
     .select({
-      date: sql<string>`date(${order.createdAt})`.as("date"),
+      date: dayExpr.as("date"),
       count: sql<number>`count(*)::int`.as("count"),
-      revenue: sql<number>`coalesce(sum(${order.merchantEarnings}), 0)`.as(
-        "revenue",
-      ),
+      revenue: sumMoney(order.merchantEarnings).as("revenue"),
     })
     .from(order)
     .where(where)
-    .groupBy(sql`date(${order.createdAt})`)
-    .orderBy(sql`date(${order.createdAt})`)
+    .groupBy(dayExpr)
+    .orderBy(dayExpr)
 
   // 2. Orders by status
   const ordersByStatus = await dbRead
@@ -111,14 +113,14 @@ export const GET = withErrorHandler(async (req: Request) => {
   // 4. COD summary
   const [codSummary] = await dbRead
     .select({
-      totalCollected:
-        sql<number>`coalesce(sum(${order.productCost}) filter (where ${order.status} = 'DELIVERED'), 0)`.as(
-          "totalCollected",
-        ),
-      totalSettled:
-        sql<number>`coalesce(sum(${order.productCost}) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null), 0)`.as(
-          "totalSettled",
-        ),
+      totalCollected: sumMoneyFiltered(
+        order.productCost,
+        sql`${order.status} = 'DELIVERED'`,
+      ).as("totalCollected"),
+      totalSettled: sumMoneyFiltered(
+        order.productCost,
+        sql`${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null`,
+      ).as("totalSettled"),
       settledCount:
         sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)::int`.as(
           "settledCount",

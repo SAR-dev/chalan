@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/drain-email-outbox",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/cleanup-sessions",
       "schedule": "0 3 * * *"
     }

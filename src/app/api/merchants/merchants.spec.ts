@@ -45,10 +45,23 @@ vi.mock("@/lib/mailer", () => ({
   sendMail: () => Promise.resolve(),
 }))
 
+vi.mock("@/lib/email-outbox", () => ({
+  enqueueEmail: vi.fn(async () => {}),
+  flushEmailOutbox: vi.fn(async () => {}),
+  drainEmailOutbox: vi.fn(async () => ({
+    claimed: 0,
+    sent: 0,
+    failed: 0,
+    requeued: 0,
+  })),
+}))
+
 const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
+/** Set to make the next `db.transaction` reject (e.g. a unique violation). */
+let transactionError: Error | null = null
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -101,7 +114,14 @@ vi.mock("@/lib/db", () => {
     insert: () => makeInsertChain(),
     update: () => makeUpdateChain(),
     delete: () => makeDeleteChain(),
-    transaction: (fn: (t: typeof tx) => unknown) => fn(tx),
+    transaction: (fn: (t: typeof tx) => unknown) => {
+      if (transactionError) {
+        const err = transactionError
+        transactionError = null
+        return Promise.reject(err)
+      }
+      return fn(tx)
+    },
   }
   return { db, dbRead: { ...db, select: () => makeSelectChain() }, pool: {} }
 })
@@ -111,6 +131,7 @@ beforeEach(() => {
   updateResult.length = 0
   updatePayloads.length = 0
   insertResult.length = 0
+  transactionError = null
   sessionState.value = null
   rateLimited = false
   vi.mocked(logAudit).mockClear()
@@ -268,11 +289,35 @@ describe("PATCH /api/merchants/:id", () => {
 
   it("updates merchant details", async () => {
     sessionState.value = merchantSession
-    updateResult.push({ id: "m_1", businessName: "Updated Biz" })
+    selectQueue.push([{ email: "old@test.com" }]) // previous email
+    selectQueue.push([{ userId: "u_owner" }]) // owner profile
+    updateResult.push({
+      id: "m_1",
+      businessName: "Updated Biz",
+      email: "new@test.com",
+    })
     const res = await updateMerchant(req("PATCH", undefined, validBody), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toBeDefined()
+    // A second write syncs the owner's auth user (no businessName) so login
+    // keeps working (P1.4c).
+    expect(
+      updatePayloads.some(
+        (p) => p.email === "new@test.com" && !("businessName" in p),
+      ),
+    ).toBe(true)
+  })
+
+  it("409 when the new email is already in use", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([{ email: "old@test.com" }])
+    transactionError = Object.assign(new Error("duplicate key"), {
+      code: "23505",
+    })
+    const res = await updateMerchant(req("PATCH", undefined, validBody), ctx())
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toContain("already in use")
   })
 
   it("updates branding fields", async () => {
@@ -372,6 +417,7 @@ describe("PATCH /api/merchants/:id", () => {
         action: "MODERATOR_QUOTA_CHANGED",
         metadata: { maxModerators: 5 },
       }),
+      expect.anything(),
     )
   })
 
@@ -421,6 +467,20 @@ describe("PATCH /api/merchants/:id/approve", () => {
     expect(res.status).toBe(400)
   })
 
+  it("409 when the status changed between the read and the write", async () => {
+    // P1.1: the write is predicated on the status that was validated, so a
+    // concurrent approve/suspend cannot be overwritten.
+    sessionState.value = admin
+    selectQueue.push([
+      { status: "PENDING", emailVerifiedAt: "2025-01-01T00:00:00Z" },
+    ])
+    updateResult.length = 0
+    const res = await approveMerchant(req("PATCH"), ctx())
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toContain("changed by someone else")
+    expect(logAudit).not.toHaveBeenCalled()
+  })
+
   it("400 when email not verified", async () => {
     sessionState.value = admin
     selectQueue.push([{ status: "PENDING", emailVerifiedAt: null }])
@@ -463,6 +523,8 @@ describe("PATCH /api/merchants/:id/approve", () => {
           },
         },
       }),
+      // Audit + email outbox row commit in the approval transaction (P1.4/P1.5).
+      expect.anything(),
     )
   })
 })
@@ -484,6 +546,24 @@ describe("PATCH /api/merchants/:id/suspend", () => {
     updateResult.length = 0
     const res = await suspendMerchant(req("PATCH"), ctx())
     expect(res.status).toBe(404)
+    expect(logAudit).not.toHaveBeenCalled()
+  })
+
+  it("400 when the merchant is already suspended", async () => {
+    sessionState.value = admin
+    selectQueue.push([{ status: "SUSPENDED" }])
+    const res = await suspendMerchant(req("PATCH"), ctx())
+    expect(res.status).toBe(400)
+    expect(updatePayloads).toHaveLength(0)
+    expect(logAudit).not.toHaveBeenCalled()
+  })
+
+  it("409 when the status changed between the read and the write", async () => {
+    sessionState.value = admin
+    selectQueue.push([{ status: "ACTIVE" }])
+    updateResult.length = 0
+    const res = await suspendMerchant(req("PATCH"), ctx())
+    expect(res.status).toBe(409)
     expect(logAudit).not.toHaveBeenCalled()
   })
 
@@ -516,6 +596,24 @@ describe("PATCH /api/merchants/:id/reactivate", () => {
     sessionState.value = merchantSession
     const res = await reactivateMerchant(req("PATCH"), ctx())
     expect(res.status).toBe(403)
+  })
+
+  it("400 when the merchant is not suspended", async () => {
+    sessionState.value = admin
+    selectQueue.push([{ status: "ACTIVE" }])
+    const res = await reactivateMerchant(req("PATCH"), ctx())
+    expect(res.status).toBe(400)
+    expect(updatePayloads).toHaveLength(0)
+    expect(logAudit).not.toHaveBeenCalled()
+  })
+
+  it("409 when the status changed between the read and the write", async () => {
+    sessionState.value = admin
+    selectQueue.push([{ status: "SUSPENDED" }])
+    updateResult.length = 0
+    const res = await reactivateMerchant(req("PATCH"), ctx())
+    expect(res.status).toBe(409)
+    expect(logAudit).not.toHaveBeenCalled()
   })
 
   it("reactivates merchant", async () => {
@@ -684,12 +782,47 @@ describe("POST /api/merchants/:id/balance/payment", () => {
 
   it("submits payment", async () => {
     sessionState.value = merchantSession
-    selectQueue.push([])
+    selectQueue.push([{ merchantId: "m_1" }]) // balance row lock
+    selectQueue.push([]) // no pending payment
     insertResult.push({ id: "tx_new", amount: -500, status: "PENDING" })
     const res = await submitPayment(req("POST", undefined, validBody), ctx())
     const json = await res.json()
     expect(res.status).toBe(201)
     expect(json).toMatchObject({ id: "tx_new" })
+  })
+
+  it("409 when a payment is already pending (checked inside the transaction)", async () => {
+    // P1.1: the check moved inside the transaction, after the balance row lock.
+    sessionState.value = merchantSession
+    selectQueue.push([{ merchantId: "m_1" }])
+    selectQueue.push([{ id: "tx_pending" }])
+    const res = await submitPayment(req("POST", undefined, validBody), ctx())
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toContain("awaiting confirmation")
+    expect(insertResult).toHaveLength(0)
+  })
+
+  it("409 when the unique index rejects a concurrent duplicate", async () => {
+    // The row lock cannot serialize two transactions when the balance row does
+    // not exist yet, so the partial unique index is the backstop.
+    sessionState.value = merchantSession
+    selectQueue.push([{ merchantId: "m_1" }])
+    selectQueue.push([])
+    transactionError = Object.assign(new Error("duplicate key"), {
+      code: "23505",
+    })
+    const res = await submitPayment(req("POST", undefined, validBody), ctx())
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toContain("awaiting confirmation")
+  })
+
+  it("500 when the write fails for an unrelated reason", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([{ merchantId: "m_1" }])
+    selectQueue.push([])
+    transactionError = new Error("boom")
+    const res = await submitPayment(req("POST", undefined, validBody), ctx())
+    expect(res.status).toBe(500)
   })
 })
 

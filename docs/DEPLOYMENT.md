@@ -39,6 +39,7 @@ DATABASE_URL=postgresql://app:localdev123@localhost:25432/delivery
 
 | Job                  | Schedule        | Description                                |
 | -------------------- | --------------- | ------------------------------------------ |
+| `drain-email-outbox` | Every minute    | Delivers queued transactional email        |
 | `cleanup-sessions`   | Daily 03:00 UTC | Deletes expired sessions and verifications |
 | `cleanup-audit-logs` | Daily 03:30 UTC | Deletes audit logs older than 30 days      |
 | `cleanup-email-logs` | Daily 04:00 UTC | Deletes sent email logs older than 10 days |
@@ -206,10 +207,13 @@ docker compose -f docker/compose.cluster.yml up -d
 | `cloudflared` | —    | —              |
 | `cron`        | —    | —              |
 
-Each role service has a corresponding `migrate-*` service that runs
-`drizzle-kit push --force` and exits before that role's app container starts
-(`depends_on: service_completed_successfully`). The migrations are idempotent
-so the race between them on first boot is harmless.
+A single `migrate` service runs the versioned migrations
+(`src/lib/db/migrate.ts`) once and exits before any app container starts
+(`depends_on: service_completed_successfully`). It takes a database-wide
+PostgreSQL advisory lock, so concurrent runners (a manual run during a deploy,
+a leftover container) queue instead of racing the DDL. Migrations are applied
+in one transaction and recorded by content hash, so a renamed or regenerated
+file is never re-applied.
 
 ### Environment
 
@@ -246,11 +250,14 @@ mapping to your tunnel's `config.yml` ingress rules and point
 ### Running migrations manually
 
 ```bash
-docker compose -f docker/compose.cluster.yml run --rm migrate-dashboard
+docker compose -f docker/compose.cluster.yml run --rm migrate
 ```
 
-(Any role's `migrate-*` service works — they run the identical command against
-the same database.)
+The same command is safe to run while the stack is up: the advisory lock makes
+it wait for any in-flight run instead of colliding with it. Never use
+`drizzle-kit push --force` against a deployed database — it diffs the live
+schema and can drop data. `push` is for local development only; deployments use
+the versioned `migrate` runner above.
 
 ---
 

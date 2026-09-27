@@ -43,9 +43,19 @@ vi.mock("@/lib/db", () => {
     }
     return chain
   }
+  const makeInsertChain = () => {
+    const chain: Record<string, unknown> = {
+      values: () => chain,
+      onConflictDoUpdate: () => chain,
+      onConflictDoNothing: () => chain,
+      returning: () => Promise.resolve([]),
+    }
+    return chain
+  }
   const db = {
     select: () => makeSelectChain(),
     update: () => makeUpdateChain(),
+    insert: () => makeInsertChain(),
     transaction: (fn: (tx: unknown) => unknown) => fn(db),
   }
   return { db, dbRead: { ...db, select: () => makeSelectChain() }, pool: {} }
@@ -174,6 +184,7 @@ describe("PATCH /api/orders/bulk/approve", () => {
           diff: { status: { from: "PENDING", to: "APPROVED" } },
         },
       }),
+      expect.anything(),
     )
   })
 })

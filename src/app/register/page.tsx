@@ -236,7 +236,11 @@ export default function RegisterPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                  <form
+                    data-testid="register-form"
+                    onSubmit={handleSubmit}
+                    className="flex flex-col gap-4"
+                  >
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="businessName">Business name</Label>
                       <Input

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { PATCH as receiverNote } from "./[id]/receiver-note/route"
+// Receiver-note (public, token-gated) is covered by its own colocated spec:
+// src/app/api/orders/[id]/receiver-note/receiver-note.spec.ts
 import { GET as getOrder } from "./[id]/route"
 import { GET as analytics } from "./analytics/route"
 import { POST as bulkCreate } from "./bulk/route"
@@ -299,36 +300,6 @@ describe("GET /api/orders/:id", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ id: "order_1" })
-  })
-})
-
-describe("PATCH /api/orders/:id/receiver-note", () => {
-  it("404 when order not found", async () => {
-    selectQueue.push([])
-    const res = await receiverNote(
-      req("PATCH", undefined, { receiverNote: "Leave at door" }),
-      ctx(),
-    )
-    expect(res.status).toBe(404)
-  })
-
-  it("409 on terminal status", async () => {
-    selectQueue.push([{ id: "o1", status: "DELIVERED" }])
-    const res = await receiverNote(
-      req("PATCH", undefined, { receiverNote: "Leave at door" }),
-      ctx(),
-    )
-    expect(res.status).toBe(409)
-  })
-
-  it("updates receiver note", async () => {
-    selectQueue.push([{ id: "o1", status: "PENDING" }])
-    updateResult.push([{ id: "o1", receiverNote: "Leave at door" }])
-    const res = await receiverNote(
-      req("PATCH", undefined, { receiverNote: "Leave at door" }),
-      ctx(),
-    )
-    expect(res.status).toBe(200)
   })
 })
 

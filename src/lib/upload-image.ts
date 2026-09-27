@@ -33,6 +33,7 @@ export async function uploadImage(
   file: File,
   folder: UploadFolder,
   compressOptions?: CompressOptions,
+  uploadToken?: string,
 ): Promise<UploadResult> {
   // Default the downscale target to the folder's configured max edge: avatars
   // shrink to 500px, photos to 1024px. Callers can still override explicitly.
@@ -53,6 +54,8 @@ export async function uploadImage(
   const body = new FormData()
   body.append("file", fileToUpload)
   body.append("folder", folder)
+  // Anonymous flows (rider-application NIDs) authorize with a short-lived token.
+  if (uploadToken) body.append("uploadToken", uploadToken)
 
   let res: Response
   try {

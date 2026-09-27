@@ -2,7 +2,10 @@
 
 # ---- Base ----------------------------------------------------------------
 FROM node:22-alpine AS base
-RUN apk add --no-cache libc6-compat curl
+# tzdata so the pinned business timezone resolves inside the container
+# (ROADMAP P1.3); libc6-compat + curl for the healthcheck.
+RUN apk add --no-cache libc6-compat curl tzdata
+ENV TZ=Asia/Dhaka
 RUN corepack enable
 WORKDIR /app
 

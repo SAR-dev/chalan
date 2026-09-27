@@ -63,6 +63,15 @@ export const orderStatuses = [
 
 export const emailLogStatuses = ["SENT", "FAILED"] as const
 
+// Transactional email outbox (ROADMAP P1.5): a row is written in the same
+// transaction as the domain change, then drained by a worker/cron.
+export const emailOutboxStatuses = [
+  "PENDING",
+  "SENDING",
+  "SENT",
+  "FAILED",
+] as const
+
 // Support ticket lifecycle: OPEN (submitted) → ANSWERED (admin replied) →
 // CLOSED (either party closed it). Drizzle-only enum hint.
 export const supportStatuses = ["OPEN", "ANSWERED", "CLOSED"] as const

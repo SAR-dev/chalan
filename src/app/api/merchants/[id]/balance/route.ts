@@ -40,7 +40,7 @@ export const GET = withErrorHandler(
     const { limit, offset } = parsePagination(req)
 
     const [{ count }] = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(*)::int` })
       .from(balanceTransaction)
       .where(eq(balanceTransaction.merchantId, merchantId))
 

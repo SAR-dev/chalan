@@ -76,15 +76,23 @@ describe("parseStatusFilter", () => {
 })
 
 describe("parseDateRange", () => {
-  it("parses valid from and to", () => {
+  it("bounds the range to the Asia/Dhaka day, inclusive", () => {
     const req = new Request("http://localhost?from=2025-01-01&to=2025-01-15")
     const result = parseDateRange(req)
     expect(result).not.toBeNull()
-    expect(result!.from.toISOString()).toContain("2025-01-01")
-    expect(result!.to.toISOString()).toContain("2025-01-15")
-    expect(result!.to.getHours()).toBe(23)
-    expect(result!.to.getMinutes()).toBe(59)
-    expect(result!.to.getSeconds()).toBe(59)
+    // 2025-01-01 00:00 Dhaka (UTC+6) === 2024-12-31 18:00 UTC.
+    expect(result!.from.toISOString()).toBe("2024-12-31T18:00:00.000Z")
+    // 2025-01-15 23:59:59.999 Dhaka === 2025-01-15 17:59:59.999 UTC.
+    expect(result!.to.toISOString()).toBe("2025-01-15T17:59:59.999Z")
+  })
+
+  it("expands a full timestamp `to` to the end of its Dhaka day", () => {
+    const req = new Request(
+      "http://localhost?from=2025-01-01T05:00:00Z&to=2025-01-15T05:00:00Z",
+    )
+    const result = parseDateRange(req)
+    expect(result!.from.toISOString()).toBe("2025-01-01T05:00:00.000Z")
+    expect(result!.to.toISOString()).toBe("2025-01-15T17:59:59.999Z")
   })
 
   it("returns null when param missing", () => {

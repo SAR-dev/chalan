@@ -29,6 +29,7 @@ const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
+const insertPayloads: Record<string, unknown>[] = []
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -58,7 +59,10 @@ vi.mock("@/lib/db", () => {
   }
   const makeInsertChain = () => {
     const chain: Record<string, unknown> = {
-      values: () => chain,
+      values: (payload: Record<string, unknown>) => {
+        insertPayloads.push(payload)
+        return chain
+      },
       onConflictDoUpdate: () => chain,
       returning: () => Promise.resolve(insertResult),
     }
@@ -83,6 +87,7 @@ beforeEach(() => {
   updateResult.length = 0
   updatePayloads.length = 0
   insertResult.length = 0
+  insertPayloads.length = 0
   sessionState.value = null
   rateLimited = false
   vi.mocked(logAudit).mockClear()
@@ -187,12 +192,21 @@ describe("POST /api/payouts", () => {
 
   it("creates payout request", async () => {
     sessionState.value = merchantSession
-    selectQueue.push([{ id: "o1", productCost: 500 }])
-    insertResult.push([{ id: "pr_new", status: "PENDING" }])
+    selectQueue.push([{ id: "o1", merchantEarnings: 89 }])
+    insertResult.push({ id: "pr_new", status: "PENDING" })
     const res = await createPayout(req("POST", undefined, validBody))
     const json = await res.json()
     expect(res.status).toBe(201)
     expect(json).toBeDefined()
+    // The request carries exactly the locked orders and their earnings total.
+    expect(insertPayloads[0]).toMatchObject({
+      merchantId: "m_1",
+      orderIds: ["o1"],
+      amount: 89,
+      status: "PENDING",
+    })
+    // …and only those orders are linked.
+    expect(updatePayloads[0]).toMatchObject({ payoutRequestId: "pr_new" })
   })
 })
 
@@ -217,9 +231,10 @@ describe("PATCH /api/payouts/:id/approve", () => {
 
   it("approves payout", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([
-      { status: "PENDING", reviewedBy: null, reviewedAt: null },
-    ])
+    selectQueue.push(
+      [{ status: "PENDING", reviewedBy: null, reviewedAt: null }],
+      [{ orderCount: 1, total: 89 }],
+    )
     updateResult.push({
       id: "pr_1",
       status: "APPROVED",
@@ -230,6 +245,8 @@ describe("PATCH /api/payouts/:id/approve", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "APPROVED" })
+    // The amount is recomputed from the linked orders.
+    expect(updatePayloads[0]).toMatchObject({ status: "APPROVED", amount: 89 })
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "PAYOUT_APPROVED",
@@ -242,6 +259,14 @@ describe("PATCH /api/payouts/:id/approve", () => {
         },
       }),
     )
+  })
+
+  it("400 when the request has no linked orders", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([{ status: "PENDING" }], [{ orderCount: 0, total: 0 }])
+    const res = await approvePayout(req("PATCH"), ctx())
+    expect(res.status).toBe(400)
+    expect(updatePayloads).toHaveLength(0)
   })
 })
 
@@ -259,16 +284,37 @@ describe("PATCH /api/payouts/:id/paid", () => {
 
   it("marks payout as paid", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([{ status: "APPROVED", paidAt: null }])
+    selectQueue.push(
+      [
+        {
+          status: "APPROVED",
+          paidAt: null,
+          merchantId: "m_1",
+          amount: 89,
+        },
+      ],
+      [{ orderCount: 1, total: 89 }],
+    )
     updateResult.push({
       id: "pr_1",
       status: "PAID",
       paidAt: "2025-01-03T00:00:00Z",
+      amount: 89,
     })
     const res = await markPayoutPaid(req("PATCH"), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ status: "PAID" })
+    // Exactly one ledger row + one balance debit, using the recomputed amount.
+    // A payout CONSUMES the merchant's credit, so it is positive in the debt
+    // convention (positive = merchant owes) — see lib/balance-ledger.ts.
+    expect(insertPayloads[0]).toMatchObject({
+      merchantId: "m_1",
+      type: "PAYOUT",
+      amount: 89,
+      status: "SETTLED",
+    })
+    expect(insertPayloads[1]).toMatchObject({ merchantId: "m_1", balance: 89 })
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "PAYOUT_PAID",
@@ -280,6 +326,18 @@ describe("PATCH /api/payouts/:id/paid", () => {
         },
       }),
     )
+  })
+
+  it("400 for an orphan request (amount but no linked orders)", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push(
+      [{ status: "APPROVED", merchantId: "m_1", amount: 89 }],
+      [{ orderCount: 0, total: 0 }],
+    )
+    const res = await markPayoutPaid(req("PATCH"), ctx())
+    expect(res.status).toBe(400)
+    expect(insertPayloads).toHaveLength(0)
+    expect(updatePayloads).toHaveLength(0)
   })
 })
 
@@ -391,16 +449,43 @@ describe("PATCH /api/payouts/bulk/mark-paid", () => {
     expect(res.status).toBe(403)
   })
 
-  it("marks approved requests as paid", async () => {
+  it("marks approved requests as paid and writes the ledger", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([{ id: "pr_1" }])
-    updateResult.push({ id: "pr_1" })
+    selectQueue.push(
+      [{ id: "pr_1" }],
+      [{ status: "APPROVED", merchantId: "m_1", amount: 89 }],
+      [{ orderCount: 1, total: 89 }],
+    )
+    updateResult.push({ id: "pr_1", status: "PAID", amount: 89 })
     const res = await bulkMarkPayoutPaid(
       req("PATCH", undefined, { ids: ["pr_1"] }),
     )
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true, count: 1 })
+    // The bulk path now settles exactly like the single one.
+    expect(insertPayloads[0]).toMatchObject({ type: "PAYOUT", amount: 89 })
+    expect(insertPayloads[1]).toMatchObject({ balance: 89 })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "PAYOUT_PAID",
+        entityId: "pr_1",
+      }),
+    )
+  })
+
+  it("400 when nothing could be settled (all orphans)", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push(
+      [{ id: "pr_1" }],
+      [{ status: "APPROVED", merchantId: "m_1", amount: 89 }],
+      [{ orderCount: 0, total: 0 }],
+    )
+    const res = await bulkMarkPayoutPaid(
+      req("PATCH", undefined, { ids: ["pr_1"] }),
+    )
+    expect(res.status).toBe(400)
+    expect(insertPayloads).toHaveLength(0)
   })
 })
 

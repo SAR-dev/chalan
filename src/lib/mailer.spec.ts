@@ -95,4 +95,55 @@ describe("sendMail", () => {
     const sent = insertCalls.find((c) => c.table === "email_log")
     expect(sent?.values).toMatchObject({ status: "SENT", to: "retry@test.com" })
   })
+
+  // ROADMAP P0.7 — a live token in stdout is a live token in the log
+  // aggregator, in `docker logs`, and in CI output.
+  it("redacts link tokens from the console log", async () => {
+    mockSendMail.mockResolvedValueOnce({ messageId: "789" })
+    const logs: string[] = []
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args) => {
+      logs.push(args.join(" "))
+    })
+    const { sendMail } = await import("@/lib/mailer")
+    try {
+      await sendMail({
+        to: "leak@test.com",
+        subject: "Reset your password",
+        text: "Reset: http://localhost:3000/reset-password?token=super-secret-token-123&next=/dashboard",
+      })
+    } finally {
+      logSpy.mockRestore()
+    }
+    const printed = logs.join("\n")
+    expect(printed).toContain("[mailer] Sending to leak@test.com")
+    expect(printed).toContain("token=[redacted]")
+    expect(printed).not.toContain("super-secret-token-123")
+  })
+
+  it("keeps the activation link in email_log (bounded) for the admin log view", async () => {
+    mockSendMail.mockResolvedValueOnce({ messageId: "abc" })
+    const { sendMail } = await import("@/lib/mailer")
+    await sendMail({
+      to: "verify@test.com",
+      subject: "Verify",
+      text: "Verify: http://localhost:3000/api/auth/verify-email?token=activation-token-abc",
+    })
+    const sent = insertCalls.find((c) => c.table === "email_log")
+    // Truncated, but still there: single-use, 24h, admin-only, 10-day retention.
+    expect(sent?.values.textBody).toContain("token=activation-token-abc")
+  })
+
+  it("truncates an oversized body in email_log", async () => {
+    mockSendMail.mockResolvedValueOnce({ messageId: "def" })
+    const { sendMail } = await import("@/lib/mailer")
+    await sendMail({
+      to: "big@test.com",
+      subject: "Big",
+      text: "x".repeat(5_000),
+    })
+    const sent = insertCalls.find((c) => c.table === "email_log")
+    const body = sent?.values.textBody as string
+    expect(body.length).toBeLessThan(5_000)
+    expect(body).toContain("[truncated 3000 chars]")
+  })
 })

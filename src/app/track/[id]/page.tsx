@@ -17,8 +17,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const code = decodeURIComponent(id).trim().toUpperCase()
-  const data = await fetchOrderData(code)
+  // Pass the raw segment through: it may be the (lowercase) tracking token.
+  // fetchOrderData normalizes for the human-code arm internally.
+  const raw = decodeURIComponent(id).trim()
+  const data = await fetchOrderData(raw)
 
   const statusLabel = data
     ? STATUS_COPY[data.order.status].headline
@@ -26,6 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const merchant = data?.merchant?.businessName
     ? ` · ${data.merchant.businessName}`
     : ""
+  // Prefer the human-readable order code in the page title.
+  const code = data?.order.id ?? raw.toUpperCase()
 
   return {
     title: `${code} – ${statusLabel}`,
@@ -36,8 +40,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TrackDetailPage({ params }: Props) {
   const { id } = await params
-  const idOrCode = decodeURIComponent(id).trim().toUpperCase()
-  const data = await fetchOrderData(idOrCode)
+  const raw = decodeURIComponent(id).trim()
+  const data = await fetchOrderData(raw)
+  const idOrCode = data?.order.id ?? raw.toUpperCase()
 
   // Branding follows the ORDER's merchant (multi-merchant safe), never the
   // instance — invalid hex makes brandThemeVars fall back to theme defaults.

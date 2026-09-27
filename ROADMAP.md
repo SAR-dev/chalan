@@ -5,8 +5,8 @@
 > The previous "Phase 5.x features" roadmap is preserved at the bottom
 > (`P4 — Product`), minus everything already shipped.
 >
-> Current health: `pnpm ci:check` ✅ · Unit **1377/1377** ✅ · Build ✅ ·
-> E2E **65/65** ✅ (10 spec files, S1–S42) · dependency tree has **0
+> Current health: `pnpm ci:check` ✅ · Unit **1557/1557** ✅ · Build ✅ ·
+> E2E **86/86** ✅ (20 spec files, S1–S53) · dependency tree has **0
 > high/critical advisories** · route-auth-guard test enforces server-side auth
 > on all API routes.
 
@@ -50,112 +50,251 @@ moderator accounts). The risk is **underneath** it:
 
 ---
 
+## Completed
+
+### ✅ P0.1 — Public tracking token + PII-free receiver note (2026-09-27)
+
+**Was:** `PATCH /api/orders/[id]/receiver-note` was public and returned the whole
+order row (`.returning()`), so anyone could enumerate the sequential ids
+(`ORD-100001E`) to harvest recipient PII and overwrite live notes.
+
+**Shipped:**
+- `order.trackingToken` — 128-bit random, unique — generated on single create,
+  bulk create and seed. Migration `drizzle/postgres/0003_orange_rhino.sql` adds
+  the column, backfills existing rows (`md5(random()…||id)`) and creates the
+  unique index.
+- The public note write now **requires the token** and returns `{ ok: true }`
+  (never order fields). Unknown order and wrong token both return 404 — no
+  existence oracle. Constant-time compare in `src/lib/tracking-token.ts`.
+- The tracking page resolves **token first, then the human order code**
+  (`src/app/track/[id]/lib.ts` → `matchedByToken`); the note form is enabled only
+  for token links and shows a read-only hint for code links.
+- Merchant UI links (orders, dashboard, finance, order drawer, `TrackingCell`)
+  now share the token URL; `ORDER_CORE_COLUMNS` exposes `trackingToken`.
+
+**Tests:** `src/lib/tracking-token.spec.ts`; `src/app/api/orders/[id]/receiver-note/receiver-note.spec.ts`
+(8 cases incl. a no-PII regression guard); extended `src/app/track/[id]/page.spec.tsx`;
+e2e **S43** (token link enables the form, code link is read-only, missing token →
+400, wrong token → 404, valid token → 200 `{ ok: true }`).
+
+**Residual (tracked elsewhere):** reads by the sequential code stay allowed for
+the parcel-label/typed-search UX (token-only reads are an optional follow-up),
+and the note write is still read-then-write — hardened under **P1.4**.
+
+---
+
+### ✅ P0.2 — Upload authorization + private NID files (2026-09-27)
+
+**Was:** `/api/uploads` accepted writes from anyone (no session) into `nids/`,
+and every stored file was world-readable via `/uploads/[...path]` (and R2's
+public URL) — rider/merchant NID documents were permanently public and the
+endpoint was free anonymous hosting. The 5 MB cap was also checked *after*
+`formData()` had buffered the whole body.
+
+**Shipped:**
+- **Read policy** (`src/app/uploads/[...path]/route.ts`): `logos` stays public
+  (needed by the public tracking page); `avatars`/`nids` are readable only by
+  their owner (the `{folder}/{userId}/…` segment must match the session) or a
+  SUPER_ADMIN; everything else needs any authenticated session. Authorization is
+  checked **before** the filesystem is touched, and private responses use
+  `Cache-Control: private` so shared caches never store them.
+- **Write policy** (`src/app/api/uploads/route.ts`): a signed-in user uploads
+  into their own namespace; the only anonymous flow (rider-application NIDs)
+  must present a short-lived HMAC token from the new rate-limited
+  `POST /api/uploads/token` (`src/lib/upload-token.ts`).
+- **Content-Length is enforced before parsing** — 413 when it exceeds the cap,
+  411 when it is absent — so a declared-oversize body is never buffered.
+- **Magic-byte sniffing** (`src/lib/image-signature.ts`) decides the stored type
+  and extension, so a spoofed `file.type`/filename cannot smuggle non-images.
+- Rider-application NID fields no longer render a URL preview (private files
+  cannot be fetched anonymously); they keep the upload/replace controls.
+
+**Tests:** `src/lib/image-signature.spec.ts`; `src/lib/upload-token.spec.ts`;
+`src/app/api/uploads/uploads.spec.ts` (411/413/401/403/400, token happy path,
+sniffed type); `src/app/uploads/[...path]/uploads.spec.ts` (public / owner /
+admin / authenticated policy + traversal); e2e **S44** (anonymous upload needs a
+token, non-images rejected, stored NID is 401 to the world and 200 with a
+private cache for a reviewer).
+
+**Residual / ops note:** with `STORAGE_PROVIDER=r2` the bucket must be **private**
+for `nids`/`avatars` — the app cannot override bucket-level ACLs, so those
+folders need a private bucket (or a separate one) and signed access. Also, a
+client that omits Content-Length and streams a chunked body can still be
+buffered up to the post-parse cap; streaming multipart parsing is the follow-up.
+
+---
+
+### ✅ P0.3 — Payout double-pay + bulk ledger gap (2026-09-27)
+
+**Was:** `POST /api/payouts` read the payable orders *outside* the transaction
+and linked orders with a broader predicate, so two concurrent requests could
+each insert a request row carrying the same orders' earnings — the loser's row
+kept an `amount` with no orders behind it and could still be approved and paid.
+Separately, `PATCH /api/payouts/bulk/mark-paid` only flipped the status: it never
+wrote the `PAYOUT` ledger row or debited `merchant_balance`, so bulk settlements
+silently diverged from the ledger. The seed never linked its payout orders
+either, leaving them payable twice.
+
+**Shipped:**
+- **Create** (`src/app/api/payouts/route.ts`): the eligible-order read now runs
+  **inside** the transaction with `FOR UPDATE`, the amount is derived from that
+  locked set, and only those ids are linked. A concurrent request finds no
+  eligible rows and returns 400 — no orphan request can be created.
+- **Shared settlement** (`src/lib/payout-settlement.ts`): one
+  `settlePayoutAsPaid()` used by both the single and bulk endpoints — locks the
+  request row, **recomputes the amount from the orders actually linked to the
+  request**, refuses a request with **no linked orders**, then writes exactly one
+  `PAYOUT` ledger row and one balance debit.
+- **Approve** validates that the request has linked orders and corrects the
+  stored amount to the recomputed total (visible in the audit diff).
+- **Seed** (`src/lib/db/seed/payouts.ts`) now sets `order.payoutRequestId` for its
+  PENDING/APPROVED payouts, so seeded orders can no longer be paid twice.
+- No extra index was required: `order.payoutRequestId` is single-valued, and the
+  locked read plus the "no linked orders" guard make an orphan request
+  impossible to create or pay.
+
+**Tests:** `src/app/api/payouts/payouts.spec.ts` (create links exactly the locked
+orders; approve recomputes/validates; paid writes the ledger + balance; orphan →
+400; bulk settles through the same helper) and e2e **S45** (bulk mark-paid → one
+new ledger row and the balance debited by the amount; a directly inserted orphan
+request is refused with nothing moved).
+
+**Residual:** the ledger *sign* convention (delivery credit vs payout debit) and
+the float money columns are the subject of **P0.4**, which adds the
+balance ↔ ledger reconciliation test.
+
+---
+
+### ✅ P0.4 — Money rounding, ledger signs + reconciliation (2026-09-27)
+
+**Was:** every money column is `double precision`; rounding was inconsistent
+(the COD fee rounded, the delivery fee/earnings did not); and the ledger used the
+same negative sign at delivery and at payout, so a settled order double-counted
+its fees — a delivered+payout order left the merchant balance at `-167` for a
+100/10/1 order instead of `0`. Nothing asserted `balance == Σ ledger rows`.
+
+**Shipped:**
+- **`src/lib/balance-ledger.ts`** — the accounting spec as code: the sign
+  convention (`positive = merchant owes the platform`), one builder per ledger
+  entry (`orderChargeAmount`, `codCollectedAmount`, `payoutAmount`,
+  `paymentAmount`), `toPaisa()` for 2-decimal rounding, and `settledTotal()` for
+  the reconciliation invariant. Worked example (productCost 100, deliveryFee 10,
+  codFee 1): placed `+11` → delivered `-100` (balance `-89`) → payout `+89`
+  (balance `0`); the platform keeps its 11 in fees.
+- **Rounding**: `pricing.ts` now rounds the delivery charge and earnings to paisa
+  (`toPaisa`), and the order-create/bulk paths round `productCost` and the
+  `ORDER_CHARGE` amount at the write boundary.
+- **Signs**: the delivered transition credits the **gross** collected COD
+  (`codCollectedAmount`), and a payout is a **positive** (credit-consuming)
+  entry — in `lib/payout-settlement.ts`, so single and bulk both follow it.
+- **Seed**: `ORDER_EARNINGS` now credits the gross COD and the two `PAYMENT_*`
+  rows are honest merchant→platform payments (they were mislabelled payouts).
+
+**Tests:** `src/lib/balance-ledger.spec.ts` (worked example + reconciliation
+invariant + rounding); `pricing.spec.ts` rounding table; the delivered-transition
+spec now asserts the `-productCost` ledger entry (its db mock gained the missing
+`insert` chain); `payouts.spec.ts` asserts the positive payout entry; e2e **S45**
+adds "every merchant balance equals the sum of its SETTLED ledger rows" against
+the real database.
+
+**Residual → P0.8 (now shipped):** the money *columns* were `double precision`;
+rounding + reconciliation tests bounded and detected drift, and **P0.8** moved
+storage to `numeric(14,2)`, making the invariant exact.
+
+---
+
+### ✅ P0.5 - Server-side session gates (2026-09-27)
+
+**Policy is now enforced in `requireSession()`, not just by shell redirects.**
+
+- **`src/lib/session-policy.ts`** (new, pure + unit-tested): one decision
+  function, `sessionBlockReason(user, twoFactorRequired)` → banned /
+  unenrolled-admin / unverified-merchant. The block reasons are plain strings so
+  both API routes and server pages share one rule set.
+- **`src/lib/api-auth.ts`**: `loadSession(lenient)` now selects
+  `user.banned`, `user.twoFactorEnabled`, `merchant.emailVerifiedAt` and
+  `session.impersonatedBy` (left join on merchant). `requireSession()` refuses
+  a session for any block reason; `requireSessionForAccountState()` is the lenient
+  variant used where the answer *is* "the account needs setup" (e.g.
+  `/api/users/me`, which the client polls to decide where to redirect).
+- **Impersonation is auditable**: `AuditActor.impersonatedBy` is merged into the
+  audit metadata by `src/lib/audit.ts`, so an admin acting through
+  "view as" leaves a distinguishable trail.
+- **Client behaviour is unchanged** — the browser redirects were already right;
+  the API now simply agrees with them.
+
+**Tests:** `session-policy.spec.ts` (each block reason + allow cases),
+`api-auth.spec.ts` (banned / 2FA-policy / unverified / lenient state /
+impersonation), e2e **S46** (`13-session-gates.spec.ts`): an unverified merchant
+session is refused by `/api/merchants` until `emailVerifiedAt` is set, and a
+banned user's session is refused by the API.
+
+### ✅ P0.6 - Rate limiting can't be spoofed or silently bypassed (2026-09-27)
+
+- **`src/lib/client-ip.ts`** (new): the single trust decision for "who is the
+  client", shared by Node routes and the edge proxy. Forwarding headers are
+  ignored entirely unless `TRUSTED_PROXY_HOPS` is set, and only the entry the
+  last trusted hop appended is honoured, so a client cannot mint a fresh bucket
+  with a forged `x-forwarded-for` (nor slip past `ADMIN_IP_ALLOWLIST`).
+- **`rate-limit.ts`**: uses that resolver; gains `rateLimitByIp({ failClosed })`
+  so IP-keyed endpoints (merchant registration, activation, verification
+  resend) share one bucket instead of going unlimited when no IP resolves;
+  reports `rateLimiterDegraded()` — a missing `REDIS_URL` in production is now a
+  loud warning plus a `/api/health` signal instead of a silent per-instance Map.
+- **`src/lib/auth.ts`**: sign-in is capped at the global 10/min in production
+  (dev/test keep 100 so a test run is not self-DoS'd); get-session stays 60/min.
+- **`src/proxy.ts`** uses the same resolver for the admin allowlist and uploads.
+- **Config/docs**: `TRUSTED_PROXY_HOPS` added to `.env.example`, `docs/ENV.md`
+  (validated by `validateEnv()`), and the four app services in
+  `docker/compose.cluster.yml`; Playwright sets it to 1 and sends a fixed
+  `x-forwarded-for` so IP-keyed limits behave deterministically.
+
+**Tests:** `client-ip.spec.ts` (untrusted headers ignored, hop-index selection,
+XFF/real-ip/cf precedence), extended `rate-limit.spec.ts`, health reports the
+degraded flag.
+
+### ✅ P0.7 - Signup closed, mailer redacted, verify token hashed (2026-09-27)
+
+- **`disableSignUp: true`** in `src/lib/auth.ts`: every account is created
+  server-side (merchant application, admin/owner invites), so the public
+  `POST /api/auth/sign-up/email` was creating profile-less password users.
+- **`src/lib/redact.ts`** (new): `redactSecrets()` strips credentials from
+  free text/HTML (token/code/key/secret query params, URL userinfo, `Bearer`
+  headers, JWTs) and `redactAndTruncate()` bounds the length. The mailer's
+  **console** log — the one that reaches container stdout, CI and log
+  aggregators — is now redacted, so no live reset/activation link lands there.
+  `email_log` rows are stored **truncated** (2 000 chars) and the admin-only,
+  10-day-retention table keeps the single-use link params on purpose: the raw
+  token expires in 24h, is consumed on first use, and `10-activation` e2e
+  depends on that row.
+- **Merchant verification tokens are hashed**: `src/lib/verify-token.ts`
+  (`issueVerifyToken` → 32 random bytes, SHA-256 stored, 24h expiry) is used by
+  registration, `resend-verification` and `merchants/[id]/verify-email`;
+  `/api/auth/verify-email` compares hashes, so a table dump can no longer verify
+  an arbitrary merchant — the same treatment staff activation tokens already had.
+- **Seed password is not a published production secret**: `SEED_PASSWORD` env
+  override, and both seed entrypoints refuse to run when
+  `NODE_ENV=production` while the default (`12qwaszx`) is in use. Tracked files
+  carry no live-looking secrets (`.env` stays git-ignored, `.env.example` is
+  placeholders only), and `docs/ENV.md` gained a "Secrets on disk" note.
+- Upload size was already covered by P0.2 (Content-Length pre-check + post-parse
+  `file.size` cap, `MAX_UPLOAD_BYTES`), so no change was needed here.
+
+**Tests:** `redact.spec.ts`, `verify-token.spec.ts`, `mailer.spec.ts` (no
+`token=` in the console output; body truncated in `email_log`),
+`seed-content/credentials.spec.ts` (production guard), `env.spec.ts`
+(`TRUSTED_PROXY_HOPS` validation), e2e **S47** (`14-signup-locked.spec.ts`):
+the sign-up endpoint 4xxs and writes no `user` row, while `/register` still
+serves the merchant application. e2e S39 now asserts the stored token is a hash
+before driving the flow with a test-owned token.
+
+---
+
 ## P0 — Security & money (ship-blockers)
 
-### P0.1 Public order endpoint leaks full PII; order IDs are guessable
-
-**Problem.** `PATCH /api/orders/[id]/receiver-note` is public (allowlisted in
-`src/app/api/route-auth-guard.spec.ts:46`) and returns the **entire** order row:
-`src/app/api/orders/[id]/receiver-note/route.ts:43-49` uses `.returning()` with
-no column projection, so an unauthenticated caller receives `recipientName`,
-`recipientPhone`, `deliveryAddress`, `productCost`, `merchantNote`, etc. The
-route comment claims ids are "cuid2" (unguessable), but they are **sequential**:
-`src/lib/db/schema.postgres/helpers.ts` (`orderIdSeq … startWith: 100001`) +
-`gen_entity_code('ORD', …)` → `ORD-100001E`, `ORD-100002E`. Anyone can
-enumerate every order, read all recipient PII, and overwrite any live order's
-note.
-
-**Fix.** (a) Return `{ ok: true }` (or a 3-field projection) — never the full
-row from a public route. (b) Give each order a high-entropy public tracking
-token (separate from the id) and authorize the note write on that token.
-(c) Keep the IP rate limit. (d) Correct the misleading comment.
-
-**Verify.** Unit: public note write returns no PII fields; wrong/missing token →
-404/403; terminal orders → 409. E2E: S-tracking still works for the seeded
-order via its token.
-
-### P0.2 Unauthenticated uploads to `nids` + all uploads served publicly
-
-**Problem.** `src/app/api/uploads/route.ts:53-61` treats `folder=nids` as
-public — **anyone** can upload up to 5 MB with a client-declared
-`file.type`/extension into `nids/public/…`. Files are then served with **no
-auth** by `src/app/uploads/[...path]/route.ts`, and on R2 via the bucket's
-public URL (`src/lib/storage/r2.ts`). Rider NID front/back/selfie images are
-therefore permanently public (immutable cache headers) and the endpoint is free
-anonymous hosting. Also, `await req.formData()` runs **before** the size check
-(`route.ts:28` vs `:49`), so a multi-GB body is buffered first (memory DoS).
-
-**Fix.** Gate NID uploads behind the rider-application flow with a
-short-lived signed token; validate magic bytes (not `file.type`); serve uploads
-through an authorized handler or short-lived signed URLs; enforce
-`Content-Length` before parsing and stream with a hard byte ceiling; add
-`Content-Disposition` for non-images.
-
-**Verify.** Unit: unauthenticated non-`nids` upload → 401; `nids` without a
-valid token → 401/403; oversize → 413 before buffering; spoofed content-type
-rejected. E2E: rider application uploads succeed with a token; a bare URL fetch
-of an NID path is not publicly readable (or requires the signed URL).
-
-### P0.3 Payout double-pay + bulk "mark paid" skips the ledger
-
-**Problem (a).** `src/app/api/payouts/route.ts:201-249` reads the payable orders
-**outside** the transaction, then inside the tx inserts a request carrying the
-stale `orderIds`/`amount` and links orders with a **broader** predicate
-(`status='DELIVERED' AND codSettledAt IS NOT NULL AND payoutRequestId IS NULL`)
-with no `FOR UPDATE` and no `inArray(order.id, payableOrders)`. Two concurrent
-POSTs both create a request row for the same orders; only one wins the link
-update, but the orphan request keeps a full `amount` and can still be approved
-and paid (`payouts/[id]/paid/route.ts:69-92` debits it unconditionally).
-
-**Problem (b).** `src/app/api/payouts/bulk/mark-paid/route.ts:32-41` only sets
-`status: "PAID"` — it never writes the `PAYOUT` ledger row or debits
-`merchant_balance`, unlike the single route. Bulk-settled payouts silently
-diverge from the ledger.
-
-**Fix.** Inside one transaction: `SELECT … FOR UPDATE` the eligible orders,
-derive `amount` from **that** set, insert the request, link **only those ids**;
-add a partial unique index guaranteeing one open request per order. Route the
-bulk path through the same transaction helper as the single path (or reject bulk
-until it shares the code). Recompute `amount` at approve/paid time from the
-locked orders.
-
-**Verify.** Unit: concurrent create (simulated interleaving) cannot produce a
-request with an amount but no orders; bulk paid writes exactly one ledger row
-per request and updates balance. Integration (real DB): two parallel POSTs →
-one request, no orphan. E2E: bulk mark-paid then balance reflects the debit.
-
-### P0.4 Money is `double precision` and the ledger signs are inconsistent
-
-**Problem (a).** Every monetary column is float — `finance.ts:26-27,51`,
-`orders.ts:95-98,139`, `merchants.ts:50-55`, `logistics.ts:78-82`,
-`platform.ts:168-184`. `0.1 + 0.2 ≠ 0.3`; per-order fees and the running balance
-accumulate representation error.
-
-**Problem (b).** Rounding is inconsistent: `src/lib/pricing.ts:56` rounds the
-COD fee, but `:29-30` and `:68` do not round the delivery fee or earnings.
-
-**Problem (c).** The ledger uses the **same negative sign** at delivery and at
-payout — `src/features/orders/transitions.ts:564-596` writes
-`ORDER_EARNINGS amount: -merchantEarnings`, and
-`src/app/api/payouts/[id]/paid/route.ts:69-92` writes `PAYOUT amount:
--current.amount`. If negative means "platform owes the merchant", a payout
-(which settles that obligation) must move the balance the other way; as written,
-a settled payout drives the balance further negative. The seed replicates the
-same pattern (`src/lib/db/seed/balances.ts:48-75`), and there is **no
-reconciliation test** anywhere that asserts `balance == Σ settled ledger rows`
-or that payout → fees-only remainder.
-
-**Fix.** (a) Migrate money to `numeric(14,2)` (or integer paisa) with a
-backfill; keep `formatTk` for display. (b) Round at every money write boundary.
-(c) Write an explicit accounting spec (sign convention per transaction type),
-fix the signs, then add a **reconciliation invariant test**: for every merchant,
-`merchant_balance.balance` equals `Σ balance_transaction.amount where
-status='SETTLED'`, and a worked example (100 cost / 10 fee / 1 COD → after
-delivery and payout the merchant owes only the 11 in fees).
-
-**Verify.** Unit: rounding table for pricing; reconciliation test over seeded +
-synthetic ledgers; payout changes balance in the documented direction. E2E:
-merchant Finance page totals match the ledger after a delivery and a payout.
+> **P0.1–P0.8 shipped 2026-09-27** — see **Completed**. **No P0 item is
+> outstanding**; **P1.1–P1.6 also shipped** (see **Completed**). **All of P1 is
+> done**; the next work is **P2.1** (deploy safety).
 
 ### P0.5 Policy is browser-only: 2FA and merchant email verification
 
@@ -218,9 +357,248 @@ files.
 
 ---
 
+### P0.8 Money column types: `numeric(14,2)` — ✅ shipped
+
+**Problem.** Every money column was `double precision` (`finance.ts:26-27,51`,
+`orders.ts:95-98,139`, `merchants.ts:50-55`, `logistics.ts:78-82`,
+`platform.ts:168-184`). P0.4 rounds at every write boundary and the
+reconciliation test detects drift, but binary-float storage made
+exact-decimal auditing impossible.
+
+**Fix (shipped).**
+- `schema.postgres/helpers.ts` exports `money(name)` =
+  `numeric(name, { precision: 14, scale: 2, mode: "number" })`; all 15 money
+  columns use it (`balance_transaction.amount`, `merchant_balance.balance` /
+  `pendingBalance`, `zone_pricing.baseRate` / `extraRatePerKg`,
+  `merchant.baseRate` / `extraRatePerKg`, `order.productCost` / `deliveryFee` /
+  `codFee` / `merchantEarnings` / `amountCollected`, `payout_request.amount`,
+  `platform_config.defaultBaseRate` / `defaultExtraRatePerKg`). Weights and
+  percentages deliberately stay `double precision`.
+- `drizzle/postgres/0004_stiff_dakota_north.sql` backfills with
+  `USING round(x::numeric, 2)` — a no-op on re-apply, so it is idempotent both
+  through `src/lib/db/migrate.ts` (Docker) and `drizzle-kit push` (dev).
+- `src/lib/db/money-sql.ts` (`sumMoney` / `sumMoneyFiltered` / `sumAbsMoney`)
+  aggregates in PostgreSQL exactly, then casts only the *result* to `::float8`.
+  Without the cast node-postgres hands back a string for `numeric` / `sum(numeric)`
+  while `sql<number>` claims a number — the silent bug this item is about.
+- `src/lib/payout-settlement.ts` and the analytics / payable / approve / rider-cash
+  / seed aggregate sites now go through those helpers.
+- Raw `pg` reads in e2e coerce with `Number(...)` (S45 had to be fixed: a
+  `numeric` amount arrives as a string and broke `toBeCloseTo`).
+
+**Verify.** `money-sql.spec.ts` pins the cast (4 unit tests, aggregate column is
+never pre-cast, `coalesce(..., 0)` on empty sets); e2e **S48**
+(`15-money-decimal.spec.ts`) asserts all 15 money columns are `numeric(14,2)`, that
+weights/percentages are still floating, and that the balance/ledger invariant is
+an *exact* `=` comparison in SQL rather than a float tolerance. Full gate green:
+unit **1496/1496**, e2e **78/78**, S45 still passes.
+
+---
+
+### ✅ P1.1 — Check-then-write races need constraints + transactions (2026-09-27)
+
+**Was:** five flows read a condition and then wrote without a lock or
+constraint, so two concurrent requests could both pass the check (moderator
+quota, zone-pricing upsert, balance-payment submit, rider application,
+merchant approve/suspend/reactivate).
+
+**Shipped:**
+- **Constraints** (migration `drizzle/postgres/0005_massive_red_shift.sql`):
+  `zone_pricing_pair_uniq` on `(fromZoneId, toZoneId)`,
+  `balance_tx_one_pending_payment_uniq` (partial, `type='PAYMENT_PENDING' AND
+  status='PENDING'`), and `rider_email_uniq` (`lower(email)` partial). The
+  migration first remediates pre-existing duplicates idempotently: surplus
+  pending payments are `REJECTED` (ledger stays append-only) and their reserved
+  `pendingBalance` released, duplicate zone pairs are collapsed to the newest,
+  and duplicate rider emails are blanked (the rider is preserved).
+- **Transactions + locks:** moderator create/update run the target read, quota
+  check and write in one transaction, with `lockModeratorQuota` doing
+  `SELECT … FOR UPDATE` on the merchant row (`src/lib/activation.ts`); the
+  balance-payment submit locks the merchant's balance row and re-checks inside;
+  the rider application writes rider + profile + audit in one transaction and
+  deletes the Better Auth user on failure (`src/lib/db-errors.ts` maps SQLSTATE).
+- **Conditional state changes:** single and bulk merchant approve / suspend /
+  reactivate repeat the status predicate on the write and surface a conflict
+  when no row matched; the moderator update predicates on the read `isActive`.
+- `logAudit` accepts an optional transaction: inside one a failure propagates
+  so the audit row commits atomically with the change it describes.
+
+**Verify.** Unit: wrong-state guards return 4xx and write nothing; quota lock
+takes `FOR UPDATE` and throws `ModeratorQuotaError` with `used/max`; SQLSTATE
+helpers; `logAudit` tx semantics (propagate in tx, swallow outside). E2E **S49**
+(`16-concurrency.spec.ts`) fires two parallel requests against real Postgres for
+each race and asserts one row / one accepted write / no orphan user. Full gate
+green: unit **1525/1525**, e2e **81/81**.
+
+---
+
+### ✅ P1.2 — Migration runner is fragile; docs contradict it (2026-09-27)
+
+**Was:** the hand-rolled runner split SQL on `;` (breaking `$$` bodies), ran
+each statement outside a transaction, and keyed the ledger on the **filename**
+(so a renamed/regenerated file re-applied the whole init migration). The cluster
+compose started **four** migrate services with no lock against non-idempotent
+DDL, and the docs told operators to run `drizzle-kit push --force` in
+production.
+
+**Shipped:**
+- `src/lib/db/migrate.ts` now wraps **drizzle's own migrator**
+  (`drizzle-orm/node-postgres/migrator`): journal-driven ordering, split on
+  `--> statement-breakpoint` (a `$$`-quoted function body survives), the whole
+  run in one transaction, and a SHA-256 content-hash ledger. A renamed or
+  regenerated file is never re-applied.
+- The runner takes a database-wide `pg_advisory_lock` on a dedicated
+  connection for the whole run, so concurrent runners queue instead of racing.
+- `src/lib/db/migration-ledger.ts` reconciles the old filename ledger in place
+  (filename → content hash + journal `when`), so existing deployments keep
+  their history; an unmatched row is neutralized rather than allowed to pin the
+  ledger. Unit-tested (`migration-ledger.spec.ts`).
+- A database with tables but no history (a `drizzle-kit push` DB) now fails
+  with an actionable message; `pnpm db:migrate --baseline` records the current
+  migrations as applied in one explicit step.
+- `0002_*.sql` / `0003_*.sql` made idempotent (`ADD COLUMN IF NOT EXISTS`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS`).
+- `docker/compose.cluster.yml` has a **single** `migrate` service; all four
+  role apps `depends_on: migrate: service_completed_successfully`. The vestigial
+  `RUN_MIGRATIONS` env and `migrate-*` services are gone.
+- `docs/DEPLOYMENT.md` / `docs/SETUP.md` now describe the runner and ban
+  `drizzle-kit push --force` outside local dev.
+
+**Verify.** Integration (manual, scratch DB): create empty database → run
+`db:migrate` → 6 migrations applied, 24 tables, ledger 6/6 content hashes → run
+again → no-op, no error. On the existing `db:push` dev DB: `db:migrate` refuses
+with the baseline hint; `db:migrate --baseline` records 6 rows and the next run
+is a no-op. `migration-ledger.spec.ts` covers the reconciliation planner.
+
+---
+
+### ✅ P1.3 — Timezone: pin the business timezone (2026-09-27)
+
+**Was:** range filters used **server-local** end-of-day
+(`src/lib/pagination.ts:79`, `orders/payable/route.ts:56`), analytics grouped
+by the DB session timezone (`date(created_at)`), and no container set `TZ`, so
+a Dhaka evening order landed in the next day's bucket and "today" leaked into
+tomorrow by up to six hours. The date picker also formatted via
+`toISOString()`, shifting its presets back a day on a Dhaka browser.
+
+**Shipped:**
+- `src/lib/timezone.ts` — `BUSINESS_TIMEZONE = "Asia/Dhaka"` and the day math
+  (`businessDateString`, `businessDayStart/End/Range`, `businessRangeBound`,
+  `businessToday`, `addBusinessDays`, month helpers). Host-timezone independent
+  (uses `Intl` with the IANA zone; two-pass offset for DST correctness).
+- `parseDateRange` now bounds the Dhaka calendar day (inclusive), and
+  `orders/payable/route.ts` uses the same helper.
+- `src/lib/db/time-sql.ts` — `businessDate(col)` renders
+  `date(col AT TIME ZONE 'Asia/Dhaka')::text`; analytics groups/orders by it.
+- `src/lib/db/index.ts` pins the session timezone
+  (`options: "-c timezone=Asia/Dhaka"`) on both pools.
+- `DateRangePicker` builds presets from business-local dates; Dockerfile adds
+  `tzdata` + `ENV TZ=Asia/Dhaka`; `.env.example` documents `TZ`.
+
+**Verify.** Unit: `timezone.spec.ts` (Dhaka boundaries, UTC+6, DST-safe
+end = next-start − 1ms, month math) and `time-sql.spec.ts` (renders the explicit
+zone, `::text`, no params); `pagination.spec.ts` pins the exact UTC bounds. E2E
+**S50** (`17-timezone.spec.ts`) moves a seeded order to `2031-03-15T20:00Z`
+(= 2031-03-16 02:00 Dhaka) and asserts the analytics bucket and the list date
+range agree. Full gate green: unit **1549/1549**, e2e **82/82**.
+
+---
+
+### ✅ P1.4 — Lifecycle writes are atomic; audit inside the tx (2026-09-27)
+
+**Was:** `logAudit` ran **after** commit, so a crash between the two lost the
+trail; registration/team creation could orphan the auth user on a partial
+failure; `merchant.email` could change without syncing `user.email` (duplicate →
+500); and there was no order status history, so `reattempt` erased the prior
+failure.
+
+**Shipped:**
+- **Order transitions** (`src/features/orders/transitions.ts`) write the audit
+  row and an `order_status_history` row **inside the transition transaction**
+  (single and bulk). A failed audit now rolls the change back instead of
+  committing state without a trail.
+- **`order_status_history`** (migration `0006_exotic_squadron_sinister.sql`):
+  append-only `orderId` / `fromStatus` / `toStatus` / `transition` / actor /
+  `note` / `createdAt`, indexed on `(orderId, createdAt)`. The `reattempt`
+  reason and the failure note survive even though the order row clears them.
+- **Registration** (`merchants/route.ts`) and **team creation**
+  (`team/route.ts`): the Better Auth user is created first, then the app tables
+  are written in one transaction; a failure deletes the user instead of leaving
+  an orphan. The activation email is sent after commit.
+- **Merchant email** (`merchants/[id]/route.ts`): the owner's `user.email` is
+  synced in the same transaction as `merchant.email`, and a duplicate returns
+  **409** via `isUniqueViolation` instead of a 500.
+
+**Verify.** Unit: audit failure → 500 (change not committed); history row
+written with the right from/to; duplicate email → 409; owner user email synced.
+E2E **S51** (`18-order-history.spec.ts`): drive `OUT_FOR_DELIVERY → failed →
+reattempt` and assert the history keeps both rows (with the failure note) while
+the order row's `failureNote` is null. Full gate green: unit **1551/1551**,
+e2e **83/83**.
+
+---
+
+### ✅ P1.5 — Durable email (outbox) instead of fire-and-forget (2026-09-27)
+
+**Was:** sends were unawaited with in-process retries, so a frozen serverless
+invocation or a crash after commit lost the send and its retries, and the
+`email_log` row only landed once the attempt resolved.
+
+**Shipped:**
+- `email_outbox` (migration `0007_cold_doomsday.sql`): a durable queue with
+  `PENDING/SENDING/SENT/FAILED`, `attempts`, `lastError`, `nextAttemptAt`.
+- `src/lib/email-outbox.ts`: `enqueueEmail(payload, tx)` inserts the row in the
+  caller's transaction; `drainEmailOutbox()` claims due rows with
+  `FOR UPDATE SKIP LOCKED`, sends via the existing mailer (`maxRetries: 0`, so
+  `email_log` stays the delivery record), deletes on success and requeues with
+  exponential backoff (5 attempts max) on failure. Stale `SENDING` rows are
+  recovered. `flushEmailOutbox()` is the never-throwing post-commit kick.
+- Every transactional sender now enqueues in the domain transaction and flushes
+  after commit: merchant registration + approval, team creation + resend,
+  moderator invite + resend, rider approve/reject, and the Better Auth password
+  reset / change-email callbacks.
+- `POST /api/cron/drain-email-outbox` (every minute) delivers anything a
+  request could not; added to the cluster cron container, `vercel.json`, and the
+  deploy/setup docs.
+
+**Verify.** Unit (`email-outbox.spec.ts`): enqueue joins recipients; drain sends
+and deletes; failure requeues with backoff; final failure marks FAILED; stale
+SENDING recovery. Existing route specs assert the email is enqueued inside the
+transaction. E2E **S52** (`19-email-outbox.spec.ts`): insert a row as if the
+request died after commit, run the cron, and assert it is processed and an
+`email_log` delivery row is written. Full gate green: unit **1557/1557**,
+e2e **84/84** (S42's resend flow re-verified end-to-end).
+
+---
+
+### ✅ P1.6 — Missing constraints, indexes, and typed counts (2026-09-27)
+
+**Was:** `profile.merchantId/warehouseId/riderId` had no FK (dangling ids after
+a delete); `profile.merchantId` had no index despite hot moderator lookups;
+several search columns had no trigram index; and ~15 `count(*)` sites used
+`sql<number>` without a cast, so `total` serialized as a **string**.
+
+**Shipped** (migration `0008_fat_old_lace.sql`, idempotent):
+- `profile` FKs on `merchantId`/`warehouseId`/`riderId` with `ON DELETE SET
+  NULL`; the migration first unlinks any dangling reference so it can't fail.
+- `profile_merchant_id_idx`, `profile_warehouse_id_idx`.
+- GIN trigram indexes: `merchant.nidNumber`,
+  `support_ticket.subject/message/actorName`.
+- `rider.email` uniqueness was already shipped in P1.1 (`rider_email_uniq`).
+- `count(*)::int` on every paginated list route (orders, payouts, merchants,
+  audit-logs, email-logs, riders, team, support, announcements,
+  pickup-locations, warehouses, rider-applications, merchant balance) and the
+  order-count aggregate.
+
+**Verify.** `db:generate` produced exactly these 9 statements. E2E **S53**
+(`20-typed-counts.spec.ts`) asserts `total` is a `number` on the merchants /
+audit-logs / email-logs / riders lists and that every `/api/orders/counts`
+aggregate is a number. Full gate green: unit **1557/1557**, e2e **86/86**.
+
+---
 ## P1 — Correctness & consistency
 
-### P1.1 Check-then-write races need constraints + transactions
+### P1.1 Check-then-write races need constraints + transactions — ✅ shipped
 
 | Flow | Evidence | Fix |
 |------|----------|-----|
@@ -233,7 +611,7 @@ files.
 **Verify.** Unit tests for each guard (wrong state → 4xx); one integration test
 per race using two parallel transactions against a real Postgres.
 
-### P1.2 Migration runner is fragile; docs contradict it
+### P1.2 Migration runner is fragile; docs contradict it — ✅ shipped
 
 **Problem.** `src/lib/db/migrate.ts:8-14` splits SQL on `;` (breaks any
 `$$`-quoted function body) and runs statements outside a transaction; it keys
@@ -255,7 +633,7 @@ per-migration transactions; wrap in `pg_advisory_lock`; make DDL idempotent
 consistent; run with a `$$` function migration → succeeds. Docs: `DEPLOYMENT.md`
 commands match compose.
 
-### P1.3 Timezone: pin the business timezone
+### P1.3 Timezone: pin the business timezone — ✅ shipped
 
 **Problem.** Range filters use **server-local** end-of-day
 (`src/lib/pagination.ts:79` — `to.setHours(23,59,59,999)`) and
@@ -271,7 +649,7 @@ explicit `AT TIME ZONE 'Asia/Dhaka'` in filters and groupings; add tests.
 **Verify.** Unit: a range for a Dhaka day includes exactly the Dhaka-day orders.
 E2E: dashboard/analytics counts for a fixed fixture date.
 
-### P1.4 Lifecycle writes should be atomic (and audit inside the tx)
+### P1.4 Lifecycle writes should be atomic (and audit inside the tx) — ✅ shipped
 
 **Problem.** (a) `logAudit` swallows errors and runs **after** commit
 (`src/lib/audit.ts:40-54`; callers e.g. `transitions.ts:603-617`,
@@ -291,7 +669,7 @@ immutable or sync it transactionally with a 409 on conflict; add an
 **Verify.** Unit: audit failure rolls back the state change; duplicate email →
 409. Integration: reattempt preserves history rows.
 
-### P1.5 Durable email (outbox) instead of fire-and-forget
+### P1.5 Durable email (outbox) instead of fire-and-forget — ✅ shipped
 
 **Problem.** Sends are unawaited with in-process retries —
 `src/lib/auth.ts:35,59`, `src/lib/activation.ts:100`,
@@ -308,7 +686,7 @@ record.
 sent/failed. Integration: kill the process after commit → row still delivered on
 next drain.
 
-### P1.6 Missing constraints, indexes, and typed counts
+### P1.6 Missing constraints, indexes, and typed counts — ✅ shipped
 
 | Item | Evidence | Fix |
 |------|----------|-----|
@@ -368,7 +746,7 @@ healthchecks there; keep `/api/health` as liveness.
 
 **Problem.** `ci.yml` runs typecheck/lint/format/unit/build/security — no
 Playwright job; `ci:test` exists but is never invoked. Regressions in roles,
-auth, money flows, and moderator/activation (S1–S42) ship unseen. Separately,
+auth, money flows, and moderator/activation (S1–S45) ship unseen. Separately,
 the suite is flaky-prone: `networkidle` ×77 and fixed sleeps.
 
 **Fix.** Add an E2E job with a Postgres service + `pnpm build` + `pnpm test:e2e`
@@ -503,28 +881,30 @@ Supabase **storage** removed (local + R2 only); SOC 2 removed by decision.
 - **Secrets**: `.env*` gitignored; `validateEnv()` enforces a ≥32-char auth
   secret and production SMTP key; SMTP password AES-256-GCM encrypted.
 - **Money invariant (new)**: once P0.4 lands, `merchant_balance` must always
-  equal the sum of its SETTLED ledger rows — assert it in tests.
-- **Spec coverage**: 1377 unit + 65 e2e — keep new routes/branches covered
-  (colocated `<resource>.spec.ts`; e2e `S<n>` serial, next is S43).
+  equal the sum of its SETTLED ledger rows — assert it in tests. Since P0.8 they
+  are `numeric(14,2)`, so the assertion is exact, not a float tolerance (S48).
+- **Spec coverage**: 1496 unit + 78 e2e — keep new routes/branches covered
+  (colocated `<resource>.spec.ts`; e2e `S<n>` serial, next is S49).
 
 ---
 
 ## Execution order
 
 ```
-1. P0.1  Public PII + guessable ids            (security)
-2. P0.2  Upload auth + public NID exposure     (security)
-3. P0.3  Payout race + bulk ledger gap         (money)
-4. P0.4  Money type + ledger signs + recon test(money)
-5. P0.5  Server-side 2FA / email verification  (authz)
-6. P0.6  Rate-limit hardening                  (abuse)
-7. P0.7  Signup off, log/token hygiene         (hygiene)
-8. P1.1  TOCTOU constraints + transactions     (correctness)
-9. P1.2  Migration runner + docs               (ops)
-10. P1.3 Timezone                              (correctness)
-11. P1.4 Atomic lifecycle + audit + history    (correctness)
-12. P1.5 Email outbox                          (reliability)
-13. P1.6 Constraints/indexes/counts            (data)
+1. ✅ P0.1  Public PII + guessable ids            (security) — DONE
+2. ✅ P0.2  Upload auth + public NID exposure     (security) — DONE
+3. ✅ P0.3  Payout race + bulk ledger gap         (money) — DONE
+4. ✅ P0.4  Money rounding + ledger signs + recon (money) — DONE
+5. ✅ P0.5  Server-side 2FA / email verification  (authz) - DONE
+6. ✅ P0.6  Rate-limit hardening                  (abuse) - DONE
+7. ✅ P0.7  Signup off, log/token hygiene         (hygiene) - DONE
+7b. ✅ P0.8 Money columns to numeric(14,2)     (money) — DONE
+8. ✅ P1.1 TOCTOU constraints + transactions     (correctness) — DONE
+9. ✅ P1.2  Migration runner + docs               (ops) — DONE
+10. ✅ P1.3 Timezone                              (correctness) — DONE
+11. ✅ P1.4 Atomic lifecycle + audit + history    (correctness) — DONE
+12. ✅ P1.5 Email outbox                          (reliability) — DONE
+13. ✅ P1.6 Constraints/indexes/counts            (data) — DONE
 14. P2.1 Deploy safety                         (ops)
 15. P2.2 Observability                         (ops)
 16. P2.3 Readiness probe                       (ops)

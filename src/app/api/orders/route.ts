@@ -19,6 +19,7 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api-response"
+import { orderChargeAmount, toPaisa } from "@/lib/balance-ledger"
 import { db, dbRead } from "@/lib/db"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
@@ -49,6 +50,7 @@ import {
   calcMerchantEarnings,
 } from "@/lib/pricing"
 import { rateLimitByIp } from "@/lib/rate-limit"
+import { generateTrackingToken } from "@/lib/tracking-token"
 import { orderCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -142,12 +144,15 @@ export const GET = withErrorHandler(async (req: Request) => {
   // COUNT only needs JOINs when the search clause references merchant/warehouse columns.
   const countQuery = search
     ? dbRead
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(order)
         .leftJoin(merchant, eq(order.merchantId, merchant.id))
         .leftJoin(warehouse, eq(order.warehouseId, warehouse.id))
         .where(where)
-    : dbRead.select({ count: sql<number>`count(*)` }).from(order).where(where)
+    : dbRead
+        .select({ count: sql<number>`count(*)::int` })
+        .from(order)
+        .where(where)
 
   const sortColumnMap = {
     order: order.id,
@@ -197,9 +202,12 @@ export const POST = withErrorHandler(async (req: Request) => {
     deliveryMapLink,
     parcelWeightKg,
     deliveryType,
-    productCost,
+    productCost: rawProductCost,
     merchantNote,
   } = parsed.data
+
+  // Money is stored to paisa (ROADMAP P0.4) — never carry sub-paisa noise.
+  const productCost = toPaisa(rawProductCost)
 
   const normalizedMapLink = deliveryMapLink?.trim()
     ? deliveryMapLink.trim()
@@ -290,6 +298,9 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
   let pricing: PricingInput = merchantRow
   if (origCity?.zoneId && destCity?.zoneId) {
+    // At most one row per (fromZone, toZone) — `zone_pricing_pair_uniq`
+    // (ROADMAP P1.1), so this pick is deterministic. The limit is kept as a
+    // guard against a pair that somehow predates the index.
     const [zonePrice] = await dbRead
       .select()
       .from(zonePricing)
@@ -323,6 +334,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         merchantId,
         pickupLocationId,
         warehouseId: hub.id,
+        trackingToken: generateTrackingToken(),
         recipientName,
         recipientPhone,
         deliveryCityId: destCityId ?? null,
@@ -358,7 +370,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         createdAt: order.createdAt,
       })
 
-    const platformFee = deliveryFee + codFee
+    const platformFee = orderChargeAmount(deliveryFee, codFee)
 
     // Append an ORDER_CHARGE ledger entry for this order's platform fee.
     await tx.insert(balanceTransaction).values({

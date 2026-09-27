@@ -200,6 +200,12 @@ export const settings = {
 }
 
 // ─── Branding ────────────────────────────────────────────────────────────────
+// --- Public tracking (P0.1 token-gated receiver note) ---
+export const tracking = {
+  noteInput: "[data-testid='receiver-note-input']",
+  noteLocked: "[data-testid='receiver-note-locked']",
+}
+
 // --- Merchants (moderators) + staff activation (S41/S42) ---
 export const moderators = {
   card: "[data-testid='moderators-card']",

@@ -44,6 +44,17 @@ vi.mock("@/lib/activation", async (importOriginal) => ({
   sendActivationEmail: activationState.sendActivationEmail,
 }))
 
+vi.mock("@/lib/email-outbox", () => ({
+  enqueueEmail: vi.fn(async () => {}),
+  flushEmailOutbox: vi.fn(async () => {}),
+  drainEmailOutbox: vi.fn(async () => ({
+    claimed: 0,
+    sent: 0,
+    failed: 0,
+    requeued: 0,
+  })),
+}))
+
 const selectQueue: unknown[][] = []
 const insertPayloads: Record<string, unknown>[] = []
 const updateResult: unknown[] = []
@@ -90,6 +101,8 @@ vi.mock("@/lib/db", () => {
     select: () => makeSelectChain(),
     insert: () => makeInsertChain(),
     update: () => makeUpdateChain(),
+    delete: () => ({ where: () => Promise.resolve([]) }),
+    transaction: (fn: (tx: unknown) => unknown) => fn(db),
   }
   return { db, dbRead: { ...db, select: () => makeSelectChain() }, pool: {} }
 })
@@ -225,12 +238,16 @@ describe("POST /api/team", () => {
     })
     expect(activationState.issueActivationToken).toHaveBeenCalledWith(
       "auth_user_id",
+      // Token is issued inside the creation transaction (ROADMAP P1.4).
+      expect.anything(),
     )
     expect(activationState.sendActivationEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "new@test.com",
         rawToken: "raw-token",
       }),
+      // Enqueued inside the creation transaction (ROADMAP P1.5).
+      expect.anything(),
     )
   })
 })
@@ -274,9 +291,14 @@ describe("POST /api/team/:id/resend-activation", () => {
     ])
     const res = await resendActivation(req("POST"), ctx())
     expect(res.status).toBe(200)
-    expect(activationState.issueActivationToken).toHaveBeenCalledWith("user_1")
+    expect(activationState.issueActivationToken).toHaveBeenCalledWith(
+      "user_1",
+      // Token re-issued inside the resend transaction (ROADMAP P1.5).
+      expect.anything(),
+    )
     expect(activationState.sendActivationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "pat@test.com", rawToken: "raw-token" }),
+      expect.anything(),
     )
   })
 })

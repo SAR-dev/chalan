@@ -16,6 +16,7 @@ import { siteConfig } from "@/config/site"
 import { decryptSecret } from "@/lib/crypto"
 import { db, dbRead } from "@/lib/db"
 import { emailLog, mailConfig } from "@/lib/db/schema"
+import { redactAndTruncate } from "@/lib/redact"
 
 export interface MailPayload {
   to: string | string[]
@@ -118,6 +119,21 @@ function stripHtml(html: string): string {
 // Inserts one row into `email_log` for a fully-resolved send attempt
 // (success or exhausted-retries failure). Never throws — logging must not
 // mask the original mail outcome.
+//
+// ROADMAP P0.7: the row used to store the *entire* HTML body, unbounded. It is
+// now truncated to MAX_LOGGED_BODY characters, which is all the admin Email
+// Logs page needs to show what was sent. Single-use link parameters are kept
+// here on purpose: the table is admin-only, pruned after
+// EMAIL_LOG_RETENTION_DAYS (default 10), and the tokens in it expire in 24h and
+// are consumed on first use — whereas the *console* log (which reaches log
+// aggregators and CI output) is redacted, so no live token is written there.
+const MAX_LOGGED_BODY = 2_000
+
+function boundForLog(value: string, max = MAX_LOGGED_BODY): string {
+  if (value.length <= max) return value
+  return `${value.slice(0, max)}\n… [truncated ${value.length - max} chars]`
+}
+
 async function logEmail(
   payload: MailPayload,
   status: (typeof emailLog.$inferInsert)["status"],
@@ -134,9 +150,9 @@ async function logEmail(
       subject: payload.subject,
       status,
       attempts,
-      error: error ?? null,
-      body: payload.html ?? null,
-      textBody,
+      error: error ? boundForLog(error, 500) : null,
+      body: payload.html ? boundForLog(payload.html) : null,
+      textBody: textBody ? boundForLog(textBody) : null,
     })
   } catch (dbErr) {
     console.error("[mailer] Failed to write email_log entry:", dbErr)
@@ -155,10 +171,12 @@ export async function sendMail(
     }
   }
 
-  // Always log the plain text version for debugging
+  // Log the plain-text version for debugging — redacted and truncated, because
+  // it carries password-reset/activation links (ROADMAP P0.7). Writing those to
+  // stdout put live tokens in container logs, CI output and log aggregators.
   if (text) {
     console.log(
-      `[mailer] Sending to ${payload.to} | Subject: ${payload.subject}\n---\n${text}\n---`,
+      `[mailer] Sending to ${payload.to} | Subject: ${payload.subject}\n---\n${redactAndTruncate(text)}\n---`,
     )
   }
 

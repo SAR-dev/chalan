@@ -1,8 +1,23 @@
 import { readFile, stat } from "node:fs/promises"
 import { extname, join, normalize, sep } from "node:path"
 import { NextResponse } from "next/server"
-import { notFound } from "@/lib/api-response"
+import { requireSession } from "@/lib/api-auth"
+import { forbidden, notFound, unauthorized } from "@/lib/api-response"
+import {
+  OWNER_ONLY_UPLOAD_FOLDERS,
+  PUBLIC_UPLOAD_FOLDERS,
+  type UploadFolder,
+} from "@/lib/storage/config"
 import { LOCAL_UPLOADS_DIR } from "@/lib/storage/local"
+
+// Serves locally-stored uploads with a folder-based access policy (ROADMAP
+// P0.2). Previously every stored file was world-readable, which exposed NID
+// documents. Policy lives in lib/storage/config.ts:
+//   - `logos` is public (merchant branding on the public tracking page).
+//   - `avatars` / `nids` are readable only by their owner or a SUPER_ADMIN.
+//   - everything else requires any authenticated session.
+// Auth is checked BEFORE the file is touched, so an unauthorized caller cannot
+// even probe which paths exist.
 
 const CONTENT_TYPES: Record<string, string> = {
   ".png": "image/png",
@@ -25,6 +40,18 @@ export async function GET(
     return notFound()
   }
 
+  const folder = segments[0] as UploadFolder
+  const isPublic = PUBLIC_UPLOAD_FOLDERS.includes(folder)
+  const isOwnerOnly = OWNER_ONLY_UPLOAD_FOLDERS.includes(folder)
+
+  if (!isPublic) {
+    const me = await requireSession()
+    if (!me) return unauthorized()
+    if (isOwnerOnly && me.role !== "SUPER_ADMIN" && segments[1] !== me.userId) {
+      return forbidden()
+    }
+  }
+
   const relativePath = segments.join("/")
   const targetPath = normalize(join(LOCAL_UPLOADS_DIR, relativePath))
   const root = normalize(LOCAL_UPLOADS_DIR + sep)
@@ -45,7 +72,11 @@ export async function GET(
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=31536000, immutable",
+        // Public assets may be cached by shared caches; private ones stay in
+        // the browser only (they are immutable by UUID naming).
+        "Cache-Control": isPublic
+          ? "public, max-age=31536000, immutable"
+          : "private, max-age=31536000, immutable",
       },
     })
   } catch {

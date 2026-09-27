@@ -71,7 +71,10 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   // COUNT and data fetch are independent — run them in parallel.
   const [[{ count }], rows] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(emailLog).where(where),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emailLog)
+      .where(where),
     q,
   ])
 

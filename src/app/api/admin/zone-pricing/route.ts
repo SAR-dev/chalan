@@ -37,34 +37,40 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (parsed.error) return parsed.error
 
   const { fromZoneId, toZoneId, ...pricing } = parsed.data
+  const pair = and(
+    eq(zonePricing.fromZoneId, fromZoneId),
+    eq(zonePricing.toZoneId, toZoneId),
+  )
+  const set = { ...pricing, updatedAt: new Date().toISOString() }
 
-  // Upsert: if a row exists for this zone pair, update it; otherwise insert
-  const existing = await db
-    .select({ id: zonePricing.id })
-    .from(zonePricing)
-    .where(
-      and(
-        eq(zonePricing.fromZoneId, fromZoneId),
-        eq(zonePricing.toZoneId, toZoneId),
-      ),
-    )
-    .limit(1)
+  // Update-first, insert-second, no read: the old select-then-branch let two
+  // concurrent saves for the same zone pair each insert a row, and order
+  // pricing then picked an arbitrary one (ROADMAP P1.1). The unique index on
+  // (fromZoneId, toZoneId) makes the pair single-valued, so:
+  //   1. an existing row is updated (200),
+  //   2. otherwise we try to insert (201),
+  //   3. if we lost that race we update the row the winner just inserted.
+  const [updated] = await db
+    .update(zonePricing)
+    .set(set)
+    .where(pair)
+    .returning()
+  if (updated) return NextResponse.json(updated)
 
-  let result
-  if (existing.length > 0) {
-    const [updated] = await db
-      .update(zonePricing)
-      .set({ ...pricing, updatedAt: new Date().toISOString() })
-      .where(eq(zonePricing.id, existing[0].id))
-      .returning()
-    result = updated
-  } else {
-    const [created] = await db
-      .insert(zonePricing)
-      .values({ fromZoneId, toZoneId, ...pricing })
-      .returning()
-    result = created
+  const [created] = await db
+    .insert(zonePricing)
+    .values({ fromZoneId, toZoneId, ...pricing })
+    .onConflictDoNothing()
+    .returning()
+  if (created) return NextResponse.json(created, { status: 201 })
+
+  const [retried] = await db
+    .update(zonePricing)
+    .set(set)
+    .where(pair)
+    .returning()
+  if (!retried) {
+    throw new Error("Zone pricing write lost to a concurrent request")
   }
-
-  return NextResponse.json(result, { status: existing.length > 0 ? 200 : 201 })
+  return NextResponse.json(retried)
 })

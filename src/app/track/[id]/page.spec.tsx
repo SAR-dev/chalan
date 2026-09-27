@@ -41,12 +41,24 @@ async function importPage(id = "PF-UNKNOWN") {
   renderPage(Component)
 }
 
-const orderRow = () => [
+const TRACKING_TOKEN = "a".repeat(32)
+
+const orderRow = (trackingToken: string | null = null) => [
   makeOrder({
     warehouseId: undefined,
     pickupRiderId: null,
     deliveryRiderId: null,
+    trackingToken,
   }),
+]
+
+const merchantRow = () => [
+  {
+    id: "m_1",
+    businessName: "Acme Goods",
+    brandColor: "#2563eb",
+    hidePlatformBranding: false,
+  },
 ]
 
 describe("Track detail page", () => {
@@ -108,5 +120,27 @@ describe("Track detail page", () => {
     )
     expect(screen.queryByTestId("track-brand-logo")).not.toBeInTheDocument()
     expect(screen.queryByTestId("track-accent")).not.toBeInTheDocument()
+  })
+
+  it("enables the recipient note form when opened with the tracking token", async () => {
+    dbQueue.reset()
+    dbQueue.enqueue(orderRow(TRACKING_TOKEN), merchantRow())
+    await importPage(TRACKING_TOKEN)
+
+    expect(screen.getByRole("textbox")).toBeInTheDocument()
+    expect(
+      screen.queryByText(/Open the tracking link shared with you/i),
+    ).not.toBeInTheDocument()
+  })
+
+  it("hides the note form when opened with the human order code", async () => {
+    dbQueue.reset()
+    dbQueue.enqueue(orderRow(TRACKING_TOKEN), merchantRow())
+    await importPage("ORD-CODE-ONLY")
+
+    expect(
+      screen.getByText(/Open the tracking link shared with you/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
 })

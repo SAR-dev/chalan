@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { dbRead } from "@/lib/db"
+import { sumMoney, sumMoneyFiltered } from "@/lib/db/money-sql"
 import { order, rider } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -23,8 +24,11 @@ export const GET = withErrorHandler(async () => {
     .select({
       riderId: rider.id,
       riderName: rider.name,
-      totalCollected: sql<number>`coalesce(sum(${order.amountCollected}), 0)`,
-      totalSubmitted: sql<number>`coalesce(sum(case when ${order.codSettledAt} is not null then ${order.amountCollected} else 0 end), 0)`,
+      totalCollected: sumMoney(order.amountCollected),
+      totalSubmitted: sumMoneyFiltered(
+        order.amountCollected,
+        sql`${order.codSettledAt} is not null`,
+      ),
     })
     .from(rider)
     .leftJoin(order, eq(order.deliveryRiderId, rider.id))

@@ -9,6 +9,8 @@ import {
 } from "drizzle-orm/pg-core"
 import { profileRoles } from "./enums"
 import { ts } from "./helpers"
+import { merchant } from "./merchants"
+import { rider, warehouse } from "./warehouses"
 
 // =============================================================================
 // Better Auth tables
@@ -159,12 +161,19 @@ export const profile = pgTable(
     // explicit `pageSize` prop. Clamped to 1-250 at the validation layer
     // (lib/validation.ts) and again defensively in components/data-table.tsx.
     tableRowsPerPage: integer("tableRowsPerPage").notNull().default(20),
-    // Domain entity references. Stored as plain text (no FK constraint) to avoid
-    // circular dependencies between the profile table and its referents.
-    // Only the field matching the user's role is expected to be populated.
-    warehouseId: text("warehouseId"), // WAREHOUSE_ADMIN: the warehouse they manage
-    merchantId: text("merchantId"), // MERCHANT: their merchant business
-    riderId: text("riderId"), // RIDER: their rider profile
+    // Domain entity references. Only the field matching the user's role is
+    // expected to be populated. FKs with `ON DELETE SET NULL` so removing the
+    // domain row unlinks the account instead of leaving a dangling id
+    // (ROADMAP P1.6).
+    warehouseId: text("warehouseId").references(() => warehouse.id, {
+      onDelete: "set null",
+    }), // WAREHOUSE_ADMIN: the warehouse they manage
+    merchantId: text("merchantId").references(() => merchant.id, {
+      onDelete: "set null",
+    }), // MERCHANT: their merchant business
+    riderId: text("riderId").references(() => rider.id, {
+      onDelete: "set null",
+    }), // RIDER: their rider profile
     // Merchant moderator accounts (ROADMAP 5.2). `isModerator` distinguishes
     // staff from the merchant owner; `moderatorPermissions` holds the nav
     // hrefs the owner granted (jsonb array, null for owners). `activatedAt`
@@ -178,6 +187,10 @@ export const profile = pgTable(
   (t) => [
     index("profile_role_idx").on(t.role),
     index("profile_rider_id_idx").on(t.riderId),
+    // Hot moderator/owner lookups filter by merchant; warehouse rosters by
+    // warehouse (ROADMAP P1.6).
+    index("profile_merchant_id_idx").on(t.merchantId),
+    index("profile_warehouse_id_idx").on(t.warehouseId),
     index("profile_phone_trgm_idx").using("gin", sql`${t.phone} gin_trgm_ops`),
   ],
 )

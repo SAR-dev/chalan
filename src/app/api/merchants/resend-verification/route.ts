@@ -1,4 +1,3 @@
-import { createId } from "@paralleldrive/cuid2"
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -8,9 +7,8 @@ import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody } from "@/lib/validation"
+import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
 import { withErrorHandler } from "@/lib/with-error-handler"
-
-const TOKEN_EXPIRY_HOURS = 24
 
 const resendVerificationSchema = z.object({
   email: z.email("A valid email is required"),
@@ -24,7 +22,9 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   // Public relay into the SMTP queue — tight per-IP budget and a 5 min window
   // so it cannot be abused to flood a mailbox or spam the mailer.
-  const limited = await rateLimitByIp(req, "resend-verification", 3, 300)
+  const limited = await rateLimitByIp(req, "resend-verification", 3, 300, {
+    failClosed: true,
+  })
   if (limited) return limited
 
   const { email } = parsed.data
@@ -46,21 +46,19 @@ export const POST = withErrorHandler(async (req: Request) => {
     return NextResponse.json({ success: true })
   }
 
-  const token = createId()
-  const expiresAt = new Date(
-    Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
-  ).toISOString()
+  // Only the hash is stored (ROADMAP P0.7); the raw token lives in the email.
+  const { raw: token, hash, expiresAt } = issueVerifyToken()
 
   await db
     .update(merchant)
     .set({
-      emailVerificationToken: token,
+      emailVerificationToken: hash,
       emailVerificationExpiresAt: expiresAt,
     })
     .where(eq(merchant.id, row.id))
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-  const verificationUrl = `${siteUrl}/api/auth/verify-email?token=${token}`
+  const verificationUrl = verifyTokenUrl(token, siteUrl)
 
   const template = await merchantVerifyEmailTemplate({
     ownerName: row.ownerName,

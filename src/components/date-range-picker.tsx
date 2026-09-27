@@ -11,6 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  addBusinessDays,
+  businessMonthStart,
+  businessPrevMonthRange,
+  businessToday,
+} from "@/lib/timezone"
 import { cn } from "@/lib/utils"
 
 const PRESETS = [
@@ -20,32 +26,6 @@ const PRESETS = [
   { label: "This month", days: undefined, isMonth: true },
   { label: "Last month", days: undefined, isLastMonth: true },
 ] as const
-
-function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
-
-function startOfMonth(): Date {
-  const d = new Date()
-  d.setDate(1)
-  return d
-}
-
-function startOfPrevMonth(): Date {
-  const d = new Date()
-  d.setMonth(d.getMonth() - 1)
-  d.setDate(1)
-  return d
-}
-
-function endOfPrevMonth(): Date {
-  const d = new Date()
-  d.setMonth(d.getMonth() - 1)
-  d.setDate(1)
-  d.setMonth(d.getMonth() + 1)
-  d.setDate(0)
-  return d
-}
 
 interface DateRangePickerProps {
   from: string | undefined
@@ -67,28 +47,26 @@ export function DateRangePicker({
   const applyPreset = useCallback(
     (value: string) => {
       setPreset(value)
-      const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      // Business-local calendar days, so "Today" is the Dhaka day even when
+      // the browser is not in that zone (ROADMAP P1.3).
+      const today = businessToday()
 
       if (value === "Today") {
-        onFromChange(formatDate(today))
-        onToChange(formatDate(today))
+        onFromChange(today)
+        onToChange(today)
       } else if (value === "Last 7 days") {
-        const from = new Date(today)
-        from.setDate(from.getDate() - 6)
-        onFromChange(formatDate(from))
-        onToChange(formatDate(today))
+        onFromChange(addBusinessDays(today, -6))
+        onToChange(today)
       } else if (value === "Last 30 days") {
-        const from = new Date(today)
-        from.setDate(from.getDate() - 29)
-        onFromChange(formatDate(from))
-        onToChange(formatDate(today))
+        onFromChange(addBusinessDays(today, -29))
+        onToChange(today)
       } else if (value === "This month") {
-        onFromChange(formatDate(startOfMonth()))
-        onToChange(formatDate(today))
+        onFromChange(businessMonthStart(today))
+        onToChange(today)
       } else if (value === "Last month") {
-        onFromChange(formatDate(startOfPrevMonth()))
-        onToChange(formatDate(endOfPrevMonth()))
+        const range = businessPrevMonthRange(today)
+        onFromChange(range.from)
+        onToChange(range.to)
       }
     },
     [onFromChange, onToChange],

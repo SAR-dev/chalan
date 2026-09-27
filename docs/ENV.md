@@ -64,7 +64,7 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 | Variable    | Required | Default | Description                                                                                          |
 | ----------- | -------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `REDIS_URL` | No       | —       | Redis connection string. When set, API rate limits are shared across app instances; otherwise an in-memory store is used (single-instance dev). Ignored if the connection fails. |
+| `REDIS_URL` | No       | —       | Redis connection string. When set, API rate limits are shared across app instances; otherwise an in-memory store is used (single-instance dev). Ignored if the connection fails.  **In production an unset value is reported on `/api/health` (`rateLimiter.degraded: true`) and logged once at boot** - limits are then per-instance, so a multi-instance deploy can be bypassed. |
 
 ---
 
@@ -72,8 +72,9 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 
 | Variable             | Required | Default   | Description                                                                                                                                                                                                                                                                                        |
 | -------------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ADMIN_IP_ALLOWLIST` | No       | disabled  | Comma-separated IPs/CIDRs allowed to reach the admin portal: paths starting with `/dashboard` and `/api/admin` (e.g. `203.0.113.5,10.0.0.0/8,2001:db8::/32`). Exact IPv4/IPv6 and CIDR ranges are supported; `*` allows any IP. Unset or empty disables the check entirely (default — e2e and dev are unaffected). Invalid entries are ignored (boot fails if none are valid). Requests from other IPs get `403` and are logged. Other admin-gated APIs are not covered — they rely on role authz. |
-| `ADMIN_2FA_REQUIRED` | No       | `0`       | Set to `1` to make two-factor authentication mandatory for admin roles (`SUPER_ADMIN`, `WAREHOUSE_ADMIN`): unenrolled admins are redirected to their account page's Two-factor tab until enrolled. Read at request time by `/api/users/me` — changing it requires a restart/redeploy (env, not DB). Merchants and riders can always opt into 2FA themselves and are never affected by this flag. |
+| `TRUSTED_PROXY_HOPS` | No       | `0`       | How many reverse-proxy hops sit in front of the app. Forwarding headers (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`) are **only trusted when this is set** (ROADMAP P0.6): the client IP is taken from the entry the last trusted hop appended, so a client cannot forge a fresh rate-limit bucket or forge its way past `ADMIN_IP_ALLOWLIST`. Single nginx = `1`; Cloudflare + nginx = `2`. Unset/`0` = no proxy, the headers are ignored. |
+| `ADMIN_IP_ALLOWLIST` | No       | disabled  | Comma-separated IPs/CIDRs allowed to reach the admin portal: paths starting with `/dashboard` and `/api/admin` (e.g. `203.0.113.5,10.0.0.0/8,2001:db8::/32`). Exact IPv4/IPv6 and CIDR ranges are supported; `*` allows any IP. Unset or empty disables the check entirely (default — e2e and dev are unaffected). Invalid entries are ignored (boot fails if none are valid). Requests from other IPs get `403` and are logged. Other admin-gated APIs are not covered — they rely on role authz.  **Requires `TRUSTED_PROXY_HOPS`**: the allowlist reads the client IP from proxy headers, so the app must sit behind a proxy that overwrites them - otherwise every request resolves to "unknown" and is denied. |
+| `ADMIN_2FA_REQUIRED` | No       | `0`       | Set to `1` to make two-factor authentication mandatory for admin roles (`SUPER_ADMIN`, `WAREHOUSE_ADMIN`): **enforced server-side**: while it is on, an unenrolled admin session is refused by every API route and every server-rendered page (`requireSession()` returns no session) and unenrolled admins are redirected to their account page's Two-factor tab until enrolled. Read at request time by `/api/users/me` — changing it requires a restart/redeploy (env, not DB). Merchants and riders can always opt into 2FA themselves and are never affected by this flag. |
 
 ---
 
@@ -147,6 +148,18 @@ the suite; the other variables are for manual invocations only.
 | -------------------------- | -------- | ------- | -------------------------------------------------------------- |
 | `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test) |
 | `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting (webServer sets this for the e2e suite; set manually for other test runs) |
+| `SEED_PASSWORD`            | No       | `12qwaszx` | Password given to every account created by `pnpm db:seed:full`. Dev/e2e default is the well-known `12qwaszx`; **both seed entrypoints refuse to run when `NODE_ENV=production` and this is unset** (ROADMAP P0.7), so a production database can never come up on a published password. |
+
+---
+
+## Secrets on disk
+
+`.env` is git-ignored and must stay that way (`git status` should never list an
+env file). `.env.example` contains placeholders only — every real secret lives
+in the deployment's own secret store, and `SMTP_SECRET_KEY` /
+`BETTER_AUTH_SECRET` / `CRON_SECRET` are validated at boot
+(`src/lib/env.ts`). If a secret is ever pasted into a tracked file, treat it as
+compromised: rotate it, then remove the value from the file.
 
 ---
 

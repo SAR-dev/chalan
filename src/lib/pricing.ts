@@ -1,3 +1,4 @@
+import { toPaisa } from "@/lib/balance-ledger"
 import { CURRENCY_SUFFIX } from "@/lib/constants"
 import type { Merchant } from "@/lib/types"
 
@@ -26,8 +27,10 @@ export function calcDeliveryCharge(
   const exceedsMax = weightKg > pricing.maxWeightKg
   const extraKg = Math.max(0, weightKg - pricing.freeWeightKg)
   const billableExtraKg = Math.ceil(extraKg)
-  const extraWeightCharge = billableExtraKg * pricing.extraRatePerKg
-  const total = pricing.baseRate + extraWeightCharge
+  // Money is rounded to paisa at every computation boundary (ROADMAP P0.4) so
+  // the stored fees/earnings can never carry float noise.
+  const extraWeightCharge = toPaisa(billableExtraKg * pricing.extraRatePerKg)
+  const total = toPaisa(pricing.baseRate + extraWeightCharge)
   return {
     baseRate: pricing.baseRate,
     billableExtraKg,
@@ -53,7 +56,7 @@ export function calcCodFee(
   productCost: number,
   codFeePercentage: number,
 ): number {
-  return Math.round(productCost * (codFeePercentage / 100) * 100) / 100
+  return toPaisa(productCost * (codFeePercentage / 100))
 }
 
 /**
@@ -65,5 +68,5 @@ export function calcMerchantEarnings(
   deliveryFee: number,
   codFee: number,
 ): number {
-  return Math.max(0, productCost - deliveryFee - codFee)
+  return Math.max(0, toPaisa(productCost - deliveryFee - codFee))
 }

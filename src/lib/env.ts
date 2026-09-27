@@ -173,6 +173,21 @@ export function validateEnv(): void {
       }
     }
 
+    // Optional — how many trusted reverse-proxy hops sit in front of the app
+    // (ROADMAP P0.6). Forwarding headers are ignored unless this is set. A
+    // non-numeric or negative value would silently disable client-IP trust, so
+    // fail boot rather than quietly changing the security posture.
+    if (process.env.TRUSTED_PROXY_HOPS) {
+      const hops = Number(process.env.TRUSTED_PROXY_HOPS)
+      if (!Number.isInteger(hops) || hops < 0 || hops > 10) {
+        e.push({
+          key: "TRUSTED_PROXY_HOPS",
+          message:
+            "Must be an integer between 0 and 10 (0 or unset = no trusted proxy; single nginx = 1).",
+        })
+      }
+    }
+
     // Optional - "1" makes 2FA mandatory for admin roles (deployment policy).
     // Unset/empty = optional (admins and merchants/riders may still opt in).
     oneOf(e, "ADMIN_2FA_REQUIRED", ["0", "1"], "0")

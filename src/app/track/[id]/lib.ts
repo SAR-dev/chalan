@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { eq, or } from "drizzle-orm"
 import {
   Bike,
   CheckCircle2,
@@ -184,18 +184,26 @@ export const STATUS_COPY: Record<
 // Cached so `generateMetadata` and the page body share one query set per
 // request instead of hitting the DB twice (1 order select + up to 4 child
 // selects either time).
-export const fetchOrderData = cache(async (idOrCode: string) => {
-  const normalized = idOrCode.trim().toUpperCase()
+//
+// The public key may be either the order's **tracking token** (shared link,
+// grants the note write) or its human **order code** (`ORD-100001E`, typed in
+// the tracking search / printed on parcels — read-only). One query resolves
+// both; `matchedByToken` tells the page whether the write capability is
+// present.
+export const fetchOrderData = cache(async (idOrToken: string) => {
+  const raw = idOrToken.trim()
+  const normalized = raw.toUpperCase()
 
-  // Try matching by id
   const rows = await db
     .select()
     .from(order)
-    .where(eq(order.id, normalized))
+    .where(or(eq(order.trackingToken, raw), eq(order.id, normalized)))
     .limit(1)
 
   const o = rows[0] ?? null
   if (!o) return null
+
+  const matchedByToken = Boolean(o.trackingToken) && o.trackingToken === raw
 
   const [merchantRows, pickupRiderRows, deliveryRiderRows, warehouseRows] =
     await Promise.all([
@@ -225,5 +233,6 @@ export const fetchOrderData = cache(async (idOrCode: string) => {
     pickupRider: pickupRiderRows[0] ?? null,
     deliveryRider: deliveryRiderRows[0] ?? null,
     warehouse: warehouseRows[0] ?? null,
+    matchedByToken,
   }
 })

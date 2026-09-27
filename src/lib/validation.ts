@@ -264,6 +264,8 @@ export const orderReceiverNoteSchema = z.object({
     .trim()
     .max(100, "Receiver note cannot exceed 100 characters")
     .min(1, "Note cannot be empty"),
+  // Public write authorization (ROADMAP P0.1): the order's tracking token.
+  token: requiredString("Tracking token"),
 })
 
 export const orderMerchantNoteSchema = z.object({

@@ -11,6 +11,7 @@ import {
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
+import { codCollectedAmount } from "@/lib/balance-ledger"
 import { db } from "@/lib/db"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
 import {
@@ -18,6 +19,7 @@ import {
   merchant,
   merchantBalance,
   order,
+  orderStatusHistory,
   rider,
 } from "@/lib/db/schema"
 import {
@@ -500,6 +502,14 @@ const TRANSITION_LABELS: Record<TransitionName, string> = {
   cancel: "Cancelled",
 }
 
+/** Free-text reason a transition carries, stored on its history row. */
+function transitionNote(name: TransitionName, body: unknown): string | null {
+  const b = (body ?? {}) as { note?: string; reason?: string }
+  if (name === "failed") return b.note?.trim() || null
+  if (name === "return" || name === "cancel") return b.reason?.trim() || null
+  return null
+}
+
 export async function applyOrderTransition(
   name: TransitionName,
   orderId: string,
@@ -524,10 +534,6 @@ export async function applyOrderTransition(
     body = parsed.data
   }
 
-  const committed: { order: OrderRow | null; before: OrderRow | null } = {
-    order: null,
-    before: null,
-  }
   const response = await db.transaction(async (tx) => {
     const [orderRow] = await tx
       .select()
@@ -560,61 +566,70 @@ export async function applyOrderTransition(
       .where(eq(order.id, orderId))
       .returning()
 
-    // If order is delivered, reduce merchant balance by earnings (X - Y - Z)
+    // If the order is delivered, the platform has collected the COD from the
+    // recipient — credit the merchant the GROSS amount (ROADMAP P0.4). The fee
+    // charge written at creation nets this to the merchant's earnings, so a
+    // later payout of those earnings settles the balance to zero.
     if (name === "delivered" && updated.productCost > 0) {
-      const merchantEarnings =
-        updated.productCost - updated.deliveryFee - updated.codFee
+      const collected = codCollectedAmount(updated.productCost)
 
-      if (merchantEarnings > 0) {
-        // Create ORDER_EARNINGS transaction — negative amount reduces merchant debt
-        await tx.insert(balanceTransaction).values({
+      // Create ORDER_EARNINGS transaction — negative amount reduces merchant debt
+      await tx.insert(balanceTransaction).values({
+        merchantId: updated.merchantId,
+        type: "ORDER_EARNINGS",
+        amount: collected,
+        status: "SETTLED",
+        note: `Order ${updated.id} delivered — COD collected`,
+        orderId: updated.id,
+        createdBy: me.name,
+      })
+
+      // Upsert merchant balance — credit the collected COD
+      await tx
+        .insert(merchantBalance)
+        .values({
+          id: createId(),
           merchantId: updated.merchantId,
-          type: "ORDER_EARNINGS",
-          amount: -merchantEarnings,
-          status: "SETTLED",
-          note: `Order ${updated.id} delivered`,
-          orderId: updated.id,
-          createdBy: me.name,
+          balance: collected,
         })
-
-        // Upsert merchant balance — reduce debt by earnings
-        await tx
-          .insert(merchantBalance)
-          .values({
-            id: createId(),
-            merchantId: updated.merchantId,
-            balance: -merchantEarnings,
-          })
-          .onConflictDoUpdate({
-            target: merchantBalance.merchantId,
-            set: {
-              balance: sql`${merchantBalance.balance} - ${merchantEarnings}`,
-              updatedAt: new Date().toISOString(),
-            },
-          })
-      }
+        .onConflictDoUpdate({
+          target: merchantBalance.merchantId,
+          set: {
+            balance: sql`${merchantBalance.balance} + ${collected}`,
+            updatedAt: new Date().toISOString(),
+          },
+        })
     }
 
-    committed.before = orderRow
-    committed.order = updated
+    // Audit and status history commit with the change they describe
+    // (ROADMAP P1.4): a crash between commit and the audit write used to lose
+    // the trail entirely. Inside the transaction a failure rolls the whole
+    // change back, so state and trail can never diverge.
+    const diff = diffEntity(orderRow, updated, ORDER_DIFF_FIELDS)
+    await logAudit(
+      {
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
+        entityType: "order",
+        entityId: updated.id,
+        description: `${TRANSITION_LABELS[name]} order ${updated.id}`,
+        metadata: diff ? { diff } : null,
+      },
+      tx,
+    )
+    await tx.insert(orderStatusHistory).values({
+      orderId: updated.id,
+      fromStatus: orderRow.status,
+      toStatus: updated.status,
+      transition: name,
+      actorId: me.userId,
+      actorName: me.name,
+      actorRole: me.role,
+      note: transitionNote(name, body),
+    })
+
     return NextResponse.json(updated)
   })
-
-  if (committed.order) {
-    const diff = diffEntity(
-      committed.before,
-      committed.order,
-      ORDER_DIFF_FIELDS,
-    )
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
-      entityType: "order",
-      entityId: committed.order.id,
-      description: `${TRANSITION_LABELS[name]} order ${committed.order.id}`,
-      metadata: diff ? { diff } : null,
-    })
-  }
 
   return response
 }
@@ -642,7 +657,6 @@ export async function applyBulkOrderTransition(
   if (!me) return unauthorized()
   if (!def.authorize(me)) return forbidden()
 
-  const committed: { before: OrderRow | null; after: OrderRow }[] = []
   const response = await db.transaction(async (tx) => {
     const rows = await tx
       .select()
@@ -697,26 +711,33 @@ export async function applyBulkOrderTransition(
     }
 
     for (const row of updated) {
-      committed.push({ before: beforeById.get(row.id) ?? null, after: row })
-    }
-    return NextResponse.json({ ok: true, count: updated.length })
-  })
-
-  if (committed.length > 0) {
-    await Promise.all(
-      committed.map(({ before, after }) => {
-        const diff = diffEntity(before, after, ORDER_DIFF_FIELDS)
-        return logAudit({
+      const before = beforeById.get(row.id) ?? null
+      const diff = diffEntity(before, row, ORDER_DIFF_FIELDS)
+      // Audit + history inside the same transaction (ROADMAP P1.4).
+      await logAudit(
+        {
           actor: { userId: me.userId, name: me.name, role: me.role },
           action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
           entityType: "order",
-          entityId: after.id,
-          description: `${TRANSITION_LABELS[name]} order ${after.id} (bulk)`,
+          entityId: row.id,
+          description: `${TRANSITION_LABELS[name]} order ${row.id} (bulk)`,
           metadata: diff ? { diff } : null,
-        })
-      }),
-    )
-  }
+        },
+        tx,
+      )
+      await tx.insert(orderStatusHistory).values({
+        orderId: row.id,
+        fromStatus: before?.status ?? null,
+        toStatus: row.status,
+        transition: name,
+        actorId: me.userId,
+        actorName: me.name,
+        actorRole: me.role,
+        note: transitionNote(name, body),
+      })
+    }
+    return NextResponse.json({ ok: true, count: updated.length })
+  })
 
   return response
 }

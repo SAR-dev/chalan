@@ -1,5 +1,3 @@
-import { createId } from "@paralleldrive/cuid2"
-import { eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import {
@@ -12,10 +10,9 @@ import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import {
-  balanceTransaction,
-  merchantBalance,
-  payoutRequest,
-} from "@/lib/db/schema"
+  type SettlePayoutResult,
+  settlePayoutAsPaid,
+} from "@/lib/payout-settlement"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -32,81 +29,33 @@ export const PATCH = withErrorHandler(
 
     const { id } = await params
 
-    // Transaction: lock the request row for the guard + write so a concurrent
-    // call can't slip in between the "still APPROVED" check and the write.
-    const committed: {
-      row: typeof payoutRequest.$inferSelect | null
-      before: Record<string, unknown> | null
-    } = {
-      row: null,
-      before: null,
-    }
+    // Shared settlement (ROADMAP P0.3): locks the request row, recomputes the
+    // amount from the linked orders, writes the ledger + balance exactly once.
+    const committed: { result: SettlePayoutResult | null } = { result: null }
     const response = await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select({
-          status: payoutRequest.status,
-          amount: payoutRequest.amount,
-          merchantId: payoutRequest.merchantId,
-          paidAt: payoutRequest.paidAt,
-        })
-        .from(payoutRequest)
-        .where(eq(payoutRequest.id, id))
-        .for("update")
-        .limit(1)
+      const result = await settlePayoutAsPaid(tx, id, me.name)
+      committed.result = result
 
-      if (!current) return notFound()
-      if (current.status !== "APPROVED") {
-        return badRequest("Only APPROVED requests can be marked paid.")
+      if (!result.ok) {
+        if (result.reason === "not_found") return notFound()
+        if (result.reason === "not_approved") {
+          return badRequest("Only APPROVED requests can be marked paid.")
+        }
+        return badRequest("This payout request has no linked orders.")
       }
 
-      const [updated] = await tx
-        .update(payoutRequest)
-        .set({ status: "PAID", paidAt: new Date().toISOString() })
-        .where(eq(payoutRequest.id, id))
-        .returning()
-
-      // Create PAYOUT balance transaction — reduces merchant debt
-      await tx.insert(balanceTransaction).values({
-        merchantId: current.merchantId,
-        type: "PAYOUT",
-        amount: -current.amount,
-        status: "SETTLED",
-        note: `Payout ${id} paid`,
-        createdBy: me.name,
-      })
-
-      // Reduce merchant balance
-      await tx
-        .insert(merchantBalance)
-        .values({
-          id: createId(),
-          merchantId: current.merchantId,
-          balance: -current.amount,
-        })
-        .onConflictDoUpdate({
-          target: merchantBalance.merchantId,
-          set: {
-            balance: sql`${merchantBalance.balance} - ${current.amount}`,
-            updatedAt: new Date().toISOString(),
-          },
-        })
-
-      committed.row = updated
-      committed.before = current
-      return NextResponse.json(updated)
+      return NextResponse.json(result.after)
     })
 
-    if (committed.row) {
-      const diff = diffEntity(committed.before, committed.row, [
-        "status",
-        "paidAt",
-      ])
+    if (committed.result?.ok) {
+      const { before, after } = committed.result
+      const diff = diffEntity(before, after, ["status", "amount", "paidAt"])
       await logAudit({
         actor: { userId: me.userId, name: me.name, role: me.role },
         action: "PAYOUT_PAID",
         entityType: "payout_request",
-        entityId: committed.row.id,
-        description: `Marked payout request ${committed.row.id} as paid`,
+        entityId: after.id,
+        description: `Marked payout request ${after.id} as paid`,
         metadata: diff ? { diff } : null,
       })
     }

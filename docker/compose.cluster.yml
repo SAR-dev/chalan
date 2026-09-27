@@ -9,21 +9,6 @@ x-repmgr-common: &repmgr-common
     timeout: 5s
     retries: 6
 
-x-app-migrate: &app-migrate
-  # APP_IMAGE lets deploys pin an exact image (e.g. ghcr.io/…:<sha>); defaults
-  # to the locally-built app:latest. Runs the same versioned migrations as the
-  # monolith compose (src/lib/db/migrate.ts), not `drizzle-kit push`.
-  image: ${APP_IMAGE:-app:latest}
-  env_file: .env
-  volumes:
-    - uploads_data:/app/uploads
-  environment:
-    RUN_MIGRATIONS: "true"
-  command: sh -c "node_modules/.bin/tsx src/lib/db/migrate.ts"
-  restart: "no"
-  networks:
-    - app-net
-
 services:
   # ---------------------------------------------------------------------
   # Infra: Postgres cluster (repmgr) + pgpool + cloudflared + cron
@@ -137,6 +122,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Migration service ───────────────────────────────────────────────────
+  # A single runner applies the versioned migrations (src/lib/db/migrate.ts)
+  # under a database-wide advisory lock, then exits. Every app service waits
+  # for it via `depends_on: service_completed_successfully` (ROADMAP P1.2).
+  # Previously each role had its own migrate-* service, so four runners raced
+  # on first boot. APP_IMAGE lets deploys pin an exact image (e.g.
+  # ghcr.io/…:<sha>); defaults to the locally-built app:latest.
+  migrate:
+    image: ${APP_IMAGE:-app:latest}
+    container_name: app-migrate
+    env_file: .env
+    command: sh -c "node_modules/.bin/tsx src/lib/db/migrate.ts"
+    restart: "no"
+    networks:
+      - app-net
+    depends_on:
+      pgpool:
+        condition: service_healthy
+
   # ── Cron container ──────────────────────────────────────────────────────
   # Runs HTTP-based cleanup jobs against the dashboard API.
   # If pg_cron is configured (see pg-0 comment above), this container can
@@ -149,6 +153,7 @@ services:
     command: >
       sh -c "
         crontab - 2>/dev/null <<'CRONTAB'
+        * * * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/drain-email-outbox >> /var/log/cron.log 2>&1
         0 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-sessions >> /var/log/cron.log 2>&1
         30 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-audit-logs >> /var/log/cron.log 2>&1
         0 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-email-logs >> /var/log/cron.log 2>&1
@@ -162,9 +167,6 @@ services:
   # ---------------------------------------------------------------------
   # Dashboard app
   # ---------------------------------------------------------------------
-  migrate-dashboard:
-    <<: *app-migrate
-
   dashboard:
     image: ${APP_IMAGE:-app:latest}
     container_name: app-dashboard
@@ -175,12 +177,15 @@ services:
     volumes:
       - uploads_data:/app/uploads
     environment:
-      RUN_MIGRATIONS: "false"
+      # cloudflared (the only thing in front of the app) writes the forwarding
+      # headers — one trusted hop (ROADMAP P0.6). Without this the app ignores
+      # them and per-IP rate limiting / ADMIN_IP_ALLOWLIST cannot work.
+      TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: dashboard
       NEXT_PUBLIC_SITE_URL: http://localhost:3001
       BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
     depends_on:
-      migrate-dashboard:
+      migrate:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -196,9 +201,6 @@ services:
   # ---------------------------------------------------------------------
   # Merchant app
   # ---------------------------------------------------------------------
-  migrate-merchant:
-    <<: *app-migrate
-
   merchant:
     image: ${APP_IMAGE:-app:latest}
     container_name: app-merchant
@@ -209,12 +211,14 @@ services:
     volumes:
       - uploads_data:/app/uploads
     environment:
-      RUN_MIGRATIONS: "false"
+      # cloudflared (the only thing in front of the app) writes the forwarding
+      # headers — one trusted hop (ROADMAP P0.6).
+      TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: merchant
       NEXT_PUBLIC_SITE_URL: http://localhost:3002
       BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
     depends_on:
-      migrate-merchant:
+      migrate:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -230,9 +234,6 @@ services:
   # ---------------------------------------------------------------------
   # Rider app
   # ---------------------------------------------------------------------
-  migrate-rider:
-    <<: *app-migrate
-
   rider:
     image: ${APP_IMAGE:-app:latest}
     container_name: app-rider
@@ -243,12 +244,14 @@ services:
     volumes:
       - uploads_data:/app/uploads
     environment:
-      RUN_MIGRATIONS: "false"
+      # cloudflared (the only thing in front of the app) writes the forwarding
+      # headers — one trusted hop (ROADMAP P0.6).
+      TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: rider
       NEXT_PUBLIC_SITE_URL: http://localhost:3003
       BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
     depends_on:
-      migrate-rider:
+      migrate:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -264,9 +267,6 @@ services:
   # ---------------------------------------------------------------------
   # Warehouse app
   # ---------------------------------------------------------------------
-  migrate-warehouse:
-    <<: *app-migrate
-
   warehouse:
     image: ${APP_IMAGE:-app:latest}
     container_name: app-warehouse
@@ -277,12 +277,14 @@ services:
     volumes:
       - uploads_data:/app/uploads
     environment:
-      RUN_MIGRATIONS: "false"
+      # cloudflared (the only thing in front of the app) writes the forwarding
+      # headers — one trusted hop (ROADMAP P0.6).
+      TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: warehouse
       NEXT_PUBLIC_SITE_URL: http://localhost:3004
       BETTER_AUTH_ALLOWED_URLS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
     depends_on:
-      migrate-warehouse:
+      migrate:
         condition: service_completed_successfully
       redis:
         condition: service_healthy

@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm"
+import { and, inArray, ne } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
@@ -17,10 +17,13 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   if (parsed.error) return parsed.error
   const { ids } = parsed.data
 
+  // Only merchants that are not already suspended are transitioned, so the
+  // reported count is honest and a concurrent change is not overwritten
+  // (ROADMAP P1.1).
   const updated = await db
     .update(merchant)
     .set({ status: "SUSPENDED" })
-    .where(inArray(merchant.id, ids))
+    .where(and(inArray(merchant.id, ids), ne(merchant.status, "SUSPENDED")))
     .returning()
 
   await Promise.all(

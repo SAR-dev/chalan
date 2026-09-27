@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { forbidden, notFound, unauthorized } from "@/lib/api-response"
+import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
-import { merchant } from "@/lib/db/schema"
+import { merchant, profile, user } from "@/lib/db/schema"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { hasNavPermission } from "@/lib/nav-config"
 import {
   merchantBrandingSchema,
@@ -143,37 +144,91 @@ export const PATCH = withErrorHandler(
       )
     }
 
-    const [updated] = await db
-      .update(merchant)
-      .set(updates)
-      .where(eq(merchant.id, id))
-      .returning()
+    // A merchant email change must also update the owner's auth user, or the
+    // account can no longer sign in with the new address (ROADMAP P1.4c). The
+    // two writes and the audits share one transaction; a duplicate email
+    // (`merchant_email_unique` / `user_email_unique`) is a 409, not a 500.
+    const newEmail = profileParsed.success
+      ? profileParsed.data.email.trim()
+      : null
+
+    let updated: typeof merchant.$inferSelect | null
+    try {
+      updated = await db.transaction(async (tx) => {
+        // Only read the previous email when the body actually carries one.
+        let previousEmail: string | null = null
+        if (newEmail) {
+          const [before] = await tx
+            .select({ email: merchant.email })
+            .from(merchant)
+            .where(eq(merchant.id, id))
+            .limit(1)
+          if (!before) return null
+          previousEmail = before.email
+        }
+
+        const [row] = await tx
+          .update(merchant)
+          .set(updates)
+          .where(eq(merchant.id, id))
+          .returning()
+
+        if (newEmail && newEmail !== previousEmail) {
+          const [owner] = await tx
+            .select({ userId: profile.userId })
+            .from(profile)
+            .where(
+              and(eq(profile.merchantId, id), eq(profile.role, "MERCHANT")),
+            )
+            .limit(1)
+          if (owner) {
+            await tx
+              .update(user)
+              .set({ email: newEmail, updatedAt: new Date().toISOString() })
+              .where(eq(user.id, owner.userId))
+          }
+        }
+
+        // Moderator quota is admin-only and always audited (ROADMAP 5.2).
+        if (quotaParsed.success) {
+          await logAudit(
+            {
+              actor: { userId: me.userId, name: me.name, role: me.role },
+              action: "MODERATOR_QUOTA_CHANGED",
+              entityType: "merchant",
+              entityId: row.id,
+              description: `Set moderator quota for ${row.businessName} to ${updates.maxModerators}`,
+              metadata: { maxModerators: updates.maxModerators },
+            },
+            tx,
+          )
+        }
+
+        // Only admins editing a merchant they don't own need an audit trail.
+        if (me.role !== "MERCHANT" && profileParsed.success) {
+          await logAudit(
+            {
+              actor: { userId: me.userId, name: me.name, role: me.role },
+              action: "MERCHANT_UPDATED",
+              entityType: "merchant",
+              entityId: row.id,
+              description: `Updated merchant ${row.businessName}`,
+              metadata: updates,
+            },
+            tx,
+          )
+        }
+
+        return row
+      })
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return conflict("That email is already in use.")
+      }
+      throw err
+    }
 
     if (!updated) return notFound()
-
-    // Moderator quota is admin-only and always audited (ROADMAP 5.2).
-    if (quotaParsed.success) {
-      await logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "MODERATOR_QUOTA_CHANGED",
-        entityType: "merchant",
-        entityId: updated.id,
-        description: `Set moderator quota for ${updated.businessName} to ${updates.maxModerators}`,
-        metadata: { maxModerators: updates.maxModerators },
-      })
-    }
-
-    // Only admins editing a merchant they don't own need an audit trail.
-    if (me.role !== "MERCHANT" && profileParsed.success) {
-      await logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "MERCHANT_UPDATED",
-        entityType: "merchant",
-        entityId: updated.id,
-        description: `Updated merchant ${updated.businessName}`,
-        metadata: updates,
-      })
-    }
 
     return NextResponse.json(updated)
   },

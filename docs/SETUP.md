@@ -104,14 +104,20 @@ primary. Here's how to set it up per provider:
 printf "CRON_SECRET='%s'\n" "$(openssl rand -base64 32)" >> .env.development.local
 ```
 
-Four cleanup endpoints are available, all authenticated via `CRON_SECRET`:
+Five scheduled endpoints are available, all authenticated via `CRON_SECRET`:
 
-| Endpoint                       | What it deletes                          | Retention default    |
+| Endpoint                       | What it does                             | Schedule             |
 | ------------------------------ | ---------------------------------------- | -------------------- |
+| `/api/cron/drain-email-outbox` | Delivers queued transactional email      | Every minute         |
 | `/api/cron/cleanup-sessions`   | Expired sessions + verification tokens   | Immediate (N/A)      |
 | `/api/cron/cleanup-audit-logs` | Old audit log entries                    | 30 days              |
 | `/api/cron/cleanup-email-logs` | Successful email logs (SENT only)        | 10 days              |
 | `/api/cron/cleanup-uploads`    | Orphaned uploads (unreferenced in the DB) | 48 hours (min age)  |
+
+Transactional email (activation, verification, password reset, merchant
+approval) is written to the `email_outbox` table in the same transaction as the
+domain change; `drain-email-outbox` delivers anything a request could not send
+synchronously (ROADMAP P1.5).
 
 Retention is configurable via `AUDIT_LOG_RETENTION_DAYS`,
 `EMAIL_LOG_RETENTION_DAYS`, and `UPLOAD_SWEEP_MIN_AGE_HOURS` env vars. FAILED
@@ -123,6 +129,8 @@ the `Authorization` header automatically. On a **Docker/VPS single instance**,
 call from crontab (stagger times to avoid load spikes):
 
 ```bash
+* * * * * curl -s -X POST https://your-domain/api/cron/drain-email-outbox \
+  -H "Authorization: Bearer $CRON_SECRET" >> /var/log/app-cron.log 2>&1
 0 3 * * * curl -s -X POST https://your-domain/api/cron/cleanup-sessions \
   -H "Authorization: Bearer $CRON_SECRET" >> /var/log/app-cron.log 2>&1
 30 3 * * * curl -s -X POST https://your-domain/api/cron/cleanup-audit-logs \
@@ -305,21 +313,24 @@ Leave unset (or omit entirely) for local development to serve all roles.
 
 ### How the migration guard works
 
-`docker/compose.cluster.yml` includes dedicated `migrate-*` services (one per
-role) that run `drizzle-kit push --force` once and exit before each app
-container starts. All role containers set `RUN_MIGRATIONS=false` and skip
-the push step in `entrypoint.sh`, booting directly to `node server.js`. This
-prevents containers from racing each other on schema changes at deploy time.
+`docker/compose.cluster.yml` has a single `migrate` service that runs the
+versioned migrations (`src/lib/db/migrate.ts`) once and exits before any app
+container starts. It holds a database-wide PostgreSQL advisory lock for the
+duration, so two runners can never apply DDL at the same time. The runner uses
+drizzle's own migrator, so the ledger stores a content hash (a renamed or
+regenerated migration is not re-applied) and each migration file is split on
+`--> statement-breakpoint` rather than `;` (a `$$`-quoted function body is
+safe).
 
 To run migrations manually (e.g. for a production update):
 
 ```bash
-docker compose -f docker/compose.cluster.yml run --rm migrate-dashboard
+docker compose -f docker/compose.cluster.yml run --rm migrate
 ```
 
 ## Gotchas
 
-- `pnpm db:push` is interactive — use `pnpm exec drizzle-kit push --force` for non-interactive runs.
+- Never run `drizzle-kit push` (or `push --force`) against a deployed database — it diffs the live schema and can drop data. Use `pnpm db:migrate` (or the `migrate` compose service) for anything beyond your local machine.
 - Always `set -a && . ./.env.development.local && set +a` before running `db:*` scripts.
 - Edit the matching domain module under `src/lib/db/schema.postgres/` when making schema
   changes (the `index.ts` barrel re-exports everything — there is still one logical schema).

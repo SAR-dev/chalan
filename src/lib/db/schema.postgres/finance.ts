@@ -1,7 +1,8 @@
 import { createId } from "@paralleldrive/cuid2"
-import { doublePrecision, index, pgTable, text } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
+import { index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
 import { balanceTxStatuses, balanceTxTypes } from "./enums"
-import { ts } from "./helpers"
+import { money, ts } from "./helpers"
 import { merchant } from "./merchants"
 import { order } from "./orders"
 
@@ -23,8 +24,8 @@ export const merchantBalance = pgTable("merchant_balance", {
     .notNull()
     .unique()
     .references(() => merchant.id, { onDelete: "cascade" }),
-  balance: doublePrecision("balance").notNull().default(0),
-  pendingBalance: doublePrecision("pendingBalance").notNull().default(0),
+  balance: money("balance").notNull().default(0),
+  pendingBalance: money("pendingBalance").notNull().default(0),
   updatedAt: ts("updatedAt").notNull().defaultNow(),
 })
 
@@ -48,7 +49,7 @@ export const balanceTransaction = pgTable(
     type: text("type", { enum: balanceTxTypes }).notNull(),
     // Positive = charge / debit (merchant owes more).
     // Negative = payment / credit (merchant owes less).
-    amount: doublePrecision("amount").notNull(),
+    amount: money("amount").notNull(),
     status: text("status", { enum: balanceTxStatuses })
       .notNull()
       .default("SETTLED"),
@@ -81,5 +82,13 @@ export const balanceTransaction = pgTable(
       t.merchantId,
       t.createdAt,
     ),
+    // P1.1: a merchant may have at most ONE payment awaiting confirmation.
+    // The route used to check-then-insert outside a transaction, so two
+    // double-clicks could both pass the check and both reserve `pendingBalance`.
+    // This index is the hard guarantee; the route only turns the violation
+    // into a friendly 409.
+    uniqueIndex("balance_tx_one_pending_payment_uniq")
+      .on(t.merchantId)
+      .where(sql`${t.type} = 'PAYMENT_PENDING' and ${t.status} = 'PENDING'`),
   ],
 )

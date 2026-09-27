@@ -8,10 +8,20 @@ import { useState } from "react"
  * Renders a parcel tracking code alongside quick actions to copy the public
  * tracking link and open the public tracking page in a new tab. Shared across
  * merchant and rider tables so the tracking affordance is consistent.
+ *
+ * The shareable link uses the order's high-entropy `token` when available
+ * (ROADMAP P0.1) so the copied URL can authorize the recipient note; it falls
+ * back to the human code for legacy rows.
  */
-export function TrackingCell({ code }: { code: string }) {
+export function TrackingCell({
+  code,
+  token,
+}: {
+  code: string
+  token?: string | null
+}) {
   const [copied, setCopied] = useState(false)
-  const path = `/track/${encodeURIComponent(code)}`
+  const path = `/track/${encodeURIComponent(token ?? code)}`
 
   async function copyLink() {
     const url =

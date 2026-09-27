@@ -7,6 +7,7 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api-response"
+import { orderChargeAmount, toPaisa } from "@/lib/balance-ledger"
 import { db, dbRead } from "@/lib/db"
 import { pickupWarehouseIds } from "@/lib/db/order-lookup"
 import {
@@ -25,6 +26,7 @@ import {
   calcMerchantEarnings,
 } from "@/lib/pricing"
 import { rateLimitByIp } from "@/lib/rate-limit"
+import { generateTrackingToken } from "@/lib/tracking-token"
 import { orderBulkCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -181,16 +183,18 @@ export const POST = withErrorHandler(async (req: Request) => {
         if (zonePrice) pricing = zonePrice
       }
 
+      // Money is stored to paisa (ROADMAP P0.4) — never carry sub-paisa noise.
+      const productCost = toPaisa(input.productCost)
       const { total: deliveryFee } = calcDeliveryCharge(
         pricing,
         input.parcelWeightKg,
       )
       const codFee = calcCodFee(
-        input.productCost,
+        productCost,
         pricing.codFeePercentage ?? merchantRow.codFeePercentage ?? 1,
       )
       const merchantEarnings = calcMerchantEarnings(
-        input.productCost,
+        productCost,
         deliveryFee,
         codFee,
       )
@@ -199,6 +203,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         merchantId,
         pickupLocationId: input.pickupLocationId,
         warehouseId: warehouseByPickup[input.pickupLocationId],
+        trackingToken: generateTrackingToken(),
         recipientName: input.recipientName,
         recipientPhone: input.recipientPhone,
         deliveryCityId: input.deliveryCityId ?? null,
@@ -206,7 +211,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         deliveryMapLink: mapLink ? mapLink : null,
         parcelWeightKg: input.parcelWeightKg,
         deliveryType: input.deliveryType ?? "STANDARD",
-        productCost: input.productCost,
+        productCost,
         deliveryFee,
         codFee,
         merchantEarnings,
@@ -239,7 +244,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     // Compute total platform fee across the batch and write one ledger entry
     // per order, then upsert the running balance once for the whole batch.
     const totalPlatformFee = values.reduce(
-      (sum, v) => sum + v.deliveryFee + v.codFee,
+      (sum, v) => sum + orderChargeAmount(v.deliveryFee, v.codFee),
       0,
     )
 
@@ -247,7 +252,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       insertedOrders.map((o) => ({
         merchantId,
         type: "ORDER_CHARGE" as const,
-        amount: o.deliveryFee + o.codFee,
+        amount: orderChargeAmount(o.deliveryFee, o.codFee),
         status: "SETTLED" as const,
         note: o.id,
         orderId: o.id,
