@@ -259,7 +259,10 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
           brandColor={currentMerchant?.brandColor ?? undefined}
           hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}
         />
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
+        <main
+          id="main-content"
+          className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
+        >
           <div className="mx-auto w-full max-w-6xl">
             <AnnouncementBanner />
             {!isMerchantLoading && currentMerchant && (

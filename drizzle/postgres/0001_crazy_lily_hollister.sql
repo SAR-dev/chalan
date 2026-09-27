@@ -29,6 +29,9 @@ CREATE TABLE "profile" (
 	"warehouseId" text,
 	"merchantId" text,
 	"riderId" text,
+	"isModerator" boolean DEFAULT false NOT NULL,
+	"moderatorPermissions" jsonb,
+	"activatedAt" timestamp with time zone,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -68,6 +71,8 @@ CREATE TABLE "user" (
 	"banReason" text,
 	"banExpires" timestamp with time zone,
 	"twoFactorEnabled" boolean DEFAULT false,
+	"activationToken" text,
+	"activationTokenExpiresAt" timestamp with time zone,
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
@@ -84,7 +89,7 @@ CREATE TABLE "balance_transaction" (
 	"id" text PRIMARY KEY NOT NULL,
 	"merchantId" text NOT NULL,
 	"type" text NOT NULL,
-	"amount" double precision NOT NULL,
+	"amount" numeric(14, 2) NOT NULL,
 	"status" text DEFAULT 'SETTLED' NOT NULL,
 	"note" text,
 	"paymentMethod" text,
@@ -101,8 +106,8 @@ CREATE TABLE "balance_transaction" (
 CREATE TABLE "merchant_balance" (
 	"id" text PRIMARY KEY NOT NULL,
 	"merchantId" text NOT NULL,
-	"balance" double precision DEFAULT 0 NOT NULL,
-	"pendingBalance" double precision DEFAULT 0 NOT NULL,
+	"balance" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"pendingBalance" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "merchant_balance_merchantId_unique" UNIQUE("merchantId")
 );
@@ -131,8 +136,8 @@ CREATE TABLE "zone_pricing" (
 	"id" text PRIMARY KEY NOT NULL,
 	"fromZoneId" text NOT NULL,
 	"toZoneId" text NOT NULL,
-	"baseRate" double precision DEFAULT 0 NOT NULL,
-	"extraRatePerKg" double precision DEFAULT 0 NOT NULL,
+	"baseRate" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"extraRatePerKg" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"freeWeightKg" double precision DEFAULT 1 NOT NULL,
 	"maxWeightKg" double precision DEFAULT 10 NOT NULL,
 	"codFeePercentage" double precision DEFAULT 1 NOT NULL,
@@ -150,11 +155,12 @@ CREATE TABLE "merchant" (
 	"businessType" text DEFAULT 'Other' NOT NULL,
 	"onboardingCompletedAt" timestamp with time zone,
 	"status" text DEFAULT 'PENDING' NOT NULL,
-	"baseRate" double precision DEFAULT 0 NOT NULL,
-	"extraRatePerKg" double precision DEFAULT 0 NOT NULL,
+	"baseRate" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"extraRatePerKg" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"maxWeightKg" double precision DEFAULT 3 NOT NULL,
 	"freeWeightKg" double precision DEFAULT 1 NOT NULL,
 	"codFeePercentage" double precision DEFAULT 1 NOT NULL,
+	"maxModerators" integer DEFAULT 3 NOT NULL,
 	"emailVerifiedAt" timestamp with time zone,
 	"emailVerificationToken" text,
 	"emailVerificationExpiresAt" timestamp with time zone,
@@ -193,6 +199,7 @@ CREATE TABLE "pickup_location" (
 --> statement-breakpoint
 CREATE TABLE "order" (
 	"id" text PRIMARY KEY DEFAULT gen_entity_code('ORD', nextval('order_id_seq')) NOT NULL,
+	"trackingToken" text,
 	"merchantId" text NOT NULL,
 	"pickupLocationId" text NOT NULL,
 	"recipientName" text NOT NULL,
@@ -202,10 +209,10 @@ CREATE TABLE "order" (
 	"deliveryMapLink" text,
 	"parcelWeightKg" double precision NOT NULL,
 	"deliveryType" text DEFAULT 'STANDARD' NOT NULL,
-	"productCost" double precision NOT NULL,
-	"deliveryFee" double precision NOT NULL,
-	"codFee" double precision DEFAULT 0 NOT NULL,
-	"merchantEarnings" double precision DEFAULT 0 NOT NULL,
+	"productCost" numeric(14, 2) NOT NULL,
+	"deliveryFee" numeric(14, 2) NOT NULL,
+	"codFee" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"merchantEarnings" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"status" text DEFAULT 'PENDING' NOT NULL,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
@@ -224,7 +231,7 @@ CREATE TABLE "order" (
 	"outForDeliveryAt" timestamp with time zone,
 	"deliveredAt" timestamp with time zone,
 	"deliveryProofRef" text,
-	"amountCollected" double precision,
+	"amountCollected" numeric(14, 2),
 	"failedAttemptAt" timestamp with time zone,
 	"failureNote" text,
 	"deliveryAttempts" integer DEFAULT 0 NOT NULL,
@@ -242,11 +249,24 @@ CREATE TABLE "order" (
 	"payoutRequestId" text
 );
 --> statement-breakpoint
+CREATE TABLE "order_status_history" (
+	"id" text PRIMARY KEY NOT NULL,
+	"orderId" text NOT NULL,
+	"fromStatus" text,
+	"toStatus" text NOT NULL,
+	"transition" text NOT NULL,
+	"actorId" text,
+	"actorName" text,
+	"actorRole" text,
+	"note" text,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "payout_request" (
 	"id" text PRIMARY KEY DEFAULT gen_entity_code('PR', nextval('payout_request_id_seq')) NOT NULL,
 	"merchantId" text NOT NULL,
 	"orderIds" jsonb NOT NULL,
-	"amount" double precision NOT NULL,
+	"amount" numeric(14, 2) NOT NULL,
 	"status" text DEFAULT 'PENDING' NOT NULL,
 	"payoutMethod" text NOT NULL,
 	"payoutDetails" text NOT NULL,
@@ -299,6 +319,21 @@ CREATE TABLE "email_log" (
 	"markedSentAt" timestamp with time zone
 );
 --> statement-breakpoint
+CREATE TABLE "email_outbox" (
+	"id" text PRIMARY KEY NOT NULL,
+	"to" text NOT NULL,
+	"subject" text NOT NULL,
+	"html" text,
+	"text" text,
+	"status" text DEFAULT 'PENDING' NOT NULL,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"lastError" text,
+	"nextAttemptAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"sentAt" timestamp with time zone,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "mail_config" (
 	"id" text PRIMARY KEY NOT NULL,
 	"label" text NOT NULL,
@@ -319,8 +354,8 @@ CREATE TABLE "platform_config" (
 	"defaultCodFeePercentage" double precision DEFAULT 1 NOT NULL,
 	"minCodFeePercentage" double precision DEFAULT 0.5 NOT NULL,
 	"maxCodFeePercentage" double precision DEFAULT 5 NOT NULL,
-	"defaultBaseRate" double precision DEFAULT 0 NOT NULL,
-	"defaultExtraRatePerKg" double precision DEFAULT 0 NOT NULL,
+	"defaultBaseRate" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"defaultExtraRatePerKg" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"defaultFreeWeightKg" double precision DEFAULT 1 NOT NULL,
 	"defaultMaxWeightKg" double precision DEFAULT 3 NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
@@ -382,6 +417,9 @@ CREATE TABLE "warehouse" (
 --> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "profile" ADD CONSTRAINT "profile_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "profile" ADD CONSTRAINT "profile_warehouseId_warehouse_id_fk" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouse"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "profile" ADD CONSTRAINT "profile_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "profile" ADD CONSTRAINT "profile_riderId_rider_id_fk" FOREIGN KEY ("riderId") REFERENCES "public"."rider"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "twoFactor" ADD CONSTRAINT "twoFactor_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "balance_transaction" ADD CONSTRAINT "balance_transaction_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -400,12 +438,15 @@ ALTER TABLE "order" ADD CONSTRAINT "order_pickupRiderId_rider_id_fk" FOREIGN KEY
 ALTER TABLE "order" ADD CONSTRAINT "order_warehouseId_warehouse_id_fk" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouse"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_deliveryRiderId_rider_id_fk" FOREIGN KEY ("deliveryRiderId") REFERENCES "public"."rider"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_payoutRequestId_payout_request_id_fk" FOREIGN KEY ("payoutRequestId") REFERENCES "public"."payout_request"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "order_status_history" ADD CONSTRAINT "order_status_history_orderId_order_id_fk" FOREIGN KEY ("orderId") REFERENCES "public"."order"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payout_request" ADD CONSTRAINT "payout_request_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_ticket" ADD CONSTRAINT "support_ticket_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rider" ADD CONSTRAINT "rider_warehouseId_warehouse_id_fk" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouse"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_user_id_idx" ON "account" USING btree ("userId");--> statement-breakpoint
 CREATE INDEX "profile_role_idx" ON "profile" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "profile_rider_id_idx" ON "profile" USING btree ("riderId");--> statement-breakpoint
+CREATE INDEX "profile_merchant_id_idx" ON "profile" USING btree ("merchantId");--> statement-breakpoint
+CREATE INDEX "profile_warehouse_id_idx" ON "profile" USING btree ("warehouseId");--> statement-breakpoint
 CREATE INDEX "profile_phone_trgm_idx" ON "profile" USING gin ("phone" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "session_user_id_idx" ON "session" USING btree ("userId");--> statement-breakpoint
 CREATE INDEX "session_expires_at_idx" ON "session" USING btree ("expiresAt");--> statement-breakpoint
@@ -420,10 +461,12 @@ CREATE INDEX "balance_tx_type_idx" ON "balance_transaction" USING btree ("type")
 CREATE INDEX "balance_tx_order_id_idx" ON "balance_transaction" USING btree ("orderId");--> statement-breakpoint
 CREATE INDEX "balance_tx_created_at_idx" ON "balance_transaction" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "balance_tx_merchant_id_created_at_idx" ON "balance_transaction" USING btree ("merchantId","createdAt");--> statement-breakpoint
+CREATE UNIQUE INDEX "balance_tx_one_pending_payment_uniq" ON "balance_transaction" USING btree ("merchantId") WHERE "balance_transaction"."type" = 'PAYMENT_PENDING' and "balance_transaction"."status" = 'PENDING';--> statement-breakpoint
 CREATE INDEX "delivery_city_zone_id_idx" ON "delivery_city" USING btree ("zoneId");--> statement-breakpoint
 CREATE INDEX "delivery_city_warehouse_id_idx" ON "delivery_city" USING btree ("warehouseId");--> statement-breakpoint
 CREATE INDEX "zone_pricing_from_idx" ON "zone_pricing" USING btree ("fromZoneId");--> statement-breakpoint
 CREATE INDEX "zone_pricing_to_idx" ON "zone_pricing" USING btree ("toZoneId");--> statement-breakpoint
+CREATE UNIQUE INDEX "zone_pricing_pair_uniq" ON "zone_pricing" USING btree ("fromZoneId","toZoneId");--> statement-breakpoint
 CREATE INDEX "merchant_status_idx" ON "merchant" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "merchant_created_at_idx" ON "merchant" USING btree ("createdAt");--> statement-breakpoint
 CREATE UNIQUE INDEX "merchant_email_unique" ON "merchant" USING btree ("email");--> statement-breakpoint
@@ -435,6 +478,7 @@ CREATE INDEX "merchant_business_name_trgm_idx" ON "merchant" USING gin ("busines
 CREATE INDEX "merchant_owner_name_trgm_idx" ON "merchant" USING gin ("ownerName" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "merchant_email_trgm_idx" ON "merchant" USING gin ("email" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "merchant_phone_trgm_idx" ON "merchant" USING gin ("phone" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "merchant_nid_number_trgm_idx" ON "merchant" USING gin ("nidNumber" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "pickup_location_merchant_id_idx" ON "pickup_location" USING btree ("merchantId");--> statement-breakpoint
 CREATE INDEX "pickup_location_city_id_idx" ON "pickup_location" USING btree ("cityId");--> statement-breakpoint
 CREATE INDEX "order_merchant_id_idx" ON "order" USING btree ("merchantId");--> statement-breakpoint
@@ -450,9 +494,11 @@ CREATE INDEX "order_merchant_status_created_at_idx" ON "order" USING btree ("mer
 CREATE INDEX "order_status_created_at_idx" ON "order" USING btree ("status","createdAt");--> statement-breakpoint
 CREATE INDEX "order_cod_settled_at_idx" ON "order" USING btree ("codSettledAt");--> statement-breakpoint
 CREATE INDEX "order_payout_request_id_idx" ON "order" USING btree ("payoutRequestId");--> statement-breakpoint
+CREATE UNIQUE INDEX "order_tracking_token_unique" ON "order" USING btree ("trackingToken");--> statement-breakpoint
 CREATE INDEX "order_code_trgm_idx" ON "order" USING gin ("id" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "order_recipient_name_trgm_idx" ON "order" USING gin ("recipientName" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "order_recipient_phone_trgm_idx" ON "order" USING gin ("recipientPhone" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "order_status_history_order_id_created_at_idx" ON "order_status_history" USING btree ("orderId","createdAt");--> statement-breakpoint
 CREATE INDEX "payout_request_merchant_id_idx" ON "payout_request" USING btree ("merchantId");--> statement-breakpoint
 CREATE INDEX "payout_request_status_idx" ON "payout_request" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "payout_request_requested_at_idx" ON "payout_request" USING btree ("requestedAt");--> statement-breakpoint
@@ -471,8 +517,13 @@ CREATE INDEX "email_log_status_idx" ON "email_log" USING btree ("status");--> st
 CREATE INDEX "email_log_created_at_idx" ON "email_log" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "email_log_to_trgm_idx" ON "email_log" USING gin ("to" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "email_log_subject_trgm_idx" ON "email_log" USING gin ("subject" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "email_outbox_status_next_attempt_idx" ON "email_outbox" USING btree ("status","nextAttemptAt");--> statement-breakpoint
+CREATE INDEX "email_outbox_created_at_idx" ON "email_outbox" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "support_ticket_status_created_at_idx" ON "support_ticket" USING btree ("status","createdAt");--> statement-breakpoint
 CREATE INDEX "support_ticket_user_id_idx" ON "support_ticket" USING btree ("userId");--> statement-breakpoint
+CREATE INDEX "support_ticket_subject_trgm_idx" ON "support_ticket" USING gin ("subject" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "support_ticket_message_trgm_idx" ON "support_ticket" USING gin ("message" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "support_ticket_actor_name_trgm_idx" ON "support_ticket" USING gin ("actorName" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "rider_warehouse_id_idx" ON "rider" USING btree ("warehouseId");--> statement-breakpoint
 CREATE INDEX "rider_task_type_idx" ON "rider" USING btree ("taskType");--> statement-breakpoint
 CREATE INDEX "rider_is_active_idx" ON "rider" USING btree ("isActive");--> statement-breakpoint
@@ -482,6 +533,7 @@ CREATE INDEX "rider_name_trgm_idx" ON "rider" USING gin ("name" gin_trgm_ops);--
 CREATE INDEX "rider_phone_trgm_idx" ON "rider" USING gin ("phone" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "rider_zone_trgm_idx" ON "rider" USING gin ("zone" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "rider_email_trgm_idx" ON "rider" USING gin ("email" gin_trgm_ops);--> statement-breakpoint
+CREATE UNIQUE INDEX "rider_email_uniq" ON "rider" USING btree (lower("email")) WHERE "rider"."email" <> '';--> statement-breakpoint
 CREATE INDEX "warehouse_name_trgm_idx" ON "warehouse" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "warehouse_address_trgm_idx" ON "warehouse" USING gin ("address" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "warehouse_city_trgm_idx" ON "warehouse" USING gin ("city" gin_trgm_ops);

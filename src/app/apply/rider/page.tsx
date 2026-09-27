@@ -177,7 +177,7 @@ export default function ApplyRiderPage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col">
+      <main id="main-content" className="flex min-h-screen flex-col">
         {/* Header */}
         <header className="border-border/70 border-b px-6 py-4">
           <div className="flex items-center justify-between">

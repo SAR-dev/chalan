@@ -37,7 +37,10 @@ export default async function OnboardingLayout({
             </span>
           </Link>
         </header>
-        <main className="flex flex-1 items-center justify-center p-6">
+        <main
+          id="main-content"
+          className="flex flex-1 items-center justify-center p-6"
+        >
           {children}
         </main>
       </div>

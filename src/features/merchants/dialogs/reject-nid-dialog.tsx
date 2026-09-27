@@ -43,8 +43,11 @@ export function RejectNidDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2 py-4">
-          <label className="text-sm font-medium">Rejection reason</label>
+          <label htmlFor="reject-nid-reason" className="text-sm font-medium">
+            Rejection reason
+          </label>
           <Textarea
+            id="reject-nid-reason"
             value={reason}
             onChange={(e) => onReasonChange(e.target.value)}
             placeholder="Enter the reason for rejection..."

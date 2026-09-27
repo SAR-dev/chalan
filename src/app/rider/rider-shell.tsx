@@ -48,7 +48,10 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
       <RiderSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileHeader config={RIDER_SIDEBAR} />
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
+        <main
+          id="main-content"
+          className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
+        >
           <div className="mx-auto w-full max-w-7xl">
             <AnnouncementBanner />
             <DataErrorBanner keys={RIDER_KEYS} />

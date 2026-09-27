@@ -38,6 +38,7 @@ export async function GET(
         fill={BRAND_ICON_FILL}
         width={glyph}
         height={glyph}
+        aria-hidden="true"
       >
         <path fillRule="evenodd" d={BRAND_ICON_PATH} />
       </svg>

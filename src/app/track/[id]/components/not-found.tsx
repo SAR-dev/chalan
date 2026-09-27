@@ -26,8 +26,8 @@ export function NotFound({ code }: { code: string }) {
           <input
             name="code"
             placeholder="Try another code…"
+            aria-label="Tracking code"
             className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-lg border pr-3.5 pl-9 text-sm focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
-            autoFocus
           />
         </div>
         <button

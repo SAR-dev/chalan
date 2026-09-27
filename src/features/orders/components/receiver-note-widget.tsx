@@ -122,6 +122,7 @@ export function ReceiverNoteWidget({
               </p>
 
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={saving || !dirty || !note.trim()}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"

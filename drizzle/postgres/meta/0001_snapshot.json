@@ -1,5 +1,5 @@
 {
-  "id": "4cced9fe-1d4d-41a1-8df0-d2ca7bab2baf",
+  "id": "4df8e274-7d81-4a06-8e2d-3138673e9cc8",
   "prevId": "63ac0b4a-c601-4b43-928e-2c106106bda4",
   "version": "7",
   "dialect": "postgresql",
@@ -182,6 +182,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "isModerator": {
+          "name": "isModerator",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "moderatorPermissions": {
+          "name": "moderatorPermissions",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activatedAt": {
+          "name": "activatedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp with time zone",
@@ -221,6 +240,36 @@
           "method": "btree",
           "with": {}
         },
+        "profile_merchant_id_idx": {
+          "name": "profile_merchant_id_idx",
+          "columns": [
+            {
+              "expression": "merchantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "profile_warehouse_id_idx": {
+          "name": "profile_warehouse_id_idx",
+          "columns": [
+            {
+              "expression": "warehouseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "profile_phone_trgm_idx": {
           "name": "profile_phone_trgm_idx",
           "columns": [
@@ -249,6 +298,45 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "profile_warehouseId_warehouse_id_fk": {
+          "name": "profile_warehouseId_warehouse_id_fk",
+          "tableFrom": "profile",
+          "tableTo": "warehouse",
+          "columnsFrom": [
+            "warehouseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "profile_merchantId_merchant_id_fk": {
+          "name": "profile_merchantId_merchant_id_fk",
+          "tableFrom": "profile",
+          "tableTo": "merchant",
+          "columnsFrom": [
+            "merchantId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "profile_riderId_rider_id_fk": {
+          "name": "profile_riderId_rider_id_fk",
+          "tableFrom": "profile",
+          "tableTo": "rider",
+          "columnsFrom": [
+            "riderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -561,6 +649,18 @@
           "primaryKey": false,
           "notNull": false,
           "default": false
+        },
+        "activationToken": {
+          "name": "activationToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activationTokenExpiresAt": {
+          "name": "activationTokenExpiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -701,7 +801,7 @@
         },
         "amount": {
           "name": "amount",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -871,6 +971,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "balance_tx_one_pending_payment_uniq": {
+          "name": "balance_tx_one_pending_payment_uniq",
+          "columns": [
+            {
+              "expression": "merchantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"balance_transaction\".\"type\" = 'PAYMENT_PENDING' and \"balance_transaction\".\"status\" = 'PENDING'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -925,14 +1041,14 @@
         },
         "balance": {
           "name": "balance",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
         "pendingBalance": {
           "name": "pendingBalance",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
@@ -1177,14 +1293,14 @@
         },
         "baseRate": {
           "name": "baseRate",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
         "extraRatePerKg": {
           "name": "extraRatePerKg",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
@@ -1252,6 +1368,27 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "zone_pricing_pair_uniq": {
+          "name": "zone_pricing_pair_uniq",
+          "columns": [
+            {
+              "expression": "fromZoneId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "toZoneId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1354,14 +1491,14 @@
         },
         "baseRate": {
           "name": "baseRate",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
         "extraRatePerKg": {
           "name": "extraRatePerKg",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
@@ -1386,6 +1523,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 1
+        },
+        "maxModerators": {
+          "name": "maxModerators",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 3
         },
         "emailVerifiedAt": {
           "name": "emailVerifiedAt",
@@ -1694,6 +1838,21 @@
           "concurrently": false,
           "method": "gin",
           "with": {}
+        },
+        "merchant_nid_number_trgm_idx": {
+          "name": "merchant_nid_number_trgm_idx",
+          "columns": [
+            {
+              "expression": "\"nidNumber\" gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1836,6 +1995,12 @@
           "notNull": true,
           "default": "gen_entity_code('ORD', nextval('order_id_seq'))"
         },
+        "trackingToken": {
+          "name": "trackingToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "merchantId": {
           "name": "merchantId",
           "type": "text",
@@ -1893,26 +2058,26 @@
         },
         "productCost": {
           "name": "productCost",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "deliveryFee": {
           "name": "deliveryFee",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "codFee": {
           "name": "codFee",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
         "merchantEarnings": {
           "name": "merchantEarnings",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
@@ -2030,7 +2195,7 @@
         },
         "amountCollected": {
           "name": "amountCollected",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -2352,6 +2517,21 @@
           "method": "btree",
           "with": {}
         },
+        "order_tracking_token_unique": {
+          "name": "order_tracking_token_unique",
+          "columns": [
+            {
+              "expression": "trackingToken",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "order_code_trgm_idx": {
           "name": "order_code_trgm_idx",
           "columns": [
@@ -2497,6 +2677,116 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.order_status_history": {
+      "name": "order_status_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orderId": {
+          "name": "orderId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fromStatus": {
+          "name": "fromStatus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "toStatus": {
+          "name": "toStatus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transition": {
+          "name": "transition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actorId": {
+          "name": "actorId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actorName": {
+          "name": "actorName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actorRole": {
+          "name": "actorRole",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "order_status_history_order_id_created_at_idx": {
+          "name": "order_status_history_order_id_created_at_idx",
+          "columns": [
+            {
+              "expression": "orderId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "order_status_history_orderId_order_id_fk": {
+          "name": "order_status_history_orderId_order_id_fk",
+          "tableFrom": "order_status_history",
+          "tableTo": "order",
+          "columnsFrom": [
+            "orderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.payout_request": {
       "name": "payout_request",
       "schema": "",
@@ -2522,7 +2812,7 @@
         },
         "amount": {
           "name": "amount",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -3123,6 +3413,133 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.email_outbox": {
+      "name": "email_outbox",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "to": {
+          "name": "to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "html": {
+          "name": "html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "lastError": {
+          "name": "lastError",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nextAttemptAt": {
+          "name": "nextAttemptAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "sentAt": {
+          "name": "sentAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "email_outbox_status_next_attempt_idx": {
+          "name": "email_outbox_status_next_attempt_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "nextAttemptAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "email_outbox_created_at_idx": {
+          "name": "email_outbox_created_at_idx",
+          "columns": [
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.mail_config": {
       "name": "mail_config",
       "schema": "",
@@ -3248,14 +3665,14 @@
         },
         "defaultBaseRate": {
           "name": "defaultBaseRate",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
         "defaultExtraRatePerKg": {
           "name": "defaultExtraRatePerKg",
-          "type": "double precision",
+          "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": 0
@@ -3405,6 +3822,51 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
+          "with": {}
+        },
+        "support_ticket_subject_trgm_idx": {
+          "name": "support_ticket_subject_trgm_idx",
+          "columns": [
+            {
+              "expression": "\"subject\" gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "support_ticket_message_trgm_idx": {
+          "name": "support_ticket_message_trgm_idx",
+          "columns": [
+            {
+              "expression": "\"message\" gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "support_ticket_actor_name_trgm_idx": {
+          "name": "support_ticket_actor_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "\"actorName\" gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
           "with": {}
         }
       },
@@ -3727,6 +4189,22 @@
           "isUnique": false,
           "concurrently": false,
           "method": "gin",
+          "with": {}
+        },
+        "rider_email_uniq": {
+          "name": "rider_email_uniq",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"rider\".\"email\" <> ''",
+          "concurrently": false,
+          "method": "btree",
           "with": {}
         }
       },

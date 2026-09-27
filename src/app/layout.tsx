@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { headers } from "next/headers"
 import NextTopLoader from "nextjs-toploader"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
+import { SkipToContent } from "@/components/skip-to-content"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { siteConfig } from "@/config/site"
@@ -87,6 +88,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-background font-sans antialiased">
+        <SkipToContent />
         {/* No nonce here on purpose: nextjs-toploader renders <style nonce> without
             suppressHydrationWarning, and React doesn't expose the nonce to the
             client render (nonce="" vs server value → hydration mismatch). Styles are

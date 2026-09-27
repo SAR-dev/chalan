@@ -60,7 +60,10 @@ function ActivateForm() {
   }
 
   return (
-    <main className="bg-background flex min-h-screen flex-col">
+    <main
+      id="main-content"
+      className="bg-background flex min-h-screen flex-col"
+    >
       <div className="absolute top-4 right-4 z-10">
         <ThemeToggle className="bg-background/80 backdrop-blur" />
       </div>

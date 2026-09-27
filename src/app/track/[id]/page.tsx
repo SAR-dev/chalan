@@ -61,6 +61,7 @@ export default async function TrackDetailPage({ params }: Props) {
   // so we can still show the search header)
   return (
     <main
+      id="main-content"
       className="bg-background min-h-screen"
       style={brandVars as React.CSSProperties | undefined}
     >
