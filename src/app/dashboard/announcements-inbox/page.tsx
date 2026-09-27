@@ -4,11 +4,12 @@ import { pageContent } from "@/config/content"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { announcement } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { AnnouncementsInboxClient } from "./inbox-client"
 
 export default async function DashboardAnnouncementsInboxPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
 
   const now = new Date().toISOString()
 

@@ -45,11 +45,11 @@
         "useImportType": "off"
       },
       "a11y": {
-        "noSvgWithoutTitle": "off",
-        "useValidAriaRole": "off",
-        "noLabelWithoutControl": "off",
-        "noAutofocus": "off",
-        "useButtonType": "off"
+        "noSvgWithoutTitle": "error",
+        "useValidAriaRole": "error",
+        "noLabelWithoutControl": "error",
+        "noAutofocus": "error",
+        "useButtonType": "error"
       }
     }
   },

@@ -24,6 +24,23 @@ export const UPLOAD_FOLDERS = [
 ] as const
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[number]
 
+// Read policy for stored files (enforced by app/uploads/[...path]/route.ts,
+// ROADMAP P0.2):
+//
+//   public     — world-readable (merchant logos render on the public tracking
+//                page, so they cannot require a session).
+//   owner-only — readable by the uploader (the path's `{userId}` segment must
+//                equal the session's user) or by a SUPER_ADMIN. Used for
+//                identity documents and avatars.
+//   everything else — any authenticated session (order proofs, pickup photos,
+//                which are viewed across roles).
+export const PUBLIC_UPLOAD_FOLDERS: readonly UploadFolder[] = ["logos"]
+
+export const OWNER_ONLY_UPLOAD_FOLDERS: readonly UploadFolder[] = [
+  "avatars",
+  "nids",
+]
+
 // Longest edge (px) each upload is downscaled to client-side before it's sent.
 // Avatars only ever render small and square, so 500px keeps them crisp while
 // staying tiny; photos (delivery proof, pickup locations) keep more detail at

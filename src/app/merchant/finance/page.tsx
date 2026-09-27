@@ -97,7 +97,7 @@ export default function MerchantFinancePage() {
       sortValue: (o) => o.id,
       cell: (o) => (
         <a
-          href={`/track/${o.id}`}
+          href={`/track/${o.trackingToken ?? o.id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="font-mono text-xs font-medium text-primary underline-offset-2 hover:underline"
@@ -156,7 +156,7 @@ export default function MerchantFinancePage() {
           size="sm"
           render={
             <a
-              href={`/track/${o.id}`}
+              href={`/track/${o.trackingToken ?? o.id}`}
               target="_blank"
               rel="noopener noreferrer"
             />

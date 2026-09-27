@@ -3,9 +3,11 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { dbRead as db } from "@/lib/db"
+import { sumMoney } from "@/lib/db/money-sql"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
 import { deliveryCity, order } from "@/lib/db/schema"
 import { paginateResponse, parsePagination } from "@/lib/pagination"
+import { businessRangeBound } from "@/lib/timezone"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 const listColumns = {
@@ -47,14 +49,15 @@ export const GET = withErrorHandler(async (req: Request) => {
     sql`${order.codSettledAt} is not null`,
     isNull(order.payoutRequestId),
   ]
-  const from = url.searchParams.get("from")
-  const to = url.searchParams.get("to")
-  if (from)
-    conditions.push(gte(order.deliveredAt, new Date(from).toISOString()))
+  const from = url.searchParams.get("from")?.trim()
+  const to = url.searchParams.get("to")?.trim()
+  if (from) {
+    const bound = businessRangeBound(from, "start")
+    if (bound) conditions.push(gte(order.deliveredAt, bound.toISOString()))
+  }
   if (to) {
-    const end = new Date(to)
-    end.setHours(23, 59, 59, 999)
-    conditions.push(lte(order.deliveredAt, end.toISOString()))
+    const bound = businessRangeBound(to, "end")
+    if (bound) conditions.push(lte(order.deliveredAt, bound.toISOString()))
   }
   const where = and(...conditions)
 
@@ -72,7 +75,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     db
       .select({
         count: sql<number>`count(*)::int`,
-        totalEarnings: sql<number>`coalesce(sum(${order.merchantEarnings}), 0)`,
+        totalEarnings: sumMoney(order.merchantEarnings),
       })
       .from(order)
       .where(where),

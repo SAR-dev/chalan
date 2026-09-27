@@ -62,7 +62,10 @@ export default function ForgotPasswordPage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col lg:flex-row">
+      <main
+        id="main-content"
+        className="flex min-h-screen flex-col lg:flex-row"
+      >
         <div className="absolute top-4 right-4 z-10">
           <ThemeToggle className="bg-background/80 backdrop-blur" />
         </div>

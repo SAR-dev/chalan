@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { dbRead } from "@/lib/db"
 import { user } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { withErrorHandler } from "@/lib/with-error-handler"
 import { authErrorResponse } from "../../auth-error"
 
@@ -29,7 +30,7 @@ export const PATCH = withErrorHandler(
         headers: req.headers,
       })
     } catch (err) {
-      console.error("[admin/users] unbanUser failed:", err)
+      logger.error("unbanUser failed", { err })
       return authErrorResponse(err, "Could not unban the user.")
     }
 

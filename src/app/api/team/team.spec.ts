@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { logAudit } from "@/lib/audit"
 import { PATCH as toggleActive } from "./[id]/active/route"
+import { POST as resendActivation } from "./[id]/resend-activation/route"
 import { PATCH as assignWarehouse } from "./[id]/warehouse/route"
 import { POST as createTeam, GET as listTeam } from "./route"
 
@@ -32,7 +33,30 @@ vi.mock("@/lib/auth", () => ({
   },
 }))
 
+const activationState = vi.hoisted(() => ({
+  issueActivationToken: vi.fn(async () => "raw-token"),
+  sendActivationEmail: vi.fn(async () => {}),
+}))
+
+vi.mock("@/lib/activation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/activation")>()),
+  issueActivationToken: activationState.issueActivationToken,
+  sendActivationEmail: activationState.sendActivationEmail,
+}))
+
+vi.mock("@/lib/email-outbox", () => ({
+  enqueueEmail: vi.fn(async () => {}),
+  flushEmailOutbox: vi.fn(async () => {}),
+  drainEmailOutbox: vi.fn(async () => ({
+    claimed: 0,
+    sent: 0,
+    failed: 0,
+    requeued: 0,
+  })),
+}))
+
 const selectQueue: unknown[][] = []
+const insertPayloads: Record<string, unknown>[] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
@@ -65,7 +89,10 @@ vi.mock("@/lib/db", () => {
   }
   const makeInsertChain = () => {
     const chain: Record<string, unknown> = {
-      values: () => chain,
+      values: (payload: Record<string, unknown>) => {
+        insertPayloads.push(payload)
+        return chain
+      },
       returning: () => Promise.resolve(insertResult),
     }
     return chain
@@ -74,6 +101,8 @@ vi.mock("@/lib/db", () => {
     select: () => makeSelectChain(),
     insert: () => makeInsertChain(),
     update: () => makeUpdateChain(),
+    delete: () => ({ where: () => Promise.resolve([]) }),
+    transaction: (fn: (tx: unknown) => unknown) => fn(db),
   }
   return { db, dbRead: { ...db, select: () => makeSelectChain() }, pool: {} }
 })
@@ -83,7 +112,10 @@ beforeEach(() => {
   updateResult.length = 0
   updatePayloads.length = 0
   insertResult.length = 0
+  insertPayloads.length = 0
   sessionState.value = null
+  activationState.issueActivationToken.mockClear()
+  activationState.sendActivationEmail.mockClear()
   vi.mocked(logAudit).mockClear()
 })
 
@@ -131,6 +163,27 @@ describe("GET /api/team", () => {
     expect(res.status).toBe(200)
     expect(json.total).toBe(1)
   })
+
+  it("maps lifecycle status (pending invite)", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push(
+      [{ count: 1 }],
+      [
+        {
+          profile: {
+            role: "WAREHOUSE_ADMIN",
+            userId: "u1",
+            isActive: false,
+            activatedAt: null,
+          },
+          user: { id: "u1", name: "Pending Pat" },
+        },
+      ],
+    )
+    const res = await listTeam(req("GET", "http://test.local/api?limit=10"))
+    const json = await res.json()
+    expect(json.data[0].status).toBe("PENDING")
+  })
 })
 
 describe("POST /api/team", () => {
@@ -153,21 +206,23 @@ describe("POST /api/team", () => {
     expect(res.status).toBe(403)
   })
 
-  it("creates team member", async () => {
+  it("creates a PENDING team member and emails the activation link", async () => {
     sessionState.value = superAdmin
     insertResult.push({
       id: "p_new",
       userId: "auth_user_id",
       role: "WAREHOUSE_ADMIN",
       phone: "01712345678",
-      isActive: true,
+      isActive: false,
+      activatedAt: null,
     })
     selectQueue.push([
       {
         id: "p_new",
         role: "WAREHOUSE_ADMIN",
         phone: "01712345678",
-        isActive: true,
+        isActive: false,
+        activatedAt: null,
         warehouseId: null,
         merchantId: null,
         riderId: null,
@@ -176,7 +231,75 @@ describe("POST /api/team", () => {
     const res = await createTeam(req("POST", undefined, validBody))
     const json = await res.json()
     expect(res.status).toBe(201)
-    expect(json).toMatchObject({ id: "auth_user_id" })
+    expect(json).toMatchObject({ id: "auth_user_id", status: "PENDING" })
+    expect(insertPayloads[0]).toMatchObject({
+      role: "WAREHOUSE_ADMIN",
+      isActive: false,
+    })
+    expect(activationState.issueActivationToken).toHaveBeenCalledWith(
+      "auth_user_id",
+      // Token is issued inside the creation transaction (ROADMAP P1.4).
+      expect.anything(),
+    )
+    expect(activationState.sendActivationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "new@test.com",
+        rawToken: "raw-token",
+      }),
+      // Enqueued inside the creation transaction (ROADMAP P1.5).
+      expect.anything(),
+    )
+  })
+})
+
+describe("POST /api/team/:id/resend-activation", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await resendActivation(req("POST"), ctx())
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for non-super-admin", async () => {
+    sessionState.value = admin
+    const res = await resendActivation(req("POST"), ctx())
+    expect(res.status).toBe(403)
+  })
+
+  it("404 when the member is unknown", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([])
+    const res = await resendActivation(req("POST"), ctx())
+    expect(res.status).toBe(404)
+  })
+
+  it("400 when already activated", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([
+      {
+        activatedAt: "2026-01-01T00:00:00.000Z",
+        name: "Amy",
+        email: "amy@test.com",
+      },
+    ])
+    const res = await resendActivation(req("POST"), ctx())
+    expect(res.status).toBe(400)
+  })
+
+  it("issues a fresh token and emails it when pending", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([
+      { activatedAt: null, name: "Pat", email: "pat@test.com" },
+    ])
+    const res = await resendActivation(req("POST"), ctx())
+    expect(res.status).toBe(200)
+    expect(activationState.issueActivationToken).toHaveBeenCalledWith(
+      "user_1",
+      // Token re-issued inside the resend transaction (ROADMAP P1.5).
+      expect.anything(),
+    )
+    expect(activationState.sendActivationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "pat@test.com", rawToken: "raw-token" }),
+      expect.anything(),
+    )
   })
 })
 

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { BRAND_NAME } from "@/lib/constants"
-import type { SidebarConfig } from "@/lib/nav-config"
+import { isNavItemActive, type SidebarConfig } from "@/lib/nav-config"
 import { cn, initials } from "@/lib/utils"
 
 // Claude-style nav link: quiet by default, soft neutral fill on hover,
@@ -46,6 +46,7 @@ export function RoleSidebar({
 
   return (
     <aside
+      data-testid="sidebar"
       className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden md:flex"
       style={sidebarStyle}
     >
@@ -71,9 +72,7 @@ export function RoleSidebar({
       {/* Nav — no rules, no boxes, just rhythm and spacing */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
         {config.items.map((item, i) => {
-          const active = item.exact
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`)
+          const active = isNavItemActive(item, pathname)
           const Icon = item.icon
           const prevGroup = i > 0 ? config.items[i - 1].group : undefined
           const showGroupHeader = item.group && item.group !== prevGroup

@@ -7,12 +7,12 @@ import { auth } from "./selectors"
  */
 export const CREDS = {
   superAdmin: {
-    email: "admin01@email.com",
+    email: "admin1@email.com",
     password: "12qwaszx",
     home: "/dashboard",
   },
   warehouseAdmin: {
-    email: "warehouse.admin01@email.com",
+    email: "warehouse.admin1@email.com",
     password: "12qwaszx",
     home: "/warehouse",
   },
@@ -51,20 +51,58 @@ export async function login(
   options: { waitFor?: RegExp; timeout?: number } = {},
 ): Promise<void> {
   await page.context().clearCookies()
-  await page.goto("/login")
+  // Already on /login (e.g. ?next=... or ?success=...): reload so the fills
+  // below hit a freshly hydrated form. The reload keeps the query string, so
+  // the return path survives sign-in.
+  if (page.url().includes("/login")) {
+    await page.reload()
+  } else {
+    await page.goto("/login")
+  }
+
+  // Signing out of an app page (clearCookies) can leave requests in flight that
+  // 401 and trigger the app's automatic-logout client redirect — which would
+  // remount the form mid-fill. Let that settle first (bounded).
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {})
 
   const emailInput = page.locator(auth.loginEmail)
   const passwordInput = page.locator(auth.loginPassword)
 
-  await emailInput.fill(cred.email)
-  // Wait for the form to become submittable instead of sleeping a fixed amount —
-  // the password field is enabled once the email passes client-side validation.
-  await passwordInput.waitFor({ state: "visible" })
-  await passwordInput.fill(cred.password)
+  // Fill + verify in a loop: if a late remount wipes the values, re-fill.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await emailInput.fill(cred.email)
+    // Wait for the form to become submittable instead of sleeping a fixed
+    // amount — the password field is enabled once the email passes validation.
+    await passwordInput.waitFor({ state: "visible" })
+    await passwordInput.fill(cred.password)
+    const [emailValue, passwordValue] = await Promise.all([
+      emailInput.inputValue(),
+      passwordInput.inputValue(),
+    ])
+    if (emailValue === cred.email && passwordValue === cred.password) break
+  }
+
   await passwordInput.press("Enter")
 
   await page.waitForURL(options.waitFor ?? AUTHENTICATED_URL, {
     timeout: options.timeout ?? 15_000,
   })
-  await page.waitForLoadState("networkidle")
+  await waitForAppReady(page)
+}
+
+/**
+ * Wait for a page to settle after navigation.
+ *
+ * `networkidle` can hang when a background request (SWR polling, streaming)
+ * never goes quiet, so the wait is bounded and best-effort — the web-first
+ * assertions that follow are the real gate. This replaces bare
+ * `waitForLoadState("networkidle")` calls that could stall for the full default
+ * timeout under CI load (ROADMAP P2.4).
+ */
+export async function waitForAppReady(
+  page: Page,
+  timeout = 10_000,
+): Promise<void> {
+  await page.waitForLoadState("load").catch(() => {})
+  await page.waitForLoadState("networkidle", { timeout }).catch(() => {})
 }

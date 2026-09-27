@@ -1,6 +1,6 @@
 "use client"
 
-import { Loader2, Warehouse } from "lucide-react"
+import { Loader2, MailPlus, Warehouse } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -82,10 +82,12 @@ export function TeamPageClient({
     query,
     toggleAccountActive,
     updateAccountWarehouse,
+    resendActivation,
     isLoading,
     mutate: refresh,
   } = useTeam({ initialData, initialTotal })
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
   const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false)
   const [warehouseUser, setWarehouseUser] = useState<TeamMember | null>(null)
   const [selectedWarehouseId, setSelectedWarehouseId] =
@@ -109,6 +111,17 @@ export function TeamPageClient({
     await toggleAccountActive(user.id)
     toast.success(`${user.name} ${user.isActive ? "disabled" : "enabled"}.`)
     setTogglingId(null)
+  }
+
+  async function handleResendActivation(user: TeamMember) {
+    setResendingId(user.id)
+    const result = await resendActivation(user.id)
+    setResendingId(null)
+    if (result.ok) {
+      toast.success(`Activation email resent to ${user.email}.`)
+    } else {
+      toast.error(result.error ?? "Failed to resend the activation email.")
+    }
   }
 
   function openWarehouseDialog(user: TeamMember) {
@@ -188,15 +201,42 @@ export function TeamPageClient({
       id: "status",
       header: "Status",
       align: "right",
-      sortValue: (u) => (u.isActive ? "Active" : "Disabled"),
+      sortValue: (u) => u.status,
       cell: (u) => (
-        <div className="flex justify-end">
-          <StatusToggle
-            user={u}
-            onToggle={() => handleToggleActive(u)}
-            loading={togglingId === u.id}
-            isSelf={u.id === currentUser?.id}
-          />
+        <div className="flex items-center justify-end gap-2">
+          {u.status === "PENDING" ? (
+            <>
+              <Badge
+                variant="outline"
+                className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px]"
+                data-testid="team-status-pending"
+              >
+                Pending
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => handleResendActivation(u)}
+                disabled={resendingId === u.id}
+                data-testid="team-resend-activation"
+              >
+                {resendingId === u.id ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <MailPlus className="size-3" />
+                )}
+                Resend
+              </Button>
+            </>
+          ) : (
+            <StatusToggle
+              user={u}
+              onToggle={() => handleToggleActive(u)}
+              loading={togglingId === u.id}
+              isSelf={u.id === currentUser?.id}
+            />
+          )}
         </div>
       ),
     },

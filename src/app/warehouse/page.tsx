@@ -3,11 +3,12 @@ import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { deliveryCity, order } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { IntakePageClient } from "./intake-client"
 
 export default async function WarehouseIntakePage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "WAREHOUSE_ADMIN") redirect("/login")
   if (!me.warehouseId) redirect("/login")
 

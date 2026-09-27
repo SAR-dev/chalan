@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { PATCH as markEmailSent } from "./[id]/route"
+import { GET as getEmailLog, PATCH as markEmailSent } from "./[id]/route"
 import { PATCH as bulkMarkSent } from "./bulk/mark-sent/route"
 import { GET as listEmailLogs } from "./route"
 
@@ -18,6 +18,7 @@ vi.mock("@/lib/audit", () => ({
 }))
 
 const selectQueue: unknown[][] = []
+const selectCalls: unknown[] = []
 const updateResult: unknown[] = []
 
 vi.mock("@/lib/db", () => {
@@ -42,15 +43,20 @@ vi.mock("@/lib/db", () => {
     }
     return chain
   }
+  const recordSelect = (fields?: unknown) => {
+    if (fields !== undefined) selectCalls.push(fields)
+    return makeSelectChain()
+  }
   const db = {
-    select: () => makeSelectChain(),
+    select: recordSelect,
     update: () => makeUpdateChain(),
   }
-  return { db, dbRead: { ...db, select: () => makeSelectChain() }, pool: {} }
+  return { db, dbRead: { ...db, select: recordSelect }, pool: {} }
 })
 
 beforeEach(() => {
   selectQueue.length = 0
+  selectCalls.length = 0
   updateResult.length = 0
   sessionState.value = null
   logAuditMock.mockClear()
@@ -96,6 +102,57 @@ describe("GET /api/email-logs", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.total).toBe(1)
+  })
+
+  it("omits the html/plain bodies from list rows (ROADMAP P3)", async () => {
+    sessionState.value = admin
+    selectQueue.push([{ count: 1 }], [{ id: "log_1" }])
+    const res = await listEmailLogs(
+      req("GET", "http://test.local/api?limit=10"),
+    )
+    expect(res.status).toBe(200)
+    // The list projection must not ask the DB for the bodies at all.
+    const listProjection = selectCalls[0] as Record<string, unknown>
+    expect(Object.keys(listProjection)).not.toContain("body")
+    expect(Object.keys(listProjection)).not.toContain("textBody")
+    expect(Object.keys(listProjection)).toContain("subject")
+  })
+})
+
+describe("GET /api/email-logs/:id", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await getEmailLog(req("GET"), ctx())
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for merchant", async () => {
+    sessionState.value = merchantSession
+    const res = await getEmailLog(req("GET"), ctx())
+    expect(res.status).toBe(403)
+  })
+
+  it("404 when not found", async () => {
+    sessionState.value = admin
+    selectQueue.push([])
+    const res = await getEmailLog(req("GET"), ctx())
+    expect(res.status).toBe(404)
+  })
+
+  it("returns the full record including the bodies", async () => {
+    sessionState.value = admin
+    selectQueue.push([
+      {
+        id: "log_1",
+        to: "a@b.com",
+        subject: "Welcome",
+        body: "<p>Hi</p>",
+        textBody: "Hi",
+      },
+    ])
+    const res = await getEmailLog(req("GET"), ctx())
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ body: "<p>Hi</p>", textBody: "Hi" })
   })
 })
 

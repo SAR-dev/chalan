@@ -76,7 +76,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     .from(pickupLocation)
     .$dynamic()
   let countQ = dbRead
-    .select({ count: sql<number>`count(*)` })
+    .select({ count: sql<number>`count(*)::int` })
     .from(pickupLocation)
     .$dynamic()
   if (joinCity) {

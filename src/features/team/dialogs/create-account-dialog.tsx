@@ -88,7 +88,7 @@ export function CreateAccountDialog({
         role: form.role,
         warehouseId: form.warehouseId || null,
       })
-      toast.success("Warehouse Admin account created.")
+      toast.success("Warehouse Admin created. Activation email sent.")
       setForm(EMPTY)
       setOpen(false)
       afterSubmit?.()
@@ -117,10 +117,11 @@ export function CreateAccountDialog({
         </Button>
       }
       title="Create Warehouse Admin"
-      description="Provision a Warehouse Admin. This role cannot self register and is created only by the Super Admin."
+      description="Provision a Warehouse Admin. This role cannot self register — we email an activation link and they choose their own password."
       onSubmit={handleSubmit}
       submitting={submitting}
       submitLabel="Create Warehouse Admin"
+      submitTestId="create-account-submit"
       submitIcon={<UserPlus className="size-4" />}
       showCancel={false}
       fullWidthButtons

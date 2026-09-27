@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { CREDS, login } from "../helpers"
+import { CREDS, login, waitForAppReady } from "../helpers"
 
 // ─── Onboarding Flow ─────────────────────────────────────────────────────────
 test.describe("S35. Merchant Onboarding Flow", () => {
@@ -77,7 +77,7 @@ test.describe("S35. Merchant Onboarding Flow", () => {
 
     // New merchant has unverified email → login should show activation prompt
     // This confirms the registration flow works
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
     // The merchant can't log in yet (email not verified), so we land back on /login
     // This is expected behavior — skip the rest of the flow
     expect(page.url()).toContain("/login")
@@ -109,7 +109,7 @@ test.describe("S35. Merchant Onboarding Flow", () => {
     await page.locator("[data-testid='login-password']").press("Enter")
 
     // Should show activation prompt (needsActivation)
-    await page.waitForLoadState("networkidle")
+    await waitForAppReady(page)
 
     // Should stay on /login — unverified merchants can't log in
     expect(page.url()).toContain("/login")

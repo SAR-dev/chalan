@@ -11,6 +11,7 @@ import { deliveryCity, order } from "@/lib/db/schema"
  */
 export const ORDER_CORE_COLUMNS = {
   id: order.id,
+  trackingToken: order.trackingToken,
   merchantId: order.merchantId,
   warehouseId: order.warehouseId,
   pickupLocationId: order.pickupLocationId,

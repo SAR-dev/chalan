@@ -3,12 +3,13 @@ import {
   boolean,
   doublePrecision,
   index,
+  integer,
   pgTable,
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core"
 import { merchantStatuses } from "./enums"
-import { ts } from "./helpers"
+import { money, ts } from "./helpers"
 import { deliveryCity } from "./logistics"
 
 // =============================================================================
@@ -46,12 +47,15 @@ export const merchant = pgTable(
       .notNull()
       .default("PENDING"),
     // Delivery pricing — set by an Admin after approval.
-    baseRate: doublePrecision("baseRate").notNull().default(0),
-    extraRatePerKg: doublePrecision("extraRatePerKg").notNull().default(0),
+    baseRate: money("baseRate").notNull().default(0),
+    extraRatePerKg: money("extraRatePerKg").notNull().default(0),
     maxWeightKg: doublePrecision("maxWeightKg").notNull().default(3),
     freeWeightKg: doublePrecision("freeWeightKg").notNull().default(1),
     // COD fee percentage (per merchant, default 1%)
     codFeePercentage: doublePrecision("codFeePercentage").notNull().default(1),
+    // Moderator quota (ROADMAP 5.2): how many ACTIVE+PENDING staff logins the
+    // owner may hold. SUPER_ADMIN-managed (0 = moderators disabled).
+    maxModerators: integer("maxModerators").notNull().default(3),
     // Email verification — set when merchant verifies their email.
     emailVerifiedAt: ts("emailVerifiedAt"),
     emailVerificationToken: text("emailVerificationToken"),
@@ -104,6 +108,11 @@ export const merchant = pgTable(
     ),
     index("merchant_email_trgm_idx").using("gin", sql`${t.email} gin_trgm_ops`),
     index("merchant_phone_trgm_idx").using("gin", sql`${t.phone} gin_trgm_ops`),
+    // NID search uses ILIKE (ROADMAP P1.6).
+    index("merchant_nid_number_trgm_idx").using(
+      "gin",
+      sql`${t.nidNumber} gin_trgm_ops`,
+    ),
   ],
 )
 

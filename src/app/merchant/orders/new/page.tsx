@@ -1,32 +1,31 @@
 "use client"
 
-import { ArrowLeft, Plus } from "lucide-react"
+import { ArrowLeft, Loader2, PackageCheck, Plus, Upload } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { pageContent } from "@/config/content"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { quoteParcel } from "@/features/orders/quote-parcel"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
-import { calcCodFee, calcDeliveryCharge } from "@/lib/pricing"
 import type { CreateOrderInput } from "@/lib/types"
 import {
   InactiveAccountCard,
   VerificationCard,
 } from "./components/account-alerts"
-import { BatchSummaryCard } from "./components/batch-summary-card"
 import { ParcelCard } from "./components/parcel-card"
-import { PickupLocationCard } from "./components/pickup-location-card"
 import type { ParcelState } from "./types"
 
-function emptyParcel(): ParcelState {
+function emptyParcel(pickupLocationId = ""): ParcelState {
   return {
     id: crypto.randomUUID(),
+    pickupLocationId,
     recipientName: "",
     recipientPhone: "",
     deliveryCityId: "",
@@ -55,12 +54,24 @@ export default function NewOrderPage() {
     [pickupLocations, currentMerchant],
   )
 
-  const [pickupLocationId, setPickupLocationId] = useState("")
   const [parcels, setParcels] = useState<ParcelState[]>([emptyParcel()])
   const [submitting, setSubmitting] = useState(false)
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const [apiErrors, setApiErrors] = useState<Record<number, string[]>>({})
-  const [showOptional, setShowOptional] = useState<Set<string>>(new Set())
+
+  // Prefill every parcel's pickup location once, when the merchant's
+  // locations finish loading. Runs a single time so a merchant who clears a
+  // select isn't fought by the effect.
+  const seededPickup = useRef(false)
+  useEffect(() => {
+    if (seededPickup.current || myLocations.length === 0) return
+    seededPickup.current = true
+    setParcels((prev) =>
+      prev.map((p) =>
+        p.pickupLocationId ? p : { ...p, pickupLocationId: myLocations[0].id },
+      ),
+    )
+  }, [myLocations])
 
   function updateParcel<K extends keyof ParcelState>(
     id: string,
@@ -73,7 +84,10 @@ export default function NewOrderPage() {
   }
 
   function addParcel() {
-    setParcels((prev) => [...prev, emptyParcel()])
+    setParcels((prev) => [
+      ...prev,
+      emptyParcel(prev[0]?.pickupLocationId ?? myLocations[0]?.id ?? ""),
+    ])
   }
 
   function removeParcel(id: string) {
@@ -83,38 +97,29 @@ export default function NewOrderPage() {
   }
 
   const rows = useMemo(() => {
-    // Resolve origin zone from selected pickup location
-    const pickupLoc = pickupLocations.find((l) => l.id === pickupLocationId)
-    const originCity = deliveryCities.find((c) => c.id === pickupLoc?.cityId)
-    const originZoneId = originCity?.zoneId ?? null
-
     return parcels.map((p, index) => {
-      const weight = Number(p.parcelWeightKg) || 0
-      const productCost = Number(p.productCost) || 0
-
-      // Zone pricing: try to find pricing from origin zone to destination zone
-      const destCity = deliveryCities.find((c) => c.id === p.deliveryCityId)
-      const destZoneId = destCity?.zoneId ?? null
-      const zonePrice =
-        originZoneId && destZoneId
-          ? zonePricing.find(
-              (z) => z.fromZoneId === originZoneId && z.toZoneId === destZoneId,
-            )
-          : null
-
-      // Use zone pricing if available, otherwise fall back to merchant pricing
-      const pricing = zonePrice ?? currentMerchant
-      const breakdown = pricing ? calcDeliveryCharge(pricing, weight) : null
-      const exceedsMax = breakdown?.exceedsMax ?? false
-      const codFeePercentage = zonePrice
-        ? (zonePrice.codFeePercentage ?? currentMerchant?.codFeePercentage ?? 1)
-        : (currentMerchant?.codFeePercentage ?? 1)
-      const codFee = currentMerchant
-        ? calcCodFee(productCost, codFeePercentage)
-        : 0
+      const {
+        weight,
+        productCost,
+        breakdown,
+        deliveryCharge,
+        codFee,
+        exceedsMax,
+        isZonePricing,
+      } = quoteParcel({
+        pickupLocationId: p.pickupLocationId,
+        deliveryCityId: p.deliveryCityId,
+        parcelWeightKg: p.parcelWeightKg,
+        productCost: p.productCost,
+        pickupLocations,
+        deliveryCities,
+        zonePricing,
+        currentMerchant,
+      })
 
       const errors: string[] = []
       if (submitAttempted) {
+        if (!p.pickupLocationId) errors.push("Pickup location is required.")
         if (!p.recipientName.trim()) errors.push("Recipient name is required.")
         if (!p.recipientPhone.trim())
           errors.push("Recipient phone is required.")
@@ -134,11 +139,11 @@ export default function NewOrderPage() {
         weight,
         productCost,
         breakdown,
-        deliveryCharge: breakdown?.total ?? 0,
+        deliveryCharge,
         codFee,
         exceedsMax,
         errors,
-        isZonePricing: !!zonePrice,
+        isZonePricing,
       }
     })
   }, [
@@ -146,29 +151,12 @@ export default function NewOrderPage() {
     currentMerchant,
     submitAttempted,
     apiErrors,
-    pickupLocationId,
     pickupLocations,
     deliveryCities,
     zonePricing,
   ])
 
   const anyExceeds = rows.some((r) => r.exceedsMax)
-  const totals = useMemo(
-    () =>
-      rows.reduce(
-        (acc, r) => ({
-          productCost: acc.productCost + r.productCost,
-          deliveryCharge: acc.deliveryCharge + r.deliveryCharge,
-          codFee: acc.codFee + r.codFee,
-        }),
-        {
-          productCost: 0,
-          deliveryCharge: 0,
-          codFee: 0,
-        },
-      ),
-    [rows],
-  )
 
   if (!currentMerchant) return null
 
@@ -177,14 +165,11 @@ export default function NewOrderPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitAttempted(true)
-    if (!pickupLocationId) {
-      toast.error("Select a pickup location.")
-      return
-    }
 
     const hasErrors = parcels.some((p) => {
       const weight = Number(p.parcelWeightKg) || 0
       return (
+        !p.pickupLocationId ||
         !p.recipientName.trim() ||
         !p.recipientPhone.trim() ||
         !p.deliveryCityId.trim() ||
@@ -196,7 +181,7 @@ export default function NewOrderPage() {
     if (hasErrors) return
 
     const payload: CreateOrderInput[] = parcels.map((p) => ({
-      pickupLocationId,
+      pickupLocationId: p.pickupLocationId,
       recipientName: p.recipientName.trim(),
       recipientPhone: p.recipientPhone.trim(),
       deliveryCityId: p.deliveryCityId.trim(),
@@ -248,6 +233,15 @@ export default function NewOrderPage() {
           <ArrowLeft className="size-4" />
           Back
         </Button>
+        <Button
+          variant="outline"
+          render={<Link href="/merchant/orders/import" />}
+          nativeButton={false}
+          data-testid="bulk-import-open"
+        >
+          <Upload className="size-4" />
+          Import CSV
+        </Button>
       </PageHeader>
 
       {notActive ? (
@@ -255,55 +249,46 @@ export default function NewOrderPage() {
       ) : !currentMerchant.emailVerifiedAt || !currentMerchant.nidVerifiedAt ? (
         <VerificationCard merchant={currentMerchant} />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="flex flex-col gap-6 lg:col-span-2">
-            <PickupLocationCard
-              myLocations={myLocations}
-              pickupLocationId={pickupLocationId}
-              setPickupLocationId={setPickupLocationId}
-            />
+        <div className="flex flex-col gap-6">
+          <form
+            id="order-form"
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-6"
+          >
+            {rows.map((row, index) => (
+              <ParcelCard
+                key={row.parcel.id}
+                row={row}
+                index={index}
+                parcelCount={parcels.length}
+                maxWeightKg={currentMerchant.maxWeightKg}
+                deliveryCities={deliveryCities}
+                myLocations={myLocations}
+                updateParcel={updateParcel}
+                removeParcel={removeParcel}
+              />
+            ))}
 
-            <form
-              id="order-form"
-              onSubmit={handleSubmit}
-              className="flex flex-col gap-6"
-            >
-              {rows.map((row, index) => (
-                <ParcelCard
-                  key={row.parcel.id}
-                  row={row}
-                  index={index}
-                  parcelCount={parcels.length}
-                  maxWeightKg={currentMerchant.maxWeightKg}
-                  deliveryCities={deliveryCities}
-                  showOptional={showOptional}
-                  setShowOptional={setShowOptional}
-                  updateParcel={updateParcel}
-                  removeParcel={removeParcel}
-                />
-              ))}
-            </form>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addParcel}
-              className="self-start"
-            >
-              <Plus className="size-4" />
-              Add another parcel
-            </Button>
-          </div>
-
-          <div className="lg:col-span-1">
-            <BatchSummaryCard
-              parcelCount={parcels.length}
-              anyExceeds={anyExceeds}
-              maxWeightKg={currentMerchant.maxWeightKg}
-              totals={totals}
-              submitting={submitting}
-            />
-          </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Button type="button" variant="outline" onClick={addParcel}>
+                <Plus className="size-4" />
+                Add another parcel
+              </Button>
+              <Button
+                type="submit"
+                className="gap-2"
+                disabled={submitting || anyExceeds}
+              >
+                {submitting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <PackageCheck className="size-4" />
+                )}
+                Confirm {parcels.length} order
+                {parcels.length > 1 ? "s" : ""}
+              </Button>
+            </div>
+          </form>
         </div>
       )}
     </>

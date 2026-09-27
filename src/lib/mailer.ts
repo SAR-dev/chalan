@@ -16,6 +16,8 @@ import { siteConfig } from "@/config/site"
 import { decryptSecret } from "@/lib/crypto"
 import { db, dbRead } from "@/lib/db"
 import { emailLog, mailConfig } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
+import { redactAndTruncate } from "@/lib/redact"
 
 export interface MailPayload {
   to: string | string[]
@@ -118,6 +120,21 @@ function stripHtml(html: string): string {
 // Inserts one row into `email_log` for a fully-resolved send attempt
 // (success or exhausted-retries failure). Never throws — logging must not
 // mask the original mail outcome.
+//
+// ROADMAP P0.7: the row used to store the *entire* HTML body, unbounded. It is
+// now truncated to MAX_LOGGED_BODY characters, which is all the admin Email
+// Logs page needs to show what was sent. Single-use link parameters are kept
+// here on purpose: the table is admin-only, pruned after
+// EMAIL_LOG_RETENTION_DAYS (default 10), and the tokens in it expire in 24h and
+// are consumed on first use — whereas the *console* log (which reaches log
+// aggregators and CI output) is redacted, so no live token is written there.
+const MAX_LOGGED_BODY = 2_000
+
+function boundForLog(value: string, max = MAX_LOGGED_BODY): string {
+  if (value.length <= max) return value
+  return `${value.slice(0, max)}\n… [truncated ${value.length - max} chars]`
+}
+
 async function logEmail(
   payload: MailPayload,
   status: (typeof emailLog.$inferInsert)["status"],
@@ -134,12 +151,12 @@ async function logEmail(
       subject: payload.subject,
       status,
       attempts,
-      error: error ?? null,
-      body: payload.html ?? null,
-      textBody,
+      error: error ? boundForLog(error, 500) : null,
+      body: payload.html ? boundForLog(payload.html) : null,
+      textBody: textBody ? boundForLog(textBody) : null,
     })
   } catch (dbErr) {
-    console.error("[mailer] Failed to write email_log entry:", dbErr)
+    logger.error("Failed to write email_log entry", { err: dbErr })
   }
 }
 
@@ -155,20 +172,39 @@ export async function sendMail(
     }
   }
 
-  // Always log the plain text version for debugging
-  if (text) {
-    console.log(
-      `[mailer] Sending to ${payload.to} | Subject: ${payload.subject}\n---\n${text}\n---`,
-    )
-  }
+  // Log the plain-text version for debugging — redacted and truncated, because
+  // it carries password-reset/activation links (ROADMAP P0.7). Writing those to
+  // stdout put live tokens in container logs, CI output and log aggregators.
+  //
+  // ROADMAP P4.4: redaction alone still shipped customer message content (and
+  // names, addresses, order details) into stdout on *every* send. The body is
+  // now opt-in via `LOG_EMAIL_BODY=1`; by default only the envelope is logged.
+  // The full body remains available in the admin-only `email_log` table.
+  logger.info("Sending email", {
+    to: payload.to,
+    subject: payload.subject,
+    ...(text && process.env.LOG_EMAIL_BODY === "1"
+      ? { body: redactAndTruncate(text) }
+      : {}),
+  })
 
   if (process.env.MAIL_DISABLED === "1") {
-    console.log(`[mailer] MAIL_DISABLED=1, skipping send to ${payload.to}`)
+    logger.info("MAIL_DISABLED=1, skipping send", { to: payload.to })
     return
   }
   const { maxRetries = 2, baseDelayMs = 1000, onRetry } = options
 
-  const config = await getSmtpConfig()
+  // A missing/broken SMTP config would otherwise throw before the retry loop
+  // and vanish without an email_log row — log it as a FAILED attempt so the
+  // admin Email Logs page (and the e2e activation flow) can see the message.
+  let config: Awaited<ReturnType<typeof getSmtpConfig>>
+  try {
+    config = await getSmtpConfig()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await logEmail(payload, "FAILED", 0, message)
+    throw err
+  }
   const mailOptions: SendMailOptions = {
     from: `"${config.fromName || siteConfig.name}" <${config.fromEmail}>`,
     ...payload,
@@ -185,20 +221,22 @@ export async function sendMail(
     try {
       const transport = await getTransporter()
       await transport.sendMail(mailOptions)
-      console.log(`[mailer] Email sent to ${payload.to} (attempt ${attempt})`)
+      logger.info("Email sent", { to: payload.to, attempt })
       await logEmail(payload, "SENT", attempt)
       return
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
-      console.error(
-        `[mailer] Attempt ${attempt}/${totalAttempts} failed:`,
-        lastError.message,
-      )
+      logger.warn("Email attempt failed", {
+        to: payload.to,
+        attempt,
+        totalAttempts,
+        err: lastError,
+      })
 
       if (attempt === totalAttempts) break
 
       const delay = baseDelayMs * 2 ** (attempt - 1)
-      console.log(`[mailer] Retrying in ${delay}ms…`)
+      logger.info("Retrying email", { to: payload.to, attempt, delayMs: delay })
       onRetry?.(attempt, lastError)
       await sleep(delay)
     }

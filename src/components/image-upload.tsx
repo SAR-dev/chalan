@@ -11,6 +11,9 @@ import { cn } from "@/lib/utils"
 
 // --- Single image uploader (used for avatar + delivery proof) ---------------
 
+/** A token, or a provider that fetches a fresh one (for anonymous flows). */
+export type UploadTokenSource = string | (() => Promise<string | null>)
+
 export function ImageUpload({
   value,
   onChange,
@@ -20,6 +23,7 @@ export function ImageUpload({
   className,
   previewClassName,
   hidePreview = false,
+  uploadToken,
 }: {
   value: string | null | undefined
   onChange: (url: string | null) => void
@@ -29,6 +33,11 @@ export function ImageUpload({
   className?: string
   previewClassName?: string
   hidePreview?: boolean
+  /**
+   * Authorization for anonymous uploads (rider-application NIDs): either a
+   * token or a provider that fetches a fresh one per upload.
+   */
+  uploadToken?: UploadTokenSource
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -37,7 +46,14 @@ export function ImageUpload({
     if (!file) return
     setUploading(true)
     try {
-      const result = await uploadImage(file, folder)
+      const token =
+        typeof uploadToken === "function" ? await uploadToken() : uploadToken
+      const result = await uploadImage(
+        file,
+        folder,
+        undefined,
+        token ?? undefined,
+      )
       if (result.ok) {
         onChange(result.url)
       } else {

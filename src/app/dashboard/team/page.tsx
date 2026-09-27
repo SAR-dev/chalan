@@ -1,13 +1,15 @@
 import { eq, inArray, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
+import { accountStatus } from "@/lib/activation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { profile, user, warehouse } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { TeamPageClient } from "./team-client"
 
 export default async function TeamPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "SUPER_ADMIN") redirect("/login")
 
   const limit = 20
@@ -26,6 +28,7 @@ export default async function TeamPage() {
         role: profile.role,
         phone: profile.phone,
         isActive: profile.isActive,
+        activatedAt: profile.activatedAt,
         warehouseId: profile.warehouseId,
       })
       .from(profile)
@@ -43,9 +46,15 @@ export default async function TeamPage() {
       .orderBy(warehouse.name),
   ])
 
+  // TeamMember.status is derived (never stored) — same rule as the API.
+  const initialData = teamRows.map((row) => ({
+    ...row,
+    status: accountStatus(row),
+  }))
+
   return (
     <TeamPageClient
-      initialData={teamRows as any}
+      initialData={initialData}
       initialTotal={total}
       initialWarehouses={warehouseRows}
     />

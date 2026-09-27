@@ -57,11 +57,10 @@ src/app/
   api/team/route.ts                   GET list, POST create (staff accounts)
   api/team/[id]/active/route.ts       PATCH — toggle active
   api/team/[id]/warehouse/route.ts    PATCH — reassign warehouse
-  api/team/[id]/pricing/route.ts      PATCH — toggle pricing permission
   api/announcements/active/route.ts   GET active announcements for current role
   api/audit-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/route.ts             GET list (Admin/Super Admin only)
-  api/email-logs/[id]/route.ts        PATCH mark failed email as sent
+  api/email-logs/[id]/route.ts        GET detail (bodies), PATCH mark failed email as sent
   api/cron/cleanup-sessions/route.ts  DELETE expired sessions (hourly)
   api/cron/cleanup-audit-logs/route.ts  DELETE old audit log entries (daily)
   api/cron/cleanup-email-logs/route.ts  DELETE old sent email logs (daily)
@@ -561,15 +560,17 @@ Key differences to know when adding a column or action:
   wins over the derived one.
 
 - **Merchant orders support CSV bulk import.** The merchant order table's
-  toolbar has an **Import CSV** entry (`bulk-import-open`) opening the
-  client-only dialog (`src/features/orders/dialogs/bulk-import-dialog.tsx`,
-  with the pure parsing/resolution modules under
-  `src/features/orders/bulk-import/`): download the template, upload or paste
-  up to 50 rows, preview every row, then import **all-or-nothing** through the
+  toolbar has an **Import CSV** entry (`bulk-import-open`) that navigates to
+  the dedicated page `/merchant/orders/import` (state machine in
+  `src/app/merchant/orders/import/import-client.tsx`, with the pure
+  parsing/resolution modules under `src/features/orders/bulk-import/`):
+  download the template, upload or paste up to 50 rows, preview every row in an
+  **editable** table (click any cell to fix it in place), then import
+  **all-or-nothing** through the
   existing `POST /api/orders/bulk` — the v1 flow deliberately adds no server
   code, fees or IDs are never accepted from the file, and empty notes are
   auto-tagged `[CSV import YYYY-MM-DD]` for auditability. The column spec,
-  header aliases, limits and test plan live in `docs/REFACTOR.md` (§3–§10);
+  header aliases, limits and test plan live in `docs/CSV-IMPORT.md` (§3–§7);
   keep changes to this flow aligned with that document.
 
 - **Optimistic mutations use two-step revalidation.** The bound `mutate()`
@@ -1885,18 +1886,18 @@ done; don't add a second `logAudit()` call in the route wrapper.
 ## Applying schema changes
 
 The DB connection string lives in `.env.development.local` (not `.env`). The
-project uses `dotenv-cli` to load it when running DB scripts — the `db:push`,
-`setup`, etc. npm scripts already include `dotenv -e .env.development.local`:
+project uses `dotenv-cli` to load it when running DB scripts — the `db:migrate`,
+`db:generate`, `setup`, etc. npm scripts load the env automatically:
 
 ```bash
-pnpm db:push
+pnpm db:migrate
 pnpm db:admin
 ```
 
 If you need to run a raw command that requires the env, use `dotenv-cli`:
 
 ```bash
-pnpm dotenv -e .env.development.local -- drizzle-kit push
+pnpm dotenv -e .env.development.local -- drizzle-kit generate
 ```
 
 **When you add or change a column, update the matching module in `src/lib/db/schema.postgres/`**
@@ -1904,21 +1905,25 @@ pnpm dotenv -e .env.development.local -- drizzle-kit push
 `@/lib/db/schema`.
 
 ```bash
-# Push schema to the database
-pnpm db:push
-
-# Generate migration files (for production migrations)
+# Generate a migration file from the schema diff
 pnpm db:generate
+
+# Apply pending migrations (versioned, idempotent, advisory-locked)
+pnpm db:migrate
 
 # Open Drizzle Studio (visual DB browser)
 pnpm db:studio
 ```
 
-- `pnpm db:push` applies the schema to the database. A `NOT NULL` add
-  fails if existing rows violate it — backfill first or give the column a default.
+- `pnpm db:generate` writes the new `drizzle/postgres/000N_*.sql`; commit it
+  together with the schema change, then `pnpm db:migrate` applies it. `db:push`
+  diffs the live schema and is **local-dev only** — never run it against a
+  deployed database.
+- A `NOT NULL` add fails if existing rows violate it — backfill in the migration
+  (or give the column a default).
 - The seed is **idempotent** — it skips rows that already exist. After changing
   seed values for existing ids, either reset the data or run a targeted `UPDATE`.
-- `pnpm db:admin` creates a superadmin account — run after `pnpm db:push`.
+- `pnpm db:admin` creates a superadmin account — run after `pnpm db:migrate`.
 - **After every schema edit**, run `pnpm ci:check` and `pnpm ci:test` (typecheck,
   lint, format, unit tests, build, E2E tests) to catch any errors from the schema change.
 
@@ -2517,8 +2522,8 @@ All seeded accounts share the password `12qwaszx`:
 
 | Role           | Email                        | Password       |
 | -------------- | ---------------------------- | -------------- |
-| Super admin    | `admin01@email.com`          | `12qwaszx`     |
-| Warehouse admin| `warehouse.admin01@email.com`| `12qwaszx`     |
+| Super admin    | `admin1@email.com`          | `12qwaszx`     |
+| Warehouse admin| `warehouse.admin1@email.com`| `12qwaszx`     |
 | Merchant       | `merchant1@email.com`          | `12qwaszx`    |
 | Rider          | `rider1@email.com`             | `12qwaszx`    |
 | Demo merchant  | `demo@kikuya.com`            | `12qwaszx`      |
@@ -2569,12 +2574,15 @@ pnpm exec playwright test --ui    # UI debugger (watch mode)
 
 #### CI/CD pipeline
 
-CI (`.github/workflows/ci.yml`) runs six jobs on every push/PR: `typecheck`,
-`lint`, `format`, `test` (unit), `build`, and `security` (`pnpm audit
---audit-level=high` + PR dependency review). **E2E is intentionally not in the
-CI pipeline** — the Playwright suite runs locally only (`pnpm test:e2e` after
-`pnpm build`); its webServer needs a local Postgres + reseed that the CI
-runners don't provision.
+CI (`.github/workflows/ci.yml`) runs eight jobs on every push/PR: `typecheck`,
+`lint`, `format`, `test` (unit), `build`, `security` (`pnpm audit
+--audit-level=high` + PR dependency review), `coverage` (`pnpm test:coverage`
+against the floors in `vitest.config.ts`), and `integration` (`pnpm test:integration`
+against a `postgres:17` service, after `pnpm db:migrate`). **E2E is intentionally
+not in the CI pipeline** — the Playwright suite runs locally only (`pnpm test:e2e`
+after `pnpm build`); its webServer needs a local Postgres + reseed that the CI
+runners don't provision. Run it yourself before merging anything that changes
+auth, money, roles or the order lifecycle.
 
 #### Writing a new E2E test — checklist
 

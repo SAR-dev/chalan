@@ -27,6 +27,9 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   }
 
   const pendingIds = pendings.map((m) => m.id)
+  // The status predicate is repeated on the write: between the read above and
+  // this update a merchant may have been suspended or reactivated, and the
+  // write must not resurrect it (ROADMAP P1.1).
   const updated = await db
     .update(merchant)
     .set({
@@ -34,7 +37,9 @@ export const PATCH = withErrorHandler(async (req: Request) => {
       approvedBy: me.name,
       approvedAt: new Date().toISOString(),
     })
-    .where(inArray(merchant.id, pendingIds))
+    .where(
+      and(inArray(merchant.id, pendingIds), eq(merchant.status, "PENDING")),
+    )
     .returning()
 
   await Promise.all(

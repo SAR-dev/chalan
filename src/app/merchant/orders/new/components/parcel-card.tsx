@@ -1,7 +1,6 @@
 "use client"
 
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react"
-import type { Dispatch, SetStateAction } from "react"
+import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -31,8 +30,7 @@ interface ParcelCardProps {
   parcelCount: number
   maxWeightKg: number
   deliveryCities: DeliveryCityOption[]
-  showOptional: Set<string>
-  setShowOptional: Dispatch<SetStateAction<Set<string>>>
+  myLocations: Array<{ id: string; label: string }>
   updateParcel: <K extends keyof ParcelState>(
     id: string,
     key: K,
@@ -47,8 +45,7 @@ export function ParcelCard({
   parcelCount,
   maxWeightKg,
   deliveryCities,
-  showOptional,
-  setShowOptional,
+  myLocations,
   updateParcel,
   removeParcel,
 }: ParcelCardProps) {
@@ -56,23 +53,17 @@ export function ParcelCard({
   return (
     <Card>
       <CardHeader className="space-y-0 [.border-b]:pb-(--card-spacing)">
-        <div>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <CardTitle className="text-base">Parcel {index + 1}</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-right">
             {row.exceedsMax ? (
               <span className="text-destructive">
                 exceeds {maxWeightKg} KG limit
               </span>
             ) : (
-              <span>
-                {row.productCost > 0 && <>COD {formatTk(row.productCost)} · </>}
+              <span className="text-chart-1">
                 {row.codFee > 0 && <>COD Charge {formatTk(row.codFee)} · </>}
                 Delivery Charge {formatTk(row.deliveryCharge)}
-                {row.isZonePricing && (
-                  <span className="text-muted-foreground ml-1 text-xs">
-                    (zone rate)
-                  </span>
-                )}
               </span>
             )}
           </CardDescription>
@@ -94,7 +85,7 @@ export function ParcelCard({
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="flex flex-col gap-2">
               <Label htmlFor={`name-${p.id}`}>Recipient name</Label>
               <Input
@@ -120,43 +111,84 @@ export function ParcelCard({
                 required
               />
             </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`city-${p.id}`}>Delivery city</Label>
+              <Select
+                value={p.deliveryCityId}
+                onValueChange={(v) => {
+                  updateParcel(p.id, "deliveryCityId", v ?? "")
+                }}
+              >
+                <SelectTrigger id={`city-${p.id}`} className="w-full">
+                  <SelectValue placeholder="Select city" />
+                </SelectTrigger>
+                <SelectContent>
+                  {deliveryCities.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`address-${p.id}`}>Delivery address</Label>
+              <Input
+                id={`address-${p.id}`}
+                value={p.deliveryAddress}
+                onChange={(e) =>
+                  updateParcel(p.id, "deliveryAddress", e.target.value)
+                }
+                placeholder="Flat B2, Road 11, Banani"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`map-${p.id}`}>
+                Delivery map link (optional)
+              </Label>
+              <Input
+                id={`map-${p.id}`}
+                type="url"
+                value={p.deliveryMapLink}
+                onChange={(e) =>
+                  updateParcel(p.id, "deliveryMapLink", e.target.value)
+                }
+                placeholder="https://maps.google.com/..."
+              />
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`city-${p.id}`}>Delivery city</Label>
-            <Select
-              value={p.deliveryCityId}
-              onValueChange={(v) => {
-                updateParcel(p.id, "deliveryCityId", v ?? "")
-              }}
-            >
-              <SelectTrigger id={`city-${p.id}`}>
-                <SelectValue placeholder="Select city" />
-              </SelectTrigger>
-              <SelectContent>
-                {deliveryCities.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`pickup-${p.id}`}>Pickup location</Label>
+              <Select
+                value={p.pickupLocationId}
+                onValueChange={(v) =>
+                  updateParcel(p.id, "pickupLocationId", v ?? "")
+                }
+              >
+                <SelectTrigger id={`pickup-${p.id}`} className="w-full">
+                  <SelectValue placeholder="Select pickup location">
+                    {(value) => {
+                      const loc = myLocations.find((l) => l.id === value)
+                      return loc ? loc.label : "Select pickup location"
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {myLocations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`address-${p.id}`}>Delivery address</Label>
-            <Input
-              id={`address-${p.id}`}
-              value={p.deliveryAddress}
-              onChange={(e) =>
-                updateParcel(p.id, "deliveryAddress", e.target.value)
-              }
-              placeholder="Flat B2, Road 11, Banani"
-              required
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor={`weight-${p.id}`}>Parcel weight (KG)</Label>
               <Input
@@ -186,99 +218,55 @@ export function ParcelCard({
                 required
               />
             </div>
-          </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`delivery-type-${p.id}`}>Delivery type</Label>
-            <Select
-              value={p.deliveryType}
-              onValueChange={(v) =>
-                updateParcel(
-                  p.id,
-                  "deliveryType",
-                  (v ?? "STANDARD") as DeliveryType,
-                )
-              }
-            >
-              <SelectTrigger
-                id={`delivery-type-${p.id}`}
-                className="w-full sm:min-w-40"
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`delivery-type-${p.id}`}>Delivery type</Label>
+              <Select
+                value={p.deliveryType}
+                onValueChange={(v) =>
+                  updateParcel(
+                    p.id,
+                    "deliveryType",
+                    (v ?? "STANDARD") as DeliveryType,
+                  )
+                }
               >
-                <SelectValue placeholder="Select delivery type">
-                  {ORDER_DELIVERY_TYPE_LABELS[p.deliveryType]}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {(
-                  Object.entries(ORDER_DELIVERY_TYPE_LABELS) as [
-                    DeliveryType,
-                    string,
-                  ][]
-                ).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectTrigger
+                  id={`delivery-type-${p.id}`}
+                  className="w-full sm:min-w-40"
+                >
+                  <SelectValue placeholder="Select delivery type">
+                    {ORDER_DELIVERY_TYPE_LABELS[p.deliveryType]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(
+                    Object.entries(ORDER_DELIVERY_TYPE_LABELS) as [
+                      DeliveryType,
+                      string,
+                    ][]
+                  ).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`note-${p.id}`}>Note (optional)</Label>
+              <Input
+                id={`note-${p.id}`}
+                value={p.merchantNote}
+                onChange={(e) =>
+                  updateParcel(p.id, "merchantNote", e.target.value)
+                }
+                placeholder="e.g. Handle with care"
+                maxLength={100}
+              />
+            </div>
           </div>
-
-          {showOptional.has(p.id) ? (
-            <>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor={`map-${p.id}`}>
-                  Delivery map link (optional)
-                </Label>
-                <Input
-                  id={`map-${p.id}`}
-                  type="url"
-                  value={p.deliveryMapLink}
-                  onChange={(e) =>
-                    updateParcel(p.id, "deliveryMapLink", e.target.value)
-                  }
-                  placeholder="https://maps.google.com/..."
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor={`note-${p.id}`}>Note (optional)</Label>
-                <Input
-                  id={`note-${p.id}`}
-                  value={p.merchantNote}
-                  onChange={(e) =>
-                    updateParcel(p.id, "merchantNote", e.target.value)
-                  }
-                  placeholder="e.g. Handle with care"
-                  maxLength={100}
-                />
-              </div>
-            </>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={() =>
-              setShowOptional((prev) => {
-                const next = new Set(prev)
-                if (next.has(p.id)) next.delete(p.id)
-                else next.add(p.id)
-                return next
-              })
-            }
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 self-start text-xs"
-          >
-            {showOptional.has(p.id) ? (
-              <>
-                <ChevronUp className="size-3" />
-                Fewer options
-              </>
-            ) : (
-              <>
-                <ChevronDown className="size-3" />
-                More options
-              </>
-            )}
-          </button>
 
           {row.errors.length > 0 && (
             <div className="bg-destructive/10 text-destructive flex flex-col gap-1 rounded-md px-3 py-2 text-xs">

@@ -82,6 +82,7 @@ function FilterContent({
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                      aria-hidden="true"
                     >
                       <path d="M2 6l3 3 5-5" />
                     </svg>

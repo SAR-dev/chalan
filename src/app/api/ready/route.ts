@@ -1,0 +1,45 @@
+// Readiness probe (ROADMAP P2.3). Unlike /api/health (liveness — 200 as soon as
+// the process serves requests), this checks the dependencies a request needs:
+//   - Postgres: `SELECT 1` on the primary pool,
+//   - Redis: PING (only when REDIS_URL is configured; optional otherwise).
+// Returns 503 when a required dependency is unreachable so load balancers /
+// Docker healthchecks stop routing to the instance. Probes have a short
+// timeout so a hung dependency cannot hang the healthcheck.
+import { sql } from "drizzle-orm"
+import { NextResponse } from "next/server"
+import { dbRead } from "@/lib/db"
+import { logger } from "@/lib/logger"
+import { pingRedis, rateLimiterDegraded } from "@/lib/rate-limit"
+import { withErrorHandler } from "@/lib/with-error-handler"
+
+const PROBE_TIMEOUT_MS = 1500
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("probe timeout")), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
+export const GET = withErrorHandler(async () => {
+  let db = false
+  try {
+    await withTimeout(dbRead.execute(sql`select 1`), PROBE_TIMEOUT_MS)
+    db = true
+  } catch (err) {
+    logger.error("Readiness DB probe failed", { err })
+  }
+
+  const redis = await pingRedis(PROBE_TIMEOUT_MS)
+  const ok = db && redis
+
+  return NextResponse.json(
+    {
+      ok,
+      checks: { db, redis },
+      rateLimiter: { degraded: rateLimiterDegraded() },
+    },
+    { status: ok ? 200 : 503 },
+  )
+})

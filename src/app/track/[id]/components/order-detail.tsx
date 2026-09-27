@@ -18,6 +18,7 @@ export function OrderDetail({
   pickupRider,
   deliveryRider,
   warehouse: warehouseData,
+  matchedByToken,
 }: NonNullable<Awaited<ReturnType<typeof fetchOrderData>>>) {
   const statusInfo = STATUS_COPY[o.status]
 
@@ -110,7 +111,9 @@ export function OrderDetail({
         </div>
       )}
 
-      {/* Receiver note widget — lets the recipient leave a delivery instruction */}
+      {/* Receiver note widget — lets the recipient leave a delivery instruction.
+          The write capability requires the tracking token (P0.1), so it is only
+          handed to the client when the page was opened via the token link. */}
       <ReceiverNoteWidget
         orderId={o.id}
         initialNote={o.receiverNote}
@@ -119,6 +122,7 @@ export function OrderDetail({
           o.status === "RETURNED" ||
           o.status === "CANCELLED"
         }
+        trackingToken={matchedByToken ? o.trackingToken : null}
       />
 
       {/* Search again button */}

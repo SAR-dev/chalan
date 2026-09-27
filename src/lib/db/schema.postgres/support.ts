@@ -1,4 +1,5 @@
 import { createId } from "@paralleldrive/cuid2"
+import { sql } from "drizzle-orm"
 import { index, pgTable, text } from "drizzle-orm/pg-core"
 import { user } from "./auth"
 import { profileRoles, supportStatuses } from "./enums"
@@ -37,5 +38,18 @@ export const supportTicket = pgTable(
   (t) => [
     index("support_ticket_status_created_at_idx").on(t.status, t.createdAt),
     index("support_ticket_user_id_idx").on(t.userId),
+    // Admin list search filters these with ILIKE (ROADMAP P1.6).
+    index("support_ticket_subject_trgm_idx").using(
+      "gin",
+      sql`${t.subject} gin_trgm_ops`,
+    ),
+    index("support_ticket_message_trgm_idx").using(
+      "gin",
+      sql`${t.message} gin_trgm_ops`,
+    ),
+    index("support_ticket_actor_name_trgm_idx").using(
+      "gin",
+      sql`${t.actorName} gin_trgm_ops`,
+    ),
   ],
 )

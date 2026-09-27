@@ -70,4 +70,57 @@ describe("logAudit", () => {
       }),
     ).resolves.toBeUndefined()
   })
+
+  it("writes through the transaction handle when one is given", async () => {
+    // ROADMAP P1.1/P1.4: the entry must commit with the change it describes.
+    const { logAudit } = await import("@/lib/audit")
+    const txValues: Record<string, unknown>[] = []
+    const tx = {
+      insert: () => ({
+        values: (v: Record<string, unknown>) => {
+          txValues.push(v)
+          return Promise.resolve()
+        },
+      }),
+    }
+    await logAudit(
+      {
+        actor: { userId: "u4", name: "Owner", role: "MERCHANT" },
+        action: "MODERATOR_CREATED",
+        entityType: "profile",
+        entityId: "mod_1",
+        description: "Invited a moderator",
+      },
+      tx as never,
+    )
+    expect(txValues).toHaveLength(1)
+    expect(txValues[0]).toMatchObject({
+      action: "MODERATOR_CREATED",
+      entityId: "mod_1",
+    })
+    // The standalone writer was not used.
+    expect(insertCalls).toHaveLength(0)
+  })
+
+  it("propagates a failure inside a transaction so the change rolls back", async () => {
+    // Outside a transaction a logging failure must never break the response;
+    // inside one, swallowing it would commit a mutation with no trail.
+    const { logAudit } = await import("@/lib/audit")
+    const tx = {
+      insert: () => ({
+        values: () => Promise.reject(new Error("DB error")),
+      }),
+    }
+    await expect(
+      logAudit(
+        {
+          actor: { userId: "u5", name: "Owner", role: "MERCHANT" },
+          action: "MODERATOR_CREATED",
+          entityType: "profile",
+          description: "Should roll back",
+        },
+        tx as never,
+      ),
+    ).rejects.toThrow("DB error")
+  })
 })

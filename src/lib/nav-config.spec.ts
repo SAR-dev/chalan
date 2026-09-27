@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest"
 import {
   dashboardSidebarForRole,
+  hasNavPermission,
   homeForRole,
+  isNavItemActive,
   MERCHANT_SIDEBAR,
+  merchantGrantableNavItems,
+  merchantVisibleNavItems,
   RIDER_SIDEBAR,
   SUPER_ADMIN_SIDEBAR,
   WAREHOUSE_SIDEBAR,
@@ -137,5 +141,98 @@ describe("RIDER_SIDEBAR", () => {
     for (const item of RIDER_SIDEBAR.items) {
       expect(item.href).toMatch(/^\/(rider|help)/)
     }
+  })
+})
+
+describe("isNavItemActive", () => {
+  const newOrder = MERCHANT_SIDEBAR.items.find((i) => i.label === "New Order")!
+
+  it("New Order also activates for the import page", () => {
+    expect(newOrder.activePaths).toContain("/merchant/orders/import")
+    expect(isNavItemActive(newOrder, "/merchant/orders/new")).toBe(true)
+    expect(isNavItemActive(newOrder, "/merchant/orders/import")).toBe(true)
+    expect(isNavItemActive(newOrder, "/merchant/orders")).toBe(false)
+    expect(isNavItemActive(newOrder, "/merchant/finance")).toBe(false)
+  })
+
+  it("matches exact items only on their own path", () => {
+    const pricing = MERCHANT_SIDEBAR.items.find((i) => i.label === "Pricing")!
+    expect(pricing.exact).toBe(true)
+    expect(isNavItemActive(pricing, "/merchant/pricing")).toBe(true)
+    expect(isNavItemActive(pricing, "/merchant/pricing/edit")).toBe(false)
+  })
+
+  it("matches non-exact items by prefix", () => {
+    expect(isNavItemActive(newOrder, "/merchant/orders/new/anything")).toBe(
+      true,
+    )
+  })
+})
+
+describe("merchant moderator nav grants (ROADMAP 5.2)", () => {
+  const owner = { role: "MERCHANT", isModerator: false }
+  const moderatorOrdersOnly = {
+    role: "MERCHANT",
+    isModerator: true,
+    moderatorPermissions: ["/merchant/orders"],
+  }
+
+  it("grantable items exclude Settings and always-on sections", () => {
+    const hrefs = merchantGrantableNavItems().map((i) => i.href)
+    expect(hrefs).not.toContain("/merchant/settings")
+    expect(hrefs).not.toContain("/merchant")
+    expect(hrefs).not.toContain("/merchant/account")
+    expect(hrefs).not.toContain("/help")
+    expect(hrefs).toContain("/merchant/orders")
+    expect(hrefs).toContain("/merchant/finance")
+  })
+
+  it("owner sees the full sidebar", () => {
+    expect(merchantVisibleNavItems(owner)).toEqual(MERCHANT_SIDEBAR.items)
+    expect(merchantVisibleNavItems({ role: "MERCHANT" })).toEqual(
+      MERCHANT_SIDEBAR.items,
+    )
+    expect(merchantVisibleNavItems(null)).toEqual(MERCHANT_SIDEBAR.items)
+  })
+
+  it("moderator sees granted items plus always-on entries", () => {
+    const labels = merchantVisibleNavItems(moderatorOrdersOnly).map(
+      (i) => i.label,
+    )
+    expect(labels).toContain("Orders")
+    expect(labels).toContain("Dashboard")
+    expect(labels).toContain("Account")
+    expect(labels).toContain("Help")
+    expect(labels).not.toContain("Finance")
+    expect(labels).not.toContain("Business Settings")
+    expect(labels).not.toContain("New Order")
+  })
+
+  it("hasNavPermission: owner and non-merchant roles always pass", () => {
+    expect(hasNavPermission(owner, "/merchant/settings")).toBe(true)
+    expect(hasNavPermission(owner, "/merchant/finance")).toBe(true)
+    expect(hasNavPermission({ role: "SUPER_ADMIN" }, "/merchant/finance")).toBe(
+      true,
+    )
+    expect(hasNavPermission({ role: "WAREHOUSE_ADMIN" }, "/x")).toBe(true)
+    expect(hasNavPermission(undefined, "/x")).toBe(false)
+  })
+
+  it("hasNavPermission: moderators only pass granted hrefs", () => {
+    expect(hasNavPermission(moderatorOrdersOnly, "/merchant/orders")).toBe(true)
+    expect(hasNavPermission(moderatorOrdersOnly, "/merchant/finance")).toBe(
+      false,
+    )
+    expect(hasNavPermission(moderatorOrdersOnly, "/merchant")).toBe(false)
+  })
+
+  it("hasNavPermission: Settings never passes for a moderator", () => {
+    const smuggled = {
+      role: "MERCHANT",
+      isModerator: true,
+      moderatorPermissions: ["/merchant/settings", "/merchant/orders"],
+    }
+    expect(hasNavPermission(smuggled, "/merchant/settings")).toBe(false)
+    expect(hasNavPermission(smuggled, "/merchant/orders")).toBe(true)
   })
 })

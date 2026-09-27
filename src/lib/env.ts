@@ -80,6 +80,24 @@ export function validateEnv(): void {
 
     required(e, "NEXT_PUBLIC_SITE_URL", "App base URL")
 
+    // Optional — absolute base URL for browser auth API calls
+    // (forgot-password page). Unset = same-origin. When set it must be a
+    // valid http(s) URL, or the reset request would POST to a broken target.
+    const publicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL
+    if (publicBaseUrl) {
+      try {
+        const parsed = new URL(publicBaseUrl)
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          throw new Error("unsupported protocol")
+        }
+      } catch {
+        e.push({
+          key: "NEXT_PUBLIC_BASE_URL",
+          message: "Must be a valid http(s) URL.",
+        })
+      }
+    }
+
     // A deploy with NEXT_PUBLIC_ENV=development in production would silently
     // disable Vercel Analytics and keep localhost in trustedOrigins, so make
     // sure that var is explicitly validated rather than left to its fallback.
@@ -169,6 +187,21 @@ export function validateEnv(): void {
         e.push({
           key: "ADMIN_IP_ALLOWLIST",
           message: "Must contain at least one valid IP or CIDR entry.",
+        })
+      }
+    }
+
+    // Optional — how many trusted reverse-proxy hops sit in front of the app
+    // (ROADMAP P0.6). Forwarding headers are ignored unless this is set. A
+    // non-numeric or negative value would silently disable client-IP trust, so
+    // fail boot rather than quietly changing the security posture.
+    if (process.env.TRUSTED_PROXY_HOPS) {
+      const hops = Number(process.env.TRUSTED_PROXY_HOPS)
+      if (!Number.isInteger(hops) || hops < 0 || hops > 10) {
+        e.push({
+          key: "TRUSTED_PROXY_HOPS",
+          message:
+            "Must be an integer between 0 and 10 (0 or unset = no trusted proxy; single nginx = 1).",
         })
       }
     }

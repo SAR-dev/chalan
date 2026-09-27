@@ -39,6 +39,20 @@ describe("calcDeliveryCharge", () => {
     expect(result.extraWeightCharge).toBe(40)
   })
 
+  it("rounds the charge to paisa (2 decimals)", () => {
+    const result = calcDeliveryCharge(
+      {
+        baseRate: 60.005,
+        extraRatePerKg: 20.005,
+        freeWeightKg: 0,
+        maxWeightKg: 30,
+      },
+      1,
+    )
+    expect(result.extraWeightCharge).toBe(20.01)
+    expect(result.total).toBe(80.02)
+  })
+
   it("marks exceedsMax when weight exceeds max", () => {
     const result = calcDeliveryCharge(base, 31)
     expect(result.exceedsMax).toBe(true)
@@ -111,6 +125,12 @@ describe("calcCodFee", () => {
 describe("calcMerchantEarnings", () => {
   it("calculates normal earnings", () => {
     expect(calcMerchantEarnings(500, 60, 7.5)).toBe(432.5)
+  })
+
+  it("rounds earnings to paisa (2 decimals)", () => {
+    expect(calcMerchantEarnings(100.005, 0, 0)).toBe(100.01)
+    expect(calcMerchantEarnings(100.005, 10.005, 1.005)).toBe(89)
+    expect(calcMerchantEarnings(100, 10, 1)).toBe(89)
   })
 
   it("floors at 0 when delivery fee exceeds product cost", () => {

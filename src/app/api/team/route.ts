@@ -1,5 +1,11 @@
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { siteConfig } from "@/config/site"
+import {
+  accountStatus,
+  issueActivationToken,
+  sendActivationEmail,
+} from "@/lib/activation"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
@@ -7,6 +13,8 @@ import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
 import { profile, profileRoles, user, warehouse } from "@/lib/db/schema"
 import { enumValue } from "@/lib/db-helpers"
+import { flushEmailOutbox } from "@/lib/email-outbox"
+import { logger } from "@/lib/logger"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import type { TeamMember } from "@/lib/types"
 import { parseBody, teamCreateSchema } from "@/lib/validation"
@@ -48,6 +56,7 @@ export const GET = withErrorHandler(async (req: Request) => {
         role: profile.role,
         phone: profile.phone,
         isActive: profile.isActive,
+        activatedAt: profile.activatedAt,
         warehouseId: profile.warehouseId,
       },
       user: {
@@ -80,7 +89,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   // COUNT and data fetch are independent — run them in parallel.
   const [[{ count }], rows] = await Promise.all([
     dbRead
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(*)::int` })
       .from(profile)
       .innerJoin(user, eq(profile.userId, user.id))
       .where(where),
@@ -94,6 +103,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     role: p.role,
     phone: p.phone,
     isActive: p.isActive,
+    status: accountStatus(p),
     warehouseId: p.warehouseId,
   }))
 
@@ -128,25 +138,82 @@ export const POST = withErrorHandler(async (req: Request) => {
       body: { name, email, password, role: newRole as "user" },
     })
   } catch (err) {
-    console.error("[team] Failed to create user account:", err)
+    logger.error("Failed to create user account", { err })
     return badRequest("Failed to create the team member")
   }
 
-  await db.insert(profile).values({
-    userId: created.user.id,
-    role: newRole,
-    phone,
-    isActive: true,
-    warehouseId: newRole === "WAREHOUSE_ADMIN" ? (warehouseId ?? null) : null,
-  })
+  // WAREHOUSE_ADMIN accounts start PENDING: login is rejected until the
+  // invitee clicks the emailed activation link and sets their own password
+  // (ROADMAP 5.2). The temporary password above seeds the credential.
+  const pendingActivation = newRole === "WAREHOUSE_ADMIN"
 
-  // Keep warehouse.managedBy in sync so the assigned warehouse reflects its
-  // new manager (and is no longer offered as "unassigned" elsewhere).
-  if (newRole === "WAREHOUSE_ADMIN" && warehouseId) {
-    await db
-      .update(warehouse)
-      .set({ managedBy: created.user.id })
-      .where(eq(warehouse.id, warehouseId))
+  // The profile, activation token, warehouse manager link and audit row are one
+  // unit (ROADMAP P1.4): a failure deletes the auth user instead of leaving a
+  // half-created team member. Better Auth owns its own connection, so the user
+  // is created first and cleaned up here if the transaction fails.
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(profile).values({
+        userId: created.user.id,
+        role: newRole,
+        phone,
+        isActive: !pendingActivation,
+        warehouseId:
+          newRole === "WAREHOUSE_ADMIN" ? (warehouseId ?? null) : null,
+      })
+
+      const token = pendingActivation
+        ? await issueActivationToken(created.user.id, tx)
+        : null
+
+      if (token) {
+        // Enqueued in the same transaction: the invite and its email commit
+        // together (ROADMAP P1.5).
+        await sendActivationEmail(
+          {
+            to: email,
+            userName: name,
+            contextName: siteConfig.name,
+            rawToken: token,
+          },
+          tx,
+        )
+      }
+
+      // Keep warehouse.managedBy in sync so the assigned warehouse reflects its
+      // new manager (and is no longer offered as "unassigned" elsewhere).
+      if (newRole === "WAREHOUSE_ADMIN" && warehouseId) {
+        await tx
+          .update(warehouse)
+          .set({ managedBy: created.user.id })
+          .where(eq(warehouse.id, warehouseId))
+      }
+
+      await logAudit(
+        {
+          actor: { userId: me.userId, name: me.name, role: me.role },
+          action: "TEAM_MEMBER_CREATED",
+          entityType: "user",
+          entityId: created.user.id,
+          description: `Created ${newRole} account for ${created.user.name} (${created.user.email})`,
+        },
+        tx,
+      )
+
+      return token
+    })
+  } catch (err) {
+    await deleteUserQuietly(created.user.id)
+    logger.error("Failed to store team member", { err })
+    return NextResponse.json(
+      { error: "Could not create the team member. Please try again." },
+      { status: 500 },
+    )
+  }
+
+  if (pendingActivation) {
+    // Best-effort immediate delivery; the cron retries anything left behind.
+    await flushEmailOutbox()
   }
 
   const [profileRow] = await db
@@ -154,19 +221,19 @@ export const POST = withErrorHandler(async (req: Request) => {
       role: profile.role,
       phone: profile.phone,
       isActive: profile.isActive,
+      activatedAt: profile.activatedAt,
       warehouseId: profile.warehouseId,
     })
     .from(profile)
     .where(eq(profile.userId, created.user.id))
     .limit(1)
 
-  await logAudit({
-    actor: { userId: me.userId, name: me.name, role: me.role },
-    action: "TEAM_MEMBER_CREATED",
-    entityType: "user",
-    entityId: created.user.id,
-    description: `Created ${newRole} account for ${created.user.name} (${created.user.email})`,
-  })
+  if (!profileRow) {
+    return NextResponse.json(
+      { error: "Could not create the team member. Please try again." },
+      { status: 500 },
+    )
+  }
 
   return NextResponse.json(
     {
@@ -176,8 +243,18 @@ export const POST = withErrorHandler(async (req: Request) => {
       role: profileRow.role,
       phone: profileRow.phone,
       isActive: profileRow.isActive,
+      status: accountStatus(profileRow),
       warehouseId: profileRow.warehouseId,
     },
     { status: 201 },
   )
 })
+
+/** Best-effort removal of the auth user created for a failed team invite. */
+async function deleteUserQuietly(userId: string): Promise<void> {
+  try {
+    await db.delete(user).where(eq(user.id, userId))
+  } catch (err) {
+    logger.error("Orphan user cleanup failed", { err })
+  }
+}

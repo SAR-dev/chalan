@@ -4,6 +4,7 @@ import Link from "next/link"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { siteConfig } from "@/config/site"
+import { brandThemeVars } from "@/lib/brand-color"
 import { NotFound } from "./components/not-found"
 import { OrderDetail } from "./components/order-detail"
 import { fetchOrderData, STATUS_COPY } from "./lib"
@@ -16,8 +17,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const code = decodeURIComponent(id).trim().toUpperCase()
-  const data = await fetchOrderData(code)
+  // Pass the raw segment through: it may be the (lowercase) tracking token.
+  // fetchOrderData normalizes for the human-code arm internally.
+  const raw = decodeURIComponent(id).trim()
+  const data = await fetchOrderData(raw)
 
   const statusLabel = data
     ? STATUS_COPY[data.order.status].headline
@@ -25,6 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const merchant = data?.merchant?.businessName
     ? ` · ${data.merchant.businessName}`
     : ""
+  // Prefer the human-readable order code in the page title.
+  const code = data?.order.id ?? raw.toUpperCase()
 
   return {
     title: `${code} – ${statusLabel}`,
@@ -35,22 +40,58 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TrackDetailPage({ params }: Props) {
   const { id } = await params
-  const idOrCode = decodeURIComponent(id).trim().toUpperCase()
-  const data = await fetchOrderData(idOrCode)
+  const raw = decodeURIComponent(id).trim()
+  const data = await fetchOrderData(raw)
+  const idOrCode = data?.order.id ?? raw.toUpperCase()
+
+  // Branding follows the ORDER's merchant (multi-merchant safe), never the
+  // instance — invalid hex makes brandThemeVars fall back to theme defaults.
+  const merchant = data?.merchant ?? null
+  const brandVars = merchant?.brandColor
+    ? brandThemeVars(merchant.brandColor)
+    : undefined
+
+  const defaultChip = (
+    <span className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-md shadow-sm transition-shadow group-hover:shadow-md">
+      <Package className="size-3.5" />
+    </span>
+  )
 
   // If not found, render a friendly not-found UI (don't use Next's notFound()
   // so we can still show the search header)
   return (
-    <main className="bg-background min-h-screen">
+    <main
+      id="main-content"
+      className="bg-background min-h-screen"
+      style={brandVars as React.CSSProperties | undefined}
+    >
+      {brandVars && (
+        <div className="bg-primary h-1.5" data-testid="track-accent" />
+      )}
       {/* Header */}
       <header className="border-border/60 bg-background/80 sticky top-0 z-10 border-b backdrop-blur-sm">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3.5">
-          <Link href="/track" className="group flex items-center gap-2.5">
-            <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md shadow-sm transition-shadow group-hover:shadow-md">
-              <Package className="size-3.5" />
-            </span>
-            <span className="text-sm font-semibold tracking-tight">
-              {siteConfig.name}
+          <Link
+            href="/track"
+            className="group flex min-w-0 items-center gap-2.5"
+          >
+            {merchant?.logoUrl ? (
+              <img
+                src={merchant.logoUrl}
+                alt={merchant.businessName}
+                className="size-7 shrink-0 rounded-md object-contain"
+                data-testid="track-brand-logo"
+              />
+            ) : (
+              defaultChip
+            )}
+            <span
+              className="truncate text-sm font-semibold tracking-tight"
+              data-testid="track-brand"
+            >
+              {merchant
+                ? `Fulfilled by ${merchant.businessName}`
+                : siteConfig.name}
             </span>
           </Link>
           <div className="flex items-center gap-3">
@@ -74,7 +115,7 @@ export default async function TrackDetailPage({ params }: Props) {
 
         {!data ? <NotFound code={idOrCode} /> : <OrderDetail {...data} />}
       </div>
-      <PublicFooter />
+      {!merchant?.hidePlatformBranding && <PublicFooter />}
     </main>
   )
 }

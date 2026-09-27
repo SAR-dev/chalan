@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
+import { safeNextPath } from "@/lib/auth-redirect"
 
 const LOGIN_EMAIL_PLACEHOLDER = "you@email.com"
 
@@ -40,6 +41,7 @@ function LoginForm() {
   const [submitting, setSubmitting] = useState(false)
   const [needsActivation, setNeedsActivation] = useState(false)
   const [activationEmail, setActivationEmail] = useState("")
+  const [canResendActivation, setCanResendActivation] = useState(true)
   const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">(
     "idle",
   )
@@ -50,11 +52,15 @@ function LoginForm() {
   const [twoFactorError, setTwoFactorError] = useState<string | null>(null)
   const [verifyingTwoFactor, setVerifyingTwoFactor] = useState(false)
 
+  // Where to land after a successful sign-in: ?next= (set by automatic-logout
+  // redirects) wins over the role's home page.
+  const nextPath = safeNextPath(searchParams.get("next"))
+
   useEffect(() => {
     if (isReady && currentUser) {
-      router.replace(homeForRole(currentUser.role))
+      router.replace(nextPath ?? homeForRole(currentUser.role))
     }
-  }, [isReady, currentUser, router])
+  }, [isReady, currentUser, router, nextPath])
 
   useEffect(() => {
     const successParam = searchParams.get("success")
@@ -62,6 +68,8 @@ function LoginForm() {
       setSuccess(
         "Your email has been verified and your account is now active. You can now sign in.",
       )
+    } else if (successParam === "activated") {
+      setSuccess("Your account is activated. Sign in with your new password.")
     }
   }, [searchParams])
 
@@ -69,12 +77,13 @@ function LoginForm() {
     e.preventDefault()
     setError(null)
     setNeedsActivation(false)
+    setCanResendActivation(true)
     setSubmitting(true)
     const result = await login(email, password)
     if (result.ok && result.user) {
-      router.replace(homeForRole(result.user.role))
+      router.replace(nextPath ?? homeForRole(result.user.role))
     } else if (result.ok) {
-      router.replace("/dashboard")
+      router.replace(nextPath ?? "/dashboard")
     } else if (result.needsTwoFactor) {
       // Password accepted — Better Auth is waiting for the second factor.
       setTwoFactorStep(true)
@@ -84,6 +93,7 @@ function LoginForm() {
     } else if (result.needsActivation && result.activationEmail) {
       setNeedsActivation(true)
       setActivationEmail(result.activationEmail)
+      setCanResendActivation(result.canResend !== false)
       setSubmitting(false)
     } else {
       setError(result.error ?? "Unable to sign in.")
@@ -100,9 +110,9 @@ function LoginForm() {
       twoFactorRecovery ? "backup" : "totp",
     )
     if (result.ok && result.user) {
-      router.replace(homeForRole(result.user.role))
+      router.replace(nextPath ?? homeForRole(result.user.role))
     } else if (result.ok) {
-      router.replace("/dashboard")
+      router.replace(nextPath ?? "/dashboard")
     } else {
       setTwoFactorError(result.error ?? "Unable to verify the code.")
       setVerifyingTwoFactor(false)
@@ -129,7 +139,10 @@ function LoginForm() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col lg:flex-row">
+      <main
+        id="main-content"
+        className="flex min-h-screen flex-col lg:flex-row"
+      >
         <div className="absolute top-4 right-4 z-10">
           <ThemeToggle className="bg-background/80 backdrop-blur" />
         </div>
@@ -336,7 +349,12 @@ function LoginForm() {
                                 . Check your inbox and click the link to
                                 activate your account.
                               </p>
-                              {resendStatus === "sent" ? (
+                              {!canResendActivation ? (
+                                <p className="text-amber-700 dark:text-amber-300 mt-1 text-xs">
+                                  Ask the person who invited you to resend the
+                                  activation email.
+                                </p>
+                              ) : resendStatus === "sent" ? (
                                 <p className="text-amber-600 dark:text-amber-400 mt-1 text-xs font-medium">
                                   Verification email sent! Check your inbox.
                                 </p>

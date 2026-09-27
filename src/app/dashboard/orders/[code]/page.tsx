@@ -4,6 +4,7 @@ import { OrderDetailView } from "@/features/orders/components/order-detail-view"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { order, rider, warehouse } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 
 export default async function OrderDetailPage({
   params,
@@ -11,7 +12,7 @@ export default async function OrderDetailPage({
   params: Promise<{ code: string }>
 }) {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
 
   const { code } = await params
 

@@ -9,8 +9,8 @@ import {
   pgTable,
   text,
 } from "drizzle-orm/pg-core"
-import { emailLogStatuses, profileRoles } from "./enums"
-import { ts } from "./helpers"
+import { emailLogStatuses, emailOutboxStatuses, profileRoles } from "./enums"
+import { money, ts } from "./helpers"
 
 // =============================================================================
 // Failed mail log — REMOVED
@@ -62,6 +62,44 @@ export const emailLog = pgTable(
       "gin",
       sql`${t.subject} gin_trgm_ops`,
     ),
+  ],
+)
+
+// =============================================================================
+// Email outbox (ROADMAP P1.5)
+//
+// Durable queue for transactional email. Callers insert a row in the same
+// transaction as the domain change (via `enqueueEmail`), so a crash or a frozen
+// serverless invocation cannot lose the send. A worker/cron drains due rows
+// with `drainEmailOutbox()`, which sends through the existing mailer (writing
+// the `email_log` delivery record) and deletes the row on success. Failed rows
+// stay for retry with exponential backoff.
+// =============================================================================
+
+export const emailOutbox = pgTable(
+  "email_outbox",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    to: text("to").notNull(), // comma-joined if multiple recipients
+    subject: text("subject").notNull(),
+    html: text("html"),
+    text: text("text"),
+    status: text("status", { enum: emailOutboxStatuses })
+      .notNull()
+      .default("PENDING"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("lastError"),
+    // Earliest time the row may be attempted again (exponential backoff).
+    nextAttemptAt: ts("nextAttemptAt").notNull().defaultNow(),
+    sentAt: ts("sentAt"),
+    createdAt: ts("createdAt").notNull().defaultNow(),
+    updatedAt: ts("updatedAt").notNull().defaultNow(),
+  },
+  (t) => [
+    index("email_outbox_status_next_attempt_idx").on(t.status, t.nextAttemptAt),
+    index("email_outbox_created_at_idx").on(t.createdAt),
   ],
 )
 
@@ -174,10 +212,8 @@ export const platformConfig = pgTable("platform_config", {
   maxCodFeePercentage: doublePrecision("maxCodFeePercentage")
     .notNull()
     .default(5),
-  defaultBaseRate: doublePrecision("defaultBaseRate").notNull().default(0),
-  defaultExtraRatePerKg: doublePrecision("defaultExtraRatePerKg")
-    .notNull()
-    .default(0),
+  defaultBaseRate: money("defaultBaseRate").notNull().default(0),
+  defaultExtraRatePerKg: money("defaultExtraRatePerKg").notNull().default(0),
   defaultFreeWeightKg: doublePrecision("defaultFreeWeightKg")
     .notNull()
     .default(1),

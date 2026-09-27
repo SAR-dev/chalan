@@ -8,6 +8,7 @@ import { MobileHeader } from "@/components/navigation/mobile-header"
 import { RiderSidebar } from "@/components/navigation/rider-sidebar"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
+import { loginPathWithNext } from "@/lib/auth-redirect"
 import { RIDER_SIDEBAR } from "@/lib/nav-config"
 
 // Rider monitors: riders, orders, merchants, warehouses, pickup-locations.
@@ -26,7 +27,9 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady) return
     if (!currentUser) {
-      router.replace("/login")
+      router.replace(
+        loginPathWithNext(window.location.pathname + window.location.search),
+      )
     } else if (currentUser.role !== "RIDER") {
       router.replace(homeForRole(currentUser.role))
     }
@@ -45,7 +48,10 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
       <RiderSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileHeader config={RIDER_SIDEBAR} />
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
+        <main
+          id="main-content"
+          className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
+        >
           <div className="mx-auto w-full max-w-7xl">
             <AnnouncementBanner />
             <DataErrorBanner keys={RIDER_KEYS} />

@@ -1,0 +1,88 @@
+// Structured JSON logger (ROADMAP P2.2).
+//
+// Every line is a single JSON object so container stdout/stderr can be parsed
+// by any log aggregator. Replaces ad-hoc `console.*` in the request/error path
+// and lets callers attach context (requestId, method, path, userId, …) without
+// string interpolation.
+//
+// Usage:
+//   logger.error("Unhandled route error", { requestId, method, path, err })
+//   const reqLogger = logger.child({ requestId, path })
+//   reqLogger.info("payment submitted", { merchantId })
+
+export type LogLevel = "debug" | "info" | "warn" | "error"
+
+const LEVELS: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+}
+
+export interface LogFields {
+  [key: string]: unknown
+}
+
+export interface Logger {
+  debug(msg: string, fields?: LogFields): void
+  info(msg: string, fields?: LogFields): void
+  warn(msg: string, fields?: LogFields): void
+  error(msg: string, fields?: LogFields): void
+  child(fields: LogFields): Logger
+}
+
+function configuredLevel(): LogLevel {
+  const raw = process.env.LOG_LEVEL?.trim().toLowerCase()
+  if (raw === "debug" || raw === "info" || raw === "warn" || raw === "error") {
+    return raw
+  }
+  return "info"
+}
+
+/** Turn an unknown thrown value into a JSON-safe object. */
+export function serializeError(err: unknown): LogFields {
+  if (err instanceof Error) {
+    const out: LogFields = { name: err.name, message: err.message }
+    if (err.stack) out.stack = err.stack
+    if (err.cause !== undefined) out.cause = serializeError(err.cause)
+    return out
+  }
+  return { message: String(err) }
+}
+
+function emit(
+  level: LogLevel,
+  msg: string,
+  base: LogFields,
+  fields?: LogFields,
+): void {
+  if (LEVELS[level] < LEVELS[configuredLevel()]) return
+
+  // `err` is serialized (JSON.stringify(new Error()) is `{}`).
+  const { err, ...rest } = fields ?? {}
+  const record: LogFields = {
+    level,
+    time: new Date().toISOString(),
+    msg,
+    ...base,
+    ...rest,
+  }
+  if (err !== undefined) record.err = serializeError(err)
+
+  const line = JSON.stringify(record)
+  // warn/error → stderr so they are separable from normal output.
+  if (LEVELS[level] >= LEVELS.warn) console.error(line)
+  else console.log(line)
+}
+
+function makeLogger(base: LogFields): Logger {
+  return {
+    debug: (msg, fields) => emit("debug", msg, base, fields),
+    info: (msg, fields) => emit("info", msg, base, fields),
+    warn: (msg, fields) => emit("warn", msg, base, fields),
+    error: (msg, fields) => emit("error", msg, base, fields),
+    child: (fields) => makeLogger({ ...base, ...fields }),
+  }
+}
+
+export const logger: Logger = makeLogger({})

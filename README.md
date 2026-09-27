@@ -12,13 +12,13 @@ Next.js 16 (App Router) · React + TypeScript · PostgreSQL · Drizzle ORM · Be
 
 ```bash
 pnpm install
-cp .env.example .env.local        # see docs/ENV.md for all variables
-pnpm db:push                      # apply schema
+cp .env.example .env              # see docs/ENV.md for all variables
+pnpm db:migrate                   # apply schema migrations
 pnpm db:admin             # create first superadmin
 pnpm dev                          # http://localhost:3000
 ```
 
-Required env: `DATABASE_URL`, `BETTER_AUTH_SECRET` (generate with `openssl rand -base64 32`). Everything else is optional or has a safe default — the app validates required vars on boot (`src/lib/env.ts`). Image uploads work out of the box with the default `STORAGE_PROVIDER=local` (files in `./uploads`); switch to `r2` for shared/cloud storage.
+Required env: `DATABASE_URL`, `BETTER_AUTH_SECRET` (generate with `openssl rand -base64 32`). Everything else is optional or has a safe default — the app validates required vars on boot (`src/lib/env.ts`). Image uploads work out of the box with the default `STORAGE_PROVIDER=local` (files in `./.uploads`); switch to `r2` for shared/cloud storage.
 
 ## Roles
 
@@ -37,13 +37,13 @@ Created by `pnpm db:admin` — local dev only. Sign in at `/login`:
 
 | Role            | Email                  | Password        |
 | --------------- | ---------------------- | --------------- |
-| Super Admin     | `admin01@email.com`    | `12qwaszx`      |
-| Warehouse Admin | `warehouse.admin01@email.com` | `12qwaszx` |
+| Super Admin     | `admin1@email.com`    | `12qwaszx`      |
+| Warehouse Admin | `warehouse.admin1@email.com` | `12qwaszx` |
 | Merchant        | `merchant1@email.com`  | `12qwaszx`      |
 | Rider           | `rider1@email.com`     | `12qwaszx`      |
 | Demo merchant   | `demo@kikuya.com`      | `12qwaszx`      |
 
-> `warehouse.admin02@email.com` is seeded inactive (tests disabled-user handling). Full list in [`docs/SETUP.md`](./docs/SETUP.md).
+> `warehouse.admin2@email.com` is seeded inactive (tests disabled-user handling). Full list in [`docs/SETUP.md`](./docs/SETUP.md).
 
 ## Scripts
 

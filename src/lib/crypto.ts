@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
+import { logger } from "@/lib/logger"
 
 // AES-256-GCM encryption for secrets at rest (e.g. SMTP credentials).
 //
@@ -15,9 +16,7 @@ function getKey(): Buffer {
     return Buffer.from(hex, "hex")
   }
   if (hex) {
-    console.warn(
-      "[crypto] SMTP_SECRET_KEY must be 64 hex chars; falling back to dev key",
-    )
+    logger.warn("SMTP_SECRET_KEY must be 64 hex chars; falling back to dev key")
   }
   return DEV_KEY
 }
@@ -55,7 +54,7 @@ export function decryptSecret(encoded: string): string {
       decipher.final(),
     ]).toString("utf8")
   } catch (err) {
-    console.error("[crypto] Failed to decrypt secret:", err)
+    logger.error("Failed to decrypt secret", { err })
     throw new Error("Failed to decrypt stored secret")
   }
 }

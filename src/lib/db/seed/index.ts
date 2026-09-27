@@ -12,6 +12,7 @@ import { seedDeliveryCities } from "./delivery-cities"
 import { seedDeliveryZones } from "./delivery-zones"
 import { log } from "./helpers"
 import { seedPlatformConfig } from "./platform-config"
+import { assertSeedPasswordAllowed } from "./seed-content/credentials"
 import { seedUsers } from "./users"
 import { seedWarehouses } from "./warehouses"
 import { seedZonePricing } from "./zone-pricing"
@@ -20,6 +21,7 @@ async function main() {
   console.log(`=== ${siteConfig.name} seed starting ===\n`)
 
   try {
+    assertSeedPasswordAllowed()
     await cleanDatabase()
 
     await seedWarehouses()

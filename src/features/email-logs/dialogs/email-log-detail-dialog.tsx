@@ -1,13 +1,21 @@
 "use client"
 
-import { AlertTriangle, CheckCircle2, Clock, Mail, User } from "lucide-react"
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  Mail,
+  User,
+} from "lucide-react"
 import { FormDialog } from "@/components/form-dialog"
 import { Badge } from "@/components/ui/badge"
+import { useEmailLog } from "@/features/email-logs/hooks/use-email-logs"
 import {
   EMAIL_LOG_STATUS_LABELS,
   EMAIL_LOG_STATUS_TONES,
 } from "@/lib/constants"
-import type { EmailLog } from "@/lib/types"
+import type { EmailLogListItem } from "@/lib/types"
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString(undefined, {
@@ -20,7 +28,7 @@ function formatTimestamp(value: string) {
 }
 
 interface EmailLogDetailDialogProps {
-  log: EmailLog | null
+  log: EmailLogListItem | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -30,6 +38,14 @@ export function EmailLogDetailDialog({
   open,
   onOpenChange,
 }: EmailLogDetailDialogProps) {
+  // The list rows omit the HTML/plain-text bodies (they are the bulk of the
+  // payload), so the preview is fetched here when the dialog opens.
+  const { log: detail, isLoading: detailLoading } = useEmailLog(
+    open ? (log?.id ?? null) : null,
+  )
+  const body = detail?.body
+  const textBody = detail?.textBody
+
   if (!log) return null
 
   return (
@@ -91,14 +107,21 @@ export function EmailLogDetailDialog({
         ) : null}
       </div>
 
-      {log.body ? (
+      {detailLoading ? (
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" />
+          <span>Loading email preview…</span>
+        </div>
+      ) : null}
+
+      {body ? (
         <div className="flex flex-col gap-2">
           <span className="text-muted-foreground text-xs font-medium uppercase">
             Email preview
           </span>
           <div className="bg-muted border-input max-h-80 overflow-y-auto rounded-md border">
             <iframe
-              srcDoc={log.body}
+              srcDoc={body}
               title="Email preview"
               sandbox="allow-same-origin"
               className="h-80 w-full border-0"
@@ -107,13 +130,13 @@ export function EmailLogDetailDialog({
         </div>
       ) : null}
 
-      {log.textBody ? (
+      {textBody ? (
         <div className="flex flex-col gap-2">
           <span className="text-muted-foreground text-xs font-medium uppercase">
             Plain text
           </span>
           <pre className="bg-muted border-input max-h-60 overflow-y-auto rounded-md border p-3 text-sm whitespace-pre-wrap">
-            {log.textBody}
+            {textBody}
           </pre>
         </div>
       ) : null}

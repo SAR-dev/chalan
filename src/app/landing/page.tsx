@@ -224,7 +224,7 @@ export default async function LandingPage() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         {/* ── Hero ── */}
         <section className="relative overflow-hidden">
           <div

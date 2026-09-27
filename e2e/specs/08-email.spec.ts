@@ -1,41 +1,68 @@
 import "dotenv/config"
 
-import { createHmac } from "node:crypto"
+import { createHash, createHmac } from "node:crypto"
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
-import { login } from "../helpers"
+import { login, waitForAppReady } from "../helpers"
 import { email } from "../selectors"
 
 const PASSWORD = "testpass123"
 const SITE_ORIGIN = "http://localhost:3000"
 
-/** Skip onboarding if the merchant landed on /welcome (fresh accounts do). */
+/** Skip onboarding for a freshly registered merchant. The shell redirects
+ *  incomplete merchants to /welcome asynchronously, so navigate to /merchant
+ *  and wait for that decision instead of checking the URL immediately. */
 async function skipOnboardingIfNeeded(page: Page) {
-  if (page.url().includes("/welcome")) {
-    await page.getByRole("button", { name: /skip for now/i }).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
+  await page.goto("/merchant")
+  await waitForAppReady(page).catch(() => {})
+  const skip = page.getByRole("button", { name: /skip for now/i })
+  try {
+    await skip.waitFor({ state: "visible", timeout: 5_000 })
+  } catch {
+    return // already onboarded
   }
+  await skip.click()
+  await page.waitForURL(/\/merchant/, { timeout: 15_000 })
+  await waitForAppReady(page)
 }
 
 /**
- * Read the merchant registration token straight from Postgres — the same
+ * Point a merchant's stored verification token at a known raw value.
+ *
+ * ROADMAP P0.7: the column holds only the SHA-256 hash of the token, so the raw
+ * value (which only ever exists inside the emailed link — the e2e environment
+ * has no SMTP) is unknowable from the database. This asserts the column really
+ * is a hash, then swaps in the hash of a token the test controls. Same
  * DATABASE_URL the server uses (.env, loaded via dotenv like scripts/setup.ts).
  */
-async function merchantVerificationToken(
+async function setMerchantVerificationToken(
   emailAddress: string,
-): Promise<string | null> {
+  raw: string,
+): Promise<string> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set — .env failed to load")
   }
   const client = new Client({ connectionString: process.env.DATABASE_URL })
   await client.connect()
   try {
-    const res = await client.query(
+    const issued = await client.query(
       `SELECT "emailVerificationToken" FROM merchant WHERE email = $1`,
       [emailAddress],
     )
-    return (res.rows[0]?.emailVerificationToken as string | null) ?? null
+    const stored = (issued.rows[0]?.emailVerificationToken as string) ?? null
+    expect(stored, "registration must issue a verification token").toBeTruthy()
+    expect(stored, "token must be stored hashed, never in plaintext").toMatch(
+      /^[0-9a-f]{64}$/,
+    )
+
+    await client.query(
+      `UPDATE merchant
+          SET "emailVerificationToken" = $1,
+              "emailVerificationExpiresAt" = NOW() + INTERVAL '24 hours'
+        WHERE email = $2`,
+      [createHash("sha256").update(raw).digest("hex"), emailAddress],
+    )
+    return raw
   } finally {
     await client.end()
   }
@@ -95,8 +122,12 @@ test.describe("S39. Change email", () => {
     })
     expect(registered.ok()).toBeTruthy()
 
-    // Activate the fresh account with the token from the merchant row.
-    const registrationToken = await merchantVerificationToken(oldEmail)
+    // Activate the fresh account. Registration stored only the token's hash,
+    // so drive the flow with a token this test controls.
+    const registrationToken = await setMerchantVerificationToken(
+      oldEmail,
+      `e2e-registration-${stamp}`,
+    )
     expect(registrationToken).toBeTruthy()
     const activated = await page.request.get(
       `/api/auth/verify-email?token=${registrationToken}`,

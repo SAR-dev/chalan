@@ -6,7 +6,7 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 import { buildTableUrl, useTableFilters } from "@/lib/hooks/use-table-filters"
 import type { PaginatedResponse } from "@/lib/pagination"
-import type { EmailLog } from "@/lib/types"
+import type { EmailLog, EmailLogListItem } from "@/lib/types"
 import { formatError } from "@/lib/validation"
 
 const KEY = "/api/email-logs"
@@ -35,7 +35,7 @@ export function useEmailLogs() {
     error,
     isLoading,
     mutate,
-  } = useSWR<PaginatedResponse<EmailLog>>(
+  } = useSWR<PaginatedResponse<EmailLogListItem>>(
     currentUser ? url : null,
     jsonFetcher,
     swrOptions,
@@ -98,4 +98,27 @@ export function useEmailLogs() {
     markAsSent,
     markAsSentBulk,
   }
+}
+
+/**
+ * Full email-log record (including `body` / `textBody`), fetched on demand.
+ * The list endpoint omits the bodies, so any view of the HTML preview has to go
+ * through here.
+ */
+export function useEmailLog(id: string | null) {
+  const { currentUser } = useAuth()
+  const { data, error, isLoading } = useSWR<EmailLog>(
+    currentUser && id ? `${KEY}/${id}` : null,
+    jsonFetcher,
+    swrOptions,
+  )
+
+  return { log: data ?? null, isLoading, error }
+}
+
+/** One-shot read of a single email log (bodies included). */
+export async function fetchEmailLog(id: string): Promise<EmailLog | null> {
+  const res = await fetch(`${KEY}/${id}`)
+  if (!res.ok) return null
+  return (await res.json()) as EmailLog
 }

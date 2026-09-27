@@ -1,4 +1,3 @@
-import { createId } from "@paralleldrive/cuid2"
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
@@ -11,10 +10,12 @@ import {
   merchantStatuses,
   platformConfig,
   profile,
+  user,
 } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
+import { enqueueEmail, flushEmailOutbox } from "@/lib/email-outbox"
+import { logger } from "@/lib/logger"
 import { merchantRegisteredTemplate } from "@/lib/mail-templates"
-import { sendMail } from "@/lib/mailer"
 import {
   paginateResponse,
   parsePagination,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/pagination"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { merchantRegisterSchema, parseBody } from "@/lib/validation"
+import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const GET = withErrorHandler(async (req: Request) => {
@@ -177,7 +179,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (where) q = q.where(where)
 
   const countQuery = dbRead
-    .select({ count: sql<number>`count(*)` })
+    .select({ count: sql<number>`count(*)::int` })
     .from(merchant)
     .where(where)
 
@@ -207,6 +209,15 @@ export const GET = withErrorHandler(async (req: Request) => {
   return NextResponse.json(paginateResponse(rows, count, limit, offset))
 })
 
+/** Best-effort removal of the auth user created for a failed registration. */
+async function deleteUserQuietly(userId: string): Promise<void> {
+  try {
+    await db.delete(user).where(eq(user.id, userId))
+  } catch (err) {
+    logger.error("Orphan user cleanup failed", { err })
+  }
+}
+
 export const POST = withErrorHandler(async (req: Request) => {
   const parsed = await parseBody(req, merchantRegisterSchema)
   if (parsed.error) return parsed.error
@@ -220,14 +231,21 @@ export const POST = withErrorHandler(async (req: Request) => {
     password,
   } = parsed.data
 
-  const limited = await rateLimitByIp(req, "merchant-register", 3, 60)
+  const limited = await rateLimitByIp(req, "merchant-register", 3, 60, {
+    failClosed: true,
+  })
   if (limited) return limited
 
-  const TOKEN_EXPIRY_HOURS = 24
-  const verificationToken = createId()
-  const verificationExpiresAt = new Date(
-    Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
-  ).toISOString()
+  // Only the SHA-256 hash of the verification token is stored (P0.7); the raw
+  // token exists only inside the emailed link.
+  const {
+    raw: verificationToken,
+    hash: verificationTokenHash,
+    expiresAt: verificationExpiresAt,
+  } = issueVerifyToken()
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  const verificationUrl = verifyTokenUrl(verificationToken, siteUrl)
 
   const config = await dbRead
     .select({
@@ -241,70 +259,71 @@ export const POST = withErrorHandler(async (req: Request) => {
     .limit(1)
     .then((r) => r[0])
 
-  const [newMerchant] = await db
-    .insert(merchant)
-    .values({
-      businessName,
-      ownerName,
-      email,
-      phone,
-      address,
-      businessType,
-      status: "PENDING",
-      baseRate: config?.defaultBaseRate ?? 0,
-      extraRatePerKg: config?.defaultExtraRatePerKg ?? 0,
-      freeWeightKg: config?.defaultFreeWeightKg ?? 1,
-      maxWeightKg: config?.defaultMaxWeightKg ?? 3,
-      emailVerificationToken: verificationToken,
-      emailVerificationExpiresAt: verificationExpiresAt,
-    })
-    .returning()
-
+  // The merchant row and the owner's profile are one unit (ROADMAP P1.4).
+  // Better Auth owns its own connection, so the user is created first and the
+  // two app tables are written in a transaction; a failure deletes the user
+  // instead of leaving an account with no merchant.
   let created
   try {
     created = await auth.api.createUser({
       body: { name: ownerName, email, password, role: "MERCHANT" as "user" },
     })
   } catch (err) {
-    await db.delete(merchant).where(eq(merchant.id, newMerchant.id))
-    console.error("[merchants] Failed to create user account:", err)
+    logger.error("Failed to create user account", { err })
     return badRequest("Could not create user account")
   }
 
-  await db.insert(profile).values({
-    userId: created.user.id,
-    role: "MERCHANT",
-    phone,
-    isActive: true,
-    merchantId: newMerchant.id,
-  })
+  let newMerchant
+  try {
+    newMerchant = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(merchant)
+        .values({
+          businessName,
+          ownerName,
+          email,
+          phone,
+          address,
+          businessType,
+          status: "PENDING",
+          baseRate: config?.defaultBaseRate ?? 0,
+          extraRatePerKg: config?.defaultExtraRatePerKg ?? 0,
+          freeWeightKg: config?.defaultFreeWeightKg ?? 1,
+          maxWeightKg: config?.defaultMaxWeightKg ?? 3,
+          emailVerificationToken: verificationTokenHash,
+          emailVerificationExpiresAt: verificationExpiresAt,
+        })
+        .returning()
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-  const verificationUrl = `${siteUrl}/api/auth/verify-email?token=${verificationToken}`
+      await tx.insert(profile).values({
+        userId: created.user.id,
+        role: "MERCHANT",
+        phone,
+        isActive: true,
+        merchantId: row.id,
+      })
 
-  const template = await merchantRegisteredTemplate({
-    ownerName,
-    businessName,
-    verificationUrl,
-  })
+      // Enqueue the verification email in the same transaction (ROADMAP P1.5).
+      const template = await merchantRegisteredTemplate({
+        ownerName,
+        businessName,
+        verificationUrl,
+      })
+      await enqueueEmail({ to: email, ...template }, tx)
 
-  sendMail(
-    {
-      to: email,
-      ...template,
-    },
-    {
-      maxRetries: 2,
-      baseDelayMs: 1000,
-      onRetry: (attempt, err) =>
-        console.warn(
-          `[mailer] Retry ${attempt} for merchant registration email (${email}):`,
-          err.message,
-        ),
-    },
-  ).catch((err) =>
-    console.error("[mailer] Merchant registration email failed:", err),
-  )
+      return row
+    })
+  } catch (err) {
+    await deleteUserQuietly(created.user.id)
+    logger.error("Failed to store merchant", { err })
+    return NextResponse.json(
+      { error: "Could not create the merchant. Please try again." },
+      { status: 500 },
+    )
+  }
+
+  // Best-effort immediate delivery; the cron retries anything left behind.
+  await flushEmailOutbox()
 
   return NextResponse.json(newMerchant, { status: 201 })
 })

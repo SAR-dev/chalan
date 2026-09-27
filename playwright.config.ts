@@ -11,6 +11,12 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // Stand in for the reverse proxy that production always has in front of
+    // the app: with TRUSTED_PROXY_HOPS=1 (see webServer.env) the app reads the
+    // client IP from the right-most x-forwarded-for entry, which is what the
+    // rate limiter keys on. Without this header every request would resolve to
+    // "no IP" and the IP-keyed limits would be skipped entirely.
+    extraHTTPHeaders: { "x-forwarded-for": "203.0.113.10" },
   },
   projects: [
     {
@@ -30,6 +36,8 @@ export default defineConfig({
     // bootstrap to fail and shells to bounce back to /login. Disable for e2e.
     env: {
       AUTH_RATE_LIMIT_DISABLED: "1",
+      // One trusted proxy hop (see use.extraHTTPHeaders).
+      TRUSTED_PROXY_HOPS: "1",
     },
   },
 })

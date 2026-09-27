@@ -3,8 +3,10 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { merchant, user } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { merchantWelcomeTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
+import { hashVerifyToken } from "@/lib/verify-token"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Public endpoint — no session required. The verification link from the email
@@ -29,6 +31,8 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const now = new Date().toISOString()
 
+  // The table holds only the SHA-256 hash of the token (ROADMAP P0.7) — the
+  // raw value exists solely inside the emailed link.
   const [current] = await db
     .select({
       id: merchant.id,
@@ -36,7 +40,7 @@ export const GET = withErrorHandler(async (req: Request) => {
       emailVerificationExpiresAt: merchant.emailVerificationExpiresAt,
     })
     .from(merchant)
-    .where(eq(merchant.emailVerificationToken, token))
+    .where(eq(merchant.emailVerificationToken, hashVerifyToken(token)))
     .limit(1)
 
   if (!current) {
@@ -86,7 +90,7 @@ export const GET = withErrorHandler(async (req: Request) => {
         businessName: _updated.businessName,
         dashboardUrl,
       })),
-    }).catch((err) => console.error("[mailer] Welcome email failed:", err))
+    }).catch((err) => logger.error("Welcome email failed", { err }))
   }
 
   return NextResponse.redirect(

@@ -127,6 +127,7 @@ export function ColumnSettingsDialog<T>({
               isPinned ||
               (isVisible && nonStickyVisibleCount <= MIN_VISIBLE_COLUMNS)
             return (
+              // biome-ignore lint/a11y/noLabelWithoutControl: the row wraps a Base UI `Switch`, which renders `<button role="switch">` (not a labelable form control) — the wrapper is for click-to-toggle only, and the switch carries its own aria-label.
               <label
                 key={col.id}
                 className={cn(
@@ -146,6 +147,7 @@ export function ColumnSettingsDialog<T>({
                 </span>
                 <Switch
                   size="sm"
+                  aria-label={`Show ${typeof col.header === "string" ? col.header : col.id} column`}
                   checked={isVisible}
                   disabled={isDisabled}
                   onCheckedChange={() => toggleColumn(col.id)}
@@ -197,6 +199,7 @@ export function SearchColumnsDialog<T>({
             const isSearchable = searchColumnIds.includes(col.id)
             const isDisabled = isSearchable && searchColumnIds.length <= 1
             return (
+              // biome-ignore lint/a11y/noLabelWithoutControl: same as the column-visibility row above — the control is a `role="switch"` button with its own aria-label.
               <label
                 key={col.id}
                 className={cn(
@@ -211,6 +214,7 @@ export function SearchColumnsDialog<T>({
                 </span>
                 <Switch
                   size="sm"
+                  aria-label={`Search ${typeof col.header === "string" ? col.header : col.id} column`}
                   checked={isSearchable}
                   disabled={isDisabled}
                   onCheckedChange={() => toggleSearchColumn(col.id)}

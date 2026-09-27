@@ -32,6 +32,8 @@ const dbState = {
   selectQueue: [] as unknown[][],
   updateResult: [] as unknown[],
   updatePayloads: [] as Record<string, unknown>[],
+  insertResult: [] as unknown[],
+  insertPayloads: [] as Record<string, unknown>[],
 }
 
 vi.mock("@/lib/db", () => {
@@ -71,11 +73,27 @@ vi.mock("@/lib/db", () => {
   interface MockDb {
     select: () => ReturnType<typeof makeSelectChain>
     update: () => ReturnType<typeof makeUpdateChain>
+    insert: () => ReturnType<typeof makeInsertChain>
     transaction: <T>(fn: (tx: MockDb) => Promise<T>) => Promise<T>
+  }
+  const makeInsertChain = () => {
+    const chain: Record<string, unknown> = {
+      values: (
+        payload: Record<string, unknown> | Record<string, unknown>[],
+      ) => {
+        dbState.insertPayloads.push(payload as Record<string, unknown>)
+        return chain
+      },
+      onConflictDoUpdate: () => chain,
+      returning: () => Promise.resolve(dbState.insertResult),
+    }
+    return chain
   }
   const db: MockDb = {
     select: () => makeSelectChain(),
     update: () => makeUpdateChain(),
+    // Ledger + balance writes (balance_transaction / merchant_balance).
+    insert: () => makeInsertChain(),
     // `applyOrderTransition` runs its fetch+guard+update inside
     // `db.transaction(async (tx) => ...)`. The mock `tx` is just another
     // handle onto the same `select`/`update` chains and the same shared
@@ -167,6 +185,8 @@ beforeEach(() => {
   dbState.selectQueue = []
   dbState.updateResult = []
   dbState.updatePayloads = []
+  dbState.insertResult = []
+  dbState.insertPayloads = []
   sessionState.value = null
   vi.mocked(logAudit).mockClear()
 })
@@ -248,7 +268,32 @@ describe("PATCH /orders/:id/approve", () => {
           diff: { status: { from: "PENDING", to: "APPROVED" } },
         },
       }),
+      // Audit now commits inside the transition's transaction (ROADMAP P1.4).
+      expect.anything(),
     )
+    // Append-only status history row, written in the same transaction.
+    expect(dbState.insertPayloads).toContainEqual(
+      expect.objectContaining({
+        orderId: ORDER_ID,
+        fromStatus: "PENDING",
+        toStatus: "APPROVED",
+        transition: "approve",
+      }),
+    )
+  })
+
+  it("500 when the audit write fails (change is not committed)", async () => {
+    // logAudit propagates inside the transaction, so a failed audit rolls the
+    // transition back instead of committing state without a trail (P1.4a).
+    sessionState.value = admin
+    dbState.selectQueue = [
+      [makeOrder({ parcelWeightKg: 2 })],
+      [{ maxWeightKg: 5 }],
+    ]
+    dbState.updateResult = [makeOrder({ status: "APPROVED" })]
+    vi.mocked(logAudit).mockRejectedValueOnce(new Error("audit down"))
+    const { status } = await call(approve)
+    expect(status).toBe(500)
   })
 
   it("allows SUPER_ADMIN too", async () => {
@@ -603,7 +648,9 @@ describe("PATCH /orders/:id/delivered", () => {
         }),
       ],
     ]
-    dbState.updateResult = [makeOrder({ status: "DELIVERED" })]
+    dbState.updateResult = [
+      makeOrder({ status: "DELIVERED", productCost: 750 }),
+    ]
     const { status, payload } = await call(delivered, {})
     expect(status).toBe(200)
     expect(payload).toMatchObject({
@@ -611,6 +658,11 @@ describe("PATCH /orders/:id/delivered", () => {
       amountCollected: 750,
     })
     expect(typeof payload?.deliveredAt).toBe("string")
+    // P0.4: delivery credits the GROSS collected COD; the ORDER_CHARGE row
+    // written at creation nets it down to the merchant's earnings.
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_EARNINGS"),
+    ).toMatchObject({ amount: -750, status: "SETTLED" })
   })
 
   it("uses provided proof ref when present", async () => {
@@ -837,6 +889,7 @@ describe("PATCH /orders/:id/settle-cod", () => {
           },
         },
       }),
+      expect.anything(),
     )
   })
 })
@@ -1038,6 +1091,7 @@ describe("PATCH /orders/:id/cancel", () => {
           },
         },
       }),
+      expect.anything(),
     )
   })
 

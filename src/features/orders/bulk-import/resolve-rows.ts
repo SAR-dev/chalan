@@ -1,9 +1,9 @@
 /**
  * Row resolution and validation for bulk order import (§6). Pure module: the
- * dialog injects the lookup maps (pickup locations, active cities) and the
- * merchant's `maxWeightKg`. Each row is normalized per §3.2, mapped to IDs,
- * auto-tagged per §7, then validated with `orderCreateSchema`; errors come
- * back as `Row N: ...` instructions via the `formatError` pattern.
+ * import page injects the lookup maps (pickup locations, active cities) and
+ * the merchant's `maxWeightKg`. Each row is normalized per §3.2, mapped to
+ * IDs, auto-tagged per §7, then validated with `orderCreateSchema`; errors
+ * come back as `Row N: ...` instructions via the `formatError` pattern.
  */
 
 import type { CreateOrderInput, DeliveryType } from "@/lib/types"
@@ -29,6 +29,26 @@ export interface ResolvedRow {
   raw: Record<OrderImportHeader, string>
   input: CreateOrderInput
   errors: string[]
+  /**
+   * Same messages attributed to the offending column, so the preview can show
+   * them under the cell instead of a separate errors column. Row-level messages
+   * stay in `errors` for filtering and the "jump to first error" action.
+   */
+  fieldErrors: Partial<Record<OrderImportHeader, string>>
+}
+
+/** Zod issue path → the CSV column that produced it. */
+const INPUT_HEADERS: Record<string, OrderImportHeader> = {
+  pickupLocationId: "pickup_location",
+  recipientName: "recipient_name",
+  recipientPhone: "recipient_phone",
+  deliveryCityId: "delivery_city",
+  deliveryAddress: "delivery_address",
+  deliveryMapLink: "delivery_map_link",
+  parcelWeightKg: "parcel_weight_kg",
+  deliveryType: "delivery_type",
+  productCost: "product_cost",
+  merchantNote: "merchant_note",
 }
 
 const BANGLA_DIGITS = "০১২৩৪৫৬৭৮৯"
@@ -87,12 +107,31 @@ function csvImportTag(): string {
   return `[CSV import ${year}-${month}-${day}]`
 }
 
-function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
+/**
+ * Normalizes, resolves and validates one row. The editable preview calls this
+ * for the single row a cell edit changed, so fixing a cell re-validates that
+ * row (and only that row) without disturbing line numbers or row order.
+ */
+export function resolveRow(
+  row: RawOrderRow,
+  lookups: ResolveLookups,
+): ResolvedRow {
   const { values } = row
   const line = row.__line
   const errors: string[] = []
+  const fieldErrors: Partial<Record<OrderImportHeader, string>> = {}
   const covered = new Set<string>()
   const push = (message: string) => errors.push(`Row ${line}: ${message}`)
+  const pushField = (header: OrderImportHeader, message: string) => {
+    fieldErrors[header] = fieldErrors[header]
+      ? `${fieldErrors[header]} ${message}`
+      : message
+  }
+  /** Row-level message (jump/filter) plus the column it belongs to (inline). */
+  const pushBoth = (header: OrderImportHeader, message: string) => {
+    push(message)
+    pushField(header, message)
+  }
 
   let pickupLocationId = ""
   const pickupName = collapseWhitespace(values.pickup_location)
@@ -100,7 +139,7 @@ function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
     const found = findLookup(lookups.pickupLocations, pickupName)
     if (found) pickupLocationId = found
     else {
-      push(`Unknown pickup location "${pickupName}".`)
+      pushBoth("pickup_location", `Unknown pickup location "${pickupName}".`)
       covered.add("pickupLocationId")
     }
   }
@@ -111,7 +150,7 @@ function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
     const found = findLookup(lookups.deliveryCities, cityName)
     if (found) deliveryCityId = found
     else {
-      push(`Unknown delivery city "${cityName}".`)
+      pushBoth("delivery_city", `Unknown delivery city "${cityName}".`)
       covered.add("deliveryCityId")
     }
   }
@@ -119,15 +158,18 @@ function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
   let parcelWeightKg = Number.NaN
   const weightRaw = values.parcel_weight_kg.trim()
   if (!weightRaw) {
-    push("Parcel weight is required.")
+    pushBoth("parcel_weight_kg", "Parcel weight is required.")
     covered.add("parcelWeightKg")
   } else {
     parcelWeightKg = normalizeNumber(weightRaw)
     if (Number.isNaN(parcelWeightKg)) {
-      push("Parcel weight must be a number like 1.5.")
+      pushBoth("parcel_weight_kg", "Parcel weight must be a number like 1.5.")
       covered.add("parcelWeightKg")
     } else if (parcelWeightKg > lookups.maxWeightKg) {
-      push(`Parcel weight exceeds the ${lookups.maxWeightKg} KG limit.`)
+      pushBoth(
+        "parcel_weight_kg",
+        `Parcel weight exceeds the ${lookups.maxWeightKg} KG limit.`,
+      )
       covered.add("parcelWeightKg")
     }
   }
@@ -135,12 +177,12 @@ function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
   let productCost = Number.NaN
   const costRaw = values.product_cost.trim()
   if (!costRaw) {
-    push("Product cost is required.")
+    pushBoth("product_cost", "Product cost is required.")
     covered.add("productCost")
   } else {
     productCost = normalizeNumber(costRaw)
     if (Number.isNaN(productCost)) {
-      push("Product cost must be a number like 1200.")
+      pushBoth("product_cost", "Product cost must be a number like 1200.")
       covered.add("productCost")
     }
   }
@@ -148,7 +190,7 @@ function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
   const deliveryType = (values.delivery_type.trim().toUpperCase() ||
     "STANDARD") as DeliveryType
   if (deliveryType !== "STANDARD" && deliveryType !== "FRAGILE") {
-    push("Delivery type must be STANDARD or FRAGILE.")
+    pushBoth("delivery_type", "Delivery type must be STANDARD or FRAGILE.")
     covered.add("deliveryType")
   }
 
@@ -177,11 +219,15 @@ function resolveRow(row: RawOrderRow, lookups: ResolveLookups): ResolvedRow {
             typeof part === "string" || typeof part === "number",
         ),
         message: issue.message,
+        header: INPUT_HEADERS[String(issue.path[0])],
       }))
     if (issues.length > 0) push(formatError({ issues }))
+    for (const issue of issues) {
+      if (issue.header) pushField(issue.header, issue.message)
+    }
   }
 
-  return { line, raw: values, input, errors }
+  return { line, raw: values, input, errors, fieldErrors }
 }
 
 /** Normalizes, resolves and validates every parsed row against §6. */

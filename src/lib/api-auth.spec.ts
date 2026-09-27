@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-let sessionResult: { user: { id: string } } | null = null
+let sessionResult: {
+  user: { id: string }
+  session?: { impersonatedBy?: string | null }
+} | null = null
 let dbResult: Record<string, unknown> | null = null
 
 vi.mock("next/headers", () => ({
@@ -19,6 +22,7 @@ vi.mock("@/lib/db", () => {
   const makeChain = (result: unknown) => ({
     from: () => makeChain(result),
     innerJoin: () => makeChain(result),
+    leftJoin: () => makeChain(result),
     where: () => makeChain(result),
     limit: () => ({
       then: (onFulfilled: (v: unknown) => unknown) =>
@@ -35,6 +39,7 @@ vi.mock("@/lib/db", () => {
 vi.mock("@/lib/db/schema", () => ({
   profile: {},
   user: {},
+  merchant: {},
 }))
 
 describe("requireSession", () => {
@@ -45,7 +50,12 @@ describe("requireSession", () => {
 
   it("returns profile when session exists", async () => {
     sessionResult = { user: { id: "u1" } }
-    dbResult = { userId: "u1", role: "MERCHANT", name: "Test Merchant" }
+    dbResult = {
+      userId: "u1",
+      role: "MERCHANT",
+      name: "Test Merchant",
+      emailVerifiedAt: "2025-01-01T00:00:00Z",
+    }
     const { requireSession } = await import("@/lib/api-auth")
     const result = await requireSession()
     expect(result).not.toBeNull()
@@ -107,5 +117,91 @@ describe("requireSession", () => {
     } finally {
       vi.unstubAllEnvs()
     }
+  })
+
+  // --- ROADMAP P0.5: policy gates that used to be browser-only ---------------
+  describe("server-side policy gates", () => {
+    it("returns null for a banned user", async () => {
+      sessionResult = { user: { id: "u6" } }
+      dbResult = { userId: "u6", role: "RIDER", name: "Banned", banned: true }
+      const { requireSession } = await import("@/lib/api-auth")
+      expect(await requireSession()).toBeNull()
+    })
+
+    it("returns null for an admin who has not enrolled while the policy is on", async () => {
+      vi.stubEnv("ADMIN_2FA_REQUIRED", "1")
+      try {
+        sessionResult = { user: { id: "u7" } }
+        dbResult = {
+          userId: "u7",
+          role: "SUPER_ADMIN",
+          name: "Unenrolled",
+          twoFactorEnabled: false,
+        }
+        const { requireSession } = await import("@/lib/api-auth")
+        expect(await requireSession()).toBeNull()
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    })
+
+    it("allows an enrolled admin while the policy is on", async () => {
+      vi.stubEnv("ADMIN_2FA_REQUIRED", "1")
+      try {
+        sessionResult = { user: { id: "u8" } }
+        dbResult = {
+          userId: "u8",
+          role: "SUPER_ADMIN",
+          name: "Enrolled",
+          twoFactorEnabled: true,
+        }
+        const { requireSession } = await import("@/lib/api-auth")
+        expect(await requireSession()).not.toBeNull()
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    })
+
+    it("returns null for an unverified merchant", async () => {
+      sessionResult = { user: { id: "u9" } }
+      dbResult = {
+        userId: "u9",
+        role: "MERCHANT",
+        name: "Unverified",
+        emailVerifiedAt: null,
+      }
+      const { requireSession } = await import("@/lib/api-auth")
+      expect(await requireSession()).toBeNull()
+    })
+
+    it("the account-state variant still returns a policy-blocked session", async () => {
+      sessionResult = { user: { id: "u10" } }
+      dbResult = {
+        userId: "u10",
+        role: "MERCHANT",
+        name: "Unverified",
+        emailVerifiedAt: null,
+      }
+      const { requireSessionForAccountState } = await import("@/lib/api-auth")
+      const result = await requireSessionForAccountState()
+      expect(result).not.toBeNull()
+      expect(result!.role).toBe("MERCHANT")
+    })
+
+    it("surfaces the impersonating admin on the session", async () => {
+      sessionResult = {
+        user: { id: "u11" },
+        session: { impersonatedBy: "admin_1" },
+      }
+      dbResult = {
+        userId: "u11",
+        role: "MERCHANT",
+        name: "Impersonated",
+        emailVerifiedAt: "2025-01-01T00:00:00Z",
+      }
+      const { requireSession } = await import("@/lib/api-auth")
+      const result = await requireSession()
+      expect(result?.impersonatedBy).toBe("admin_1")
+    })
   })
 })

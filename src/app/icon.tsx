@@ -24,6 +24,7 @@ export default function Icon() {
         fill={BRAND_ICON_FILL}
         width={28}
         height={28}
+        aria-hidden="true"
       >
         <path fillRule="evenodd" d={BRAND_ICON_PATH} />
       </svg>

@@ -42,6 +42,20 @@ const insertResult: unknown[] = []
 const insertPayloads: Record<string, unknown>[] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
+/** User ids passed to `DELETE FROM user` (orphan cleanup after a failure). */
+const deletedUserIds: string[] = []
+/** Set to make the next `db.transaction` reject (e.g. a unique violation). */
+let transactionError: Error | null = null
+
+/** Pulls the bound value out of a drizzle `eq(column, value)` clause. */
+function extractParamValue(clause: unknown): string {
+  const chunks = (clause as { queryChunks?: unknown[] })?.queryChunks ?? []
+  for (const chunk of chunks) {
+    const value = (chunk as { value?: unknown })?.value
+    if (typeof value === "string") return value
+  }
+  return "?"
+}
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -53,6 +67,7 @@ vi.mock("@/lib/db", () => {
       orderBy: () => chain,
       leftJoin: () => chain,
       $dynamic: () => chain,
+      for: () => chain,
       then: (onFulfilled: (v: unknown) => unknown) =>
         Promise.resolve(selectQueue.shift() ?? []).then(onFulfilled),
     }
@@ -83,6 +98,20 @@ vi.mock("@/lib/db", () => {
     select: () => makeSelectChain(),
     insert: () => makeInsertChain(),
     update: () => makeUpdateChain(),
+    delete: () => ({
+      where: (clause: unknown) => {
+        deletedUserIds.push(extractParamValue(clause))
+        return Promise.resolve([])
+      },
+    }),
+    transaction: (fn: (tx: unknown) => unknown) => {
+      if (transactionError) {
+        const err = transactionError
+        transactionError = null
+        return Promise.reject(err)
+      }
+      return Promise.resolve(fn(db))
+    },
   }
   return { db, dbRead: { ...db, select: () => makeSelectChain() }, pool: {} }
 })
@@ -93,6 +122,8 @@ beforeEach(() => {
   insertPayloads.length = 0
   updateResult.length = 0
   updatePayloads.length = 0
+  deletedUserIds.length = 0
+  transactionError = null
   sessionState.value = null
 })
 
@@ -163,6 +194,55 @@ describe("POST /api/rider-applications", () => {
       req("POST", undefined, validApplication),
     )
     expect(res.status).toBe(400)
+  })
+
+  it("stores the rider and its profile in one transaction", async () => {
+    selectQueue.push([{ id: "wh_1" }])
+    selectQueue.push([])
+    insertResult.push({ id: "r_new" }, { id: "profile_new" })
+    const res = await submitApplication(
+      req("POST", undefined, validApplication),
+    )
+    expect(res.status).toBe(201)
+    expect(insertPayloads[0]).toMatchObject({
+      email: "rider@test.com",
+      status: "PENDING",
+      isActive: false,
+    })
+    expect(insertPayloads[1]).toMatchObject({
+      userId: "auth_new_user",
+      riderId: "r_new",
+    })
+  })
+
+  it("returns 400 and removes the auth user when the unique index rejects a duplicate email", async () => {
+    // P1.1: the pre-check above can pass for two simultaneous applications;
+    // `rider_email_uniq` is what actually stops the second one.
+    selectQueue.push([{ id: "wh_1" }])
+    selectQueue.push([])
+    transactionError = Object.assign(new Error("duplicate key"), {
+      code: "23505",
+    })
+    const res = await submitApplication(
+      req("POST", undefined, validApplication),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({
+      error: "An application with this email already exists.",
+    })
+    expect(deletedUserIds).toEqual(["auth_new_user"])
+  })
+
+  it("returns 500 and removes the auth user when the write fails", async () => {
+    selectQueue.push([{ id: "wh_1" }])
+    selectQueue.push([])
+    transactionError = new Error("boom")
+    const res = await submitApplication(
+      req("POST", undefined, validApplication),
+    )
+    expect(res.status).toBe(500)
+    // No orphan: the user created for this application is gone.
+    expect(deletedUserIds).toEqual(["auth_new_user"])
   })
 })
 

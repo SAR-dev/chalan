@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { PATCH as receiverNote } from "./[id]/receiver-note/route"
+// Receiver-note (public, token-gated) is covered by its own colocated spec:
+// src/app/api/orders/[id]/receiver-note/receiver-note.spec.ts
 import { GET as getOrder } from "./[id]/route"
 import { GET as analytics } from "./analytics/route"
 import { POST as bulkCreate } from "./bulk/route"
@@ -302,36 +303,6 @@ describe("GET /api/orders/:id", () => {
   })
 })
 
-describe("PATCH /api/orders/:id/receiver-note", () => {
-  it("404 when order not found", async () => {
-    selectQueue.push([])
-    const res = await receiverNote(
-      req("PATCH", undefined, { receiverNote: "Leave at door" }),
-      ctx(),
-    )
-    expect(res.status).toBe(404)
-  })
-
-  it("409 on terminal status", async () => {
-    selectQueue.push([{ id: "o1", status: "DELIVERED" }])
-    const res = await receiverNote(
-      req("PATCH", undefined, { receiverNote: "Leave at door" }),
-      ctx(),
-    )
-    expect(res.status).toBe(409)
-  })
-
-  it("updates receiver note", async () => {
-    selectQueue.push([{ id: "o1", status: "PENDING" }])
-    updateResult.push([{ id: "o1", receiverNote: "Leave at door" }])
-    const res = await receiverNote(
-      req("PATCH", undefined, { receiverNote: "Leave at door" }),
-      ctx(),
-    )
-    expect(res.status).toBe(200)
-  })
-})
-
 describe("POST /api/orders/bulk", () => {
   const bulkBody = {
     orders: [
@@ -394,14 +365,16 @@ describe("GET /api/orders/analytics", () => {
     expect(res.status).toBe(401)
   })
 
-  it("super admin gets platform-wide analytics (no where clause)", async () => {
+  it("super admin gets platform-wide analytics scoped only by the default 30-day window", async () => {
     sessionState.value = admin
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(whereCalls).toHaveLength(4)
-    expect(whereCalls.every((w) => w === undefined)).toBe(true)
+    // No merchant/warehouse scope, but the default window still bounds the scan
+    // (ROADMAP P3) — so a where clause is present on every aggregate.
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
     expect(json).toMatchObject({
       ordersByDay: [],
       ordersByStatus: [],
@@ -493,7 +466,7 @@ describe("GET /api/orders/analytics", () => {
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
-  it("ignores invalid date range params", async () => {
+  it("ignores invalid date range params and falls back to the default window", async () => {
     sessionState.value = admin
     pushEmptyAnalytics()
     const res = await analytics(
@@ -501,7 +474,7 @@ describe("GET /api/orders/analytics", () => {
     )
     expect(res.status).toBe(200)
     expect(whereCalls).toHaveLength(4)
-    expect(whereCalls.every((w) => w === undefined)).toBe(true)
+    expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
   it("computes aggregates from query results", async () => {

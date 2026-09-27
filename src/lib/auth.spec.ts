@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-const mockSendMail = vi.fn()
+const mockEnqueue = vi.fn()
+const mockFlush = vi.fn()
 const mockPasswordResetTemplate = vi.fn()
 
-vi.mock("@/lib/mailer", () => ({
-  sendMail: (...args: unknown[]) => mockSendMail(...args),
+vi.mock("@/lib/email-outbox", () => ({
+  enqueueEmail: (...args: unknown[]) => mockEnqueue(...args),
+  flushEmailOutbox: (...args: unknown[]) => mockFlush(...args),
 }))
 
 vi.mock("@/lib/mail-templates", () => ({
@@ -26,7 +28,8 @@ vi.mock("better-auth/plugins", () => ({
 }))
 
 afterEach(() => {
-  mockSendMail.mockReset()
+  mockEnqueue.mockReset()
+  mockFlush.mockReset()
   mockPasswordResetTemplate.mockReset()
 })
 
@@ -42,7 +45,7 @@ describe("handlePasswordReset", () => {
       html: "<p>reset</p>",
       text: "reset",
     })
-    mockSendMail.mockResolvedValue(undefined)
+    mockEnqueue.mockResolvedValue(undefined)
 
     const handler = await importHandler()
     await handler({
@@ -62,7 +65,7 @@ describe("handlePasswordReset", () => {
       html: "<p>reset</p>",
       text: "reset",
     })
-    mockSendMail.mockResolvedValue(undefined)
+    mockEnqueue.mockResolvedValue(undefined)
 
     const handler = await importHandler()
     await handler({
@@ -76,14 +79,14 @@ describe("handlePasswordReset", () => {
     })
   })
 
-  it("sends email to user with template output", async () => {
+  it("enqueues the email to the user with the template output", async () => {
     const templateOutput = {
       subject: "Reset your password",
       html: "<p>Hi Bob</p>",
       text: "Hi Bob",
     }
     mockPasswordResetTemplate.mockResolvedValue(templateOutput)
-    mockSendMail.mockResolvedValue(undefined)
+    mockEnqueue.mockResolvedValue(undefined)
 
     const handler = await importHandler()
     await handler({
@@ -91,19 +94,20 @@ describe("handlePasswordReset", () => {
       url: "/reset?token=123",
     })
 
-    expect(mockSendMail).toHaveBeenCalledWith({
+    expect(mockEnqueue).toHaveBeenCalledWith({
       to: "bob@test.com",
       ...templateOutput,
     })
+    expect(mockFlush).toHaveBeenCalled()
   })
 
-  it("does not throw when sendMail fails", async () => {
+  it("does not throw when enqueue fails", async () => {
     mockPasswordResetTemplate.mockResolvedValue({
       subject: "Reset",
       html: "<p>reset</p>",
       text: "reset",
     })
-    mockSendMail.mockRejectedValue(new Error("SMTP down"))
+    mockEnqueue.mockRejectedValue(new Error("DB down"))
     const spy = vi.spyOn(console, "error").mockImplementation(() => {})
 
     const handler = await importHandler()
@@ -112,10 +116,13 @@ describe("handlePasswordReset", () => {
       url: "/reset?token=999",
     })
 
-    expect(spy).toHaveBeenCalledWith(
-      "[mailer] Password reset email failed:",
-      expect.any(Error),
-    )
+    // Structured log: one JSON line naming the failure and the error.
+    const record = JSON.parse(spy.mock.calls.at(-1)?.[0] as string)
+    expect(record).toMatchObject({
+      level: "error",
+      msg: "Password reset enqueue failed",
+      err: { message: "DB down" },
+    })
     spy.mockRestore()
   })
 })

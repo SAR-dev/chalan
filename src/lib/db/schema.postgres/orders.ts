@@ -1,3 +1,4 @@
+import { createId } from "@paralleldrive/cuid2"
 import { sql } from "drizzle-orm"
 import {
   doublePrecision,
@@ -6,13 +7,14 @@ import {
   jsonb,
   pgTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 import {
   orderDeliveryTypes,
   orderStatuses,
   payoutRequestStatuses,
 } from "./enums"
-import { ts } from "./helpers"
+import { money, ts } from "./helpers"
 import { deliveryCity } from "./logistics"
 import { merchant, pickupLocation } from "./merchants"
 import { rider, warehouse } from "./warehouses"
@@ -34,7 +36,7 @@ export const payoutRequest = pgTable(
     // .$type<string[]>() call tells Drizzle the inferred type without altering
     // the column — no manual JSON.stringify / JSON.parse is needed at runtime.
     orderIds: jsonb("orderIds").$type<string[]>().notNull(),
-    amount: doublePrecision("amount").notNull(),
+    amount: money("amount").notNull(),
     status: text("status", { enum: payoutRequestStatuses })
       .notNull()
       .default("PENDING"),
@@ -73,6 +75,10 @@ export const order = pgTable(
     id: text("id")
       .primaryKey()
       .default(sql`gen_entity_code('ORD', nextval('order_id_seq'))`),
+    // High-entropy public identifier used by the tracking page URL and to
+    // authorize the public receiver-note write. The sequential `id` stays the
+    // human/parcel code; the token is the secret that grants write access.
+    trackingToken: text("trackingToken"),
     merchantId: text("merchantId")
       .notNull()
       .references(() => merchant.id),
@@ -92,10 +98,10 @@ export const order = pgTable(
     deliveryType: text("deliveryType", { enum: orderDeliveryTypes })
       .notNull()
       .default("STANDARD"),
-    productCost: doublePrecision("productCost").notNull(),
-    deliveryFee: doublePrecision("deliveryFee").notNull(),
-    codFee: doublePrecision("codFee").notNull().default(0),
-    merchantEarnings: doublePrecision("merchantEarnings").notNull().default(0),
+    productCost: money("productCost").notNull(),
+    deliveryFee: money("deliveryFee").notNull(),
+    codFee: money("codFee").notNull().default(0),
+    merchantEarnings: money("merchantEarnings").notNull().default(0),
 
     status: text("status", { enum: orderStatuses })
       .notNull()
@@ -136,7 +142,7 @@ export const order = pgTable(
     deliveredAt: ts("deliveredAt"),
     // Soft reference to uploaded proof image (URL / storage key).
     deliveryProofRef: text("deliveryProofRef"),
-    amountCollected: doublePrecision("amountCollected"),
+    amountCollected: money("amountCollected"),
     // Failed attempt.
     failedAttemptAt: ts("failedAttemptAt"),
     failureNote: text("failureNote"),
@@ -193,6 +199,8 @@ export const order = pgTable(
     index("order_status_created_at_idx").on(t.status, t.createdAt),
     index("order_cod_settled_at_idx").on(t.codSettledAt),
     index("order_payout_request_id_idx").on(t.payoutRequestId),
+    // Public tracking lookups resolve by token (and the token is unique).
+    uniqueIndex("order_tracking_token_unique").on(t.trackingToken),
     index("order_code_trgm_idx").using("gin", sql`${t.id} gin_trgm_ops`),
     index("order_recipient_name_trgm_idx").using(
       "gin",
@@ -201,6 +209,43 @@ export const order = pgTable(
     index("order_recipient_phone_trgm_idx").using(
       "gin",
       sql`${t.recipientPhone} gin_trgm_ops`,
+    ),
+  ],
+)
+
+// =============================================================================
+// Order status history (ROADMAP P1.4)
+//
+// Append-only trail of every lifecycle transition. The order row keeps only
+// the current status, so without this a `reattempt` erased the prior failure
+// and a support question about "what happened to this parcel" had no answer.
+// Rows are written inside the same transaction as the transition itself.
+// =============================================================================
+
+export const orderStatusHistory = pgTable(
+  "order_status_history",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    orderId: text("orderId")
+      .notNull()
+      .references(() => order.id, { onDelete: "cascade" }),
+    fromStatus: text("fromStatus", { enum: orderStatuses }),
+    toStatus: text("toStatus", { enum: orderStatuses }).notNull(),
+    transition: text("transition").notNull(),
+    actorId: text("actorId"),
+    actorName: text("actorName"),
+    actorRole: text("actorRole"),
+    // Free-text reason carried by the transition (failure note, return/cancel
+    // reason), so the trail is self-contained.
+    note: text("note"),
+    createdAt: ts("createdAt").notNull().defaultNow(),
+  },
+  (t) => [
+    index("order_status_history_order_id_created_at_idx").on(
+      t.orderId,
+      t.createdAt,
     ),
   ],
 )

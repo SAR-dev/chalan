@@ -4,8 +4,10 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
-import { profile, rider, riderStatuses, warehouse } from "@/lib/db/schema"
+import { profile, rider, riderStatuses, user, warehouse } from "@/lib/db/schema"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { enumValues } from "@/lib/db-helpers"
+import { logger } from "@/lib/logger"
 import {
   paginateResponse,
   parsePagination,
@@ -19,6 +21,16 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // ---------------------------------------------------------------------------
 // POST — public rider application (no auth required)
 // ---------------------------------------------------------------------------
+
+/** Best-effort removal of the auth user created for a failed application. */
+async function deleteUserQuietly(userId: string): Promise<void> {
+  try {
+    await db.delete(user).where(eq(user.id, userId))
+  } catch (err) {
+    logger.error("Orphan user cleanup failed", { err })
+  }
+}
+
 export const POST = withErrorHandler(async (req: Request) => {
   const limited = await rateLimitByIp(req, "rider-apply", 3, 60)
   if (limited) return limited
@@ -49,8 +61,8 @@ export const POST = withErrorHandler(async (req: Request) => {
     return badRequest("Select a valid warehouse.")
   }
 
-  // Check for duplicate email among existing riders.
-  const [existing] = await db
+  // Friendly pre-check; `rider_email_uniq` is the guarantee (P1.1).
+  const [existing] = await dbRead
     .select({ id: rider.id })
     .from(rider)
     .where(ilike(rider.email, email))
@@ -59,7 +71,9 @@ export const POST = withErrorHandler(async (req: Request) => {
     return badRequest("An application with this email already exists.")
   }
 
-  // Create the auth user account with the provided password.
+  // Create the auth user account with the provided password. Better Auth owns
+  // its own connection, so it cannot join our transaction — it is created first
+  // and deleted again if the rider/profile write fails.
   const { auth } = await import("@/lib/auth")
   let createdUser
   try {
@@ -67,47 +81,68 @@ export const POST = withErrorHandler(async (req: Request) => {
       body: { name, email, password, role: "RIDER" as "user" },
     })
   } catch (err) {
-    console.error("[rider-applications] Failed to create user account:", err)
+    logger.error("Failed to create user account", { err })
     return badRequest("Could not create the rider account")
   }
 
-  // Insert the rider row.
   const hasNidImages = Boolean(nidFrontImage || nidBackImage || nidSelfieImage)
-  const [newRider] = await db
-    .insert(rider)
-    .values({
-      name,
-      email,
-      phone,
-      zone,
-      address,
-      nidNumber: nidNumber ?? "",
-      nidFrontImage: nidFrontImage ?? null,
-      nidBackImage: nidBackImage ?? null,
-      nidSelfieImage: nidSelfieImage ?? null,
-      nidSubmittedAt: hasNidImages ? new Date().toISOString() : null,
-      warehouseId,
-      status: "PENDING",
-      isActive: false,
+  try {
+    // Rider + profile + audit are one unit: a failure can no longer leave a
+    // rider row without its profile (or an audit-less application).
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(rider)
+        .values({
+          name,
+          email,
+          phone,
+          zone,
+          address,
+          nidNumber: nidNumber ?? "",
+          nidFrontImage: nidFrontImage ?? null,
+          nidBackImage: nidBackImage ?? null,
+          nidSelfieImage: nidSelfieImage ?? null,
+          nidSubmittedAt: hasNidImages ? new Date().toISOString() : null,
+          warehouseId,
+          status: "PENDING",
+          isActive: false,
+        })
+        .returning()
+
+      await tx.insert(profile).values({
+        userId: createdUser.user.id,
+        role: "RIDER",
+        phone,
+        isActive: false,
+        riderId: row.id,
+      })
+
+      await logAudit(
+        {
+          actor: { userId: "public", name, role: "RIDER" },
+          action: "RIDER_APPLICATION_SUBMITTED",
+          entityType: "rider",
+          entityId: row.id,
+          description: `Rider application submitted by ${name} (${zone})`,
+        },
+        tx,
+      )
+
+      return row
     })
-    .returning()
-
-  // Create a profile linking the auth user → rider row.
-  await db.insert(profile).values({
-    userId: createdUser.user.id,
-    role: "RIDER",
-    phone,
-    isActive: false,
-    riderId: newRider.id,
-  })
-
-  await logAudit({
-    actor: { userId: "public", name, role: "RIDER" },
-    action: "RIDER_APPLICATION_SUBMITTED",
-    entityType: "rider",
-    entityId: newRider.id,
-    description: `Rider application submitted by ${name} (${zone})`,
-  })
+  } catch (err) {
+    // Another application for the same email won the race.
+    if (isUniqueViolation(err)) {
+      await deleteUserQuietly(createdUser.user.id)
+      return badRequest("An application with this email already exists.")
+    }
+    logger.error("Failed to store application", { err })
+    await deleteUserQuietly(createdUser.user.id)
+    return NextResponse.json(
+      { error: "Could not store the application. Please try again." },
+      { status: 500 },
+    )
+  }
 
   return NextResponse.json(
     { message: "Application submitted successfully" },
@@ -191,7 +226,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (offset !== undefined) q = q.offset(offset)
 
   const countQuery = dbRead
-    .select({ count: sql<number>`count(*)` })
+    .select({ count: sql<number>`count(*)::int` })
     .from(rider)
     .where(where)
 

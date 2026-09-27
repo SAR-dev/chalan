@@ -130,7 +130,10 @@ export default function RegisterPage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col lg:flex-row">
+      <main
+        id="main-content"
+        className="flex min-h-screen flex-col lg:flex-row"
+      >
         {/* Brand panel */}
         <section className="bg-sidebar text-sidebar-foreground relative hidden flex-1 flex-col justify-between p-12 lg:flex">
           <Link href="/" className="flex items-center gap-2">
@@ -236,7 +239,11 @@ export default function RegisterPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                  <form
+                    data-testid="register-form"
+                    onSubmit={handleSubmit}
+                    className="flex flex-col gap-4"
+                  >
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="businessName">Business name</Label>
                       <Input

@@ -14,12 +14,19 @@ interface Props {
   initialNote: string | null | undefined
   // Whether the order is in a terminal status (DELIVERED / RETURNED / CANCELLED)
   isTerminal: boolean
+  /**
+   * The order's tracking token — present only when the page was opened via the
+   * token link. It authorizes the public write (ROADMAP P0.1); when absent the
+   * widget renders a read-only hint instead of the form.
+   */
+  trackingToken?: string | null
 }
 
 export function ReceiverNoteWidget({
   orderId,
   initialNote,
   isTerminal,
+  trackingToken,
 }: Props) {
   const [note, setNote] = useState(initialNote ?? "")
   const [saved, setSaved] = useState(!!initialNote)
@@ -38,7 +45,7 @@ export function ReceiverNoteWidget({
       const res = await fetch(`/api/orders/${orderId}/receiver-note`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receiverNote: trimmed }),
+        body: JSON.stringify({ receiverNote: trimmed, token: trackingToken }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -54,6 +61,27 @@ export function ReceiverNoteWidget({
   }
 
   if (isTerminal && !initialNote) return null
+
+  // Opened via the human order code (parcel label / search) — no token, so the
+  // public write is not authorized. Explain instead of showing a dead form.
+  if (!trackingToken && !isTerminal) {
+    return (
+      <div
+        className="border-border bg-card rounded-xl border p-5 shadow-sm"
+        data-testid="receiver-note-locked"
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <StickyNote className="text-muted-foreground size-4" />
+          <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+            Note from recipient
+          </p>
+        </div>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Open the tracking link shared with you to leave a delivery note.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="border-border bg-card rounded-xl border p-5 shadow-sm">
@@ -76,6 +104,7 @@ export function ReceiverNoteWidget({
           <div className="space-y-2">
             <textarea
               value={note}
+              data-testid="receiver-note-input"
               onChange={(e) => {
                 setNote(e.target.value.slice(0, MAX))
                 setSaved(false)
@@ -93,6 +122,7 @@ export function ReceiverNoteWidget({
               </p>
 
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={saving || !dirty || !note.trim()}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"

@@ -41,7 +41,7 @@ export default async function TrackPage({ searchParams }: Props) {
   }
 
   return (
-    <main className="bg-background min-h-screen">
+    <main id="main-content" className="bg-background min-h-screen">
       {/* Header */}
       <header className="border-border/60 bg-background/80 sticky top-0 z-10 border-b backdrop-blur-sm">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3.5">
@@ -90,7 +90,6 @@ export default async function TrackPage({ searchParams }: Props) {
               placeholder="Tracking code — e.g. PF-100231"
               className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-lg border pr-3.5 pl-9 text-sm transition-shadow focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
               aria-label="Tracking code"
-              autoFocus
             />
           </div>
           <button

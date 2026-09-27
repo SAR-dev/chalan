@@ -30,3 +30,6 @@ test-results/
 /dev-out.log
 /playwright-report/
 /html/
+
+# Vitest coverage output
+/coverage/

@@ -94,3 +94,58 @@ jobs:
         continue-on-error: true
         uses: actions/dependency-review-action@v4
 
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Fails if statements/branches/functions/lines fall below the floors in
+      # vitest.config.ts, so coverage cannot silently regress (ROADMAP P3).
+      - run: pnpm test:coverage
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: coverage-summary
+          path: coverage/coverage-summary.json
+          retention-days: 7
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: delivery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+      BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
+      INTEGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Real-DB invariants that the mocked unit suite cannot prove (P1.1 unique
+      # indexes, P1.2 ledger + advisory lock, P1.3 business timezone).
+      - run: pnpm db:migrate
+      - run: pnpm test:integration
+

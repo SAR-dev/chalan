@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import {
@@ -10,7 +10,8 @@ import {
 import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
-import { payoutRequest } from "@/lib/db/schema"
+import { sumMoney } from "@/lib/db/money-sql"
+import { order, payoutRequest } from "@/lib/db/schema"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -56,10 +57,26 @@ export const PATCH = withErrorHandler(
         return badRequest("Only PENDING requests can be approved.")
       }
 
+      // A payout must actually reference orders (ROADMAP P0.3): the old create
+      // race could produce a request carrying an amount with nothing behind it.
+      // Recompute from the linked orders so the stored amount is always honest.
+      const [totals] = await tx
+        .select({
+          orderCount: sql<number>`count(*)::int`,
+          total: sumMoney(order.merchantEarnings),
+        })
+        .from(order)
+        .where(eq(order.payoutRequestId, id))
+
+      if (Number(totals?.orderCount ?? 0) === 0) {
+        return badRequest("This payout request has no linked orders.")
+      }
+
       const [updated] = await tx
         .update(payoutRequest)
         .set({
           status: "APPROVED",
+          amount: Number(totals?.total ?? 0),
           reviewedBy: me.name,
           reviewedAt: new Date().toISOString(),
         })
@@ -74,6 +91,7 @@ export const PATCH = withErrorHandler(
     if (committed.row) {
       const diff = diffEntity(committed.before, committed.row, [
         "status",
+        "amount",
         "reviewedBy",
         "reviewedAt",
         "rejectReason",

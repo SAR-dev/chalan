@@ -3,11 +3,12 @@ import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { order } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { OrdersPageClient } from "./orders-client"
 
 export default async function OrdersPage() {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
   if (me.role !== "SUPER_ADMIN") redirect("/login")
 
   const limit = 20

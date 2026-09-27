@@ -1,5 +1,7 @@
 import Redis from "ioredis"
 import { NextResponse } from "next/server"
+import { resolveClientIp } from "@/lib/client-ip"
+import { logger } from "@/lib/logger"
 
 interface RateLimitEntry {
   count: number
@@ -64,23 +66,72 @@ return { count, ttl }
 `
 
 let redis: Redis | null | undefined
+let warnedNoRedisInProduction = false
+
+/**
+ * Whether the limiter is running in its degraded (per-process) mode.
+ * Surfaced by the health endpoint so a multi-instance deploy cannot silently
+ * run with per-instance limits (ROADMAP P0.6).
+ */
+export function rateLimiterDegraded(): boolean {
+  if (!process.env.REDIS_URL) {
+    return process.env.NODE_ENV === "production"
+  }
+  return false
+}
 
 // Lazy single Redis client. Returns null (falling back to the in-memory Map)
 // when REDIS_URL is unset; once a connection succeeds, all limits are stored
 // in Redis so they are shared across app instances.
+//
+// In production a missing REDIS_URL is a misconfiguration that silently turns
+// every limit into a per-instance one (trivially bypassed with N instances),
+// so it is reported loudly and through /api/health instead of passing
+// unnoticed. Requests are still served — a hard failure here would take the
+// whole API down for a config problem.
 function getRedis(): Redis | null {
   const url = process.env.REDIS_URL
-  if (!url) return null
+  if (!url) {
+    if (process.env.NODE_ENV === "production" && !warnedNoRedisInProduction) {
+      warnedNoRedisInProduction = true
+      logger.warn(
+        "REDIS_URL is not set in production — rate limits are per-instance and can be bypassed. Set REDIS_URL (see docs/DEPLOYMENT.md).",
+      )
+    }
+    return null
+  }
   if (redis === undefined) {
     redis = new Redis(url, {
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
     })
     redis.on("error", (err) => {
-      console.warn("[rate-limit] Redis connection error:", err.message)
+      logger.warn("Redis connection error", { err })
     })
   }
   return redis
+}
+
+/**
+ * Readiness probe (ROADMAP P2.3): PING the configured Redis. Returns `true`
+ * when no Redis is configured (it is optional for single-instance deploys) and
+ * `false` when a configured Redis cannot answer within `timeoutMs`.
+ */
+export async function pingRedis(timeoutMs = 1500): Promise<boolean> {
+  const redis = getRedis()
+  if (!redis) return true
+  try {
+    const pong = await Promise.race([
+      redis.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("redis ping timeout")), timeoutMs),
+      ),
+    ])
+    return pong === "PONG"
+  } catch (err) {
+    logger.warn("Redis readiness ping failed", { err })
+    return false
+  }
 }
 
 /**
@@ -122,53 +173,73 @@ export async function rateLimit(
       }
       return null
     } catch (err) {
-      console.warn(
-        "[rate-limit] Redis request failed, degrading to in-memory:",
-        err instanceof Error ? err.message : err,
-      )
+      logger.warn("Redis request failed, degrading to in-memory", { err })
     }
   }
   return memoryLimit(key, max, window)
 }
 
 /**
- * Extracts the client IP from trusted proxy headers, or `null` when none can
- * be determined.
+ * Extracts the client IP from the forwarding headers **a trusted proxy is
+ * configured to write** (`TRUSTED_PROXY_HOPS`), or `null` when no IP can be
+ * determined.
  *
- * Precedence: `x-real-ip` (set by nginx/Caddy), `cf-connecting-ip`
- * (Cloudflare), then the left-most entry of `x-forwarded-for`. The proxy
- * layers of production deployments overwrite these headers, so a direct
- * client cannot spoof them.
- *
- * Returns `null` instead of a shared `"unknown"` value so every unidentifiable
- * request is handled individually — never throttled together in one bucket
- * that a single visitor could exhaust (cross-tenant DoS).
+ * Client-supplied `x-real-ip` / `cf-connecting-ip` / `x-forwarded-for` values
+ * are ignored unless the deployment declares its proxy hops — otherwise anyone
+ * could mint a fresh bucket per request. See `lib/client-ip.ts`.
  */
 export function getClientIp(req: Request): string | null {
-  for (const header of ["x-real-ip", "cf-connecting-ip"]) {
-    const value = req.headers.get(header)?.trim()
-    if (value) return value
-  }
-  const forwarded = req.headers.get("x-forwarded-for")?.trim()
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim()
-    if (first) return first
-  }
-  return null
+  return resolveClientIp(req.headers).ip
+}
+
+/** Shared bucket for requests whose IP cannot be resolved. */
+const NO_IP_BUCKET = "no-ip"
+let warnedNoIp = false
+
+export interface RateLimitByIpOptions {
+  /**
+   * Fail closed when the client IP cannot be resolved: unidentifiable requests
+   * share one bucket instead of skipping the limiter. Use it on the
+   * unauthenticated, abuse-prone routes (registration, activation, resend)
+   * where "no limit" is the easy path around the control.
+   */
+  failClosed?: boolean
 }
 
 /**
- * Rate limit keyed on the request's client IP. Requests without a resolvable
- * IP (missing/invalid proxy headers) are not throttled — preferable to
- * lumping every such visitor into one shared "unknown" bucket.
+ * Rate limit keyed on the request's client IP.
+ *
+ * With no resolvable IP: `failClosed` routes fall back to a single shared
+ * bucket (and warn once), everything else is not throttled — preferable to
+ * lumping every such visitor into one bucket that a single visitor could
+ * exhaust (cross-tenant DoS).
  */
 export async function rateLimitByIp(
   req: Request,
   prefix: string,
   max: number,
   window: number,
+  options: RateLimitByIpOptions = {},
 ): Promise<NextResponse | null> {
-  const ip = getClientIp(req)
-  if (!ip) return null
-  return rateLimit(`${prefix}:${ip}`, max, window)
+  const resolved = resolveClientIp(req.headers)
+  if (resolved.ignoredHeaders) {
+    logger.warn("Ignoring client-supplied IP headers", {
+      prefix,
+      hint: "set TRUSTED_PROXY_HOPS if this deployment has a reverse proxy",
+    })
+  }
+  if (!resolved.ip) {
+    if (options.failClosed) {
+      if (!warnedNoIp) {
+        warnedNoIp = true
+        logger.warn(
+          "Rate limit cannot resolve a client IP; running fail-closed (all unresolvable requests share one bucket)",
+          { prefix },
+        )
+      }
+      return rateLimit(`${prefix}:${NO_IP_BUCKET}`, max, window)
+    }
+    return null
+  }
+  return rateLimit(`${prefix}:${resolved.ip}`, max, window)
 }

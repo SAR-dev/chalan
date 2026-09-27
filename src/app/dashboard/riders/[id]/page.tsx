@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { rider, warehouse } from "@/lib/db/schema"
+import { loginRedirectPath } from "@/lib/login-redirect"
 import { RiderDetailClient } from "./detail-client"
 
 export default async function RiderDetailPage({
@@ -11,7 +12,7 @@ export default async function RiderDetailPage({
   params: Promise<{ id: string }>
 }) {
   const me = await requireSession()
-  if (!me) redirect("/login")
+  if (!me) redirect(await loginRedirectPath())
 
   const { id } = await params
 

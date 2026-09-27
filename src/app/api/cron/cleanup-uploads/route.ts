@@ -23,6 +23,7 @@
 import { NextResponse } from "next/server"
 import { isAuthorizedCron } from "@/lib/cron-auth"
 import { dbRead } from "@/lib/db"
+import { logger } from "@/lib/logger"
 import { deleteFile, listFiles } from "@/lib/storage"
 import {
   collectReferencedKeys,
@@ -97,7 +98,10 @@ export const POST = withErrorHandler(async (req: Request) => {
       } catch (err) {
         // One bad file must never fail the whole job.
         failed += 1
-        console.error("[cron/cleanup-uploads] failed to delete", file.key, err)
+        logger.error("Failed to delete orphaned upload", {
+          key: file.key,
+          err,
+        })
       }
     }
   }

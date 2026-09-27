@@ -58,7 +58,12 @@ export type SupportStatus = (typeof supportTicket.$inferSelect)["status"]
 // `userId` is just profile's PK/FK back to user.id, and profile.createdAt
 // mirrors user.createdAt, so both are dropped from the profile side to avoid
 // duplicate/conflicting keys.
-type JoinedUser = typeof user.$inferSelect &
+// Activation tokens are server-only credentials — deliberately omitted so
+// the client-facing User type never claims them.
+type JoinedUser = Omit<
+  typeof user.$inferSelect,
+  "activationToken" | "activationTokenExpiresAt"
+> &
   Omit<typeof profile.$inferSelect, "userId" | "createdAt"> & {
     // Optional per-user password — only set on self-registered users (seeded
     // demo users authenticate with the shared demo passwords below). Not a
@@ -75,6 +80,11 @@ type JoinedUser = typeof user.$inferSelect &
     // explain and sign the user out instead of hitting opaque 401s. Not a
     // user column.
     portalAllowed?: boolean
+    // Staff-account activation (ROADMAP 5.2): true while a moderator or
+    // warehouse-admin invite is still PENDING (never activated). Surfaced by
+    // /api/users/me so the login page shows the "check your email" panel.
+    // Computed from isActive + activatedAt — not a user column.
+    pendingActivation?: boolean
   }
 
 export type User = Loosen<JoinedUser>
@@ -87,7 +97,11 @@ export type User = Loosen<JoinedUser>
 export type TeamMember = Pick<
   User,
   "id" | "name" | "email" | "role" | "phone" | "isActive" | "warehouseId"
->
+> & {
+  /** Lifecycle status: PENDING = created by an admin, activation link not
+   *  yet clicked (warehouse-admin invites, ROADMAP 5.2). */
+  status: "ACTIVE" | "PENDING" | "DEACTIVATED"
+}
 
 export type Warehouse = Loosen<typeof warehouse.$inferSelect>
 // `balance` is not a column on the merchant table — it comes from a LEFT JOIN
@@ -109,6 +123,9 @@ export type Order = Loosen<typeof order.$inferSelect> & {
 export type PayoutRequest = Loosen<typeof payoutRequest.$inferSelect>
 export type SupportTicket = Loosen<typeof supportTicket.$inferSelect>
 export type EmailLog = Loosen<typeof emailLog.$inferSelect>
+// The list endpoint omits the HTML/plain-text bodies (they dominate the payload
+// and are only needed by the detail view), so list rows are a projection.
+export type EmailLogListItem = Omit<EmailLog, "body" | "textBody">
 export type AuditLog = Loosen<typeof auditLog.$inferSelect>
 export type MerchantBalance = Loosen<typeof merchantBalance.$inferSelect>
 export type BalanceTransaction = Loosen<typeof balanceTransaction.$inferSelect>

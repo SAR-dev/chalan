@@ -26,6 +26,8 @@ vi.mock("@/features/email-logs/hooks/use-email-logs", () => ({
     markAsSent: vi.fn(),
     markAsSentBulk: vi.fn(),
   }),
+  useEmailLog: () => ({ log: null, isLoading: false, error: null }),
+  fetchEmailLog: vi.fn(() => Promise.resolve(null)),
 }))
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 

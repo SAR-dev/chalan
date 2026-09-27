@@ -23,6 +23,7 @@ export async function seedOrders() {
     const batch = SEED_ORDERS.slice(i, i + BATCH).map(
       ({
         id,
+        trackingToken,
         merchantId,
         pickupLocationId,
         recipientName,
@@ -61,6 +62,7 @@ export async function seedOrders() {
         createdAt,
       }) => ({
         id,
+        trackingToken,
         merchantId,
         pickupLocationId,
         recipientName,

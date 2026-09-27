@@ -16,7 +16,8 @@ vi.mock("@/lib/audit", () => ({
 }))
 
 const selectQueue: unknown[][] = []
-const updateResult: unknown[] = []
+/** Queue of `UPDATE … RETURNING` results, in call order. */
+const updateResultQueue: unknown[][] = []
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
 const insertPayloads: Record<string, unknown>[] = []
@@ -47,7 +48,7 @@ vi.mock("@/lib/db", () => {
         return chain
       },
       where: () => chain,
-      returning: () => Promise.resolve(updateResult),
+      returning: () => Promise.resolve(updateResultQueue.shift() ?? []),
     }
     return chain
   }
@@ -57,6 +58,8 @@ vi.mock("@/lib/db", () => {
         insertPayloads.push(vals)
         return chain
       },
+      onConflictDoNothing: () => chain,
+      onConflictDoUpdate: () => chain,
       returning: () => Promise.resolve(insertResult),
     }
     return chain
@@ -78,7 +81,7 @@ vi.mock("@/lib/db", () => {
 
 beforeEach(() => {
   selectQueue.length = 0
-  updateResult.length = 0
+  updateResultQueue.length = 0
   updatePayloads.length = 0
   insertResult.length = 0
   insertPayloads.length = 0
@@ -202,7 +205,7 @@ describe("POST /api/admin/zone-pricing", () => {
 
   it("creates pricing row when pair does not exist", async () => {
     sessionState.value = admin
-    selectQueue.push([])
+    updateResultQueue.push([])
     insertResult.push({ id: "zp_new", ...validCreateBody })
     const res = await createZonePricing(req("POST", undefined, validCreateBody))
     const json = await res.json()
@@ -217,8 +220,7 @@ describe("POST /api/admin/zone-pricing", () => {
 
   it("updates existing row for same zone pair (upsert)", async () => {
     sessionState.value = admin
-    selectQueue.push([{ id: "zp_1" }])
-    updateResult.push({ id: "zp_1", baseRate: 75 })
+    updateResultQueue.push([{ id: "zp_1", baseRate: 75 }])
     const res = await createZonePricing(
       req("POST", undefined, { ...validCreateBody, baseRate: 75 }),
     )
@@ -226,6 +228,22 @@ describe("POST /api/admin/zone-pricing", () => {
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ id: "zp_1", baseRate: 75 })
     expect(updatePayloads[0]).toMatchObject({ baseRate: 75 })
+    // No insert attempted — the row already existed.
+    expect(insertPayloads).toHaveLength(0)
+  })
+
+  it("retries the update when a concurrent request inserted the pair first", async () => {
+    // P1.1: the first update finds nothing, the insert loses the unique-index
+    // race, so the route must fall back to updating the winner's row instead
+    // of creating a duplicate pair.
+    sessionState.value = admin
+    updateResultQueue.push([], [{ id: "zp_race", baseRate: 60 }])
+    insertResult.length = 0
+    const res = await createZonePricing(req("POST", undefined, validCreateBody))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ id: "zp_race" })
+    expect(updatePayloads).toHaveLength(2)
   })
 })
 
@@ -261,7 +279,7 @@ describe("PATCH /api/admin/zone-pricing/:id", () => {
 
   it("updates pricing row", async () => {
     sessionState.value = admin
-    updateResult.push({ id: "zp_1", baseRate: 70 })
+    updateResultQueue.push([{ id: "zp_1", baseRate: 70 }])
     const res = await updateZonePricing(
       req("PATCH", undefined, { baseRate: 70 }),
       ctx(),

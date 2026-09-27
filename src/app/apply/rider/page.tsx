@@ -100,6 +100,18 @@ export default function ApplyRiderPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  // NID uploads happen before the applicant has an account, so they need a
+  // short-lived signed upload token (ROADMAP P0.2) — fetched fresh per upload.
+  async function provideUploadToken(): Promise<string | null> {
+    try {
+      const res = await fetch("/api/uploads/token", { method: "POST" })
+      const data = await res.json().catch(() => null)
+      return res.ok && typeof data?.token === "string" ? data.token : null
+    } catch {
+      return null
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -165,7 +177,7 @@ export default function ApplyRiderPage() {
 
   return (
     <>
-      <main className="flex min-h-screen flex-col">
+      <main id="main-content" className="flex min-h-screen flex-col">
         {/* Header */}
         <header className="border-border/70 border-b px-6 py-4">
           <div className="flex items-center justify-between">
@@ -444,7 +456,8 @@ export default function ApplyRiderPage() {
                             folder="nids"
                             label="Upload front"
                             className="h-36"
-                            previewClassName="h-36"
+                            uploadToken={provideUploadToken}
+                            hidePreview
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -459,7 +472,8 @@ export default function ApplyRiderPage() {
                             folder="nids"
                             label="Upload back"
                             className="h-36"
-                            previewClassName="h-36"
+                            uploadToken={provideUploadToken}
+                            hidePreview
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -474,7 +488,8 @@ export default function ApplyRiderPage() {
                             folder="nids"
                             label="Upload selfie"
                             className="h-36"
-                            previewClassName="h-36"
+                            uploadToken={provideUploadToken}
+                            hidePreview
                           />
                         </div>
                       </div>

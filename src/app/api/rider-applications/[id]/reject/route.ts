@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import siteData from "@/config/site.json"
 import { requireSession } from "@/lib/api-auth"
@@ -11,7 +11,7 @@ import {
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { rider } from "@/lib/db/schema"
-import { sendMail } from "@/lib/mailer"
+import { enqueueEmail, flushEmailOutbox } from "@/lib/email-outbox"
 import { parseBody, riderApplicationRejectSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -40,51 +40,57 @@ export const PATCH = withErrorHandler(
       return badRequest("Only PENDING applications can be rejected")
     }
 
-    const [updated] = await db
-      .update(rider)
-      .set({
-        status: "REJECTED",
-        rejectionReason: reason,
-        nidRejectedBy: me.name,
-        nidRejectedAt: new Date().toISOString(),
-      })
-      .where(eq(rider.id, id))
-      .returning()
+    // Rider + audit + rejection-email outbox row commit together
+    // (ROADMAP P1.4/P1.5).
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(rider)
+        .set({
+          status: "REJECTED",
+          rejectionReason: reason,
+          nidRejectedBy: me.name,
+          nidRejectedAt: new Date().toISOString(),
+        })
+        .where(and(eq(rider.id, id), eq(rider.status, "PENDING")))
+        .returning()
+      if (!row) return null
 
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "RIDER_REJECTED",
-      entityType: "rider",
-      entityId: updated.id,
-      description: `Rejected rider application for ${updated.name}: ${reason}`,
-    })
+      await logAudit(
+        {
+          actor: { userId: me.userId, name: me.name, role: me.role },
+          action: "RIDER_REJECTED",
+          entityType: "rider",
+          entityId: row.id,
+          description: `Rejected rider application for ${row.name}: ${reason}`,
+        },
+        tx,
+      )
 
-    // Send rejection email (fire-and-forget with retries).
-    sendMail(
-      {
-        to: updated.email,
-        subject: `[${siteData.name}] Update on your rider application`,
-        html: `
-        <p>Hi ${updated.name},</p>
+      await enqueueEmail(
+        {
+          to: row.email,
+          subject: `[${siteData.name}] Update on your rider application`,
+          html: `
+        <p>Hi ${row.name},</p>
         <p>Thank you for your interest in joining ${siteData.name} as a rider.</p>
         <p>After careful review, we are unable to approve your application at this time.</p>
         <p><strong>Reason:</strong> ${reason}</p>
         <p>If you believe this was a mistake or your circumstances have changed, you are welcome to reapply.</p>
         <p>— The ${siteData.name} Team</p>
       `,
-      },
-      {
-        maxRetries: 3,
-        baseDelayMs: 1000,
-        onRetry: (attempt, err) =>
-          console.warn(
-            `[mailer] Retry ${attempt} for rider rejection email (${updated.email}):`,
-            err.message,
-          ),
-      },
-    ).catch((err) =>
-      console.error("[mailer] Rider rejection email failed:", err),
-    )
+        },
+        tx,
+      )
+
+      return row
+    })
+
+    if (!updated) {
+      return badRequest("Only PENDING applications can be rejected")
+    }
+
+    // Best-effort immediate delivery; the cron retries anything left behind.
+    await flushEmailOutbox()
 
     return NextResponse.json(updated)
   },

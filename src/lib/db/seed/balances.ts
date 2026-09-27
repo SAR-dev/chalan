@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm"
+import { codCollectedAmount, paymentAmount } from "@/lib/balance-ledger"
 import { db } from "@/lib/db"
+import { sumAbsMoney, sumMoney } from "@/lib/db/money-sql"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
 import {
   ADMIN_USER_NAMES,
@@ -45,9 +47,11 @@ export async function seedBalances() {
       id: `BTE-${o.id}`,
       merchantId: o.merchantId,
       type: "ORDER_EARNINGS" as const,
-      amount: -(o.productCost - o.deliveryFee - o.codFee),
+      // Gross COD collected on the merchant's behalf (ROADMAP P0.4) — the
+      // ORDER_CHARGE row above nets it down to the merchant's earnings.
+      amount: codCollectedAmount(o.productCost),
       status: "SETTLED" as const,
-      note: `Order ${o.id} — merchant earnings`,
+      note: `Order ${o.id} — COD collected`,
       orderId: o.id,
       createdBy: "system",
     }))
@@ -55,7 +59,8 @@ export async function seedBalances() {
   }
   log(`  created ${deliveredOrders.length} ORDER_EARNINGS transactions`)
 
-  // 2. Insert PAYMENT_CONFIRMED transaction for the approved payout
+  // 2. A confirmed merchant → platform payment (money the merchant paid in).
+  //    PAYMENT_* rows are merchant payments; payouts are their own PAYOUT rows.
   const approvedPayout = SEED_PAYOUT_REQUESTS.find(
     (p) => p.status === "APPROVED",
   )
@@ -64,33 +69,33 @@ export async function seedBalances() {
       id: "BT-100001E",
       merchantId: approvedPayout.merchantId,
       type: "PAYMENT_CONFIRMED",
-      amount: -approvedPayout.amount,
+      amount: paymentAmount(500),
       status: "SETTLED",
-      note: `Payout ${approvedPayout.id} confirmed`,
+      note: "Merchant payment received",
       paymentMethod: approvedPayout.payoutMethod,
       paymentAccount: approvedPayout.payoutDetails,
       reviewedBy: ADMIN_USER_NAMES.nadia,
       reviewedAt: approvedPayout.reviewedAt,
       createdBy: ADMIN_USER_NAMES.nadia,
     })
-    log("  created PAYMENT_CONFIRMED transaction for approved payout")
+    log("  created PAYMENT_CONFIRMED transaction")
   }
 
-  // 3. Insert PAYMENT_PENDING transaction for the pending payout
+  // 3. A merchant payment awaiting confirmation.
   const pendingPayout = SEED_PAYOUT_REQUESTS.find((p) => p.status === "PENDING")
   if (pendingPayout) {
     await db.insert(balanceTransaction).values({
       id: "BT-100002E",
       merchantId: pendingPayout.merchantId,
       type: "PAYMENT_PENDING",
-      amount: -pendingPayout.amount,
+      amount: paymentAmount(300),
       status: "PENDING",
-      note: `Payout ${pendingPayout.id} — awaiting confirmation`,
+      note: "Merchant payment — awaiting confirmation",
       paymentMethod: pendingPayout.payoutMethod,
       paymentAccount: pendingPayout.payoutDetails,
       createdBy: pendingPayout.merchantId,
     })
-    log("  created PAYMENT_PENDING transaction for pending payout")
+    log("  created PAYMENT_PENDING transaction")
   }
 
   // 4. Upsert merchant_balance for each active merchant
@@ -105,7 +110,7 @@ export async function seedBalances() {
     // Sum all settled transaction amounts for this merchant
     const balanceResult = await db
       .select({
-        total: sql<number>`coalesce(sum(${balanceTransaction.amount}), 0)`,
+        total: sumMoney(balanceTransaction.amount),
       })
       .from(balanceTransaction)
       .where(
@@ -117,7 +122,7 @@ export async function seedBalances() {
     // Sum pending payment amounts
     const pendingResult = await db
       .select({
-        total: sql<number>`coalesce(sum(abs(${balanceTransaction.amount})), 0)`,
+        total: sumAbsMoney(balanceTransaction.amount),
       })
       .from(balanceTransaction)
       .where(

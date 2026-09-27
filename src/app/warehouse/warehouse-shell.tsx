@@ -8,6 +8,7 @@ import { MobileHeader } from "@/components/navigation/mobile-header"
 import { WarehouseSidebar } from "@/components/navigation/warehouse-sidebar"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
+import { loginPathWithNext } from "@/lib/auth-redirect"
 import { WAREHOUSE_SIDEBAR } from "@/lib/nav-config"
 import { twoFactorEnforcementPath } from "@/lib/two-factor"
 
@@ -39,7 +40,7 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady) return
     if (!currentUser) {
-      router.replace("/login")
+      router.replace(loginPathWithNext(pathname + window.location.search))
     } else if (currentUser.role !== "WAREHOUSE_ADMIN") {
       router.replace(homeForRole(currentUser.role))
     } else if (twoFactorSetupPath) {
@@ -65,7 +66,10 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
       <WarehouseSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileHeader config={WAREHOUSE_SIDEBAR} />
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
+        <main
+          id="main-content"
+          className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
+        >
           <div className="mx-auto w-full max-w-7xl">
             <AnnouncementBanner />
             <DataErrorBanner keys={WAREHOUSE_KEYS} />

@@ -24,6 +24,7 @@ export default function AppleIcon() {
         fill={BRAND_ICON_FILL}
         width={140}
         height={140}
+        aria-hidden="true"
       >
         <path fillRule="evenodd" d={BRAND_ICON_PATH} />
       </svg>

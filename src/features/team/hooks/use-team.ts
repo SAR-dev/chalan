@@ -109,23 +109,20 @@ export function useTeam({
     [mutate, _globalMutate],
   )
 
-  const togglePricingPermission = useCallback(
-    async (id: string) => {
-      const res = await fetch(`${KEY}/${id}/pricing`, { method: "PATCH" })
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        return {
-          ok: false,
-          error: formatError(data, "Failed to toggle pricing permission."),
-        }
+  const resendActivation = useCallback(async (id: string) => {
+    const res = await fetch(`${KEY}/${id}/resend-activation`, {
+      method: "POST",
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      return {
+        ok: false,
+        error: formatError(data, "Failed to resend the activation email."),
       }
-      await mutate()
-      _globalMutate((key: string) => key === KEY)
-      _globalMutate((key: string) => key.startsWith(_WAREHOUSES_KEY))
-      return { ok: true }
-    },
-    [mutate, _globalMutate],
-  )
+    }
+    return { ok: true }
+  }, [])
+
   const updateAccountWarehouse = useCallback(
     async (id: string, warehouseId: string | null) => {
       const res = await fetch(`${KEY}/${id}/warehouse`, {
@@ -165,7 +162,7 @@ export function useTeam({
     mutate,
     createAccount,
     toggleAccountActive,
-    togglePricingPermission,
+    resendActivation,
     updateAccountWarehouse,
   }
 }

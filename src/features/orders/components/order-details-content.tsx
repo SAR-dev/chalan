@@ -100,7 +100,7 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                   Placed {new Date(order.createdAt).toLocaleString()}
                 </p>
                 <Link
-                  href={`/track/${order.id}`}
+                  href={`/track/${order.trackingToken ?? order.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary mt-1 inline-flex items-center gap-1 text-xs hover:underline"

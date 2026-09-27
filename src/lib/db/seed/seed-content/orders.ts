@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto"
 import { SEED_COUNTS } from "./credentials"
 import { MERCHANT_IDS } from "./merchants"
 import { SEED_RIDERS } from "./riders"
@@ -84,6 +85,8 @@ const PARCEL_WEIGHTS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0]
 // ---------------------------------------------------------------------------
 export interface OrderSeedEntry {
   id: string
+  /** Public tracking token (P0.1) — generated per seeded order. */
+  trackingToken: string
   merchantId: string
   pickupLocationId: string
   recipientName: string
@@ -186,6 +189,7 @@ function buildSeedOrders(): OrderSeedEntry[] {
 
     const base: OrderSeedEntry = {
       id: `ORD-${String(100001 + i).padStart(6, "0")}E`,
+      trackingToken: randomBytes(16).toString("hex"),
       merchantId: merchant.id,
       pickupLocationId: merchant.pickupId,
       recipientName,

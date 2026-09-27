@@ -127,7 +127,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     // COUNT and data fetch are independent — run them in parallel.
     const [[{ count }], scoped] = await Promise.all([
       dbRead
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(rider)
         .where(scopedWhere),
       scopedQuery,
@@ -177,7 +177,10 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   // COUNT and data fetch are independent — run them in parallel.
   const [[{ count }], rows] = await Promise.all([
-    dbRead.select({ count: sql<number>`count(*)` }).from(rider).where(where),
+    dbRead
+      .select({ count: sql<number>`count(*)::int` })
+      .from(rider)
+      .where(where),
     q,
   ])
 

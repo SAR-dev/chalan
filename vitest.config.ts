@@ -24,6 +24,31 @@ export default defineConfig({
     // at module scope, and unstubbing before each test removes that stub.
     clearMocks: true,
     restoreMocks: true,
+    // Coverage tooling (ROADMAP P3). `pnpm test:coverage` writes a summary +
+    // LCOV report; thresholds are enforced there and in CI so coverage cannot
+    // silently regress.
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary", "json-summary", "lcov"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.spec.{ts,tsx}",
+        "src/**/__tests__/**",
+        "src/lib/db/schema*",
+        "src/proxy.ts",
+        "src/instrumentation*.ts",
+      ],
+      // Global floors, set just under the measured baseline (statements 49.5,
+      // branches 42.7, functions 38.6, lines 50.1) so a drop fails the gate.
+      // They are a regression guard, not a target — raise them as tests land.
+      thresholds: {
+        statements: 48,
+        branches: 41,
+        functions: 37,
+        lines: 49,
+      },
+    },
   },
   resolve: {
     alias: {

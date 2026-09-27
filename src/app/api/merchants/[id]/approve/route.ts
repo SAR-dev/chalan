@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import {
   badRequest,
+  conflict,
   forbidden,
   notFound,
   unauthorized,
@@ -11,8 +12,8 @@ import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { enqueueEmail, flushEmailOutbox } from "@/lib/email-outbox"
 import { merchantApprovedTemplate } from "@/lib/mail-templates"
-import { sendMail } from "@/lib/mailer"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const PATCH = withErrorHandler(
@@ -44,53 +45,56 @@ export const PATCH = withErrorHandler(
       return badRequest("Merchant must verify their email before approval")
     }
 
-    const [updated] = await db
-      .update(merchant)
-      .set({
-        status: "ACTIVE",
-        approvedBy: me.name,
-        approvedAt: new Date().toISOString(),
+    // The status flip, audit row and approval email outbox row commit
+    // together (ROADMAP P1.4/P1.5).
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(merchant)
+        .set({
+          status: "ACTIVE",
+          approvedBy: me.name,
+          approvedAt: new Date().toISOString(),
+        })
+        .where(and(eq(merchant.id, id), eq(merchant.status, "PENDING")))
+        .returning()
+
+      if (!row) return null
+
+      const diff = diffEntity(current, row, [
+        "status",
+        "approvedBy",
+        "approvedAt",
+      ])
+
+      await logAudit(
+        {
+          actor: { userId: me.userId, name: me.name, role: me.role },
+          action: "MERCHANT_APPROVED",
+          entityType: "merchant",
+          entityId: row.id,
+          description: `Approved merchant ${row.businessName}`,
+          metadata: diff ? { diff } : null,
+        },
+        tx,
+      )
+
+      const template = await merchantApprovedTemplate({
+        ownerName: row.ownerName,
+        businessName: row.businessName,
       })
-      .where(eq(merchant.id, id))
-      .returning()
+      await enqueueEmail({ to: row.email, ...template }, tx)
 
-    const diff = diffEntity(current, updated, [
-      "status",
-      "approvedBy",
-      "approvedAt",
-    ])
-
-    await logAudit({
-      actor: { userId: me.userId, name: me.name, role: me.role },
-      action: "MERCHANT_APPROVED",
-      entityType: "merchant",
-      entityId: updated.id,
-      description: `Approved merchant ${updated.businessName}`,
-      metadata: diff ? { diff } : null,
+      return row
     })
 
-    const template = await merchantApprovedTemplate({
-      ownerName: updated.ownerName,
-      businessName: updated.businessName,
-    })
+    if (!updated) {
+      return conflict(
+        "This merchant was changed by someone else — reload and try again.",
+      )
+    }
 
-    sendMail(
-      {
-        to: updated.email,
-        ...template,
-      },
-      {
-        maxRetries: 3,
-        baseDelayMs: 1000,
-        onRetry: (attempt, err) =>
-          console.warn(
-            `[mailer] Retry ${attempt} for merchant approval email (${updated.email}):`,
-            err.message,
-          ),
-      },
-    ).catch((err) =>
-      console.error("[mailer] Merchant approval email failed:", err),
-    )
+    // Best-effort immediate delivery; the cron retries anything left behind.
+    await flushEmailOutbox()
 
     return NextResponse.json(updated)
   },

@@ -22,7 +22,7 @@ async function main() {
      FROM "user" u
      LEFT JOIN profile p ON p."userId" = u.id
      LEFT JOIN account a ON a."userId" = u.id AND a."providerId" = 'credential'
-           WHERE u.email = 'admin01@email.com'`,
+           WHERE u.email = 'admin1@email.com'`,
   )
   console.log("[check] superadmin row:", users.rows)
 

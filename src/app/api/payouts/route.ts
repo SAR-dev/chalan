@@ -20,6 +20,7 @@ import {
   payoutRequestStatuses,
 } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
+import { hasNavPermission } from "@/lib/nav-config"
 import {
   paginateResponse,
   parsePagination,
@@ -101,7 +102,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     // COUNT and data fetch are independent — run them in parallel.
     const [[{ count }], rows] = await Promise.all([
       dbRead
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(payoutRequest)
         .where(where),
       q,
@@ -169,7 +170,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   // COUNT and data fetch are independent — run them in parallel.
   const [[{ count }], rows] = await Promise.all([
     dbRead
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(*)::int` })
       .from(payoutRequest)
       .where(where),
     q,
@@ -184,6 +185,11 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can request payouts")
   }
+  // Payout requests are the Finance surface — moderators need the grant
+  // (ROADMAP 5.2 hard server checks).
+  if (!hasNavPermission(me, "/merchant/finance")) {
+    return forbidden("You don't have access to Finance.")
+  }
 
   const limited = await rateLimitByIp(req, "payouts", 10, 60)
   if (limited) return limited
@@ -192,34 +198,39 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (parsed.error) return parsed.error
   const { payoutMethod, payoutDetails } = parsed.data
 
-  const payableOrders = await db
-    .select({ id: order.id, merchantEarnings: order.merchantEarnings })
-    .from(order)
-    .where(
-      and(
-        eq(order.merchantId, me.merchantId),
-        eq(order.status, "DELIVERED"),
-        sql`${order.codSettledAt} is not null`,
-        isNull(order.payoutRequestId),
-      ),
+  // Read + lock the eligible orders INSIDE the transaction and link exactly
+  // those rows (ROADMAP P0.3). Two concurrent requests now serialize on the
+  // row locks: the second sees `payoutRequestId` already set and finds no
+  // eligible orders, so no orphan request carrying an amount but no orders can
+  // be created.
+  const newRequest = await db.transaction(async (tx) => {
+    const payableOrders = await tx
+      .select({ id: order.id, merchantEarnings: order.merchantEarnings })
+      .from(order)
+      .where(
+        and(
+          eq(order.merchantId, me.merchantId!),
+          eq(order.status, "DELIVERED"),
+          sql`${order.codSettledAt} is not null`,
+          isNull(order.payoutRequestId),
+        ),
+      )
+      .for("update")
+
+    if (payableOrders.length === 0) return null
+
+    const orderIds = payableOrders.map((o: { id: string }) => o.id)
+    const amount = payableOrders.reduce(
+      (sum: number, o: { merchantEarnings: number }) =>
+        sum + o.merchantEarnings,
+      0,
     )
 
-  if (payableOrders.length === 0) {
-    return badRequest("No settled funds available to request.")
-  }
-
-  const amount = payableOrders.reduce(
-    (sum: number, o: { merchantEarnings: number }) => sum + o.merchantEarnings,
-    0,
-  )
-
-  // Transaction: insert the request and lock its orders atomically.
-  const newRequest = await db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(payoutRequest)
       .values({
         merchantId: me.merchantId!,
-        orderIds: payableOrders.map((o: { id: string }) => o.id),
+        orderIds,
         amount,
         status: "PENDING",
         payoutMethod: payoutMethod.trim(),
@@ -230,17 +241,14 @@ export const POST = withErrorHandler(async (req: Request) => {
     await tx
       .update(order)
       .set({ payoutRequestId: inserted.id })
-      .where(
-        and(
-          eq(order.merchantId, me.merchantId!),
-          eq(order.status, "DELIVERED"),
-          sql`${order.codSettledAt} is not null`,
-          isNull(order.payoutRequestId),
-        ),
-      )
+      .where(and(inArray(order.id, orderIds), isNull(order.payoutRequestId)))
 
     return inserted
   })
+
+  if (!newRequest) {
+    return badRequest("No settled funds available to request.")
+  }
 
   return NextResponse.json(newRequest, { status: 201 })
 })

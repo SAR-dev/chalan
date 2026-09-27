@@ -1,15 +1,14 @@
-import { createId } from "@paralleldrive/cuid2"
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
+import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
 import { withErrorHandler } from "@/lib/with-error-handler"
-
-const TOKEN_EXPIRY_HOURS = 24
 
 export const POST = withErrorHandler(
   async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
@@ -44,22 +43,19 @@ export const POST = withErrorHandler(
       return badRequest("Email is already verified")
     }
 
-    // Generate verification token
-    const token = createId()
-    const expiresAt = new Date(
-      Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
-    ).toISOString()
+    // Only the hash is stored (ROADMAP P0.7); the raw token lives in the email.
+    const { raw: token, hash, expiresAt } = issueVerifyToken()
 
     await db
       .update(merchant)
       .set({
-        emailVerificationToken: token,
+        emailVerificationToken: hash,
         emailVerificationExpiresAt: expiresAt,
       })
       .where(eq(merchant.id, id))
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    const verificationUrl = `${siteUrl}/api/auth/verify-email?token=${token}`
+    const verificationUrl = verifyTokenUrl(token, siteUrl)
 
     const template = await merchantVerifyEmailTemplate({
       ownerName: current.ownerName,
@@ -76,12 +72,13 @@ export const POST = withErrorHandler(
         maxRetries: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, err) =>
-          console.warn(
-            `[mailer] Retry ${attempt} for verification email (${current.email}):`,
-            err.message,
-          ),
+          logger.warn("Verification email retry", {
+            attempt,
+            to: current.email,
+            err,
+          }),
       },
-    ).catch((err) => console.error("[mailer] Verification email failed:", err))
+    ).catch((err) => logger.error("Verification email failed", { err }))
 
     return NextResponse.json({ success: true })
   },

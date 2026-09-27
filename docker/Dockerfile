@@ -2,7 +2,10 @@
 
 # ---- Base ----------------------------------------------------------------
 FROM node:22-alpine AS base
-RUN apk add --no-cache libc6-compat curl
+# tzdata so the pinned business timezone resolves inside the container
+# (ROADMAP P1.3); libc6-compat + curl for the healthcheck.
+RUN apk add --no-cache libc6-compat curl tzdata
+ENV TZ=Asia/Dhaka
 RUN corepack enable
 WORKDIR /app
 
@@ -13,12 +16,6 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
-
-# ---- Production Dependencies only (kept separate: prod-only install) ------
-FROM base AS deps-prod
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # ---- Builder -------------------------------------------------------------
 FROM base AS builder
@@ -41,9 +38,10 @@ RUN --mount=type=cache,id=nextcache,target=/app/.next/cache \
 # ---- Runner --------------------------------------------------------------
 # This image is used for BOTH the `app` service and the one-off `migrate`
 # service in compose.monolith.yml (which overrides `entrypoint`/`command` to
-# run src/lib/db/migrate.ts instead of the server). Keeping full `node_modules`
-# (from `deps`, not `deps-prod`) so tsx + drizzle-orm are available for the
-# migrate service without a second image.
+# run src/lib/db/migrate.ts instead of the server). That is why the runner keeps
+# the FULL dependency tree from `deps` rather than a `--prod` install: tsx +
+# drizzle-orm must be present for the migrate service, and shipping a second
+# prod-only stage just to copy from the full one only doubled the install work.
 FROM base AS runner
 WORKDIR /app
 
@@ -71,6 +69,6 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD curl -f http://localhost:3000/api/ready || exit 1
 
 CMD ["node", "server.js"]
