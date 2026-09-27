@@ -143,13 +143,21 @@ deletes.
 ## Testing
 
 Set these locally when running e2e tests or manual dev-server test runs.
-Playwright's `webServer` sets `AUTH_RATE_LIMIT_DISABLED=1` automatically for
-the suite; the other variables are for manual invocations only.
+Playwright's `webServer` sets `AUTH_RATE_LIMIT_DISABLED=1` and
+`LOG_EMAIL_BODY=1` automatically for the suite; the other variables are for
+manual invocations only.
+
+> Do **not** set `MAIL_DISABLED=1` for the e2e suite. It makes `sendMail` return
+> as a *success*, so the outbox row is deleted and no `email_log` record is
+> written — the specs that read activation/verification links out of
+> `email_log` (S42, S47) and the outbox assertions (S52) depend on the
+> "attempted, logged as FAILED, requeued" path.
 
 | Variable                   | Required | Default | Description                                                    |
 | -------------------------- | -------- | ------- | -------------------------------------------------------------- |
 | `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test) |
 | `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting (webServer sets this for the e2e suite; set manually for other test runs) |
+| `LOG_EMAIL_BODY`           | No       | —       | Set to `1` to log the redacted mail body on each send. Off by default; the e2e suite turns it on so a failing run shows the mail in the server console. The specs read links from `email_log` either way. |
 | `SEED_PASSWORD`            | No       | `12qwaszx` | Password given to every account created by `pnpm db:seed:full`. Dev/e2e default is the well-known `12qwaszx`; **both seed entrypoints refuse to run when `NODE_ENV=production` and this is unset** (ROADMAP P0.7), so a production database can never come up on a published password. |
 
 ---
