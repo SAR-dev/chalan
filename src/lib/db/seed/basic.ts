@@ -7,6 +7,10 @@
 // seeded accounts for every role (super admin, warehouse admin, merchant,
 // rider).
 //
+// SMTP mail configs are NOT wiped: `cleanDatabase` never truncates
+// `mail_config`, so the SMTP settings the admin configured (used by the daily
+// reset emails) survive every reseed.
+//
 // Unlike the standalone entrypoints (index.ts / index-full.ts) this does NOT
 // close the shared pool — the daily reset runs inside the long-lived server
 // process. Closing the pool there would kill the app's DB connection.
@@ -24,7 +28,7 @@ import { seedZonePricing } from "./zone-pricing"
 
 export async function seedBasicDatabase(): Promise<void> {
   assertSeedAllowedInDev()
-  await cleanDatabase()
+  await cleanDatabase(["mail_config"])
 
   await seedWarehouses()
   await seedDeliveryZones()
