@@ -87,7 +87,7 @@ describe("totpSecretFromUri", () => {
   it("extracts the secret from an otpauth URI", () => {
     expect(
       totpSecretFromUri(
-        "otpauth://totp/Jhor%20Express:admin1%40email.com?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Jhor%20Express&digits=6&period=30",
+        "otpauth://totp/Chalan:admin1%40email.com?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Chalan&digits=6&period=30",
       ),
     ).toBe("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP")
   })

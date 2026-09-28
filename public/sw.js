@@ -1,4 +1,4 @@
-/* Jhor Express service worker — PWA installability + offline app shell.
+/* Chalan service worker — PWA installability + offline app shell.
  *
  * Strategy:
  *  - Precache the app shell (start page + manifest) on install.
@@ -16,8 +16,8 @@
  */
 
 const VERSION = "v24"
-const SHELL_CACHE = `jhorexpress-shell-${VERSION}`
-const STATIC_CACHE = `jhorexpress-static-${VERSION}`
+const SHELL_CACHE = `chalan-shell-${VERSION}`
+const STATIC_CACHE = `chalan-static-${VERSION}`
 
 const SHELL_URLS = ["/", "/manifest.webmanifest"]
 
@@ -39,7 +39,9 @@ self.addEventListener("activate", (event) => {
           keys
             .filter(
               (key) =>
-                key.startsWith("jhorexpress-") &&
+                // Prune every cache that is not the active generation. Keeping
+                // the check prefix-agnostic means a brand rename (which swaps
+                // the `chalan-` prefix) can't strand caches from an older name.
                 key !== SHELL_CACHE &&
                 key !== STATIC_CACHE,
             )

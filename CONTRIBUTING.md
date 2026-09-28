@@ -1486,7 +1486,7 @@ Service worker behaviour:
   responses are session- and role-scoped, so caching them would leak data
   across users. Do not add them to the fetch handler.
 - Bump `VERSION` in `public/sw.js` to invalidate old caches on deploy; the
-  `activate` handler prunes superseded `jhorexpress-*` caches automatically.
+  `activate` handler prunes superseded `chalan-*` caches automatically.
 
 Rules:
 
