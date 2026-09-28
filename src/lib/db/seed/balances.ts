@@ -74,7 +74,7 @@ export async function seedBalances() {
       {
         id: `BTR-${o.id}`,
         merchantId: o.merchantId,
-        type: "ORDER_CHARGE" as const,
+        type: "ORDER_CHARGE_REVERSAL" as const,
         amount: orderChargeReversalAmount(o.deliveryFee, o.codFee),
         status: "SETTLED" as const,
         note: `Order ${o.id} returned — delivery & COD fees refunded`,

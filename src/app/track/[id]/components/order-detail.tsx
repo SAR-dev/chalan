@@ -100,7 +100,10 @@ export function OrderDetail({
   deliveryRider,
   warehouse: warehouseData,
   matchedByToken,
-}: NonNullable<Awaited<ReturnType<typeof fetchOrderData>>>) {
+  minimal = false,
+}: NonNullable<Awaited<ReturnType<typeof fetchOrderData>>> & {
+  minimal?: boolean
+}) {
   const statusInfo = STATUS_COPY[o.status]
   const StatusIcon = STATUS_ICON[o.status]
   const tint = STATUS_TINT[o.status]
@@ -213,7 +216,13 @@ export function OrderDetail({
       </section>
 
       {/* ── Timeline + sidebar ── */}
-      <div className="grid gap-4 lg:grid-cols-[1.55fr_1fr] lg:items-start">
+      <div
+        className={
+          minimal
+            ? "grid gap-4"
+            : "grid gap-4 lg:grid-cols-[1.55fr_1fr] lg:items-start"
+        }
+      >
         <section className="border-border bg-card rounded-2xl border p-5 shadow-sm">
           <p className="text-muted-foreground mb-5 text-xs font-semibold tracking-widest uppercase">
             Delivery timeline
@@ -223,48 +232,53 @@ export function OrderDetail({
             pickupRider={pickupRider}
             warehouse={warehouseData}
             deliveryRider={deliveryRider}
+            minimal={minimal}
           />
         </section>
 
+        {/* Code lookups (minimal) hide shipment details and the merchant note —
+            status + area only (ROADMAP B11). The PII-free locked note hint
+            stays so the recipient still learns how to leave a note. */}
         <aside className="space-y-4">
-          {/* Shipment details */}
-          <section className="border-border bg-card rounded-2xl border p-5 shadow-sm">
-            <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
-              Shipment details
-            </p>
-            <dl className="divide-border/60 mt-2 divide-y">
-              <DetailRow
-                icon={User}
-                label="Recipient"
-                value={`${o.recipientName.split(" ")[0]} · ${maskPhone(o.recipientPhone)}`}
-              />
-              <DetailRow
-                icon={Weight}
-                label="Weight"
-                value={`${o.parcelWeightKg} kg`}
-              />
-              <DetailRow
-                icon={Truck}
-                label="Handling"
-                value={o.deliveryType === "FRAGILE" ? "Fragile" : "Standard"}
-              />
-              <DetailRow
-                icon={HandCoins}
-                label="Cash on delivery"
-                value={formatTk(o.productCost)}
-                mono
-              />
-              <DetailRow
-                icon={Banknote}
-                label="Delivery fee"
-                value={formatTk(o.deliveryFee)}
-                mono
-              />
-            </dl>
-          </section>
+          {!minimal && (
+            <section className="border-border bg-card rounded-2xl border p-5 shadow-sm">
+              <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                Shipment details
+              </p>
+              <dl className="divide-border/60 mt-2 divide-y">
+                <DetailRow
+                  icon={User}
+                  label="Recipient"
+                  value={`${o.recipientName.split(" ")[0]} · ${maskPhone(o.recipientPhone)}`}
+                />
+                <DetailRow
+                  icon={Weight}
+                  label="Weight"
+                  value={`${o.parcelWeightKg} kg`}
+                />
+                <DetailRow
+                  icon={Truck}
+                  label="Handling"
+                  value={o.deliveryType === "FRAGILE" ? "Fragile" : "Standard"}
+                />
+                <DetailRow
+                  icon={HandCoins}
+                  label="Cash on delivery"
+                  value={formatTk(o.productCost)}
+                  mono
+                />
+                <DetailRow
+                  icon={Banknote}
+                  label="Delivery fee"
+                  value={formatTk(o.deliveryFee)}
+                  mono
+                />
+              </dl>
+            </section>
+          )}
 
           {/* Merchant note (read-only) */}
-          {o.merchantNote && (
+          {!minimal && o.merchantNote && (
             <section className="border-border bg-card rounded-2xl border p-5 shadow-sm">
               <div className="mb-2 flex items-center gap-2">
                 <StickyNote className="text-muted-foreground size-4" />

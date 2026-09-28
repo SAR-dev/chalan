@@ -21,6 +21,7 @@ interface DefaultPricing {
   freeWeightKg: number
   maxWeightKg: number
   codFeePercentage: number
+  cancellationFee: number
 }
 
 interface DeliveryCity {
@@ -38,6 +39,7 @@ interface ZonePricingRow {
   freeWeightKg: number
   maxWeightKg: number
   codFeePercentage: number
+  cancellationFee: number
 }
 
 /**
@@ -117,6 +119,7 @@ export function DeliveryFeeCalculator({
             freeWeightKg: zoneRow.freeWeightKg,
             maxWeightKg: zoneRow.maxWeightKg,
             codFeePercentage: zoneRow.codFeePercentage,
+            cancellationFee: zoneRow.cancellationFee,
           }
         : defaultPricing,
     [zoneRow, defaultPricing],
@@ -323,6 +326,19 @@ export function DeliveryFeeCalculator({
             </p>
             <p className="text-lg font-semibold tabular-nums">
               {formatTk(codFee)}
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-4">
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+              Cancellation fee
+            </p>
+            <p className="text-lg font-semibold tabular-nums">
+              {formatTk(effective.cancellationFee)}
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Charged only if the parcel is returned; the delivery and COD fees
+              are refunded.
             </p>
           </div>
 

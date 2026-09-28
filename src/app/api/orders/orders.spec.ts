@@ -72,6 +72,7 @@ vi.mock("@/lib/db", () => {
       },
       returning: () => Promise.resolve(insertResult),
       onConflictDoUpdate: () => Promise.resolve(),
+      onConflictDoNothing: () => chain,
     }
     return chain
   }
@@ -239,6 +240,23 @@ describe("POST /api/orders", () => {
     const json = await res.json()
     expect(res.status).toBe(201)
     expect(json).toMatchObject({ id: "o_new" })
+  })
+
+  it("returns the original order for a repeated Idempotency-Key (ROADMAP B13)", async () => {
+    sessionState.value = merchant
+    selectQueue.push([{ id: "o_orig", status: "PENDING" }])
+    const request = new Request("http://test.local/api", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": "retry-1",
+      },
+      body: JSON.stringify(validOrderBody),
+    })
+    const res = await createOrder(request)
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ id: "o_orig" })
   })
 
   it("snapshots the zone-pair cancellation fee on the order", async () => {

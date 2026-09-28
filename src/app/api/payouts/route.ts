@@ -15,6 +15,7 @@ import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
 import {
   merchant,
+  merchantBalance,
   order,
   payoutRequest,
   payoutRequestStatuses,
@@ -203,7 +204,20 @@ export const POST = withErrorHandler(async (req: Request) => {
   // row locks: the second sees `payoutRequestId` already set and finds no
   // eligible orders, so no orphan request carrying an amount but no orders can
   // be created.
-  const newRequest = await db.transaction(async (tx) => {
+  //
+  // The request is also capped at the merchant's available credit (ROADMAP B1):
+  // a merchant who owes the platform (positive balance from cancelled orders,
+  // COD fees, or shortfalls) can never be paid cash beyond their credit.
+  const result = await db.transaction(async (tx) => {
+    const [balanceRow] = await tx
+      .select({ balance: merchantBalance.balance })
+      .from(merchantBalance)
+      .where(eq(merchantBalance.merchantId, me.merchantId!))
+      .for("update")
+      .limit(1)
+    const available = Math.max(0, -(balanceRow?.balance ?? 0))
+    if (available <= 0) return null
+
     const payableOrders = await tx
       .select({ id: order.id, merchantEarnings: order.merchantEarnings })
       .from(order)
@@ -215,16 +229,20 @@ export const POST = withErrorHandler(async (req: Request) => {
           isNull(order.payoutRequestId),
         ),
       )
+      .orderBy(asc(order.createdAt))
       .for("update")
 
-    if (payableOrders.length === 0) return null
+    // Link only as many orders as the credit covers (oldest first).
+    const linked: { id: string; merchantEarnings: number }[] = []
+    let amount = 0
+    for (const o of payableOrders) {
+      if (amount + o.merchantEarnings > available) break
+      linked.push(o)
+      amount += o.merchantEarnings
+    }
+    if (linked.length === 0 || amount <= 0) return null
 
-    const orderIds = payableOrders.map((o: { id: string }) => o.id)
-    const amount = payableOrders.reduce(
-      (sum: number, o: { merchantEarnings: number }) =>
-        sum + o.merchantEarnings,
-      0,
-    )
+    const orderIds = linked.map((o: { id: string }) => o.id)
 
     const [inserted] = await tx
       .insert(payoutRequest)
@@ -246,9 +264,9 @@ export const POST = withErrorHandler(async (req: Request) => {
     return inserted
   })
 
-  if (!newRequest) {
+  if (!result) {
     return badRequest("No settled funds available to request.")
   }
 
-  return NextResponse.json(newRequest, { status: 201 })
+  return NextResponse.json(result, { status: 201 })
 })

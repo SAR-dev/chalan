@@ -62,11 +62,15 @@ export function calcCodFee(
 /**
  * Calculate merchant earnings for an order.
  * Earnings = COD amount - delivery fee - COD fee
+ *
+ * Signed on purpose (ROADMAP B7): when the fees exceed the COD collected the
+ * merchant is net-negative, and clamping to 0 would hide that debt from
+ * payouts and reports. The ledger already stores the true signed balance.
  */
 export function calcMerchantEarnings(
   productCost: number,
   deliveryFee: number,
   codFee: number,
 ): number {
-  return Math.max(0, toPaisa(productCost - deliveryFee - codFee))
+  return toPaisa(productCost - deliveryFee - codFee)
 }

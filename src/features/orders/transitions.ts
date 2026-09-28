@@ -25,8 +25,10 @@ import {
   merchantBalance,
   order,
   orderStatusHistory,
+  platformConfig,
   rider,
 } from "@/lib/db/schema"
+import { calcMerchantEarnings } from "@/lib/pricing"
 import {
   orderAssignPickupRiderSchema,
   orderCancelSchema,
@@ -92,10 +94,22 @@ export const ORDER_TRANSITIONS = {
         return { error: "Only PENDING orders can be approved", status: 400 }
       }
       const [merchantRow] = await db
-        .select({ maxWeightKg: merchant.maxWeightKg })
+        .select({
+          maxWeightKg: merchant.maxWeightKg,
+          status: merchant.status,
+        })
         .from(merchant)
         .where(eq(merchant.id, o.merchantId))
         .limit(1)
+      // A suspended/closed merchant must not have new orders enter the pipeline
+      // (ROADMAP B8). New orders are already blocked at creation; this closes
+      // the gap for PENDING orders queued before suspension.
+      if (merchantRow && merchantRow.status !== "ACTIVE") {
+        return {
+          error: "This merchant is not active; the order cannot be approved.",
+          status: 400,
+        }
+      }
       if (merchantRow && o.parcelWeightKg > merchantRow.maxWeightKg) {
         return {
           error: `Parcel weight exceeds the ${merchantRow.maxWeightKg} KG limit and cannot be approved.`,
@@ -276,7 +290,7 @@ export const ORDER_TRANSITIONS = {
   delivered: defineTransition({
     authorize: (me) => me.role === "RIDER" && Boolean(me.riderId),
     schema: orderDeliveredSchema,
-    guard: ({ order: o, session }) => {
+    guard: ({ order: o, session, body }) => {
       if (o.deliveryRiderId !== session.riderId) {
         return { error: "This delivery is not assigned to you.", status: 403 }
       }
@@ -286,14 +300,44 @@ export const ORDER_TRANSITIONS = {
           status: 400,
         }
       }
+      // Partial COD (ROADMAP B2): can't collect more than owed, and a shortfall
+      // must be explained.
+      const collected = body.amountCollected
+      if (collected !== undefined && collected > o.productCost) {
+        return {
+          error: "Collected amount cannot exceed the COD amount.",
+          status: 400,
+        }
+      }
+      if (
+        collected !== undefined &&
+        collected < o.productCost &&
+        !body.shortfallReason?.trim()
+      ) {
+        return {
+          error:
+            "A reason is required when collecting less than the COD amount.",
+          status: 400,
+        }
+      }
       return null
     },
-    buildUpdate: ({ order: o, body }) => ({
-      status: "DELIVERED",
-      deliveredAt: new Date().toISOString(),
-      deliveryProofRef: body.proofRef ?? `proof_${o.id.toLowerCase()}.jpg`,
-      amountCollected: o.productCost,
-    }),
+    buildUpdate: ({ order: o, body }) => {
+      const collected = body.amountCollected ?? o.productCost
+      return {
+        status: "DELIVERED",
+        deliveredAt: new Date().toISOString(),
+        deliveryProofRef: body.proofRef ?? `proof_${o.id.toLowerCase()}.jpg`,
+        amountCollected: collected,
+        deliveryShortfallReason: body.shortfallReason?.trim() || null,
+        // Earnings follow the amount actually collected, not the expected COD.
+        merchantEarnings: calcMerchantEarnings(
+          collected,
+          o.deliveryFee,
+          o.codFee,
+        ),
+      }
+    },
   }),
 
   failed: defineTransition({
@@ -515,6 +559,67 @@ function transitionNote(name: TransitionName, body: unknown): string | null {
   return null
 }
 
+type OrderTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
+ * Writes the fee settlement for a terminal order (returned/cancelled): reverses
+ * the creation `ORDER_CHARGE` and optionally charges the cancellation fee, then
+ * moves the merchant balance by the net. Zero rows are skipped.
+ */
+async function applyFeeSettlement(
+  tx: OrderTx,
+  updated: OrderRow,
+  actorName: string,
+  opts: { label: string; refundFees: boolean; cancellationFee: number },
+): Promise<void> {
+  const reversal = opts.refundFees
+    ? orderChargeReversalAmount(updated.deliveryFee, updated.codFee)
+    : 0
+  const cancellation = cancellationChargeAmount(opts.cancellationFee)
+
+  if (reversal !== 0) {
+    await tx.insert(balanceTransaction).values({
+      merchantId: updated.merchantId,
+      type: "ORDER_CHARGE_REVERSAL",
+      amount: reversal,
+      status: "SETTLED",
+      note: `Order ${updated.id} ${opts.label} — delivery & COD fees refunded`,
+      orderId: updated.id,
+      createdBy: actorName,
+    })
+  }
+
+  if (cancellation !== 0) {
+    await tx.insert(balanceTransaction).values({
+      merchantId: updated.merchantId,
+      type: "ORDER_CANCELLATION",
+      amount: cancellation,
+      status: "SETTLED",
+      note: `Order ${updated.id} ${opts.label} — cancellation fee`,
+      orderId: updated.id,
+      createdBy: actorName,
+    })
+  }
+
+  const net = toPaisa(reversal + cancellation)
+  if (net !== 0) {
+    await tx
+      .insert(merchantBalance)
+      .values({
+        id: createId(),
+        merchantId: updated.merchantId,
+        balance: net,
+      })
+      .onConflictDoUpdate({
+        target: merchantBalance.merchantId,
+        set: {
+          balance: sql`${merchantBalance.balance} + ${net}`,
+          updatedAt: new Date().toISOString(),
+        },
+      })
+  }
+}
+
 export async function applyOrderTransition(
   name: TransitionName,
   orderId: string,
@@ -575,8 +680,9 @@ export async function applyOrderTransition(
     // recipient — credit the merchant the GROSS amount (ROADMAP P0.4). The fee
     // charge written at creation nets this to the merchant's earnings, so a
     // later payout of those earnings settles the balance to zero.
-    if (name === "delivered" && updated.productCost > 0) {
-      const collected = codCollectedAmount(updated.productCost)
+    const collectedAmount = updated.amountCollected ?? updated.productCost
+    if (name === "delivered" && collectedAmount > 0) {
+      const collected = codCollectedAmount(collectedAmount)
 
       // Create ORDER_EARNINGS transaction — negative amount reduces merchant debt
       await tx.insert(balanceTransaction).values({
@@ -607,58 +713,35 @@ export async function applyOrderTransition(
     }
 
     // A returned order refunds the creation charge and charges the zone-pair
-    // cancellation fee instead. Net: the merchant's obligation becomes just the
-    // cancellation fee — they get `deliveryFee + codFee - cancellationFee` back.
-    // The ORDER_CHARGE reversal is a negative row of the same type (the mirror
-    // of creation); the fee itself is a distinct ORDER_CANCELLATION row.
+    // cancellation fee instead (ROADMAP B4). Net: the merchant's obligation
+    // becomes just the cancellation fee.
     if (name === "return") {
-      const reversal = orderChargeReversalAmount(
-        updated.deliveryFee,
-        updated.codFee,
-      )
-      const cancellation = cancellationChargeAmount(updated.cancellationFee)
+      await applyFeeSettlement(tx, updated, me.name, {
+        label: "returned",
+        refundFees: true,
+        cancellationFee: updated.cancellationFee,
+      })
+    }
 
-      if (reversal !== 0) {
-        await tx.insert(balanceTransaction).values({
-          merchantId: updated.merchantId,
-          type: "ORDER_CHARGE",
-          amount: reversal,
-          status: "SETTLED",
-          note: `Order ${updated.id} returned — delivery & COD fees refunded`,
-          orderId: updated.id,
-          createdBy: me.name,
-        })
-      }
-
-      if (cancellation !== 0) {
-        await tx.insert(balanceTransaction).values({
-          merchantId: updated.merchantId,
-          type: "ORDER_CANCELLATION",
-          amount: cancellation,
-          status: "SETTLED",
-          note: `Order ${updated.id} returned — cancellation fee`,
-          orderId: updated.id,
-          createdBy: me.name,
-        })
-      }
-
-      const net = toPaisa(reversal + cancellation)
-      if (net !== 0) {
-        await tx
-          .insert(merchantBalance)
-          .values({
-            id: createId(),
-            merchantId: updated.merchantId,
-            balance: net,
-          })
-          .onConflictDoUpdate({
-            target: merchantBalance.merchantId,
-            set: {
-              balance: sql`${merchantBalance.balance} + ${net}`,
-              updatedAt: new Date().toISOString(),
-            },
-          })
-      }
+    // A cancelled order is refunded the creation charge. Before pickup nothing
+    // has been rendered, so the refund is total; once the parcel has moved, the
+    // zone-pair cancellation fee applies instead (ROADMAP B4/B10). The
+    // `refundOnCancel` platform toggle can disable the refund entirely (B15).
+    if (name === "cancel") {
+      const postPickup =
+        orderRow.status === "PICKED_UP" ||
+        orderRow.status === "IN_WAREHOUSE" ||
+        orderRow.status === "IN_TRANSIT"
+      const [policy] = await tx
+        .select({ refundOnCancel: platformConfig.refundOnCancel })
+        .from(platformConfig)
+        .limit(1)
+      const refundFees = policy?.refundOnCancel ?? true
+      await applyFeeSettlement(tx, updated, me.name, {
+        label: "cancelled",
+        refundFees,
+        cancellationFee: refundFees && postPickup ? updated.cancellationFee : 0,
+      })
     }
 
     // Audit and status history commit with the change they describe

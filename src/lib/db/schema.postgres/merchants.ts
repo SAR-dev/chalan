@@ -53,6 +53,9 @@ export const merchant = pgTable(
     freeWeightKg: doublePrecision("freeWeightKg").notNull().default(1),
     // COD fee percentage (per merchant, default 1%)
     codFeePercentage: doublePrecision("codFeePercentage").notNull().default(1),
+    // Per-merchant cancellation fee fallback (0 = inherit the platform default).
+    // Zone-pair pricing still wins; this mirrors how baseRate etc. fall back.
+    cancellationFee: money("cancellationFee").notNull().default(0),
     // Moderator quota (ROADMAP 5.2): how many ACTIVE+PENDING staff logins the
     // owner may hold. SUPER_ADMIN-managed (0 = moderators disabled).
     maxModerators: integer("maxModerators").notNull().default(3),

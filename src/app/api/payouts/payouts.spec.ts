@@ -192,7 +192,10 @@ describe("POST /api/payouts", () => {
 
   it("creates payout request", async () => {
     sessionState.value = merchantSession
-    selectQueue.push([{ id: "o1", merchantEarnings: 89 }])
+    selectQueue.push(
+      [{ balance: -100 }], // merchant is in credit by 100 (ROADMAP B1)
+      [{ id: "o1", merchantEarnings: 89 }],
+    )
     insertResult.push({ id: "pr_new", status: "PENDING" })
     const res = await createPayout(req("POST", undefined, validBody))
     const json = await res.json()
@@ -207,6 +210,28 @@ describe("POST /api/payouts", () => {
     })
     // …and only those orders are linked.
     expect(updatePayloads[0]).toMatchObject({ payoutRequestId: "pr_new" })
+  })
+
+  it("caps the request at the available credit (ROADMAP B1)", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push(
+      [{ balance: -100 }], // only 100 of credit available
+      [
+        { id: "o1", merchantEarnings: 89 },
+        { id: "o2", merchantEarnings: 30 }, // would push the total to 119
+      ],
+    )
+    insertResult.push({ id: "pr_new", status: "PENDING" })
+    const res = await createPayout(req("POST", undefined, validBody))
+    expect(res.status).toBe(201)
+    expect(insertPayloads[0]).toMatchObject({ orderIds: ["o1"], amount: 89 })
+  })
+
+  it("400 when the merchant owes (no available credit)", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([{ balance: 60 }], [{ id: "o1", merchantEarnings: 89 }])
+    const res = await createPayout(req("POST", undefined, validBody))
+    expect(res.status).toBe(400)
   })
 })
 

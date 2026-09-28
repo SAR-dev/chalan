@@ -184,6 +184,9 @@ describe("RIDER_STATUS_LABELS", () => {
 describe("BALANCE_TX_TYPE_LABELS", () => {
   it("has all types", () => {
     expect(BALANCE_TX_TYPE_LABELS.ORDER_CHARGE).toBe("Order Charge")
+    expect(BALANCE_TX_TYPE_LABELS.ORDER_CHARGE_REVERSAL).toBe(
+      "Order Charge Reversal",
+    )
     expect(BALANCE_TX_TYPE_LABELS.ORDER_EARNINGS).toBe("Order Earnings")
     expect(BALANCE_TX_TYPE_LABELS.ORDER_CANCELLATION).toBe("Order Cancellation")
     expect(BALANCE_TX_TYPE_LABELS.PAYOUT).toBe("Payout")

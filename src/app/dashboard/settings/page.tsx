@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { pageContent } from "@/config/content"
 import { CreateMailConfigDialog } from "@/features/platform-config/dialogs/create-mail-config-dialog"
 import { usePlatformConfig } from "@/features/platform-config/hooks/use-platform-config"
@@ -71,6 +72,7 @@ export default function DashboardSettingsPage() {
   const [freeWeightKg, setFreeWeightKg] = useState("1")
   const [maxWeightKg, setMaxWeightKg] = useState("3")
   const [cancellationFee, setCancellationFee] = useState("0")
+  const [refundOnCancel, setRefundOnCancel] = useState(true)
   const [saving, setSaving] = useState(false)
 
   // Mail config state
@@ -91,6 +93,7 @@ export default function DashboardSettingsPage() {
     setFreeWeightKg(String(config.defaultFreeWeightKg ?? 1))
     setMaxWeightKg(String(config.defaultMaxWeightKg ?? 3))
     setCancellationFee(String(config.defaultCancellationFee ?? 0))
+    setRefundOnCancel(config.refundOnCancel !== false)
   }, [config])
 
   async function loadMailConfigs() {
@@ -116,6 +119,7 @@ export default function DashboardSettingsPage() {
       defaultFreeWeightKg: Number(freeWeightKg) || 0,
       defaultMaxWeightKg: Number(maxWeightKg) || 3,
       defaultCancellationFee: Number(cancellationFee) || 0,
+      refundOnCancel,
     }
     if (parsed.defaultMaxWeightKg <= 0) {
       toast.error("Max weight must be greater than 0.")
@@ -321,60 +325,77 @@ export default function DashboardSettingsPage() {
             not affected.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="base-rate">Base rate (TK)</Label>
-            <Input
-              id="base-rate"
-              type="number"
-              min="0"
-              step="1"
-              value={baseRate}
-              onChange={(e) => setBaseRate(e.target.value)}
-            />
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="base-rate">Base rate (TK)</Label>
+              <Input
+                id="base-rate"
+                type="number"
+                min="0"
+                step="1"
+                value={baseRate}
+                onChange={(e) => setBaseRate(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="extra-rate">Extra per KG (TK)</Label>
+              <Input
+                id="extra-rate"
+                type="number"
+                min="0"
+                step="1"
+                value={extraRatePerKg}
+                onChange={(e) => setExtraRatePerKg(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="free-weight">Free weight (KG)</Label>
+              <Input
+                id="free-weight"
+                type="number"
+                min="0"
+                step="0.1"
+                value={freeWeightKg}
+                onChange={(e) => setFreeWeightKg(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="max-weight">Max weight (KG)</Label>
+              <Input
+                id="max-weight"
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={maxWeightKg}
+                onChange={(e) => setMaxWeightKg(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="cancellation-fee">Cancellation fee (TK)</Label>
+              <Input
+                id="cancellation-fee"
+                type="number"
+                min="0"
+                step="1"
+                value={cancellationFee}
+                onChange={(e) => setCancellationFee(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="extra-rate">Extra per KG (TK)</Label>
-            <Input
-              id="extra-rate"
-              type="number"
-              min="0"
-              step="1"
-              value={extraRatePerKg}
-              onChange={(e) => setExtraRatePerKg(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="free-weight">Free weight (KG)</Label>
-            <Input
-              id="free-weight"
-              type="number"
-              min="0"
-              step="0.1"
-              value={freeWeightKg}
-              onChange={(e) => setFreeWeightKg(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="max-weight">Max weight (KG)</Label>
-            <Input
-              id="max-weight"
-              type="number"
-              min="0.1"
-              step="0.1"
-              value={maxWeightKg}
-              onChange={(e) => setMaxWeightKg(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="cancellation-fee">Cancellation fee (TK)</Label>
-            <Input
-              id="cancellation-fee"
-              type="number"
-              min="0"
-              step="1"
-              value={cancellationFee}
-              onChange={(e) => setCancellationFee(e.target.value)}
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div>
+              <Label htmlFor="refund-on-cancel">
+                Refund fees on cancellation
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                When off, a cancelled order keeps its delivery and COD fees.
+              </p>
+            </div>
+            <Switch
+              id="refund-on-cancel"
+              checked={refundOnCancel}
+              onCheckedChange={(v) => setRefundOnCancel(v)}
             />
           </div>
         </CardContent>

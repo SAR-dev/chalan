@@ -10,12 +10,12 @@
  * | Type              | Sign  | Meaning                                                    |
  * |-------------------|-------|------------------------------------------------------------|
  * | ORDER_CHARGE      | +fees | Platform fees accrued when the order is placed.            |
- * |                   | -fees | Reversed on a returned order (delivery + COD fees refunded).|
+ * | ORDER_CHARGE_REV. | -fees | Reversed on a returned/cancelled order (fees refunded).     |
  * | ORDER_EARNINGS    | -gross| COD collected from the recipient on the merchant's behalf |
  * |                   |       | (gross `productCost`; the fee charge above nets this to     |
  * |                   |       | the merchant's earnings).                                   |
- * | ORDER_CANCELLATION| +fee  | Cancellation fee charged when an order is returned to the  |
- * |                   |       | merchant (instead of the delivery fee).                    |
+ * | ORDER_CANCELLATION| +fee  | Cancellation fee charged when an order is returned/cancelled|
+ * |                   |       | instead of the delivery fee.                               |
  * | PAYOUT            | +paid | The platform paid the merchant — consumes their credit.     |
  * | PAYMENT_PENDING   | -amt  | The merchant paid the platform (awaiting confirmation).     |
  * | PAYMENT_CONFIRMED | -amt  | Merchant payment confirmed.                                 |

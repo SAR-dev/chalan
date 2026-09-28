@@ -1,9 +1,12 @@
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm"
+import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
-import { deliveryCity, order } from "@/lib/db/schema"
+import { sumMoney } from "@/lib/db/money-sql"
+import { deliveryCity, order, rider } from "@/lib/db/schema"
 import { loginRedirectPath } from "@/lib/login-redirect"
+import { formatTk } from "@/lib/pricing"
 import { WarehouseSettlementPageClient } from "./cod-settlement-client"
 
 const ORDER_COLUMNS = {
@@ -46,7 +49,7 @@ export default async function WarehouseSettlementPage() {
   )
   const statusFilter = eq(order.status, "DELIVERED")
 
-  const [[{ total }], rows] = await Promise.all([
+  const [[{ total }], rows, riderCash] = await Promise.all([
     dbRead
       .select({ total: sql<number>`count(*)::int` })
       .from(order)
@@ -58,9 +61,53 @@ export default async function WarehouseSettlementPage() {
       .where(and(warehouseScope, statusFilter))
       .orderBy(desc(order.createdAt))
       .limit(limit),
+    // Cash each delivery rider is holding: delivered but not yet settled with
+    // the warehouse (ROADMAP B3). The `codSettledAt` stamp is the handover
+    // record; this surfaces the outstanding balance per rider.
+    dbRead
+      .select({
+        riderId: order.deliveryRiderId,
+        riderName: rider.name,
+        cash: sumMoney(order.amountCollected),
+        orders: sql<number>`count(*)::int`,
+      })
+      .from(order)
+      .leftJoin(rider, eq(order.deliveryRiderId, rider.id))
+      .where(
+        and(
+          eq(order.warehouseId, me.warehouseId),
+          eq(order.status, "DELIVERED"),
+          isNull(order.codSettledAt),
+          isNotNull(order.deliveryRiderId),
+        ),
+      )
+      .groupBy(order.deliveryRiderId, rider.name),
   ])
 
   return (
-    <WarehouseSettlementPageClient initialData={rows} initialTotal={total} />
+    <div className="flex flex-col gap-6">
+      {riderCash.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Rider cash in hand</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {riderCash.map((r) => (
+              <div
+                key={r.riderId}
+                className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+              >
+                <span className="font-medium">{r.riderName ?? r.riderId}</span>
+                <span className="text-muted-foreground tabular-nums">
+                  {formatTk(Number(r.cash ?? 0))} · {r.orders} order
+                  {r.orders === 1 ? "" : "s"}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      <WarehouseSettlementPageClient initialData={rows} initialTotal={total} />
+    </div>
   )
 }

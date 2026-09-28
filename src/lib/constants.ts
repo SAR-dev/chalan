@@ -176,6 +176,7 @@ export const RIDER_STATUS_TONES: Record<RiderStatus, BadgeTone> = {
 
 export const BALANCE_TX_TYPE_LABELS: Record<BalanceTxType, string> = {
   ORDER_CHARGE: "Order Charge",
+  ORDER_CHARGE_REVERSAL: "Order Charge Reversal",
   ORDER_EARNINGS: "Order Earnings",
   ORDER_CANCELLATION: "Order Cancellation",
   PAYOUT: "Payout",
@@ -186,6 +187,7 @@ export const BALANCE_TX_TYPE_LABELS: Record<BalanceTxType, string> = {
 
 export const BALANCE_TX_TYPE_TONES: Record<BalanceTxType, BadgeTone> = {
   ORDER_CHARGE: "danger",
+  ORDER_CHARGE_REVERSAL: "success",
   ORDER_EARNINGS: "success",
   ORDER_CANCELLATION: "pending",
   PAYOUT: "info",

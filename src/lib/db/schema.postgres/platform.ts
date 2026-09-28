@@ -222,6 +222,9 @@ export const platformConfig = pgTable("platform_config", {
   // Fallback cancellation fee used when no zone-pair row is configured; the
   // order snapshots the resolved value at creation (see `order.cancellationFee`).
   defaultCancellationFee: money("defaultCancellationFee").notNull().default(0),
+  // Whether a cancelled order is refunded its creation charge (ROADMAP B15).
+  // true = refund (default); false = the merchant keeps the fee.
+  refundOnCancel: boolean("refundOnCancel").notNull().default(true),
   updatedAt: ts("updatedAt").notNull().defaultNow(),
 })
 

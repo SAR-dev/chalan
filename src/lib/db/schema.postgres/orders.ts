@@ -79,6 +79,9 @@ export const order = pgTable(
     // authorize the public receiver-note write. The sequential `id` stays the
     // human/parcel code; the token is the secret that grants write access.
     trackingToken: text("trackingToken"),
+    // Optional client-supplied idempotency key (ROADMAP B13) — a retried create
+    // returns the original order instead of charging twice.
+    idempotencyKey: text("idempotencyKey"),
     merchantId: text("merchantId")
       .notNull()
       .references(() => merchant.id),
@@ -146,6 +149,8 @@ export const order = pgTable(
     // Soft reference to uploaded proof image (URL / storage key).
     deliveryProofRef: text("deliveryProofRef"),
     amountCollected: money("amountCollected"),
+    // Why less than the expected COD was collected (partial/refused payment).
+    deliveryShortfallReason: text("deliveryShortfallReason"),
     // Failed attempt.
     failedAttemptAt: ts("failedAttemptAt"),
     failureNote: text("failureNote"),
@@ -200,6 +205,9 @@ export const order = pgTable(
       t.createdAt,
     ),
     index("order_status_created_at_idx").on(t.status, t.createdAt),
+    // A merchant cannot reuse an idempotency key (ROADMAP B13); NULL keys are
+    // distinct, so orders without a key are unconstrained.
+    uniqueIndex("order_idempotency_uniq").on(t.merchantId, t.idempotencyKey),
     index("order_cod_settled_at_idx").on(t.codSettledAt),
     index("order_payout_request_id_idx").on(t.payoutRequestId),
     // Public tracking lookups resolve by token (and the token is unique).
