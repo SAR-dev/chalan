@@ -266,6 +266,15 @@ export default async function LandingPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                data-testid="nav-pricing"
+                render={<Link href="/rates" />}
+                nativeButton={false}
+              >
+                Pricing
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 render={<Link href="/login" />}
                 nativeButton={false}
               >
@@ -710,6 +719,15 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-3xl">
             <DeliveryFeeCalculator defaultPricing={platformPricing} />
           </div>
+          <p className="mt-5 text-center">
+            <Link
+              href="/rates"
+              data-testid="rate-card-link"
+              className="text-primary text-sm font-medium hover:underline"
+            >
+              View the full city-to-city rate card
+            </Link>
+          </p>
         </section>
 
         {/* ── How it works ── */}
