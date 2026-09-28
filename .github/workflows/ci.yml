@@ -189,8 +189,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Schema first: the webServer seeds (pnpm db:seed:full) before it starts.
       - run: pnpm db:migrate
-      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
       # Playwright boots its own server: `pnpm db:seed:full && pnpm start`.
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4

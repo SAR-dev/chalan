@@ -8,15 +8,32 @@ const raw = readFileSync(
 )
 const pkg = readFileSync(join(process.cwd(), "package.json"), "utf-8")
 
+/** The `name:` job block, from its key to the next top-level job key. */
+function jobBlock(name: string): string {
+  const start = raw.search(new RegExp(`^\\s{2}${name}:`, "m"))
+  if (start === -1) return ""
+  const rest = raw.slice(start + 1)
+  const next = rest.search(/^\s{2}[a-zA-Z0-9_-]+:/m)
+  return next === -1 ? raw.slice(start) : rest.slice(0, next)
+}
+
 describe("CI workflow", () => {
-  it("keeps Playwright out of CI (local gate only)", () => {
-    // The e2e job was removed on purpose: the suite is a pre-merge/local gate
-    // (`pnpm build` + `pnpm test:e2e`), not a CI one. If you re-add the job,
-    // restore the migration → build → Playwright ordering it enforced.
-    expect(raw).not.toMatch(/^\s{2}e2e:/m)
-    expect(raw).not.toContain("pnpm test:e2e")
-    expect(raw).not.toContain("playwright install")
-    // ...but the suite itself must stay runnable.
+  it("runs e2e after migrating and building", () => {
+    // The e2e job is a CI gate. It must keep the ordering it depends on:
+    // migrate the DB, build the app, install browsers, then run the suite.
+    const job = jobBlock("e2e")
+    expect(job).not.toBe("")
+
+    const order = [
+      "pnpm db:migrate",
+      "pnpm build",
+      "playwright install",
+      "pnpm test:e2e",
+    ].map((step) => job.indexOf(step))
+    expect(order.every((i) => i >= 0)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+
+    // ...and the suite itself must stay runnable locally.
     expect(pkg).toContain('"test:e2e"')
   })
 
