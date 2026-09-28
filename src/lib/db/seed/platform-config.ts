@@ -23,6 +23,7 @@ export async function seedPlatformConfig() {
     defaultCodFeePercentage: 1,
     minCodFeePercentage: 0.5,
     maxCodFeePercentage: 5,
+    defaultCancellationFee: 20,
   })
 
   log("Seeded platform config defaults")

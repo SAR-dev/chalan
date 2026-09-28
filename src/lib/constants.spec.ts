@@ -185,6 +185,7 @@ describe("BALANCE_TX_TYPE_LABELS", () => {
   it("has all types", () => {
     expect(BALANCE_TX_TYPE_LABELS.ORDER_CHARGE).toBe("Order Charge")
     expect(BALANCE_TX_TYPE_LABELS.ORDER_EARNINGS).toBe("Order Earnings")
+    expect(BALANCE_TX_TYPE_LABELS.ORDER_CANCELLATION).toBe("Order Cancellation")
     expect(BALANCE_TX_TYPE_LABELS.PAYOUT).toBe("Payout")
     expect(BALANCE_TX_TYPE_LABELS.PAYMENT_PENDING).toBe("Payment Pending")
     expect(BALANCE_TX_TYPE_LABELS.PAYMENT_CONFIRMED).toBe("Payment Confirmed")

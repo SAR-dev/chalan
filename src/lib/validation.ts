@@ -216,6 +216,7 @@ export const platformConfigSchema = z
     defaultExtraRatePerKg: z.number().nonnegative().optional(),
     defaultFreeWeightKg: z.number().nonnegative().optional(),
     defaultMaxWeightKg: z.number().positive().optional(),
+    defaultCancellationFee: z.number().nonnegative().optional(),
   })
   .refine(
     (d) =>
@@ -599,6 +600,10 @@ export const zonePricingCreateSchema = z.object({
   freeWeightKg: z.number().nonnegative("Free weight cannot be negative"),
   maxWeightKg: z.number().positive("Max weight must be greater than 0"),
   codFeePercentage: z.number().nonnegative("COD fee cannot be negative"),
+  cancellationFee: z
+    .number()
+    .nonnegative("Cancellation fee cannot be negative")
+    .optional(),
 })
 
 export const zonePricingUpdateSchema = z.object({
@@ -607,6 +612,7 @@ export const zonePricingUpdateSchema = z.object({
   freeWeightKg: z.number().nonnegative().optional(),
   maxWeightKg: z.number().positive().optional(),
   codFeePercentage: z.number().nonnegative().optional(),
+  cancellationFee: z.number().nonnegative().optional(),
 })
 
 // ---------------------------------------------------------------------------

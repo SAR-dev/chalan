@@ -35,6 +35,7 @@ export function useZonePricing() {
       freeWeightKg: number
       maxWeightKg: number
       codFeePercentage: number
+      cancellationFee?: number
     }): Promise<Result> => {
       const res = await fetch(KEY, {
         method: "POST",

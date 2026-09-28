@@ -37,6 +37,11 @@ const ORDER_SEED_STATUSES: (
   ...Array.from({ length: 10 }, () => "CANCELLED" as const),
 ]
 
+// Cancellation fee snapshotted on every seeded order, and mirrored by the
+// ledger rows seedBalances writes for returned ones. Uniform in the seed;
+// production resolves it per zone pair at creation time.
+export const SEED_CANCELLATION_FEE = 20
+
 const ORDER_SEED_CITIES = [
   "Dhaka",
   "Chattogram",

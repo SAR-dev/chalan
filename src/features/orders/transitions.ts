@@ -11,7 +11,12 @@ import {
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
-import { codCollectedAmount } from "@/lib/balance-ledger"
+import {
+  cancellationChargeAmount,
+  codCollectedAmount,
+  orderChargeReversalAmount,
+  toPaisa,
+} from "@/lib/balance-ledger"
 import { db } from "@/lib/db"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
 import {
@@ -599,6 +604,61 @@ export async function applyOrderTransition(
             updatedAt: new Date().toISOString(),
           },
         })
+    }
+
+    // A returned order refunds the creation charge and charges the zone-pair
+    // cancellation fee instead. Net: the merchant's obligation becomes just the
+    // cancellation fee — they get `deliveryFee + codFee - cancellationFee` back.
+    // The ORDER_CHARGE reversal is a negative row of the same type (the mirror
+    // of creation); the fee itself is a distinct ORDER_CANCELLATION row.
+    if (name === "return") {
+      const reversal = orderChargeReversalAmount(
+        updated.deliveryFee,
+        updated.codFee,
+      )
+      const cancellation = cancellationChargeAmount(updated.cancellationFee)
+
+      if (reversal !== 0) {
+        await tx.insert(balanceTransaction).values({
+          merchantId: updated.merchantId,
+          type: "ORDER_CHARGE",
+          amount: reversal,
+          status: "SETTLED",
+          note: `Order ${updated.id} returned — delivery & COD fees refunded`,
+          orderId: updated.id,
+          createdBy: me.name,
+        })
+      }
+
+      if (cancellation !== 0) {
+        await tx.insert(balanceTransaction).values({
+          merchantId: updated.merchantId,
+          type: "ORDER_CANCELLATION",
+          amount: cancellation,
+          status: "SETTLED",
+          note: `Order ${updated.id} returned — cancellation fee`,
+          orderId: updated.id,
+          createdBy: me.name,
+        })
+      }
+
+      const net = toPaisa(reversal + cancellation)
+      if (net !== 0) {
+        await tx
+          .insert(merchantBalance)
+          .values({
+            id: createId(),
+            merchantId: updated.merchantId,
+            balance: net,
+          })
+          .onConflictDoUpdate({
+            target: merchantBalance.merchantId,
+            set: {
+              balance: sql`${merchantBalance.balance} + ${net}`,
+              updatedAt: new Date().toISOString(),
+            },
+          })
+      }
     }
 
     // Audit and status history commit with the change they describe

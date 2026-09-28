@@ -306,6 +306,14 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                   { label: "COD amount", amount: order.productCost },
                   { label: "Delivery fee", amount: order.deliveryFee },
                   { label: "COD fee", amount: order.codFee },
+                  ...(order.status === "RETURNED"
+                    ? [
+                        {
+                          label: "Cancellation fee",
+                          amount: order.cancellationFee,
+                        },
+                      ]
+                    : []),
                 ].map(({ label, amount }) => (
                   <div
                     key={label}
@@ -328,6 +336,12 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                 <p className="text-muted-foreground mt-3 text-xs">
                   Collected: {order.amountCollected} {CURRENCY_SUFFIX}
                   {order.codSettledAt ? " · COD settled" : ""}
+                </p>
+              )}
+              {order.status === "RETURNED" && (
+                <p className="text-muted-foreground mt-3 text-xs">
+                  Returned — delivery and COD fees refunded; only the
+                  cancellation fee applies.
                 </p>
               )}
             </Section>

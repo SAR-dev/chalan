@@ -810,6 +810,38 @@ describe("PATCH /orders/:id/return", () => {
     })
     expect(payload?.failedResolvedAt).toBe(payload?.returnedAt)
   })
+
+  it("refunds the creation fees and charges the cancellation fee", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "FAILED_ATTEMPT", warehouseId: "wh_1" })],
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "RETURNED",
+        deliveryFee: 60,
+        codFee: 5,
+        cancellationFee: 20,
+      }),
+    ]
+    const { status } = await call(returnRoute, { reason: "unreachable" })
+    expect(status).toBe(200)
+
+    // Creation charge reversed (negative ORDER_CHARGE): -(60 + 5).
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE"),
+    ).toMatchObject({ amount: -65, status: "SETTLED" })
+
+    // Cancellation fee charged instead.
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CANCELLATION"),
+    ).toMatchObject({ amount: 20, status: "SETTLED" })
+
+    // Merchant balance moves by the net: -65 + 20 = -45.
+    expect(dbState.insertPayloads.find((p) => "balance" in p)).toMatchObject({
+      balance: -45,
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------

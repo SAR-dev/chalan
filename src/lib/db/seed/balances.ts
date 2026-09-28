@@ -1,11 +1,17 @@
 import { sql } from "drizzle-orm"
-import { codCollectedAmount, paymentAmount } from "@/lib/balance-ledger"
+import {
+  cancellationChargeAmount,
+  codCollectedAmount,
+  orderChargeReversalAmount,
+  paymentAmount,
+} from "@/lib/balance-ledger"
 import { db } from "@/lib/db"
 import { sumAbsMoney, sumMoney } from "@/lib/db/money-sql"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
 import {
   ADMIN_USER_NAMES,
   MERCHANT_IDS,
+  SEED_CANCELLATION_FEE,
   SEED_ORDERS,
   SEED_PAYOUT_REQUESTS,
 } from "@/lib/db/seed/seed-content"
@@ -58,6 +64,37 @@ export async function seedBalances() {
     await db.insert(balanceTransaction).values(batch)
   }
   log(`  created ${deliveredOrders.length} ORDER_EARNINGS transactions`)
+
+  // 1c. Returned orders: refund the creation charge and charge the cancellation
+  //     fee, mirroring the return transition — net obligation is the fee only.
+  const returnedOrders = SEED_ORDERS.filter((o) => o.status === "RETURNED")
+  if (returnedOrders.length > 0) {
+    log("  creating return refund + cancellation transactions…")
+    const rows = returnedOrders.flatMap((o) => [
+      {
+        id: `BTR-${o.id}`,
+        merchantId: o.merchantId,
+        type: "ORDER_CHARGE" as const,
+        amount: orderChargeReversalAmount(o.deliveryFee, o.codFee),
+        status: "SETTLED" as const,
+        note: `Order ${o.id} returned — delivery & COD fees refunded`,
+        orderId: o.id,
+        createdBy: "system",
+      },
+      {
+        id: `BTC-${o.id}`,
+        merchantId: o.merchantId,
+        type: "ORDER_CANCELLATION" as const,
+        amount: cancellationChargeAmount(SEED_CANCELLATION_FEE),
+        status: "SETTLED" as const,
+        note: `Order ${o.id} returned — cancellation fee`,
+        orderId: o.id,
+        createdBy: "system",
+      },
+    ])
+    await db.insert(balanceTransaction).values(rows)
+    log(`  created return transactions for ${returnedOrders.length} orders`)
+  }
 
   // 2. A confirmed merchant → platform payment (money the merchant paid in).
   //    PAYMENT_* rows are merchant payments; payouts are their own PAYOUT rows.

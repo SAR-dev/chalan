@@ -22,6 +22,13 @@
       "when": 1790566120214,
       "tag": "0002_married_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790599633077,
+      "tag": "0003_right_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

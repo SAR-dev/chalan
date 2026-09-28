@@ -56,6 +56,7 @@ export const nav = {
 export const pricing = {
   pageHeading: "[data-testid='pricing-heading']",
   table: "[data-testid='pricing-table']",
+  cancellationTable: "[data-testid='cancellation-fee-table']",
   navLink: "[data-testid='nav-pricing']",
   rateCardLink: "[data-testid='rate-card-link']",
 }

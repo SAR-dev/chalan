@@ -14,6 +14,7 @@ export interface ZonePricingEstimate {
   freeWeightKg: number
   maxWeightKg: number
   codFeePercentage: number
+  cancellationFee: number
 }
 
 export function useZonePricingPublic() {

@@ -70,6 +70,7 @@ export default function DashboardSettingsPage() {
   const [extraRatePerKg, setExtraRatePerKg] = useState("0")
   const [freeWeightKg, setFreeWeightKg] = useState("1")
   const [maxWeightKg, setMaxWeightKg] = useState("3")
+  const [cancellationFee, setCancellationFee] = useState("0")
   const [saving, setSaving] = useState(false)
 
   // Mail config state
@@ -89,6 +90,7 @@ export default function DashboardSettingsPage() {
     setExtraRatePerKg(String(config.defaultExtraRatePerKg ?? 0))
     setFreeWeightKg(String(config.defaultFreeWeightKg ?? 1))
     setMaxWeightKg(String(config.defaultMaxWeightKg ?? 3))
+    setCancellationFee(String(config.defaultCancellationFee ?? 0))
   }, [config])
 
   async function loadMailConfigs() {
@@ -113,6 +115,7 @@ export default function DashboardSettingsPage() {
       defaultExtraRatePerKg: Number(extraRatePerKg) || 0,
       defaultFreeWeightKg: Number(freeWeightKg) || 0,
       defaultMaxWeightKg: Number(maxWeightKg) || 3,
+      defaultCancellationFee: Number(cancellationFee) || 0,
     }
     if (parsed.defaultMaxWeightKg <= 0) {
       toast.error("Max weight must be greater than 0.")
@@ -318,7 +321,7 @@ export default function DashboardSettingsPage() {
             not affected.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-4">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="flex flex-col gap-2">
             <Label htmlFor="base-rate">Base rate (TK)</Label>
             <Input
@@ -361,6 +364,17 @@ export default function DashboardSettingsPage() {
               step="0.1"
               value={maxWeightKg}
               onChange={(e) => setMaxWeightKg(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="cancellation-fee">Cancellation fee (TK)</Label>
+            <Input
+              id="cancellation-fee"
+              type="number"
+              min="0"
+              step="1"
+              value={cancellationFee}
+              onChange={(e) => setCancellationFee(e.target.value)}
             />
           </div>
         </CardContent>

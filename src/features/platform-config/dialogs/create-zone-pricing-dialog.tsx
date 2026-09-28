@@ -31,6 +31,7 @@ export function CreateZonePricingDialog({
   const [freeWeightKg, setFreeWeightKg] = useState("1")
   const [maxWeightKg, setMaxWeightKg] = useState("10")
   const [codFeePercentage, setCodFeePercentage] = useState("1")
+  const [cancellationFee, setCancellationFee] = useState("0")
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit() {
@@ -52,6 +53,7 @@ export function CreateZonePricingDialog({
         freeWeightKg: Number(freeWeightKg),
         maxWeightKg: Number(maxWeightKg),
         codFeePercentage: Number(codFeePercentage),
+        cancellationFee: Number(cancellationFee),
       })
       if (result.ok) {
         toast.success("Pricing saved.")
@@ -62,6 +64,7 @@ export function CreateZonePricingDialog({
         setFreeWeightKg("1")
         setMaxWeightKg("10")
         setCodFeePercentage("1")
+        setCancellationFee("0")
         onOpenChange(false)
       } else {
         toast.error(result.error ?? "Could not save pricing.")
@@ -171,6 +174,17 @@ export function CreateZonePricingDialog({
             step="0.1"
             value={codFeePercentage}
             onChange={(e) => setCodFeePercentage(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="cancellation-fee">Cancellation fee</Label>
+          <Input
+            id="cancellation-fee"
+            type="number"
+            min="0"
+            step="0.01"
+            value={cancellationFee}
+            onChange={(e) => setCancellationFee(e.target.value)}
           />
         </div>
       </div>

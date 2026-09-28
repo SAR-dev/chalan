@@ -219,6 +219,9 @@ export const platformConfig = pgTable("platform_config", {
   defaultMaxWeightKg: doublePrecision("defaultMaxWeightKg")
     .notNull()
     .default(3),
+  // Fallback cancellation fee used when no zone-pair row is configured; the
+  // order snapshots the resolved value at creation (see `order.cancellationFee`).
+  defaultCancellationFee: money("defaultCancellationFee").notNull().default(0),
   updatedAt: ts("updatedAt").notNull().defaultNow(),
 })
 

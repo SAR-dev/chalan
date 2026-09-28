@@ -32,6 +32,7 @@ import {
   order,
   orderStatuses,
   pickupLocation,
+  platformConfig,
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
@@ -297,6 +298,10 @@ export const POST = withErrorHandler(async (req: Request) => {
     codFeePercentage?: number | null
   }
   let pricing: PricingInput = merchantRow
+  // Cancellation fee is resolved alongside the delivery fee: the zone-pair row
+  // wins, otherwise the platform default applies. Snapshotted on the order so a
+  // later return is priced at creation time, not at return time.
+  let cancellationFee: number | null = null
   if (origCity?.zoneId && destCity?.zoneId) {
     // At most one row per (fromZone, toZone) — `zone_pricing_pair_uniq`
     // (ROADMAP P1.1), so this pick is deterministic. The limit is kept as a
@@ -313,7 +318,15 @@ export const POST = withErrorHandler(async (req: Request) => {
       .limit(1)
     if (zonePrice) {
       pricing = zonePrice
+      cancellationFee = toPaisa(zonePrice.cancellationFee)
     }
+  }
+  if (cancellationFee === null) {
+    const [config] = await dbRead
+      .select({ fee: platformConfig.defaultCancellationFee })
+      .from(platformConfig)
+      .limit(1)
+    cancellationFee = toPaisa(config?.fee ?? 0)
   }
 
   const { total: deliveryFee } = calcDeliveryCharge(pricing, parcelWeightKg)
@@ -345,6 +358,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         productCost,
         deliveryFee,
         codFee,
+        cancellationFee,
         merchantEarnings,
         status: "PENDING",
         deliveryAttempts: 0,
@@ -364,6 +378,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         productCost: order.productCost,
         deliveryFee: order.deliveryFee,
         codFee: order.codFee,
+        cancellationFee: order.cancellationFee,
         merchantEarnings: order.merchantEarnings,
         status: order.status,
         merchantNote: order.merchantNote,

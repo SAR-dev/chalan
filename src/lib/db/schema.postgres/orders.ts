@@ -101,6 +101,9 @@ export const order = pgTable(
     productCost: money("productCost").notNull(),
     deliveryFee: money("deliveryFee").notNull(),
     codFee: money("codFee").notNull().default(0),
+    // Snapshot of the zone-pair cancellation fee at creation. Charged (and the
+    // delivery/COD fees refunded) if the parcel is returned to the merchant.
+    cancellationFee: money("cancellationFee").notNull().default(0),
     merchantEarnings: money("merchantEarnings").notNull().default(0),
 
     status: text("status", { enum: orderStatuses })

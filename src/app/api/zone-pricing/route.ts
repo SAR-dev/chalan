@@ -15,6 +15,7 @@ export const GET = withErrorHandler(async () => {
       freeWeightKg: zonePricing.freeWeightKg,
       maxWeightKg: zonePricing.maxWeightKg,
       codFeePercentage: zonePricing.codFeePercentage,
+      cancellationFee: zonePricing.cancellationFee,
     })
     .from(zonePricing)
     .orderBy(asc(zonePricing.fromZoneId), asc(zonePricing.toZoneId))

@@ -100,6 +100,16 @@ export async function seedZonePricing() {
     return
   }
 
-  await db.insert(zonePricing).values(PRICING_MATRIX)
+  // Cancellation fee charged (instead of the delivery fee) when an order on
+  // the pair is returned to the merchant. Uniform in the seed; admins tune it
+  // per city-pair from the platform settings page.
+  const CANCELLATION_FEE = 20
+
+  await db.insert(zonePricing).values(
+    PRICING_MATRIX.map((row) => ({
+      ...row,
+      cancellationFee: CANCELLATION_FEE,
+    })),
+  )
   log(`  created ${PRICING_MATRIX.length} zone pricing rows`)
 }

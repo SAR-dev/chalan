@@ -81,6 +81,10 @@ export const zonePricing = pgTable(
     freeWeightKg: doublePrecision("freeWeightKg").notNull().default(1),
     maxWeightKg: doublePrecision("maxWeightKg").notNull().default(10),
     codFeePercentage: doublePrecision("codFeePercentage").notNull().default(1),
+    // Charged (instead of the delivery fee) when an order on this zone pair is
+    // returned to the merchant; the creation fee is refunded (see return
+    // transition). Configured per city-pair alongside the delivery rates.
+    cancellationFee: money("cancellationFee").notNull().default(0),
     createdAt: ts("createdAt").notNull().defaultNow(),
     updatedAt: ts("updatedAt").notNull().defaultNow(),
   },
