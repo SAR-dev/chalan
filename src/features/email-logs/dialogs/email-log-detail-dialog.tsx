@@ -38,12 +38,11 @@ export function EmailLogDetailDialog({
   open,
   onOpenChange,
 }: EmailLogDetailDialogProps) {
-  // The list rows omit the HTML/plain-text bodies (they are the bulk of the
-  // payload), so the preview is fetched here when the dialog opens.
+  // The list rows omit the plain-text body (it is the bulk of the payload),
+  // so the preview is fetched here when the dialog opens.
   const { log: detail, isLoading: detailLoading } = useEmailLog(
     open ? (log?.id ?? null) : null,
   )
-  const body = detail?.body
   const textBody = detail?.textBody
 
   if (!log) return null
@@ -111,22 +110,6 @@ export function EmailLogDetailDialog({
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
           <span>Loading email preview…</span>
-        </div>
-      ) : null}
-
-      {body ? (
-        <div className="flex flex-col gap-2">
-          <span className="text-muted-foreground text-xs font-medium uppercase">
-            Email preview
-          </span>
-          <div className="bg-muted border-input max-h-80 overflow-y-auto rounded-md border">
-            <iframe
-              srcDoc={body}
-              title="Email preview"
-              sandbox="allow-same-origin"
-              className="h-80 w-full border-0"
-            />
-          </div>
         </div>
       ) : null}
 

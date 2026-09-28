@@ -1,6 +1,6 @@
 "use client"
 
-import { Loader2 } from "lucide-react"
+import { Loader2, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -31,7 +31,9 @@ interface CreateMailConfigDialogProps {
   form: MailConfigForm
   onFormChange: (form: MailConfigForm) => void
   onSubmit: () => void
+  onTest: () => void
   saving?: boolean
+  testing?: boolean
 }
 
 export function CreateMailConfigDialog({
@@ -40,15 +42,21 @@ export function CreateMailConfigDialog({
   form,
   onFormChange,
   onSubmit,
+  onTest,
   saving,
+  testing,
 }: CreateMailConfigDialogProps) {
+  const testDisabled =
+    testing || !form.host || !form.user || !form.pass || !form.fromEmail
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Mail Config</DialogTitle>
           <DialogDescription>
-            Add a new SMTP configuration. You can activate it later.
+            Add a new SMTP configuration. You can activate it later. Use Send
+            test email to verify the credentials above before saving.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
@@ -134,10 +142,29 @@ export function CreateMailConfigDialog({
           </div>
         </div>
         <DialogFooter>
+          <Button
+            data-testid="mail-config-send-test"
+            variant="outline"
+            onClick={onTest}
+            disabled={testDisabled}
+          >
+            {testing ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Sending…
+              </>
+            ) : (
+              <>
+                <Send className="size-4" />
+                Send test email
+              </>
+            )}
+          </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
+            data-testid="mail-config-create"
             onClick={onSubmit}
             disabled={
               saving ||

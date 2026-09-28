@@ -4,6 +4,7 @@ import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import {
+  activated,
   activation,
   dialog,
   merchantQuota,
@@ -165,7 +166,10 @@ async function activateFromEmail(page: Page, email: string, password: string) {
   await page.locator(activation.password).fill(password)
   await page.locator(activation.confirm).fill(password)
   await page.locator(activation.submit).click()
-  await page.waitForURL(/\/login\?success=activated/, { timeout: 15_000 })
+  // Activation signs the visitor out of whatever session they had and lands on
+  // the /activated welcome page — not straight on /login.
+  await page.waitForURL(/\/activated$/, { timeout: 15_000 })
+  await expect(page.locator(activated.title)).toBeVisible()
 }
 
 // S41. Merchant moderator accounts
@@ -231,7 +235,13 @@ test.describe("S41. Merchant moderator accounts", () => {
   }) => {
     const modEmail = await latestPendingModeratorEmail()
     await activateFromEmail(page, modEmail, MOD_PASSWORD2)
-    await expect(page.getByText(/account is activated/i)).toBeVisible()
+    // The owner was still signed in when the invitee activated: that session
+    // must be gone, so an app URL bounces to /login.
+    await page.goto("/merchant/orders")
+    await page.waitForURL(/\/login/, { timeout: 15_000 })
+    // Drop the ?next= the redirect added so the sign-in below lands on the
+    // moderator's own home page.
+    await page.goto("/login")
 
     // Sign in with the password they chose on activation.
     await login(page, { email: modEmail, password: MOD_PASSWORD2 })
@@ -332,7 +342,12 @@ test.describe("S42. Warehouse admin activation", () => {
 
     // Invitee activates from the (latest) email and signs in.
     await activateFromEmail(page, WA_EMAIL, WA_PASSWORD2)
-    await expect(page.getByText(/account is activated/i)).toBeVisible()
+    // The super admin who created the invite was signed in during activation —
+    // activation must have signed them out too.
+    await expect(page.locator(activated.message)).toBeVisible()
+    await page.goto("/dashboard")
+    await page.waitForURL(/\/login/, { timeout: 15_000 })
+    await page.goto("/login")
     await login(page, { email: WA_EMAIL, password: WA_PASSWORD2 })
     await page.waitForURL(/\/warehouse/, { timeout: 15_000 })
     await expect(

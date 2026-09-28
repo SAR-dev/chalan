@@ -38,6 +38,11 @@ export default defineConfig({
       AUTH_RATE_LIMIT_DISABLED: "1",
       // One trusted proxy hop (see use.extraHTTPHeaders).
       TRUSTED_PROXY_HOPS: "1",
+      // No SMTP in e2e, so nothing is actually delivered — the specs read the
+      // activation/verification links out of `email_log` instead. Log the
+      // (redacted) body too, so a failing run shows the mail in the server
+      // console and you can follow a link by hand.
+      LOG_EMAIL_BODY: "1",
     },
   },
 })

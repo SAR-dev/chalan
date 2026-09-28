@@ -219,12 +219,19 @@ describe("DELETE /api/admin/delivery-cities/[id]", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/delivery-cities", () => {
-  it("401 when unauthenticated", async () => {
+  it("returns active cities without a session (public)", async () => {
+    selectQueue.push([
+      { id: "c1", name: "Dhaka", zoneId: "z_1" },
+      { id: "c2", name: "Chittagong", zoneId: "z_2" },
+    ])
     const res = await listActiveCities()
-    expect(res.status).toBe(401)
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toHaveLength(2)
+    expect(json[0]).toMatchObject({ id: "c1", zoneId: "z_1" })
   })
 
-  it("returns active cities for any user", async () => {
+  it("returns active cities for signed-in users too", async () => {
     sessionState.value = merchantSession
     selectQueue.push([
       { id: "c1", name: "Dhaka" },

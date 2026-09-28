@@ -1,11 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockSendMail = vi.fn()
+const mockCreateTransport = vi.fn()
 const insertCalls: { table: string; values: Record<string, unknown> }[] = []
+
+// Config returned by the mocked `getSmtpConfig` DB read. Tests mutate `.pass`
+// to prove the cached transporter is invalidated on a credential change.
+const smtpState = vi.hoisted(() => ({
+  rows: [
+    {
+      host: "smtp.test.com",
+      port: "587",
+      secure: false,
+      user: "user",
+      pass: "pass",
+      fromEmail: "test@test.com",
+      fromName: "Test",
+    },
+  ],
+}))
 
 vi.mock("nodemailer", () => ({
   default: {
-    createTransport: () => ({ sendMail: mockSendMail }),
+    createTransport: mockCreateTransport.mockImplementation(() => ({
+      sendMail: mockSendMail,
+    })),
   },
 }))
 
@@ -24,18 +43,7 @@ vi.mock("@/lib/db", () => ({
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: () =>
-            Promise.resolve([
-              {
-                host: "smtp.test.com",
-                port: 587,
-                secure: false,
-                user: "user",
-                pass: "pass",
-                fromEmail: "test@test.com",
-                fromName: "Test",
-              },
-            ]),
+          limit: () => Promise.resolve(smtpState.rows),
         }),
       }),
     }),
@@ -50,8 +58,22 @@ vi.mock("@/lib/db/schema", () => ({
 describe("sendMail", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Fresh module state per test: the mailer caches its transporter in a
+    // module-level variable, so the cache-invalidation test needs isolation.
+    vi.resetModules()
     insertCalls.length = 0
     delete process.env.LOG_EMAIL_BODY
+    smtpState.rows = [
+      {
+        host: "smtp.test.com",
+        port: "587",
+        secure: false,
+        user: "user",
+        pass: "pass",
+        fromEmail: "test@test.com",
+        fromName: "Test",
+      },
+    ]
   })
 
   it("skips send when MAIL_DISABLED=1", async () => {
@@ -69,32 +91,72 @@ describe("sendMail", () => {
     expect(mockSendMail).toHaveBeenCalledTimes(1)
     const sent = insertCalls.find((c) => c.table === "email_log")
     expect(sent).toBeDefined()
-    expect(sent!.values).toMatchObject({ status: "SENT", to: "a@b.com" })
+    expect(sent!.values).toMatchObject({
+      status: "SENT",
+      to: "a@b.com",
+      attempts: 1,
+    })
   })
 
-  it("exhausts retries, logs FAILED email_log, then throws", async () => {
+  it("does not store an HTML body in email_log", async () => {
+    mockSendMail.mockResolvedValueOnce({ messageId: "123" })
+    const { sendMail } = await import("@/lib/mailer")
+    await sendMail({ to: "a@b.com", subject: "Hi", html: "<b>Hi</b>" })
+    const sent = insertCalls.find((c) => c.table === "email_log")
+    expect(sent!.values).not.toHaveProperty("body")
+    expect(sent!.values.textBody).toBe("Hi")
+  })
+
+  it("fails on a single attempt, logs FAILED email_log, then throws", async () => {
     mockSendMail.mockRejectedValue(new Error("SMTP error"))
     const { sendMail } = await import("@/lib/mailer")
     await expect(
       sendMail({ to: "fail@test.com", subject: "Fail", text: "..." }),
     ).rejects.toThrow("SMTP error")
-    expect(mockSendMail).toHaveBeenCalledTimes(3)
+    expect(mockSendMail).toHaveBeenCalledTimes(1)
     const failedLog = insertCalls.find((c) => c.table === "email_log")
     expect(failedLog?.values).toMatchObject({
       status: "FAILED",
       to: "fail@test.com",
+      attempts: 1,
     })
   })
 
-  it("succeeds on retry", async () => {
-    mockSendMail
-      .mockRejectedValueOnce(new Error("Temp error"))
-      .mockResolvedValueOnce({ messageId: "456" })
+  it("keeps the sender's configured from header", async () => {
+    mockSendMail.mockResolvedValueOnce({ messageId: "123" })
     const { sendMail } = await import("@/lib/mailer")
-    await sendMail({ to: "retry@test.com", subject: "Retry", text: "..." })
-    expect(mockSendMail).toHaveBeenCalledTimes(2)
-    const sent = insertCalls.find((c) => c.table === "email_log")
-    expect(sent?.values).toMatchObject({ status: "SENT", to: "retry@test.com" })
+    await sendMail({ to: "a@b.com", subject: "Hi", html: "<b>Hi</b>" })
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ from: '"Test" <test@test.com>' }),
+    )
+  })
+
+  it("recreates the transporter when the SMTP password changes", async () => {
+    mockSendMail.mockResolvedValue({ messageId: "123" })
+    const { sendMail } = await import("@/lib/mailer")
+    await sendMail({ to: "a@b.com", subject: "Hi", text: "Hi" })
+    expect(mockCreateTransport).toHaveBeenCalledTimes(1)
+
+    // Delete + recreate with the same host/port/user but a corrected password
+    // must NOT reuse the old (password-cached) transporter.
+    smtpState.rows = [
+      {
+        host: "smtp.test.com",
+        port: "587",
+        secure: false,
+        user: "user",
+        pass: "corrected-pass",
+        fromEmail: "test@test.com",
+        fromName: "Test",
+      },
+    ]
+    await sendMail({ to: "b@c.com", subject: "Hi", text: "Hi" })
+    expect(mockCreateTransport).toHaveBeenCalledTimes(2)
+    expect(mockCreateTransport).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        auth: { user: "user", pass: "corrected-pass" },
+      }),
+    )
   })
 
   // ROADMAP P0.7 — a live token in stdout is a live token in the log
@@ -177,5 +239,62 @@ describe("sendMail", () => {
     const body = sent?.values.textBody as string
     expect(body.length).toBeLessThan(5_000)
     expect(body).toContain("[truncated 3000 chars]")
+  })
+})
+
+describe("sendTestMail", () => {
+  const testConfig = {
+    host: "smtp.test.com",
+    port: "465",
+    secure: true,
+    user: "test-user",
+    pass: "test-pass",
+    fromEmail: "no-reply@test.com",
+    fromName: "Chalan Test",
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    vi.resetModules()
+    insertCalls.length = 0
+  })
+
+  it("builds a transporter from the given config and sends a test email", async () => {
+    mockSendMail.mockResolvedValueOnce({ messageId: "test-1" })
+    const { sendTestMail } = await import("@/lib/mailer")
+    const result = await sendTestMail(testConfig, "admin@test.com")
+    expect(result).toEqual({ messageId: "test-1" })
+    expect(mockCreateTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: "smtp.test.com",
+        port: 465,
+        secure: true,
+        auth: { user: "test-user", pass: "test-pass" },
+      }),
+    )
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: '"Chalan Test" <no-reply@test.com>',
+        to: "admin@test.com",
+        subject: "SMTP configuration test",
+      }),
+    )
+  })
+
+  it("does not write an email_log row (pre-save diagnostic)", async () => {
+    mockSendMail.mockResolvedValueOnce({ messageId: "test-2" })
+    const { sendTestMail } = await import("@/lib/mailer")
+    await sendTestMail(testConfig, "admin@test.com")
+    expect(insertCalls).toHaveLength(0)
+  })
+
+  it("propagates SMTP failures so the caller can surface them", async () => {
+    mockSendMail.mockRejectedValue(
+      new Error("Invalid login: 535 5.7.8 Username and Password not accepted"),
+    )
+    const { sendTestMail } = await import("@/lib/mailer")
+    await expect(sendTestMail(testConfig, "admin@test.com")).rejects.toThrow(
+      "535 5.7.8 Username and Password not accepted",
+    )
   })
 })

@@ -34,8 +34,10 @@ export async function handlePasswordReset({
     resetUrl,
   })
   // Persist then attempt delivery (ROADMAP P1.5): the row survives a frozen
-  // invocation and is retried by the outbox cron. A failure here must not fail
-  // the auth flow (same posture as the old fire-and-forget send).
+  // invocation and is delivered by the outbox flush/cron. No retries — a send
+  // failure is recorded in `email_log` and the outbox row is marked FAILED
+  // (kept for review). A failure here must not fail the auth flow (same
+  // posture as the old fire-and-forget send).
   try {
     await enqueueEmail({ to: user.email, ...template })
     void flushEmailOutbox()

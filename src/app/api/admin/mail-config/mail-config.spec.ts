@@ -2,6 +2,13 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { PATCH as activateMailConfig } from "./[id]/activate/route"
 import { DELETE as deleteMailConfig } from "./[id]/route"
 import { POST as createMailConfig, GET as listMailConfigs } from "./route"
+import { POST as testMail } from "./test/route"
+
+const { mockSendTestMail } = vi.hoisted(() => ({ mockSendTestMail: vi.fn() }))
+
+vi.mock("@/lib/mailer", () => ({
+  sendTestMail: mockSendTestMail,
+}))
 
 // encryptSecret needs a 64-hex-char AES-256 key; the crypto.ts dev fallback is
 // not a valid 32-byte key, so stub a valid one for every test in this file.
@@ -87,6 +94,7 @@ beforeEach(() => {
   insertResult.length = 0
   insertPayloads.length = 0
   sessionState.value = null
+  mockSendTestMail.mockReset()
 })
 
 function req(method: string, url?: string, body?: unknown): Request {
@@ -128,6 +136,8 @@ const validCreateBody = {
   fromEmail: "no-reply@example.com",
   fromName: "Chalan",
 }
+
+const { label: _label, ...validTestBody } = validCreateBody
 
 describe("GET /api/admin/mail-config", () => {
   it("403 when unauthenticated (route forbids missing session)", async () => {
@@ -236,6 +246,77 @@ describe("POST /api/admin/mail-config", () => {
     const stored = insertPayloads[0].pass as string
     expect(stored).not.toBe("super-secret-pass")
     expect(stored.startsWith("enc:v1:")).toBe(true)
+  })
+})
+
+describe("POST /api/admin/mail-config/test", () => {
+  it("403 when unauthenticated (route forbids missing session)", async () => {
+    const res = await testMail(req("POST", undefined, validTestBody))
+    expect(res.status).toBe(403)
+  })
+
+  it("403 for merchant", async () => {
+    sessionState.value = merchantSession
+    const res = await testMail(req("POST", undefined, validTestBody))
+    expect(res.status).toBe(403)
+  })
+
+  it("400 on invalid body with issues", async () => {
+    sessionState.value = admin
+    const res = await testMail(req("POST", undefined, {}))
+    const json = await res.json()
+    expect(res.status).toBe(400)
+    expect(json.error).toBe("Invalid request body")
+    expect(json.issues).toBeDefined()
+  })
+
+  it("400 on invalid to address", async () => {
+    sessionState.value = admin
+    const res = await testMail(
+      req("POST", undefined, { ...validTestBody, to: "not-an-email" }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it("sends test mail to fromEmail by default, returns ok", async () => {
+    sessionState.value = admin
+    mockSendTestMail.mockResolvedValue({ messageId: "msg_1" })
+    const res = await testMail(req("POST", undefined, validTestBody))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toEqual({ ok: true, messageId: "msg_1" })
+    expect(mockSendTestMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: "smtp.example.com",
+        user: "smtp-user",
+        pass: "super-secret-pass",
+      }),
+      "no-reply@example.com",
+    )
+  })
+
+  it("routes to the provided to address", async () => {
+    sessionState.value = admin
+    mockSendTestMail.mockResolvedValue({ messageId: "msg_2" })
+    const res = await testMail(
+      req("POST", undefined, { ...validTestBody, to: "ops@example.com" }),
+    )
+    expect(res.status).toBe(200)
+    expect(mockSendTestMail).toHaveBeenCalledWith(
+      expect.anything(),
+      "ops@example.com",
+    )
+  })
+
+  it("surfaces the SMTP auth error verbatim as a 400", async () => {
+    sessionState.value = admin
+    mockSendTestMail.mockRejectedValue(
+      new Error("Invalid login: 535 5.7.8 Username and Password not accepted"),
+    )
+    const res = await testMail(req("POST", undefined, validTestBody))
+    const json = await res.json()
+    expect(res.status).toBe(400)
+    expect(json.error).toContain("535 5.7.8 Username and Password not accepted")
   })
 })
 

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { headers } from "next/headers"
 import NextTopLoader from "nextjs-toploader"
+import { DevModeBanner } from "@/components/dev-mode-banner"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
 import { SkipToContent } from "@/components/skip-to-content"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -88,6 +89,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-background font-sans antialiased">
+        <DevModeBanner />
         <SkipToContent />
         {/* No nonce here on purpose: nextjs-toploader renders <style nonce> without
             suppressHydrationWarning, and React doesn't expose the nonce to the

@@ -47,9 +47,13 @@ const rider = {
 }
 
 describe("GET /api/zone-pricing", () => {
-  it("401 when unauthenticated", async () => {
+  it("returns zone pricing without a session (public)", async () => {
+    selectQueue.push([{ id: "zp_1", fromZoneId: "z_a", toZoneId: "z_b" }])
     const res = await listZonePricing()
-    expect(res.status).toBe(401)
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toHaveLength(1)
+    expect(json[0]).toMatchObject({ fromZoneId: "z_a", toZoneId: "z_b" })
   })
 
   it("returns zone pricing rows for admin", async () => {

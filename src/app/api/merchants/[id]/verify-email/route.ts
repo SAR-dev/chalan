@@ -5,6 +5,10 @@ import { badRequest, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { logger } from "@/lib/logger"
+import {
+  hasActiveMailConfig,
+  MAIL_NOT_CONFIGURED_MESSAGE,
+} from "@/lib/mail-config"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
@@ -43,6 +47,10 @@ export const POST = withErrorHandler(
       return badRequest("Email is already verified")
     }
 
+    if (!(await hasActiveMailConfig())) {
+      return badRequest(MAIL_NOT_CONFIGURED_MESSAGE)
+    }
+
     // Only the hash is stored (ROADMAP P0.7); the raw token lives in the email.
     const { raw: token, hash, expiresAt } = issueVerifyToken()
 
@@ -63,22 +71,10 @@ export const POST = withErrorHandler(
       verificationUrl,
     })
 
-    sendMail(
-      {
-        to: current.email,
-        ...template,
-      },
-      {
-        maxRetries: 3,
-        baseDelayMs: 1000,
-        onRetry: (attempt, err) =>
-          logger.warn("Verification email retry", {
-            attempt,
-            to: current.email,
-            err,
-          }),
-      },
-    ).catch((err) => logger.error("Verification email failed", { err }))
+    sendMail({
+      to: current.email,
+      ...template,
+    }).catch((err) => logger.error("Verification email failed", { err }))
 
     return NextResponse.json({ success: true })
   },

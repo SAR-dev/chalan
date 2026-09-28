@@ -52,7 +52,10 @@ vi.mock("@/lib/db", () => {
   }
 })
 
-vi.mock("@/lib/mailer", () => ({ sendMail: vi.fn(async () => {}) }))
+vi.mock("@/lib/mailer", () => ({
+  sendMail: vi.fn(async () => {}),
+  toPlainText: (html: string) => html.replace(/<[^>]+>/g, ""),
+}))
 
 beforeEach(() => {
   dbState.claimed.length = 0
@@ -64,7 +67,7 @@ beforeEach(() => {
 })
 
 describe("enqueueEmail", () => {
-  it("stores the email as a PENDING row", async () => {
+  it("stores the plain-text version of the email as a PENDING row", async () => {
     await enqueueEmail({
       to: "a@b.com",
       subject: "Hi",
@@ -73,8 +76,28 @@ describe("enqueueEmail", () => {
     expect(dbState.enqueued[0]).toMatchObject({
       to: "a@b.com",
       subject: "Hi",
-      html: "<b>Hi</b>",
+      text: "Hi",
     })
+  })
+
+  it("does not persist the HTML body", async () => {
+    await enqueueEmail({
+      to: "a@b.com",
+      subject: "Hi",
+      html: "<b>Hi</b>",
+      text: "Hi",
+    })
+    expect(dbState.enqueued[0]).not.toHaveProperty("html")
+  })
+
+  it("stores the explicit text version when provided", async () => {
+    await enqueueEmail({
+      to: "a@b.com",
+      subject: "Hi",
+      html: "<p>HTML</p>",
+      text: "Plain text",
+    })
+    expect(dbState.enqueued[0].text).toBe("Plain text")
   })
 
   it("joins multiple recipients", async () => {
@@ -89,51 +112,51 @@ describe("drainEmailOutbox", () => {
       id: "ob_1",
       to: "a@b.com",
       subject: "Hi",
-      html: null,
       text: "Hi",
       attempts: 0,
     })
     const result = await drainEmailOutbox()
-    expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: "a@b.com", subject: "Hi" }),
-      { maxRetries: 0 },
-    )
+    expect(sendMail).toHaveBeenCalledWith({
+      to: "a@b.com",
+      subject: "Hi",
+      text: "Hi",
+    })
     expect(dbState.deletes).toBe(1)
-    expect(result).toEqual({ claimed: 1, sent: 1, failed: 0, requeued: 0 })
+    expect(result).toEqual({ claimed: 1, sent: 1, failed: 0 })
   })
 
-  it("requeues with backoff when the send fails", async () => {
+  it("marks FAILED and keeps the row when the send fails (no retry)", async () => {
     dbState.claimed.push({
       id: "ob_2",
       to: "a@b.com",
       subject: "Hi",
-      html: null,
       text: null,
       attempts: 0,
     })
     vi.mocked(sendMail).mockRejectedValueOnce(new Error("smtp down"))
     const result = await drainEmailOutbox()
-    expect(result).toEqual({ claimed: 1, sent: 0, failed: 0, requeued: 1 })
+    expect(result).toEqual({ claimed: 1, sent: 0, failed: 1 })
     expect(dbState.updates).toContainEqual(
-      expect.objectContaining({ status: "PENDING", attempts: 1 }),
+      expect.objectContaining({ status: "FAILED", attempts: 1 }),
     )
+    expect(dbState.deletes).toBe(0)
   })
 
-  it("marks FAILED after the final attempt", async () => {
+  it("records the error message on the FAILED row", async () => {
     dbState.claimed.push({
       id: "ob_3",
       to: "a@b.com",
       subject: "Hi",
-      html: null,
       text: null,
-      attempts: 4,
+      attempts: 2,
     })
-    vi.mocked(sendMail).mockRejectedValueOnce(new Error("smtp down"))
-    const result = await drainEmailOutbox()
-    expect(result).toEqual({ claimed: 1, sent: 0, failed: 1, requeued: 0 })
-    expect(dbState.updates).toContainEqual(
-      expect.objectContaining({ status: "FAILED", attempts: 5 }),
+    vi.mocked(sendMail).mockRejectedValueOnce(
+      new Error("Invalid login: 535 5.7.8 Username and Password not accepted"),
     )
+    await drainEmailOutbox()
+    const update = dbState.updates.find((u) => u.status === "FAILED")
+    expect(update?.attempts).toBe(3)
+    expect(update?.lastError).toContain("Username and Password not accepted")
   })
 
   it("recovers stale SENDING rows before claiming", async () => {

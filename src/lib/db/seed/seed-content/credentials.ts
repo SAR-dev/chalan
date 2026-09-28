@@ -15,27 +15,22 @@ export interface SeedUserCredential {
 
 // Shared password for every seeded account (local dev / e2e only).
 //
-// ROADMAP P0.7: this literal used to be the *only* way to get a password, so a
-// production database seeded with `pnpm db:seed:full` came up with four
-// super-admins all on a password published in the README. Set SEED_PASSWORD to
-// override it, and note that both seed entrypoints refuse to run in production
-// while the default is in use.
-const DEFAULT_SEED_PASSWORD = "12qwaszx"
-
-export const SEED_PASSWORD = process.env.SEED_PASSWORD || DEFAULT_SEED_PASSWORD
-
-/** True while the well-known dev/e2e password is still in use. */
-export const USING_DEFAULT_SEED_PASSWORD = !process.env.SEED_PASSWORD
+// There is deliberately no env override. The seed is a development/e2e fixture,
+// and a configurable value meant a production run could quietly come up on
+// either the published password below or an ad-hoc one only the operator knew.
+// Since the value can no longer differ, the seed entrypoints refuse to run in
+// production at all (see assertSeedAllowedInDev).
+export const SEED_PASSWORD = "12qwaszx"
 
 /**
- * Guard for the seed entrypoints: seeding a production database with the
- * published dev password is never acceptable.
+ * Guard for the seed entrypoints: every seeded account lands on the published
+ * development password, so seeding a production database is never acceptable.
  */
-export function assertSeedPasswordAllowed(): void {
-  if (process.env.NODE_ENV === "production" && USING_DEFAULT_SEED_PASSWORD) {
+export function assertSeedAllowedInDev(): void {
+  if (process.env.NODE_ENV === "production") {
     throw new Error(
-      "Refusing to seed with the default password in production. " +
-        "Set SEED_PASSWORD to a strong, unique value before seeding.",
+      "Refusing to seed in production — every seeded account is created with " +
+        "the well-known development password. Seed a development database instead.",
     )
   }
 }

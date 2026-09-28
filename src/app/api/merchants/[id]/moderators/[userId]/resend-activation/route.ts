@@ -11,6 +11,10 @@ import {
 import { db, dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
 import { flushEmailOutbox } from "@/lib/email-outbox"
+import {
+  hasActiveMailConfig,
+  MAIL_NOT_CONFIGURED_MESSAGE,
+} from "@/lib/mail-config"
 import { hasNavPermission } from "@/lib/nav-config"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -53,6 +57,10 @@ export const POST = withErrorHandler(
     if (!target) return notFound("Moderator not found")
     if (target.activatedAt) {
       return badRequest("This account is already activated.")
+    }
+
+    if (!(await hasActiveMailConfig())) {
+      return badRequest(MAIL_NOT_CONFIGURED_MESSAGE)
     }
 
     // Token re-issue + outbox row commit together (ROADMAP P1.5).

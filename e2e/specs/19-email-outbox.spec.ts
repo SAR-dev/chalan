@@ -65,10 +65,11 @@ test.describe("S52. Email outbox", () => {
         }
       })
 
-      // No SMTP in e2e, so the attempt fails and the row is requeued with
-      // backoff — but it was processed, and the delivery record was written.
+      // No SMTP in e2e, so the single attempt fails. The row is marked FAILED
+      // (never retried) but it was processed, and the delivery record was
+      // written — failed mails are kept in the DB.
       expect(after.attempts).toBe(1)
-      expect(after.status).toBe("PENDING")
+      expect(after.status).toBe("FAILED")
       expect(after.logs).toBe(1)
     } finally {
       await withDb(async (client) => {

@@ -51,6 +51,12 @@ const PUBLIC_ALLOWLIST = new Set<string>([
   "orders/[id]/receiver-note/route.ts",
   // Public list of active warehouses for the rider application form.
   "warehouses/public/route.ts",
+  // Public active delivery cities, zones, and the N×N zone-pricing matrix used
+  // by the Delivery Fee Calculator on the public landing page. No session
+  // exists for anonymous visitors making a fee estimate.
+  "delivery-cities/route.ts",
+  "delivery-zones/route.ts",
+  "zone-pricing/route.ts",
 ])
 
 function collectRouteFiles(dir: string): string[] {

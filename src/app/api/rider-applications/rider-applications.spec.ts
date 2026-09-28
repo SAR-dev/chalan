@@ -17,6 +17,7 @@ vi.mock("@/lib/audit", () => ({
 
 vi.mock("@/lib/mailer", () => ({
   sendMail: () => Promise.resolve(),
+  toPlainText: (html: string) => html.replace(/<[^>]+>/g, ""),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({

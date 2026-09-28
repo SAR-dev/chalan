@@ -14,6 +14,12 @@ const state = vi.hoisted(() => ({
   freeSlots: vi.fn(() => 0),
   /** Set to make `lockModeratorQuota` behave as if the merchant vanished. */
   merchantMissing: false,
+  hasActiveMailConfig: vi.fn(async () => true),
+}))
+
+vi.mock("@/lib/mail-config", () => ({
+  hasActiveMailConfig: state.hasActiveMailConfig,
+  MAIL_NOT_CONFIGURED_MESSAGE: "Mail server is not set up yet.",
 }))
 
 vi.mock("@/lib/api-auth", () => ({
@@ -31,7 +37,6 @@ vi.mock("@/lib/email-outbox", () => ({
     claimed: 0,
     sent: 0,
     failed: 0,
-    requeued: 0,
   })),
 }))
 
@@ -183,6 +188,8 @@ beforeEach(() => {
   state.countModeratorSlots.mockResolvedValue(0)
   state.freeSlots.mockClear()
   state.freeSlots.mockReturnValue(1)
+  state.hasActiveMailConfig.mockReset()
+  state.hasActiveMailConfig.mockResolvedValue(true)
   vi.mocked(logAudit).mockClear()
 })
 
@@ -570,6 +577,24 @@ describe("POST .../moderators/:userId/resend-activation", () => {
     ])
     const res = await resendActivation(req("POST"), params())
     expect(res.status).toBe(400)
+  })
+
+  it("400 when no active mail config exists", async () => {
+    state.session = owner
+    state.hasActiveMailConfig.mockResolvedValue(false)
+    dbState.selectQueue.push([
+      {
+        activatedAt: null,
+        name: "Pending Pat",
+        email: "pat@acme.test",
+        businessName: "Acme Corp",
+      },
+    ])
+    const res = await resendActivation(req("POST"), params())
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toContain("Mail server is not set up")
+    expect(state.issueActivationToken).not.toHaveBeenCalled()
   })
 
   it("issues a fresh token and emails it for a pending moderator", async () => {

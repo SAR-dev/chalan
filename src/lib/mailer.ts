@@ -1,4 +1,4 @@
-// Generic SMTP mailer with retry logic and exponential backoff.
+// Generic SMTP mailer.
 //
 // Uses nodemailer under the hood. SMTP config is read from the `mail_config`
 // DB table (managed via Super Admin settings).
@@ -6,9 +6,10 @@
 // Usage:
 //   await sendMail({ to: "x@y.com", subject: "Hi", html: "<b>Hello</b>" })
 //
-// Every fully-resolved send attempt (delivered, or all retries exhausted) is
-// recorded in the `email_log` table — this is the Admin/Super Admin "Email
-// logs" history.
+// A send is attempted exactly once — there is no retry loop. Every attempt is
+// recorded in the `email_log` table (SENT on success, FAILED on failure); this
+// is the Admin/Super Admin "Email logs" history. Failed mails stay in the DB so
+// they can be reviewed or manually re-sent.
 
 import { eq } from "drizzle-orm"
 import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer"
@@ -26,10 +27,15 @@ export interface MailPayload {
   text?: string
 }
 
-export interface SendMailOptions_ {
-  maxRetries?: number // default: 3
-  baseDelayMs?: number // default: 1000 — doubles on each retry
-  onRetry?: (attempt: number, error: Error) => void
+/** SMTP values taken straight from the Add Config form for a pre-save test. */
+export interface TestSmtpConfig {
+  host: string
+  port: string
+  secure: boolean
+  user: string
+  pass: string
+  fromEmail: string
+  fromName: string
 }
 
 interface SmtpConfig {
@@ -42,7 +48,9 @@ interface SmtpConfig {
   fromName: string
 }
 
-// Cached transporter — recreated when DB config changes.
+// Cached transporter — recreated whenever the SMTP identity changes (host,
+// port, secure, user or password), so a config change (including delete +
+// recreate with the same host/port/user) takes effect on the next send.
 let cachedTransporter: Transporter | null = null
 let cachedConfigKey = ""
 
@@ -76,7 +84,7 @@ async function getSmtpConfig(): Promise<SmtpConfig> {
 /** Get or create a transporter for the current config. */
 async function getTransporter(): Promise<Transporter> {
   const config = await getSmtpConfig()
-  const key = `${config.host}:${config.port}:${config.user}`
+  const key = `${config.host}:${config.port}:${config.secure}:${config.user}:${config.pass}`
   if (cachedTransporter && cachedConfigKey === key) {
     return cachedTransporter
   }
@@ -95,12 +103,8 @@ async function getTransporter(): Promise<Transporter> {
   return cachedTransporter
 }
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms))
-}
-
-/** Strip HTML tags and decode common entities for a plain-text fallback. */
-function stripHtml(html: string): string {
+/** Strip HTML tags and decode common entities for a plain-text version. */
+export function toPlainText(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
@@ -117,17 +121,18 @@ function stripHtml(html: string): string {
     .trim()
 }
 
-// Inserts one row into `email_log` for a fully-resolved send attempt
-// (success or exhausted-retries failure). Never throws — logging must not
-// mask the original mail outcome.
+// Inserts one row into `email_log` for a resolved send attempt (success or
+// failure). Never throws — logging must not mask the original mail outcome.
 //
 // ROADMAP P0.7: the row used to store the *entire* HTML body, unbounded. It is
-// now truncated to MAX_LOGGED_BODY characters, which is all the admin Email
-// Logs page needs to show what was sent. Single-use link parameters are kept
+// now truncated to MAX_LOGGED_BODY characters. Only the plain-text version is
+// stored (no HTML) — that is what the admin Email Logs page needs to show what
+// was sent and what a manual re-send uses. Single-use link parameters are kept
 // here on purpose: the table is admin-only, pruned after
-// EMAIL_LOG_RETENTION_DAYS (default 10), and the tokens in it expire in 24h and
-// are consumed on first use — whereas the *console* log (which reaches log
-// aggregators and CI output) is redacted, so no live token is written there.
+// EMAIL_LOG_RETENTION_DAYS (default 10; failed rows are never deleted), and
+// the tokens in it expire in 24h and are consumed on first use — whereas the
+// *console* log (which reaches log aggregators and CI output) is redacted, so
+// no live token is written there.
 const MAX_LOGGED_BODY = 2_000
 
 function boundForLog(value: string, max = MAX_LOGGED_BODY): string {
@@ -144,7 +149,7 @@ async function logEmail(
   try {
     let textBody = payload.text ?? null
     if (!textBody && payload.html) {
-      textBody = stripHtml(payload.html)
+      textBody = toPlainText(payload.html)
     }
     await db.insert(emailLog).values({
       to: Array.isArray(payload.to) ? payload.to.join(", ") : payload.to,
@@ -152,7 +157,6 @@ async function logEmail(
       status,
       attempts,
       error: error ? boundForLog(error, 500) : null,
-      body: payload.html ? boundForLog(payload.html) : null,
       textBody: textBody ? boundForLog(textBody) : null,
     })
   } catch (dbErr) {
@@ -160,16 +164,11 @@ async function logEmail(
   }
 }
 
-export async function sendMail(
-  payload: MailPayload,
-  options: SendMailOptions_ = {},
-): Promise<void> {
-  // Auto-generate plain text from HTML if not provided
+export async function sendMail(payload: MailPayload): Promise<void> {
+  // Auto-generate plain text from HTML if not provided.
   let text = payload.text
   if (payload.html && !text) {
-    if (typeof payload.html === "string") {
-      text = stripHtml(payload.html)
-    }
+    text = toPlainText(payload.html)
   }
 
   // Log the plain-text version for debugging — redacted and truncated, because
@@ -192,10 +191,9 @@ export async function sendMail(
     logger.info("MAIL_DISABLED=1, skipping send", { to: payload.to })
     return
   }
-  const { maxRetries = 2, baseDelayMs = 1000, onRetry } = options
 
-  // A missing/broken SMTP config would otherwise throw before the retry loop
-  // and vanish without an email_log row — log it as a FAILED attempt so the
+  // A missing/broken SMTP config would otherwise throw before the send and
+  // vanish without an email_log row — log it as a FAILED attempt so the
   // admin Email Logs page (and the e2e activation flow) can see the message.
   let config: Awaited<ReturnType<typeof getSmtpConfig>>
   try {
@@ -205,6 +203,7 @@ export async function sendMail(
     await logEmail(payload, "FAILED", 0, message)
     throw err
   }
+
   const mailOptions: SendMailOptions = {
     from: `"${config.fromName || siteConfig.name}" <${config.fromEmail}>`,
     ...payload,
@@ -214,44 +213,56 @@ export async function sendMail(
     mailOptions.text = text
   }
 
-  let lastError: Error | null = null
-  const totalAttempts = maxRetries + 1
-
-  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
-    try {
-      const transport = await getTransporter()
-      await transport.sendMail(mailOptions)
-      logger.info("Email sent", { to: payload.to, attempt })
-      await logEmail(payload, "SENT", attempt)
-      return
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err))
-      logger.warn("Email attempt failed", {
-        to: payload.to,
-        attempt,
-        totalAttempts,
-        err: lastError,
-      })
-
-      if (attempt === totalAttempts) break
-
-      const delay = baseDelayMs * 2 ** (attempt - 1)
-      logger.info("Retrying email", { to: payload.to, attempt, delayMs: delay })
-      onRetry?.(attempt, lastError)
-      await sleep(delay)
-    }
+  // Single attempt — no retries.
+  try {
+    const transport = await getTransporter()
+    await transport.sendMail(mailOptions)
+    logger.info("Email sent", { to: payload.to })
+    await logEmail(payload, "SENT", 1)
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err))
+    logger.warn("Email send failed", { to: payload.to, err: error })
+    // The failure is captured by email_log — failed mails are kept in the DB
+    // for review/manual re-send (the standalone `failed_mail` table was
+    // dropped in favour of email_log).
+    await logEmail(payload, "FAILED", 1, error.message)
+    throw error
   }
+}
 
-  // All retries exhausted — the failed send is captured by email_log below
-  // with status "FAILED" (the standalone `failed_mail` table was dropped).
-  await logEmail(
-    payload,
-    "FAILED",
-    totalAttempts,
-    lastError?.message ?? "Unknown error",
-  )
+// Sends a diagnostic test email using SMTP values entered in the Add Config
+// form — BEFORE the config is saved. It never reads the DB (the config does
+// not exist yet) and, unlike sendMail(), deliberately does NOT write an
+// `email_log` row: this is a pre-save connection check, not domain mail, and
+// the unsaved credentials must not appear in the delivery history.
+//
+// Throws on failure (calling code maps the error to a 400).
+export async function sendTestMail(
+  config: TestSmtpConfig,
+  to: string,
+): Promise<{ messageId: string }> {
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: Number(config.port),
+    secure: config.secure,
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+    connectionTimeout: 5_000,
+    socketTimeout: 10_000,
+  })
 
-  throw new Error(
-    `[mailer] Failed after ${totalAttempts} attempts. Last error: ${lastError?.message}`,
-  )
+  logger.info("Sending SMTP test email", { to, host: config.host })
+
+  const result = await transporter.sendMail({
+    from: `"${config.fromName || siteConfig.name}" <${config.fromEmail}>`,
+    to,
+    subject: "SMTP configuration test",
+    text:
+      "This is a test email. If you received this, the SMTP configuration " +
+      `(${config.host}:${config.port}) is working correctly.`,
+  })
+
+  return { messageId: result.messageId ?? "" }
 }

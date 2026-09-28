@@ -59,6 +59,12 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 | `MAIL_DISABLED`    | No           | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)            |
 | `LOG_EMAIL_BODY`   | No           | —       | Set to `1` to add the (redacted + truncated) message body to the `Sending email` log line. **Off by default** — the body carries customer content, so stdout stays envelope-only (ROADMAP P4.4). The full body is always available in the admin-only Email Logs page. |
 
+Each email is sent **once** — there is no retry and no outbox requeue/backoff.
+Every send attempt is recorded in `email_log` (SENT or FAILED); failed mails
+are kept in the DB for review/manual re-send (the success-only cleanup cron
+never deletes them). Only the plain-text version of the body is stored — the
+HTML is not persisted.
+
 ---
 
 ## Rate Limiting
@@ -137,20 +143,34 @@ deletes.
 | `NEXT_PUBLIC_SITE_URL`  | **Yes**  | —             | Canonical public URL for SEO, OG tags, sitemaps                                                     |
 | `NEXT_PUBLIC_ENV`       | **Yes**  | `development` | One of: `development`, `production`                                                                 |
 | `NEXT_PUBLIC_BASE_URL`  | No       | (same origin) | Absolute base URL for browser auth API calls (`forgot-password`). Must be a valid http(s) URL when set. |
+| `NEXT_DEVELOPMENT_MODE`| No       | off          | Seeded-demo switch for local development. `true`/`1` enables: (1) a "sign in as" dropdown on `/login` listing one seeded account per role (Super Admin, Warehouse Admin, Merchant, Rider), (2) a top "demo server" banner that notes the daily reset, and (3) a scheduled reset to the basic seed dataset at 12:00 AM local time every day (see `src/lib/demo-reset.ts`; SMTP `mail_config` rows survive the reset). **Server-only** (never `NEXT_PUBLIC_*`): the login page reads it in a server component and passes the list down, so the flag and passwords stay out of the build output unless the page is rendered. **Boot fails if it is enabled while `NEXT_PUBLIC_ENV=production`** — it publishes credentials in the browser. Read at render time, so flipping it only needs a reload. |
 
 ---
 
 ## Testing
 
 Set these locally when running e2e tests or manual dev-server test runs.
-Playwright's `webServer` sets `AUTH_RATE_LIMIT_DISABLED=1` automatically for
-the suite; the other variables are for manual invocations only.
+Playwright's `webServer` sets `AUTH_RATE_LIMIT_DISABLED=1` and
+`LOG_EMAIL_BODY=1` automatically for the suite; the other variables are for
+manual invocations only.
+
+> Do **not** set `MAIL_DISABLED=1` for the e2e suite. It makes `sendMail` return
+> as a *success*, so the outbox row is deleted and no `email_log` record is
+> written — the specs that read activation/verification links out of
+> `email_log` (S42, S47) and the outbox assertions (S52) depend on the
+> "attempted, logged as FAILED, kept for review" path.
 
 | Variable                   | Required | Default | Description                                                    |
 | -------------------------- | -------- | ------- | -------------------------------------------------------------- |
 | `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test) |
 | `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting (webServer sets this for the e2e suite; set manually for other test runs) |
-| `SEED_PASSWORD`            | No       | `12qwaszx` | Password given to every account created by `pnpm db:seed:full`. Dev/e2e default is the well-known `12qwaszx`; **both seed entrypoints refuse to run when `NODE_ENV=production` and this is unset** (ROADMAP P0.7), so a production database can never come up on a published password. |
+| `LOG_EMAIL_BODY`           | No       | —       | Set to `1` to log the redacted mail body on each send. Off by default; the e2e suite turns it on so a failing run shows the mail in the server console. The specs read links from `email_log` either way. |
+
+> There is no env var for the seed password: every account created by
+> `pnpm db:seed:full` gets the well-known `12qwaszx`, and both seed entrypoints
+> refuse to run when `NODE_ENV=production`. Change
+> `SEED_PASSWORD` in `src/lib/db/seed/seed-content/credentials.ts` if you need
+> a different dev password.
 
 ---
 

@@ -138,21 +138,21 @@ describe("GET /api/email-logs/:id", () => {
     expect(res.status).toBe(404)
   })
 
-  it("returns the full record including the bodies", async () => {
+  it("returns the full record including the plain-text body", async () => {
     sessionState.value = admin
     selectQueue.push([
       {
         id: "log_1",
         to: "a@b.com",
         subject: "Welcome",
-        body: "<p>Hi</p>",
         textBody: "Hi",
       },
     ])
     const res = await getEmailLog(req("GET"), ctx())
     const json = await res.json()
     expect(res.status).toBe(200)
-    expect(json).toMatchObject({ body: "<p>Hi</p>", textBody: "Hi" })
+    expect(json).toMatchObject({ textBody: "Hi" })
+    expect(json).not.toHaveProperty("body")
   })
 })
 
