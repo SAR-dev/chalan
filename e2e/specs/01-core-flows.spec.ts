@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { help } from "../selectors"
+import { help, pricing } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
 async function skipOnboardingIfNeeded(page: any) {
@@ -148,6 +148,29 @@ test.describe("S19. Landing Page", () => {
     await expect(page.getByText(/track everything/i)).toBeVisible()
     await expect(page.getByText("Order Management")).toBeVisible()
     await expect(page.getByText("Delivery Fee Calculator")).toBeVisible()
+  })
+})
+
+// ─── S55. Public Pricing Page ────────────────────────────────────────────────
+test.describe("S55. Public Pricing Rate Card", () => {
+  test("landing links to the city-to-city rate card", async ({ page }) => {
+    await page.goto("/")
+    await waitForAppReady(page)
+
+    await expect(page.locator(pricing.navLink)).toBeVisible()
+    await page.locator(pricing.navLink).click()
+    await expect(page).toHaveURL(/\/rates$/)
+  })
+
+  test("pricing page renders the city-to-city matrix", async ({ page }) => {
+    await page.goto("/rates")
+    await waitForAppReady(page)
+
+    await expect(page.locator(pricing.pageHeading)).toBeVisible()
+    await expect(page.locator(pricing.table)).toBeVisible()
+    await expect(page.getByText("Pickup ↓ / Destination →")).toBeVisible()
+    // Seeded zones produce at least one pair, so a base-rate cell exists.
+    await expect(page.locator(pricing.table).getByText(/TK$/)).toBeVisible()
   })
 })
 

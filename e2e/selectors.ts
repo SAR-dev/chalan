@@ -52,6 +52,14 @@ export const nav = {
   userMenu: "[data-testid='user-menu']",
 }
 
+// ─── Public pricing (city-to-city rate card) ─────────────────────────────────
+export const pricing = {
+  pageHeading: "[data-testid='pricing-heading']",
+  table: "[data-testid='pricing-table']",
+  navLink: "[data-testid='nav-pricing']",
+  rateCardLink: "[data-testid='rate-card-link']",
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboard = {
   statCard: (label: string) => `[data-testid='stat-card-${label}']`,

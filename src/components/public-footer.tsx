@@ -16,6 +16,12 @@ export function PublicFooter() {
             FAQ
           </Link>
           <Link
+            href="/rates"
+            className="hover:text-foreground transition-colors"
+          >
+            Pricing
+          </Link>
+          <Link
             href="/help"
             className="hover:text-foreground transition-colors"
           >
