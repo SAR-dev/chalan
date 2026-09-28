@@ -8,7 +8,9 @@ import { logger } from "@/lib/logger"
 // NOT be relied on in production, where the env var is required.
 const ALGO = "aes-256-gcm"
 const PREFIX = "enc:v1:"
-const DEV_KEY = Buffer.from("kikuya-chalan-dev-only-secret-key-0000", "utf8") // 32 bytes
+// Exactly 32 bytes — AES-256 rejects any other key length. Must match the
+// length that SMTP_SECRET_KEY provides ("openssl rand -hex 32" → 64 hex chars).
+const DEV_KEY = Buffer.from("kikuya-chalan-dev-only-secret-00", "utf8")
 
 function getKey(): Buffer {
   const hex = process.env.SMTP_SECRET_KEY
