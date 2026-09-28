@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react"
 import type { Metadata } from "next"
 import { unstable_cache } from "next/cache"
 import Link from "next/link"
+import type { ReactNode } from "react"
 import { PublicFooter } from "@/components/public-footer"
 import { PublicHeader } from "@/components/public-header"
 import { Button } from "@/components/ui/button"
@@ -20,7 +21,7 @@ import { formatTk } from "@/lib/pricing"
 
 export const metadata: Metadata = {
   title: "Delivery Pricing",
-  description: `${siteConfig.name} city-to-city delivery rates at a glance — pick your pickup and destination city to see the starting delivery fee for every route.`,
+  description: `${siteConfig.name} city-to-city delivery and cancellation rates at a glance — pick your pickup and destination city to see the starting delivery fee for every route.`,
   alternates: { canonical: "/rates" },
   openGraph: {
     title: `Delivery Pricing – ${siteConfig.name}`,
@@ -28,6 +29,13 @@ export const metadata: Metadata = {
     url: "/rates",
   },
 }
+
+// The rate card is DB-driven and must reflect the current matrix, never a
+// build-time snapshot. Without this, a production build against a database
+// that is migrated but not yet seeded caches an EMPTY rate card in the data
+// cache and serves it for the revalidate window (this is exactly how the CI
+// e2e run failed: the seed happens after the build).
+export const dynamic = "force-dynamic"
 
 // Public rate-card data is cached like the landing page's platform config:
 // zone-based prices only change when an admin edits them, so 5-minute reuse is
@@ -57,6 +65,7 @@ const getRateCard = unstable_cache(
           extraRatePerKg: zonePricing.extraRatePerKg,
           freeWeightKg: zonePricing.freeWeightKg,
           maxWeightKg: zonePricing.maxWeightKg,
+          cancellationFee: zonePricing.cancellationFee,
         })
         .from(zonePricing)
         .orderBy(asc(zonePricing.fromZoneId), asc(zonePricing.toZoneId)),
@@ -66,6 +75,95 @@ const getRateCard = unstable_cache(
   ["public-rate-card"],
   { revalidate: 300 },
 )
+
+type CityRow = { id: string; name: string; zoneId: string }
+
+// Shared city×city matrix (rows = pickup, columns = destination). Kept generic
+// so the delivery-fee and cancellation-fee cards render identical tables.
+function RateMatrix({
+  testId,
+  title,
+  description,
+  cities,
+  cell,
+  cellTitle,
+  emptyText,
+}: {
+  testId: string
+  title: string
+  description: string
+  cities: CityRow[]
+  cell: (from: CityRow, to: CityRow) => ReactNode
+  cellTitle?: (from: CityRow, to: CityRow) => string | undefined
+  emptyText: string
+}) {
+  return (
+    <Card>
+      <CardHeader className="border-border border-b bg-muted/50">
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        {cities.length === 0 ? (
+          <p className="text-muted-foreground px-6 py-10 text-center text-sm">
+            {emptyText}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table
+              data-testid={testId}
+              className="w-full min-w-[720px] border-collapse text-sm"
+            >
+              <thead>
+                <tr className="border-border/60 border-b bg-muted/30">
+                  <th
+                    scope="col"
+                    className="text-muted-foreground sticky left-0 z-30 border-r border-border/60 bg-muted/30 px-4 py-3 text-left text-xs font-semibold tracking-wide uppercase"
+                  >
+                    Pickup ↓ / Destination →
+                  </th>
+                  {cities.map((to) => (
+                    <th
+                      key={to.id}
+                      scope="col"
+                      className="text-muted-foreground px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap uppercase"
+                    >
+                      {to.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cities.map((from) => (
+                  <tr
+                    key={from.id}
+                    className="border-border/40 border-b last:border-b-0"
+                  >
+                    <th
+                      scope="row"
+                      className="bg-card sticky left-0 z-10 border-r border-border/60 px-4 py-2.5 text-left font-medium whitespace-nowrap"
+                    >
+                      {from.name}
+                    </th>
+                    {cities.map((to) => (
+                      <td
+                        key={to.id}
+                        className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums"
+                        title={cellTitle?.(from, to)}
+                      >
+                        {cell(from, to)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export default async function PricingPage() {
   const { zones, cities, pricing } = await getRateCard()
@@ -92,87 +190,45 @@ export default async function PricingPage() {
             City-to-city rates at a glance
           </h1>
           <p className="text-muted-foreground mt-4 text-sm leading-relaxed text-pretty">
-            The starting delivery fee between any two service areas. Pick a city
-            from the rows (pickup) and the columns (destination) — each cell is
-            the base rate for that route. Final charges depend on parcel weight
-            and each merchant&apos;s rate card.
+            The starting delivery fee between any two service areas — and the
+            cancellation fee charged if a parcel is returned to the merchant.
+            Pick a city from the rows (pickup) and the columns (destination).
+            Final charges depend on parcel weight and each merchant&apos;s rate
+            card.
           </p>
         </div>
 
-        <Card>
-          <CardHeader className="border-border border-b bg-muted/50">
-            <CardTitle>Delivery fee matrix</CardTitle>
-            <CardDescription>
-              Starting delivery fee (Tk) from each pickup city to each
-              destination city.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {cities.length === 0 ? (
-              <p className="text-muted-foreground px-6 py-10 text-center text-sm">
-                No delivery routes have been published yet — check back soon.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table
-                  data-testid="pricing-table"
-                  className="w-full min-w-[720px] border-collapse text-sm"
-                >
-                  <thead>
-                    <tr className="border-border/60 border-b bg-muted/30">
-                      <th
-                        scope="col"
-                        className="text-muted-foreground sticky left-0 z-30 border-r border-border/60 bg-muted/30 px-4 py-3 text-left text-xs font-semibold tracking-wide uppercase"
-                      >
-                        Pickup ↓ / Destination →
-                      </th>
-                      {cities.map((to) => (
-                        <th
-                          key={to.id}
-                          scope="col"
-                          className="text-muted-foreground px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap uppercase"
-                        >
-                          {to.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cities.map((from) => (
-                      <tr
-                        key={from.id}
-                        className="border-border/40 border-b last:border-b-0"
-                      >
-                        <th
-                          scope="row"
-                          className="bg-card sticky left-0 z-10 border-r border-border/60 px-4 py-2.5 text-left font-medium whitespace-nowrap"
-                        >
-                          {from.name}
-                        </th>
-                        {cities.map((to) => {
-                          const row = rateFor.get(`${from.zoneId}:${to.zoneId}`)
-                          return (
-                            <td
-                              key={to.id}
-                              className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums"
-                              title={
-                                row
-                                  ? `First ${row.freeWeightKg} kg free, then ${formatTk(row.extraRatePerKg)} per extra kg, up to ${row.maxWeightKg} kg`
-                                  : undefined
-                              }
-                            >
-                              {row ? formatTk(row.baseRate) : "—"}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-6">
+          <RateMatrix
+            testId="pricing-table"
+            title="Delivery fee matrix"
+            description="Starting delivery fee (Tk) from each pickup city to each destination city."
+            cities={cities}
+            cell={(from, to) => {
+              const row = rateFor.get(`${from.zoneId}:${to.zoneId}`)
+              return row ? formatTk(row.baseRate) : "—"
+            }}
+            cellTitle={(from, to) => {
+              const row = rateFor.get(`${from.zoneId}:${to.zoneId}`)
+              return row
+                ? `First ${row.freeWeightKg} kg free, then ${formatTk(row.extraRatePerKg)} per extra kg, up to ${row.maxWeightKg} kg`
+                : undefined
+            }}
+            emptyText="No delivery routes have been published yet — check back soon."
+          />
+
+          <RateMatrix
+            testId="cancellation-fee-table"
+            title="Cancellation fee matrix"
+            description="Charged instead of the delivery fee if a parcel is returned to the merchant."
+            cities={cities}
+            cell={(from, to) => {
+              const row = rateFor.get(`${from.zoneId}:${to.zoneId}`)
+              return row ? formatTk(row.cancellationFee) : "—"
+            }}
+            emptyText="No cancellation fees have been published yet."
+          />
+        </div>
 
         <div className="text-muted-foreground mt-6 grid gap-2 text-xs leading-relaxed sm:grid-cols-3">
           <p>
@@ -193,6 +249,13 @@ export default async function PricingPage() {
             .
           </p>
         </div>
+
+        <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
+          <span className="text-foreground font-medium">Cancellation fee.</span>{" "}
+          If a delivery cannot be completed and the parcel is returned to the
+          merchant, the delivery and COD fees are refunded and only the
+          cancellation fee for that route is charged.
+        </p>
 
         <div className="mt-12 text-center">
           <Button

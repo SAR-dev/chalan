@@ -42,6 +42,7 @@ const DEFAULT_PRICING = {
   freeWeightKg: 1,
   maxWeightKg: 10,
   codFeePercentage: 1,
+  cancellationFee: 20,
 }
 
 // Cache platform config for 5 minutes — this page is heavily fetched
@@ -57,6 +58,7 @@ const getCachedPlatformConfig = unstable_cache(
           defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
           defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
           defaultCodFeePercentage: platformConfig.defaultCodFeePercentage,
+          defaultCancellationFee: platformConfig.defaultCancellationFee,
         })
         .from(platformConfig)
         .limit(1)
@@ -71,6 +73,8 @@ const getCachedPlatformConfig = unstable_cache(
         maxWeightKg: config?.defaultMaxWeightKg ?? DEFAULT_PRICING.maxWeightKg,
         codFeePercentage:
           config?.defaultCodFeePercentage ?? DEFAULT_PRICING.codFeePercentage,
+        cancellationFee:
+          config?.defaultCancellationFee ?? DEFAULT_PRICING.cancellationFee,
       }
     } catch {
       return DEFAULT_PRICING
@@ -105,6 +109,10 @@ export const metadata: Metadata = {
     images: [siteConfig.ogImage],
   },
 }
+
+// DB-backed pricing must reflect the current config, never a build-time
+// snapshot (see the same note in src/app/rates/page.tsx).
+export const dynamic = "force-dynamic"
 
 const features = [
   {

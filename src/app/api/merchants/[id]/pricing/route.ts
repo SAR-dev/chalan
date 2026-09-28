@@ -18,7 +18,13 @@ export const PATCH = withErrorHandler(
     const { id } = await params
     const parsed = await parseBody(req, merchantPricingSchema)
     if (parsed.error) return parsed.error
-    const { baseRate, extraRatePerKg, freeWeightKg, maxWeightKg } = parsed.data
+    const {
+      baseRate,
+      extraRatePerKg,
+      freeWeightKg,
+      maxWeightKg,
+      cancellationFee,
+    } = parsed.data
 
     const [current] = await db
       .select({
@@ -26,6 +32,7 @@ export const PATCH = withErrorHandler(
         extraRatePerKg: merchant.extraRatePerKg,
         freeWeightKg: merchant.freeWeightKg,
         maxWeightKg: merchant.maxWeightKg,
+        cancellationFee: merchant.cancellationFee,
       })
       .from(merchant)
       .where(eq(merchant.id, id))
@@ -35,7 +42,13 @@ export const PATCH = withErrorHandler(
 
     const [updated] = await db
       .update(merchant)
-      .set({ baseRate, extraRatePerKg, freeWeightKg, maxWeightKg })
+      .set({
+        baseRate,
+        extraRatePerKg,
+        freeWeightKg,
+        maxWeightKg,
+        ...(cancellationFee !== undefined ? { cancellationFee } : {}),
+      })
       .where(eq(merchant.id, id))
       .returning()
 
@@ -46,6 +59,7 @@ export const PATCH = withErrorHandler(
       "extraRatePerKg",
       "freeWeightKg",
       "maxWeightKg",
+      "cancellationFee",
     ])
 
     await logAudit({

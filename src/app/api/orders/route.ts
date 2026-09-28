@@ -32,6 +32,7 @@ import {
   order,
   orderStatuses,
   pickupLocation,
+  platformConfig,
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
@@ -213,6 +214,27 @@ export const POST = withErrorHandler(async (req: Request) => {
     ? deliveryMapLink.trim()
     : null
 
+  // Idempotency (ROADMAP B13): a retried create with the same key returns the
+  // original order instead of charging twice. Checked before any pricing work;
+  // the unique (merchantId, key) index makes the concurrent case safe too.
+  const idempotencyKey = req.headers.get("idempotency-key")?.trim() || null
+  const findByKey = () =>
+    dbRead
+      .select()
+      .from(order)
+      .where(
+        and(
+          eq(order.merchantId, merchantId),
+          eq(order.idempotencyKey, idempotencyKey!),
+        ),
+      )
+      .limit(1)
+      .then((r) => r[0])
+  if (idempotencyKey) {
+    const existing = await findByKey()
+    if (existing) return NextResponse.json(existing)
+  }
+
   const hubId = await pickupWarehouseId(pickupLocationId)
   if (!hubId) {
     return badRequest("Pickup location has no warehouse assigned.")
@@ -237,6 +259,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       freeWeightKg: merchant.freeWeightKg,
       maxWeightKg: merchant.maxWeightKg,
       codFeePercentage: merchant.codFeePercentage,
+      cancellationFee: merchant.cancellationFee,
     })
     .from(merchant)
     .where(eq(merchant.id, merchantId))
@@ -297,6 +320,10 @@ export const POST = withErrorHandler(async (req: Request) => {
     codFeePercentage?: number | null
   }
   let pricing: PricingInput = merchantRow
+  // Cancellation fee is resolved alongside the delivery fee: the zone-pair row
+  // wins, otherwise the platform default applies. Snapshotted on the order so a
+  // later return is priced at creation time, not at return time.
+  let cancellationFee: number | null = null
   if (origCity?.zoneId && destCity?.zoneId) {
     // At most one row per (fromZone, toZone) — `zone_pricing_pair_uniq`
     // (ROADMAP P1.1), so this pick is deterministic. The limit is kept as a
@@ -313,7 +340,21 @@ export const POST = withErrorHandler(async (req: Request) => {
       .limit(1)
     if (zonePrice) {
       pricing = zonePrice
+      cancellationFee = toPaisa(zonePrice.cancellationFee)
     }
+  }
+  // Cancellation fee resolves through the same chain as the delivery rate
+  // (ROADMAP B6): zone-pair row wins, then the merchant's own fee, then the
+  // platform default. A merchant fee of 0 means "inherit the platform default".
+  if (cancellationFee === null) {
+    cancellationFee = toPaisa(merchantRow.cancellationFee ?? 0)
+  }
+  if (cancellationFee === 0) {
+    const [config] = await dbRead
+      .select({ fee: platformConfig.defaultCancellationFee })
+      .from(platformConfig)
+      .limit(1)
+    cancellationFee = toPaisa(config?.fee ?? 0)
   }
 
   const { total: deliveryFee } = calcDeliveryCharge(pricing, parcelWeightKg)
@@ -327,7 +368,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     codFee,
   )
 
-  const [newOrder] = await db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(order)
       .values({
@@ -335,6 +376,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         pickupLocationId,
         warehouseId: hub.id,
         trackingToken: generateTrackingToken(),
+        idempotencyKey,
         recipientName,
         recipientPhone,
         deliveryCityId: destCityId ?? null,
@@ -345,11 +387,13 @@ export const POST = withErrorHandler(async (req: Request) => {
         productCost,
         deliveryFee,
         codFee,
+        cancellationFee,
         merchantEarnings,
         status: "PENDING",
         deliveryAttempts: 0,
         merchantNote: merchantNote?.trim() || null,
       })
+      .onConflictDoNothing()
       .returning({
         id: order.id,
         merchantId: order.merchantId,
@@ -364,11 +408,16 @@ export const POST = withErrorHandler(async (req: Request) => {
         productCost: order.productCost,
         deliveryFee: order.deliveryFee,
         codFee: order.codFee,
+        cancellationFee: order.cancellationFee,
         merchantEarnings: order.merchantEarnings,
         status: order.status,
         merchantNote: order.merchantNote,
         createdAt: order.createdAt,
       })
+
+    // Lost the race to a concurrent retry — nothing to write; the caller
+    // re-reads the winner below.
+    if (!inserted) return { replay: true as const }
 
     const platformFee = orderChargeAmount(deliveryFee, codFee)
 
@@ -396,8 +445,14 @@ export const POST = withErrorHandler(async (req: Request) => {
         },
       })
 
-    return [inserted]
+    return { replay: false as const, order: inserted }
   })
 
-  return NextResponse.json(newOrder, { status: 201 })
+  if (created.replay) {
+    const existing = idempotencyKey ? await findByKey() : undefined
+    if (existing) return NextResponse.json(existing)
+    return badRequest("Duplicate request")
+  }
+
+  return NextResponse.json(created.order, { status: 201 })
 })

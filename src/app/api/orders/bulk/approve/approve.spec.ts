@@ -149,7 +149,10 @@ describe("PATCH /api/orders/bulk/approve", () => {
 
   it("400 when parcel weight exceeds merchant limit", async () => {
     sessionState.value = admin
-    selectQueue.push([makeOrder({ parcelWeightKg: 10 })], [{ maxWeightKg: 5 }])
+    selectQueue.push(
+      [makeOrder({ parcelWeightKg: 10 })],
+      [{ maxWeightKg: 5, status: "ACTIVE" }],
+    )
     const res = await approve(req({ ids: ["o1"] }))
     expect(res.status).toBe(400)
     const json = await res.json()
@@ -162,7 +165,7 @@ describe("PATCH /api/orders/bulk/approve", () => {
     sessionState.value = admin
     selectQueue.push(
       [makeOrder({ status: "PENDING", parcelWeightKg: 2 })],
-      [{ maxWeightKg: 5 }],
+      [{ maxWeightKg: 5, status: "ACTIVE" }],
     )
     updateResult.push(makeOrder({ status: "APPROVED" }))
     const res = await approve(req({ ids: ["o1"] }))

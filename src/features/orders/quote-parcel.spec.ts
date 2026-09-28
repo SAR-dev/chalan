@@ -31,6 +31,7 @@ const zonePricing = [
     freeWeightKg: 5,
     maxWeightKg: 25,
     codFeePercentage: 2,
+    cancellationFee: 0,
   },
 ]
 

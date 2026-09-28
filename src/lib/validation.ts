@@ -204,6 +204,7 @@ export const merchantPricingSchema = z
     extraRatePerKg: z.number().nonnegative(),
     freeWeightKg: z.number().nonnegative(),
     maxWeightKg: z.number().positive(),
+    cancellationFee: z.number().nonnegative().optional(),
   })
   .refine((d) => d.freeWeightKg <= d.maxWeightKg, {
     error: "freeWeightKg cannot exceed maxWeightKg",
@@ -216,6 +217,8 @@ export const platformConfigSchema = z
     defaultExtraRatePerKg: z.number().nonnegative().optional(),
     defaultFreeWeightKg: z.number().nonnegative().optional(),
     defaultMaxWeightKg: z.number().positive().optional(),
+    defaultCancellationFee: z.number().nonnegative().optional(),
+    refundOnCancel: z.boolean().optional(),
   })
   .refine(
     (d) =>
@@ -305,6 +308,14 @@ export const orderPickedUpSchema = z.object({
 
 export const orderDeliveredSchema = z.object({
   proofRef: z.string().trim().min(1).optional(),
+  // COD actually collected (ROADMAP B2). Omitted = the full productCost.
+  // The route rejects a value above the order's expected COD.
+  amountCollected: z
+    .number()
+    .nonnegative("Collected amount cannot be negative")
+    .optional(),
+  // Required by the transition when amountCollected is below the expected COD.
+  shortfallReason: z.string().trim().max(300).optional(),
 })
 
 export const orderFailedSchema = z.object({
@@ -599,6 +610,10 @@ export const zonePricingCreateSchema = z.object({
   freeWeightKg: z.number().nonnegative("Free weight cannot be negative"),
   maxWeightKg: z.number().positive("Max weight must be greater than 0"),
   codFeePercentage: z.number().nonnegative("COD fee cannot be negative"),
+  cancellationFee: z
+    .number()
+    .nonnegative("Cancellation fee cannot be negative")
+    .optional(),
 })
 
 export const zonePricingUpdateSchema = z.object({
@@ -607,6 +622,7 @@ export const zonePricingUpdateSchema = z.object({
   freeWeightKg: z.number().nonnegative().optional(),
   maxWeightKg: z.number().positive().optional(),
   codFeePercentage: z.number().nonnegative().optional(),
+  cancellationFee: z.number().nonnegative().optional(),
 })
 
 // ---------------------------------------------------------------------------

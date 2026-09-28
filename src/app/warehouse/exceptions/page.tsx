@@ -19,6 +19,7 @@ const ORDER_COLUMNS = {
   productCost: order.productCost,
   deliveryFee: order.deliveryFee,
   codFee: order.codFee,
+  cancellationFee: order.cancellationFee,
   merchantEarnings: order.merchantEarnings,
   status: order.status,
   createdAt: order.createdAt,

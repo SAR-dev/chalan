@@ -154,6 +154,7 @@ export interface MerchantPricingInput {
   extraRatePerKg: number
   freeWeightKg: number
   maxWeightKg: number
+  cancellationFee?: number
 }
 
 export interface PlatformConfigInput {
@@ -161,6 +162,8 @@ export interface PlatformConfigInput {
   defaultExtraRatePerKg?: number
   defaultFreeWeightKg?: number
   defaultMaxWeightKg?: number
+  defaultCancellationFee?: number
+  refundOnCancel?: boolean
 }
 
 export interface CreateOrderInput {

@@ -26,6 +26,7 @@ export function PricingDialog({
   const [extraRatePerKg, setExtraRatePerKg] = useState("15")
   const [freeWeightKg, setFreeWeightKg] = useState("1")
   const [maxWeightKg, setMaxWeightKg] = useState("3")
+  const [cancellationFee, setCancellationFee] = useState("0")
   const [previewWeight, setPreviewWeight] = useState("2")
   // Track which merchant the form is currently synced to.
   const [syncedId, setSyncedId] = useState<string | null>(null)
@@ -37,6 +38,7 @@ export function PricingDialog({
     setExtraRatePerKg(String(merchant.extraRatePerKg))
     setFreeWeightKg(String(merchant.freeWeightKg))
     setMaxWeightKg(String(merchant.maxWeightKg))
+    setCancellationFee(String(merchant.cancellationFee))
     setPreviewWeight(String(merchant.maxWeightKg))
   }
 
@@ -47,6 +49,7 @@ export function PricingDialog({
     extraRatePerKg: Number(extraRatePerKg) || 0,
     freeWeightKg: Number(freeWeightKg) || 0,
     maxWeightKg: Number(maxWeightKg) || 0,
+    cancellationFee: Number(cancellationFee) || 0,
   }
   const weight = Number(previewWeight) || 0
   const breakdown = calcDeliveryCharge(pricing, weight)
@@ -128,6 +131,20 @@ export function PricingDialog({
             value={maxWeightKg}
             onChange={(e) => setMaxWeightKg(e.target.value)}
           />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="cancellationFee">Cancellation fee (TK)</Label>
+          <Input
+            id="cancellationFee"
+            type="number"
+            min="0"
+            step="1"
+            value={cancellationFee}
+            onChange={(e) => setCancellationFee(e.target.value)}
+          />
+          <p className="text-muted-foreground text-xs">
+            0 = use the platform default.
+          </p>
         </div>
       </div>
 

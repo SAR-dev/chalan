@@ -133,9 +133,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+      DATABASE_URL: postgresql://neondb_owner:npg_Xsd3J8aQLKEr@ep-winter-flower-ao2mptb0-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
-      INTEGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+      INTEGRATION_DATABASE_URL: postgresql://neondb_owner:npg_Xsd3J8aQLKEr@ep-winter-flower-ao2mptb0-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -148,4 +148,57 @@ jobs:
       # indexes, P1.2 ledger + advisory lock, P1.3 business timezone).
       - run: pnpm db:migrate
       - run: pnpm test:integration
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: delivery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    # No `.env`/`.env.e2e` file in CI — env comes from here (shell values win
+    # over any file anyway). Playwright's webServer inherits these and adds its
+    # own (AUTH_RATE_LIMIT_DISABLED, TRUSTED_PROXY_HOPS, LOG_EMAIL_BODY); the
+    # test workers read DATABASE_URL / CRON_SECRET directly.
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+      BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
+      CRON_SECRET: ci-cron-secret-0000000000000000000000
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_ENV: development
+      STORAGE_PROVIDER: local
+      LOCAL_UPLOADS_DIR: ./.uploads
+      TZ: Asia/Dhaka
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Schema first: the webServer seeds (pnpm db:seed:full) before it starts.
+      - run: pnpm db:migrate
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      # Playwright boots its own server: `pnpm db:seed:full && pnpm start`.
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 

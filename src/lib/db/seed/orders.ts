@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { order } from "@/lib/db/schema"
-import { SEED_ORDERS } from "@/lib/db/seed/seed-content"
+import { SEED_CANCELLATION_FEE, SEED_ORDERS } from "@/lib/db/seed/seed-content"
 import { log } from "./helpers"
 
 export async function seedOrders() {
@@ -73,6 +73,7 @@ export async function seedOrders() {
         productCost,
         deliveryFee,
         codFee,
+        cancellationFee: SEED_CANCELLATION_FEE,
         merchantEarnings,
         status,
         warehouseId,

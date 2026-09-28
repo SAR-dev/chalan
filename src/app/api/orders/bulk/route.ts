@@ -240,6 +240,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       productCost: order.productCost,
       deliveryFee: order.deliveryFee,
       codFee: order.codFee,
+      cancellationFee: order.cancellationFee,
       merchantEarnings: order.merchantEarnings,
       status: order.status,
       merchantNote: order.merchantNote,

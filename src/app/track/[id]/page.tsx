@@ -1,10 +1,13 @@
 import { ArrowLeft, Package } from "lucide-react"
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import Link from "next/link"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { siteConfig } from "@/config/site"
 import { brandThemeVars } from "@/lib/brand-color"
+import { resolveClientIp } from "@/lib/client-ip"
+import { rateLimit } from "@/lib/rate-limit"
 import { NotFound } from "./components/not-found"
 import { OrderDetail } from "./components/order-detail"
 import { fetchOrderData, STATUS_COPY } from "./lib"
@@ -22,18 +25,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const raw = decodeURIComponent(id).trim()
   const data = await fetchOrderData(raw)
 
-  const statusLabel = data
-    ? STATUS_COPY[data.order.status].headline
-    : "Not found"
-  const merchant = data?.merchant?.businessName
-    ? ` · ${data.merchant.businessName}`
-    : ""
-  // Prefer the human-readable order code in the page title.
+  // Only the unguessable token link may reveal the live status (ROADMAP B11);
+  // a sequential order-code lookup gets a generic title.
+  const byToken = Boolean(data?.matchedByToken)
   const code = data?.order.id ?? raw.toUpperCase()
+  const statusLabel =
+    data && byToken ? STATUS_COPY[data.order.status].headline : "Track parcel"
+  const merchant =
+    byToken && data?.merchant?.businessName
+      ? ` · ${data.merchant.businessName}`
+      : ""
 
   return {
     title: `${code} – ${statusLabel}`,
-    description: `Live delivery status for parcel ${code}${merchant} on ${siteConfig.name}.`,
+    description: byToken
+      ? `Live delivery status for parcel ${code}${merchant} on ${siteConfig.name}.`
+      : `Tracking lookup for parcel ${code} on ${siteConfig.name}.`,
     robots: { index: false, follow: false },
   }
 }
@@ -43,6 +50,31 @@ export default async function TrackDetailPage({ params }: Props) {
   const raw = decodeURIComponent(id).trim()
   const data = await fetchOrderData(raw)
   const idOrCode = data?.order.id ?? raw.toUpperCase()
+
+  // A code lookup is enumerable, so it is throttled and rendered with the
+  // minimum fields (status + area). The token link keeps the full view.
+  const minimal = Boolean(data) && !data?.matchedByToken
+  if (minimal) {
+    let limited: Awaited<ReturnType<typeof rateLimit>> = null
+    try {
+      const { ip } = resolveClientIp(await headers())
+      limited = await rateLimit(`track:${ip ?? "no-ip"}`, 30, 60)
+    } catch {
+      // No request context (e.g. unit render) — skip throttling.
+    }
+    if (limited) {
+      return (
+        <main id="main-content" className="bg-background min-h-screen">
+          <div className="mx-auto max-w-2xl px-5 py-20 text-center">
+            <h1 className="text-lg font-semibold">Too many requests</h1>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Please wait a moment, then try again.
+            </p>
+          </div>
+        </main>
+      )
+    }
+  }
 
   // Branding follows the ORDER's merchant (multi-merchant safe), never the
   // instance — invalid hex makes brandThemeVars fall back to theme defaults.
@@ -70,7 +102,7 @@ export default async function TrackDetailPage({ params }: Props) {
       )}
       {/* Header */}
       <header className="border-border/60 bg-background/80 sticky top-0 z-10 border-b backdrop-blur-sm">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3.5">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3.5">
           <Link
             href="/track"
             className="group flex min-w-0 items-center gap-2.5"
@@ -103,7 +135,7 @@ export default async function TrackDetailPage({ params }: Props) {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl px-5 py-8">
+      <div className="mx-auto max-w-4xl px-5 py-8">
         {/* Back / search again button */}
         <Link
           href="/track"
@@ -113,7 +145,11 @@ export default async function TrackDetailPage({ params }: Props) {
           Track another parcel
         </Link>
 
-        {!data ? <NotFound code={idOrCode} /> : <OrderDetail {...data} />}
+        {!data ? (
+          <NotFound code={idOrCode} />
+        ) : (
+          <OrderDetail {...data} minimal={minimal} />
+        )}
       </div>
       {!merchant?.hidePlatformBranding && <PublicFooter />}
     </main>

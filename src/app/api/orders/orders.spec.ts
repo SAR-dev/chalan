@@ -29,6 +29,7 @@ const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
+const insertPayloads: Record<string, unknown>[] = []
 const whereCalls: unknown[] = []
 
 vi.mock("@/lib/db", () => {
@@ -65,9 +66,13 @@ vi.mock("@/lib/db", () => {
   }
   const makeInsertChain = () => {
     const chain: Record<string, unknown> = {
-      values: () => chain,
+      values: (payload: Record<string, unknown>) => {
+        insertPayloads.push(payload)
+        return chain
+      },
       returning: () => Promise.resolve(insertResult),
       onConflictDoUpdate: () => Promise.resolve(),
+      onConflictDoNothing: () => chain,
     }
     return chain
   }
@@ -97,6 +102,7 @@ beforeEach(() => {
   updateResult.length = 0
   updatePayloads.length = 0
   insertResult.length = 0
+  insertPayloads.length = 0
   whereCalls.length = 0
   sessionState.value = null
   rateLimited = false
@@ -234,6 +240,67 @@ describe("POST /api/orders", () => {
     const json = await res.json()
     expect(res.status).toBe(201)
     expect(json).toMatchObject({ id: "o_new" })
+  })
+
+  it("returns the original order for a repeated Idempotency-Key (ROADMAP B13)", async () => {
+    sessionState.value = merchant
+    selectQueue.push([{ id: "o_orig", status: "PENDING" }])
+    const request = new Request("http://test.local/api", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": "retry-1",
+      },
+      body: JSON.stringify(validOrderBody),
+    })
+    const res = await createOrder(request)
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ id: "o_orig" })
+  })
+
+  it("snapshots the zone-pair cancellation fee on the order", async () => {
+    sessionState.value = merchant
+    selectQueue.push(
+      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "wh_hub", isActive: true }], // warehouse hub
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          baseRate: 50,
+          extraRatePerKg: 10,
+          freeWeightKg: 1,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+          codFeePercentage: 1,
+        },
+      ], // merchant
+      [{ zoneId: "ZN-2" }], // destination city zone
+      [{ city: "Dhaka" }], // origin warehouse city
+      [{ zoneId: "ZN-1" }], // origin city zone
+      [
+        {
+          fromZoneId: "ZN-1",
+          toZoneId: "ZN-2",
+          baseRate: 100,
+          extraRatePerKg: 20,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 25,
+        },
+      ], // zone pricing
+    )
+    insertResult.push({ id: "o_new", status: "PENDING" })
+
+    const res = await createOrder(req("POST", undefined, validOrderBody))
+    expect(res.status).toBe(201)
+
+    const orderInsert = insertPayloads.find((p) => "recipientName" in p)
+    expect(orderInsert).toMatchObject({ cancellationFee: 25 })
   })
 })
 

@@ -23,6 +23,8 @@ export const GET = withErrorHandler(async () => {
       defaultExtraRatePerKg: platformConfig.defaultExtraRatePerKg,
       defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
       defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
+      defaultCancellationFee: platformConfig.defaultCancellationFee,
+      refundOnCancel: platformConfig.refundOnCancel,
       updatedAt: platformConfig.updatedAt,
     })
     .from(platformConfig)
@@ -63,6 +65,8 @@ export const PATCH = withErrorHandler(async (req: Request) => {
       defaultExtraRatePerKg: platformConfig.defaultExtraRatePerKg,
       defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
       defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
+      defaultCancellationFee: platformConfig.defaultCancellationFee,
+      refundOnCancel: platformConfig.refundOnCancel,
       updatedAt: platformConfig.updatedAt,
     })
     .from(platformConfig)

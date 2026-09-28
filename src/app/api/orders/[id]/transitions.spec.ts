@@ -235,7 +235,7 @@ describe("PATCH /orders/:id/approve", () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 10 })],
-      [{ maxWeightKg: 5 }],
+      [{ maxWeightKg: 5, status: "ACTIVE" }],
     ]
     const { status, json } = await call(approve)
     expect(status).toBe(400)
@@ -244,11 +244,24 @@ describe("PATCH /orders/:id/approve", () => {
     })
   })
 
+  it("400 when the merchant is suspended (ROADMAP B8)", async () => {
+    sessionState.value = admin
+    dbState.selectQueue = [
+      [makeOrder({ parcelWeightKg: 2 })],
+      [{ maxWeightKg: 5, status: "SUSPENDED" }],
+    ]
+    const { status, json } = await call(approve)
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "This merchant is not active; the order cannot be approved.",
+    })
+  })
+
   it("approves: sets APPROVED + approver + timestamps", async () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 2 })],
-      [{ maxWeightKg: 5 }],
+      [{ maxWeightKg: 5, status: "ACTIVE" }],
     ]
     dbState.updateResult = [makeOrder({ status: "APPROVED" })]
     const { status, payload } = await call(approve)
@@ -288,7 +301,7 @@ describe("PATCH /orders/:id/approve", () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 2 })],
-      [{ maxWeightKg: 5 }],
+      [{ maxWeightKg: 5, status: "ACTIVE" }],
     ]
     dbState.updateResult = [makeOrder({ status: "APPROVED" })]
     vi.mocked(logAudit).mockRejectedValueOnce(new Error("audit down"))
@@ -300,8 +313,7 @@ describe("PATCH /orders/:id/approve", () => {
     sessionState.value = superAdmin
     dbState.selectQueue = [
       [makeOrder()],
-      [{ id: "r1", isActive: true, taskType: "BOTH" }],
-      [{ maxWeightKg: 5 }],
+      [{ maxWeightKg: 5, status: "ACTIVE" }],
     ]
     dbState.updateResult = [makeOrder({ status: "APPROVED" })]
     const { status } = await call(approve, { riderId: "r1" })
@@ -665,6 +677,74 @@ describe("PATCH /orders/:id/delivered", () => {
     ).toMatchObject({ amount: -750, status: "SETTLED" })
   })
 
+  it("credits only the amount actually collected (partial COD, ROADMAP B2)", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          deliveryRiderId: "rider_1",
+          status: "OUT_FOR_DELIVERY",
+          productCost: 750,
+          deliveryFee: 60,
+          codFee: 0,
+        }),
+      ],
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "DELIVERED",
+        productCost: 750,
+        amountCollected: 500,
+        deliveryFee: 60,
+        codFee: 0,
+      }),
+    ]
+    const { status } = await call(delivered, {
+      amountCollected: 500,
+      shortfallReason: "customer paid partial",
+    })
+    expect(status).toBe(200)
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_EARNINGS"),
+    ).toMatchObject({ amount: -500 })
+  })
+
+  it("400 when a shortfall has no reason (ROADMAP B2)", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          deliveryRiderId: "rider_1",
+          status: "OUT_FOR_DELIVERY",
+          productCost: 750,
+        }),
+      ],
+    ]
+    const { status, json } = await call(delivered, { amountCollected: 500 })
+    expect(status).toBe(400)
+    expect(json).toMatchObject({
+      error: expect.stringMatching(/reason is required/i),
+    })
+  })
+
+  it("400 when collecting more than the COD (ROADMAP B2)", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          deliveryRiderId: "rider_1",
+          status: "OUT_FOR_DELIVERY",
+          productCost: 750,
+        }),
+      ],
+    ]
+    const { status, json } = await call(delivered, { amountCollected: 800 })
+    expect(status).toBe(400)
+    expect(json).toMatchObject({
+      error: expect.stringMatching(/cannot exceed/i),
+    })
+  })
+
   it("uses provided proof ref when present", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
@@ -810,6 +890,38 @@ describe("PATCH /orders/:id/return", () => {
     })
     expect(payload?.failedResolvedAt).toBe(payload?.returnedAt)
   })
+
+  it("refunds the creation fees and charges the cancellation fee", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "FAILED_ATTEMPT", warehouseId: "wh_1" })],
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "RETURNED",
+        deliveryFee: 60,
+        codFee: 5,
+        cancellationFee: 20,
+      }),
+    ]
+    const { status } = await call(returnRoute, { reason: "unreachable" })
+    expect(status).toBe(200)
+
+    // Creation charge reversed (negative ORDER_CHARGE): -(60 + 5).
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE_REVERSAL"),
+    ).toMatchObject({ amount: -65, status: "SETTLED" })
+
+    // Cancellation fee charged instead.
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CANCELLATION"),
+    ).toMatchObject({ amount: 20, status: "SETTLED" })
+
+    // Merchant balance moves by the net: -65 + 20 = -45.
+    expect(dbState.insertPayloads.find((p) => "balance" in p)).toMatchObject({
+      balance: -45,
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -954,6 +1066,87 @@ describe("PATCH /orders/:id/cancel", () => {
     expect(json).toEqual({
       error: "Orders can only be cancelled before they are picked up.",
     })
+  })
+
+  it("refunds the full creation charge when cancelled before pickup (ROADMAP B4)", async () => {
+    sessionState.value = merchantSession("merch_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          status: "PENDING",
+          merchantId: "merch_1",
+          deliveryFee: 60,
+          codFee: 5,
+        }),
+      ],
+    ]
+    dbState.updateResult = [
+      makeOrder({ status: "CANCELLED", deliveryFee: 60, codFee: 5 }),
+    ]
+    const { status } = await call(cancel)
+    expect(status).toBe(200)
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE_REVERSAL"),
+    ).toMatchObject({ amount: -65 })
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CANCELLATION"),
+    ).toBeUndefined()
+  })
+
+  it("charges the cancellation fee when cancelled after pickup (ROADMAP B4)", async () => {
+    sessionState.value = admin
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          status: "IN_WAREHOUSE",
+          deliveryFee: 60,
+          codFee: 5,
+          cancellationFee: 20,
+        }),
+      ],
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "CANCELLED",
+        deliveryFee: 60,
+        codFee: 5,
+        cancellationFee: 20,
+      }),
+    ]
+    const { status } = await call(cancel)
+    expect(status).toBe(200)
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE_REVERSAL"),
+    ).toMatchObject({ amount: -65 })
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CANCELLATION"),
+    ).toMatchObject({ amount: 20 })
+  })
+
+  it("keeps the charge when refundOnCancel is off (ROADMAP B15)", async () => {
+    sessionState.value = merchantSession("merch_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          status: "PENDING",
+          merchantId: "merch_1",
+          deliveryFee: 60,
+          codFee: 5,
+        }),
+      ],
+      [{ refundOnCancel: false }],
+    ]
+    dbState.updateResult = [
+      makeOrder({ status: "CANCELLED", deliveryFee: 60, codFee: 5 }),
+    ]
+    const { status } = await call(cancel)
+    expect(status).toBe(200)
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE_REVERSAL"),
+    ).toBeUndefined()
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CANCELLATION"),
+    ).toBeUndefined()
   })
 
   it("merchant cannot cancel another merchant's PENDING order (403)", async () => {

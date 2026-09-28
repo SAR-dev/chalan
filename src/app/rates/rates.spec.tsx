@@ -45,6 +45,7 @@ const PRICING = [
     extraRatePerKg: 10,
     freeWeightKg: 1,
     maxWeightKg: 10,
+    cancellationFee: 5,
   },
 ]
 
@@ -57,11 +58,14 @@ describe("Public pricing page", () => {
       screen.getByRole("heading", { name: /city-to-city rates/i }),
     ).toBeInTheDocument()
     expect(screen.getByTestId("pricing-table")).toBeInTheDocument()
+    expect(screen.getByTestId("cancellation-fee-table")).toBeInTheDocument()
     // Destination header + origin row labels.
-    expect(screen.getAllByText("Dhaka")).toHaveLength(2)
-    expect(screen.getAllByText("Chattogram")).toHaveLength(2)
-    // Both pairs share the same zone → every cell of the 2×2 grid shows 60 TK.
+    expect(screen.getAllByText("Dhaka")).toHaveLength(4)
+    expect(screen.getAllByText("Chattogram")).toHaveLength(4)
+    // Both pairs share the same zone → every cell of the 2×2 grid shows 60 TK
+    // in the delivery matrix and 5 TK in the cancellation matrix.
     expect(screen.getAllByText("60 TK")).toHaveLength(4)
+    expect(screen.getAllByText("5 TK")).toHaveLength(4)
   })
 
   it("shows an empty state when no routes are published", async () => {
@@ -72,5 +76,8 @@ describe("Public pricing page", () => {
       screen.getByText(/no delivery routes have been published yet/i),
     ).toBeInTheDocument()
     expect(screen.queryByTestId("pricing-table")).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId("cancellation-fee-table"),
+    ).not.toBeInTheDocument()
   })
 })

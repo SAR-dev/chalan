@@ -86,6 +86,7 @@ export function makeOrder(overrides?: Partial<Order>): Order {
     productCost: 500,
     deliveryFee: 60,
     codFee: 0,
+    cancellationFee: 0,
     merchantEarnings: 0,
     merchantNote: null,
     receiverNote: null,

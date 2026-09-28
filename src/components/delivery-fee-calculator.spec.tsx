@@ -10,6 +10,7 @@ const defaultPricing = {
   freeWeightKg: 1,
   maxWeightKg: 10,
   codFeePercentage: 1,
+  cancellationFee: 20,
 }
 
 const dhaka = { id: "c_dhaka", name: "Dhaka", zoneId: "z_dhaka" }
@@ -25,6 +26,7 @@ const dhakaChattogramRow = {
   freeWeightKg: 1,
   maxWeightKg: 10,
   codFeePercentage: 2,
+  cancellationFee: 25,
 }
 
 function mockFetch(
@@ -52,6 +54,7 @@ describe("DeliveryFeeCalculator", () => {
     })
     expect(screen.getAllByText("80 TK").length).toBeGreaterThan(0)
     expect(screen.getByText("COD fee (2%)")).toBeInTheDocument()
+    expect(screen.getByText("Cancellation fee")).toBeInTheDocument()
   })
 
   it("renders an instant estimate from defaults while rates load", async () => {

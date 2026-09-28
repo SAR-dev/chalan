@@ -21,11 +21,13 @@ export function Timeline({
   pickupRider,
   warehouse: warehouseData,
   deliveryRider,
+  minimal = false,
 }: {
   order: Order
   pickupRider: RiderRow | null
   warehouse: WarehouseRow | null
   deliveryRider: RiderRow | null
+  minimal?: boolean
 }) {
   const currentRank = STATUS_RANK[o.status]
   const isReturned = o.status === "RETURNED"
@@ -33,50 +35,55 @@ export function Timeline({
   const isCancelled = o.status === "CANCELLED"
 
   type HandlerInfo = { role: string; name: string; detail?: string } | null
-  const stepHandlers: Partial<Record<StepKey, HandlerInfo>> = {
-    PICKED_UP: pickupRider
-      ? {
-          role: "Pickup rider",
-          name: pickupRider.name,
-          detail: [maskPhone(pickupRider.phone), pickupRider.zone]
-            .filter(Boolean)
-            .join(" · "),
-        }
-      : null,
-    IN_WAREHOUSE: warehouseData
-      ? {
-          role: "Sorting hub",
-          name: warehouseData.name,
-          detail: [
-            warehouseData.city,
-            o.receivedByWarehouse ? `Logged by ${o.receivedByWarehouse}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · "),
-        }
-      : null,
-    OUT_FOR_DELIVERY: deliveryRider
-      ? {
-          role: "Delivery rider",
-          name: deliveryRider.name,
-          detail: [maskPhone(deliveryRider.phone), deliveryRider.zone]
-            .filter(Boolean)
-            .join(" · "),
-        }
-      : null,
-    DELIVERED: deliveryRider
-      ? {
-          role: "Delivery rider",
-          name: deliveryRider.name,
-          detail: [maskPhone(deliveryRider.phone), deliveryRider.zone]
-            .filter(Boolean)
-            .join(" · "),
-        }
-      : null,
-  }
+  // Code lookups (minimal) omit rider names/phones entirely (ROADMAP B11).
+  const stepHandlers: Partial<Record<StepKey, HandlerInfo>> = minimal
+    ? {}
+    : {
+        PICKED_UP: pickupRider
+          ? {
+              role: "Pickup rider",
+              name: pickupRider.name,
+              detail: [maskPhone(pickupRider.phone), pickupRider.zone]
+                .filter(Boolean)
+                .join(" · "),
+            }
+          : null,
+        IN_WAREHOUSE: warehouseData
+          ? {
+              role: "Sorting hub",
+              name: warehouseData.name,
+              detail: [
+                warehouseData.city,
+                o.receivedByWarehouse
+                  ? `Logged by ${o.receivedByWarehouse}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            }
+          : null,
+        OUT_FOR_DELIVERY: deliveryRider
+          ? {
+              role: "Delivery rider",
+              name: deliveryRider.name,
+              detail: [maskPhone(deliveryRider.phone), deliveryRider.zone]
+                .filter(Boolean)
+                .join(" · "),
+            }
+          : null,
+        DELIVERED: deliveryRider
+          ? {
+              role: "Delivery rider",
+              name: deliveryRider.name,
+              detail: [maskPhone(deliveryRider.phone), deliveryRider.zone]
+                .filter(Boolean)
+                .join(" · "),
+            }
+          : null,
+      }
 
   return (
-    <ol className="relative space-y-0">
+    <ol data-testid="track-timeline" className="relative space-y-0">
       {STEPS.map((step, index) => {
         const isLast = index === STEPS.length - 1
         const reached = currentRank >= step.rank
@@ -99,7 +106,10 @@ export function Timeline({
 
         return (
           <Fragment key={step.key}>
-            <li className="flex gap-3.5">
+            <li
+              className="flex gap-3.5"
+              aria-current={isCurrent ? "step" : undefined}
+            >
               {/* Rail */}
               <div className="flex flex-col items-center">
                 <span
@@ -175,7 +185,7 @@ export function Timeline({
                     )}
                   </div>
                 )}
-                {step.key === "PICKED_UP" && reached && (
+                {!minimal && step.key === "PICKED_UP" && reached && (
                   <div className="mt-2.5">
                     <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
                       Pickup proof
@@ -199,7 +209,7 @@ export function Timeline({
                     )}
                   </div>
                 )}
-                {step.key === "DELIVERED" && reached && (
+                {!minimal && step.key === "DELIVERED" && reached && (
                   <div className="mt-2.5">
                     <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
                       Proof of delivery

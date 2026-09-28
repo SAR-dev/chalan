@@ -22,6 +22,27 @@
       "when": 1790566120214,
       "tag": "0002_married_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790599633077,
+      "tag": "0003_right_scarlet_spider",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790604016204,
+      "tag": "0004_simple_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790607518584,
+      "tag": "0005_daffy_starjammers",
+      "breakpoints": true
     }
   ]
 }

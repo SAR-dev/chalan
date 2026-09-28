@@ -142,5 +142,8 @@ describe("Track detail page", () => {
       screen.getByText(/Open the tracking link shared with you/i),
     ).toBeInTheDocument()
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+    // Code lookups render the minimal view (ROADMAP B11): no shipment details.
+    expect(screen.queryByText(/shipment details/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/cash on delivery/i)).not.toBeInTheDocument()
   })
 })

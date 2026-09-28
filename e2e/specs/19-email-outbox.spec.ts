@@ -59,18 +59,25 @@ test.describe("S52. Email outbox", () => {
           [subject],
         )
         return {
-          status: row.rows[0]?.status as string,
+          status: row.rows[0]?.status as string | undefined,
           attempts: Number(row.rows[0]?.attempts ?? 0),
           logs: Number(logs.rows[0]?.n ?? 0),
         }
       })
 
-      // No SMTP in e2e, so the single attempt fails. The row is marked FAILED
-      // (never retried) but it was processed, and the delivery record was
-      // written — failed mails are kept in the DB.
-      expect(after.attempts).toBe(1)
-      expect(after.status).toBe("FAILED")
+      // The row is processed exactly once and a delivery record is always
+      // written. The outcome depends on the environment: CI has no SMTP, so the
+      // single attempt fails and the row is kept FAILED (never retried); a dev
+      // database may have an active `mail_config` (it is preserved across
+      // reseeds), in which case the send succeeds and the queue row is deleted.
       expect(after.logs).toBe(1)
+      if (after.status === undefined) {
+        // Delivered — the queue row is removed on success.
+        expect(after.attempts).toBe(0)
+      } else {
+        expect(after.status).toBe("FAILED")
+        expect(after.attempts).toBe(1)
+      }
     } finally {
       await withDb(async (client) => {
         await client.query(`DELETE FROM email_outbox WHERE id = $1`, [id])

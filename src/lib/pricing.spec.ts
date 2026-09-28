@@ -133,12 +133,12 @@ describe("calcMerchantEarnings", () => {
     expect(calcMerchantEarnings(100, 10, 1)).toBe(89)
   })
 
-  it("floors at 0 when delivery fee exceeds product cost", () => {
-    expect(calcMerchantEarnings(50, 60, 7.5)).toBe(0)
+  it("goes negative when the fees exceed the COD (signed net, ROADMAP B7)", () => {
+    expect(calcMerchantEarnings(50, 60, 7.5)).toBe(-17.5)
   })
 
-  it("floors at 0 when cod fee exceeds product cost", () => {
-    expect(calcMerchantEarnings(5, 0, 10)).toBe(0)
+  it("goes negative when the COD fee exceeds the COD", () => {
+    expect(calcMerchantEarnings(5, 0, 10)).toBe(-5)
   })
 
   it("returns full amount when no fees", () => {
@@ -146,6 +146,6 @@ describe("calcMerchantEarnings", () => {
   })
 
   it("handles zero product cost", () => {
-    expect(calcMerchantEarnings(0, 60, 7.5)).toBe(0)
+    expect(calcMerchantEarnings(0, 60, 7.5)).toBe(-67.5)
   })
 })

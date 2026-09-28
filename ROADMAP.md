@@ -2,17 +2,25 @@
 
 > Forward-looking only. Completed work is tracked in git history, not here.
 >
-> Current health: `pnpm ci:check` ✅ · Unit **1605/1605** ✅ · Build ✅ ·
-> E2E **87/87** ✅ (21 spec files, S1–S54) · real-DB integration suite ✅ in CI ·
-> coverage gate enforced (statements 48 / branches 41 / functions 37 / lines 49,
-> measured 49.48 / 42.78 / 38.60 / 50.12) · dependency tree has
-> **0 high/critical advisories** · route-auth-guard test enforces server-side
-> auth on all API routes.
+> **Health:** `pnpm ci:check` green · Unit **1673 pass / 8 skip** · Build green ·
+> E2E **89/89** (21 spec files, S1–S55; next serial **S56**) · real-DB
+> integration suite 8/8 in CI · coverage gate enforced (statements 48 /
+> branches 41 / functions 37 / lines 49; measured **50.19 / 43.75 / 39.46 /
+> 50.92**) · route-auth-guard test enforces server-side auth on all API routes.
 >
-> Every change verifies with: `pnpm ci:check` → `pnpm test:unit:run` →
-> `pnpm build` → `pnpm test:e2e`.
+> **Every change verifies with:** `pnpm ci:check` → `pnpm test:unit:run` →
+> `pnpm build` → `pnpm test:e2e` (+ `pnpm test:integration` when DB invariants
+> move).
+>
+> The business-logic audit (payout caps, partial COD, rider cash, cancel/return
+> fees, pricing fallback, signed earnings, suspension gate, stale-order aging,
+> tracking hardening, explicit charge-reversal type, order idempotency,
+> calculator cancellation fee, configurable refund-on-cancel) is **complete** —
+> all findings shipped. New concerns start a fresh section here.
 
 ---
+
+# Product & growth
 
 ## P4.1 Notification system (deferred — design kept)
 
@@ -27,8 +35,8 @@ mirroring `audit.ts`; bell + unread badge in all four shells; `GET
 
 ## P4.2 Quick wins
 
-Subscription/pricing display on the merchant dashboard; pricing tiers on the
-landing page; help-center polish (FAQ deep links).
+Subscription/pricing display on the merchant dashboard; help-center polish (FAQ
+deep links from order/support screens).
 
 ## P4.3 Growth backlog
 
@@ -56,7 +64,7 @@ landing page; help-center polish (FAQ deep links).
 
 ---
 
-## Guardrails — verified-clean areas (don't regress these)
+# Guardrails — verified-clean areas (don't regress these)
 
 - **Uploads**: content-type/size/folder allowlists + traversal defense
   (`uploads/route.ts`, `uploads/[...path]/route.ts`), owner-or-admin read policy
@@ -71,8 +79,9 @@ landing page; help-center polish (FAQ deep links).
 - **Admin surface**: write sites gated to SUPER_ADMIN (or role-appropriate) —
   the route-auth-guard test makes this a *static* guarantee.
 - **Public tracking**: only a secretless PII-free receiver note is writable, and
-  it requires the per-order tracking token; reads by the sequential code stay
-  allowed for the parcel-label UX.
+  it requires the per-order tracking token. Code lookups are rate-limited and
+  render a minimal view (status + area, no COD/weight/rider/proof) with no
+  status in metadata.
 - **Session policy**: `requireSession()` enforces banned users, admin 2FA
   enrolment and merchant email verification server-side — not just via browser
   redirects.
@@ -83,8 +92,13 @@ landing page; help-center polish (FAQ deep links).
   verification tokens stored hashed; console logs carry no live tokens.
 - **Money**: all money columns are `numeric(14,2)`; `merchant_balance` must
   always equal the sum of its SETTLED ledger rows (asserted in tests as an exact
-  SQL `=`, not a float tolerance).
+  SQL `=`, not a float tolerance). Payouts are capped at available credit;
+  partial COD is credited at the collected amount; returns/cancels write an
+  `ORDER_CHARGE_REVERSAL` + a positive `ORDER_CANCELLATION` row (cancel refunds
+  gated by `platform_config.refundOnCancel`); order creation is idempotent via
+  the `Idempotency-Key` header (`src/lib/balance-ledger.ts` worked examples).
 - **Logging**: `logger` (never `console.*`) on the request/error path, and
   `x-request-id` on every response for correlation.
-- **Spec coverage**: 1605 unit + 87 e2e — keep new routes/branches covered
-  (colocated `<resource>.spec.ts`; e2e `S<n>` serial, next is S55).
+- **Spec coverage**: 1671 unit + 89 e2e — keep new routes/branches covered
+  (colocated `<resource>.spec.ts`; e2e `S<n>` serial, next is **S56**).
+

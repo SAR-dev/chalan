@@ -33,7 +33,9 @@ export const payoutRequestStatuses = [
 
 export const balanceTxTypes = [
   "ORDER_CHARGE", // auto-created when an order is placed — merchant charged platform fees
+  "ORDER_CHARGE_REVERSAL", // order returned/cancelled — creation fees refunded
   "ORDER_EARNINGS", // order delivered — merchant earnings reduce debt
+  "ORDER_CANCELLATION", // order returned — platform fee refunded, cancellation fee charged
   "PAYOUT", // payout paid — reduces merchant debt
   "PAYMENT_PENDING", // merchant submits proof of payment; balance not yet reduced
   "PAYMENT_CONFIRMED", // admin confirms the payment; balance is reduced

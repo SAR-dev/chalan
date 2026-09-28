@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
 import {
+  cancellationChargeAmount,
   codCollectedAmount,
   orderChargeAmount,
+  orderChargeReversalAmount,
   paymentAmount,
   payoutAmount,
   settledTotal,
@@ -33,6 +35,16 @@ describe("ledger entry amounts", () => {
 
   it("records a merchant payment as negative", () => {
     expect(paymentAmount(50)).toBe(-50)
+  })
+
+  it("refunds the creation fees on a return (negative reversal)", () => {
+    expect(orderChargeReversalAmount(10, 1)).toBe(-11)
+    expect(orderChargeReversalAmount(10.005, 0.005)).toBe(-10.01)
+  })
+
+  it("charges the cancellation fee on a return (positive)", () => {
+    expect(cancellationChargeAmount(3)).toBe(3)
+    expect(cancellationChargeAmount(0)).toBe(0)
   })
 })
 
@@ -66,6 +78,39 @@ describe("worked example — productCost 100, deliveryFee 10, codFee 1", () => {
   it("leaves the platform's fee revenue intact (11)", () => {
     // balance 0 == platform keeps the 11 it charged and paid out the rest.
     expect(orderChargeAmount(10, 1)).toBe(11)
+  })
+})
+
+describe("worked example — returned order (productCost 100, fees 11, cancellationFee 3)", () => {
+  // The canonical return story from lib/balance-ledger.ts: the creation charge
+  // is reversed and only the cancellation fee remains owed.
+  const rows = [
+    {
+      type: "ORDER_CHARGE",
+      amount: orderChargeAmount(10, 1),
+      status: "SETTLED",
+    },
+    {
+      type: "ORDER_CHARGE",
+      amount: orderChargeReversalAmount(10, 1),
+      status: "SETTLED",
+    },
+    {
+      type: "ORDER_CANCELLATION",
+      amount: cancellationChargeAmount(3),
+      status: "SETTLED",
+    },
+  ]
+
+  it("leaves the merchant owing only the cancellation fee", () => {
+    expect(settledTotal(rows)).toBe(3)
+  })
+
+  it("refunds the delivery + COD fees minus the cancellation fee", () => {
+    // Net credit to the merchant = 11 - 3 = 8.
+    const netChange =
+      orderChargeReversalAmount(10, 1) + cancellationChargeAmount(3)
+    expect(netChange).toBe(-8)
   })
 })
 

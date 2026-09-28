@@ -1,4 +1,21 @@
+import fs from "node:fs"
+import { config as loadEnv } from "dotenv"
 import { defineConfig, devices } from "@playwright/test"
+
+// E2E can run against its own env file. If `.env.e2e` exists it is loaded here,
+// into the Playwright runner process, so every child inherits it:
+//   - the webServer command (db:seed:full && next start)
+//   - the test workers (specs read DATABASE_URL, CRON_SECRET, … directly)
+// Values already set in the shell win, and anything omitted from `.env.e2e`
+// still falls back to `.env` (Next's loader and the specs' `dotenv/config`
+// never overwrite already-set vars). Copy `.env.e2e.example` to `.env.e2e` to
+// point the suite at a dedicated test database.
+if (fs.existsSync(".env.e2e")) loadEnv({ path: ".env.e2e", quiet: true })
+
+// With a dedicated `.env.e2e`, never reuse a server that's already on the port
+// (e.g. a `pnpm dev` session) — it would be running against `.env`, not the
+// e2e config. Without `.env.e2e`, keep the convenient local reuse.
+const hasE2eEnv = fs.existsSync(".env.e2e")
 
 export default defineConfig({
   testDir: "./e2e/specs",
@@ -29,7 +46,7 @@ export default defineConfig({
     // each run begins from the same known data (see seed/index-full.ts).
     command: "pnpm db:seed:full && pnpm start",
     url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !hasE2eEnv,
     timeout: 180_000,
     // Better Auth's rate limiter (max: 10/min against get-session in production)
     // gets exhausted by the suite's many logins/session checks, causing auth
@@ -43,6 +60,10 @@ export default defineConfig({
       // (redacted) body too, so a failing run shows the mail in the server
       // console and you can follow a link by hand.
       LOG_EMAIL_BODY: "1",
+      // Insert an (unreachable) active mail_config during the seed so routes
+      // gated on hasActiveMailConfig() — resend-activation, verify-email — are
+      // reachable. Sends still fail, so `email_log` FAILED rows keep the links.
+      SEED_MAIL_CONFIG: "1",
     },
   },
 })
