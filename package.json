@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.20.0",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=24 <25"
   },
   "scripts": {
     "dev": "next dev",
@@ -78,7 +78,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/mjml": "^5.0.0",
-    "@types/node": "^22",
+    "@types/node": "^24",
     "@types/nodemailer": "^8.0.1",
     "@types/papaparse": "^5.5.2",
     "@types/pg": "^8.20.0",
