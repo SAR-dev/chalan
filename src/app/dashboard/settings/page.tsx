@@ -78,6 +78,7 @@ export default function DashboardSettingsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [mailSaving, setMailSaving] = useState(false)
+  const [mailTesting, setMailTesting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<MailConfig | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -150,6 +151,25 @@ export default function DashboardSettingsPage() {
       }
     } finally {
       setMailSaving(false)
+    }
+  }
+
+  async function handleTestMail() {
+    setMailTesting(true)
+    try {
+      const res = await fetch("/api/admin/mail-config/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) {
+        toast.success("Test email sent — check your inbox.")
+      } else {
+        const resData = await res.json()
+        toast.error(formatError(resData, "Failed to send test email."))
+      }
+    } finally {
+      setMailTesting(false)
     }
   }
 
@@ -394,7 +414,9 @@ export default function DashboardSettingsPage() {
         form={form}
         onFormChange={setForm}
         onSubmit={handleCreateMail}
+        onTest={handleTestMail}
         saving={mailSaving}
+        testing={mailTesting}
       />
 
       <ConfirmDialog

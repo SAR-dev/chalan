@@ -2,22 +2,25 @@ import { and, eq, inArray, lt, lte } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { emailOutbox } from "@/lib/db/schema"
 import { logger } from "@/lib/logger"
-import { sendMail } from "@/lib/mailer"
+import { sendMail, toPlainText } from "@/lib/mailer"
 
 // =============================================================================
 // Transactional email outbox (ROADMAP P1.5)
 //
-// Fire-and-forget `sendMail(...)` calls lose the send (and its in-process
-// retries) when a serverless invocation freezes or the process dies after the
-// domain write commits. Instead, callers persist a row here in the same
-// transaction as the domain change, then drain it:
+// Fire-and-forget `sendMail(...)` calls lose the send when a serverless
+// invocation freezes or the process dies after the domain write commits.
+// Instead, callers persist a row here in the same transaction as the domain
+// change, then drain it:
 //
 //   - `enqueueEmail(payload, tx)` writes the row (inside the caller's tx when
 //     one is passed, so state + intent commit together).
 //   - `flushEmailOutbox()` / `drainEmailOutbox()` send due rows through the
 //     existing mailer (which writes the `email_log` delivery record) and delete
-//     the row on success, or requeue it with exponential backoff on failure.
-//   - `POST /api/cron/drain-email-outbox` drains rows left behind by a crash.
+//     the row on success, or mark it FAILED on failure.
+//
+// There is no retry: a row is attempted once and, if delivery fails, is kept
+// as FAILED in the DB (with the error on `lastError`) so it can be reviewed or
+// manually re-sent. Only the plain-text version of the body is stored.
 // =============================================================================
 
 /** Transaction handle as returned by `db.transaction()`. */
@@ -30,14 +33,12 @@ export interface OutboxEmail {
   text?: string
 }
 
-const MAX_ATTEMPTS = 5
 const STALE_SENDING_MS = 10 * 60_000
 
 export interface DrainResult {
   claimed: number
   sent: number
   failed: number
-  requeued: number
 }
 
 /** Persist an email for delivery. Pass `tx` to commit it with the domain
@@ -47,23 +48,20 @@ export async function enqueueEmail(
   tx?: EmailOutboxTx,
 ): Promise<void> {
   const runner = tx ?? db
+  // Only the plain-text body is kept — the HTML is not stored.
+  const text = email.text ?? (email.html ? toPlainText(email.html) : null)
   await runner.insert(emailOutbox).values({
     to: Array.isArray(email.to) ? email.to.join(", ") : email.to,
     subject: email.subject,
-    html: email.html ?? null,
-    text: email.text ?? null,
+    text,
   })
-}
-
-function backoffMs(attempts: number): number {
-  // 1 min, 2, 4, 8 … capped at 1 hour.
-  return Math.min(60_000 * 2 ** (attempts - 1), 60 * 60_000)
 }
 
 /**
  * Send every due outbox row (up to `limit`). Claims rows under
  * `FOR UPDATE SKIP LOCKED`, so concurrent drains never double-send. Returns
- * counts for logging/tests.
+ * counts for logging/tests. Rows that fail are marked FAILED in place and are
+ * never retried.
  */
 export async function drainEmailOutbox({
   limit = 20,
@@ -117,44 +115,35 @@ export async function drainEmailOutbox({
 
   let sent = 0
   let failed = 0
-  let requeued = 0
 
   for (const row of claimed) {
     try {
-      await sendMail(
-        {
-          to: row.to,
-          subject: row.subject,
-          html: row.html ?? undefined,
-          text: row.text ?? undefined,
-        },
-        { maxRetries: 0 },
-      )
+      await sendMail({
+        to: row.to,
+        subject: row.subject,
+        ...(row.text ? { text: row.text } : {}),
+      })
       // Success: `email_log` is the delivery record, so drop the queue row.
       await db.delete(emailOutbox).where(eq(emailOutbox.id, row.id))
       sent++
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      const attempts = row.attempts + 1
-      const isFinal = attempts >= MAX_ATTEMPTS
+      // Single attempt, no requeue: the row stays so the admin can see the
+      // failure (`email_log` holds the DUR record; this row holds the intent).
       await db
         .update(emailOutbox)
         .set({
-          status: isFinal ? "FAILED" : "PENDING",
-          attempts,
+          status: "FAILED",
+          attempts: row.attempts + 1,
           lastError: message.slice(0, 500),
-          nextAttemptAt: new Date(
-            Date.now() + backoffMs(attempts),
-          ).toISOString(),
           updatedAt: new Date().toISOString(),
         })
         .where(eq(emailOutbox.id, row.id))
-      if (isFinal) failed++
-      else requeued++
+      failed++
     }
   }
 
-  return { claimed: claimed.length, sent, failed, requeued }
+  return { claimed: claimed.length, sent, failed }
 }
 
 /** Drain once and never throw — for use right after a domain commit. */

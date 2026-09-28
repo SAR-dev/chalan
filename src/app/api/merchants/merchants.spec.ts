@@ -43,6 +43,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/mailer", () => ({
   sendMail: () => Promise.resolve(),
+  toPlainText: (html: string) => html.replace(/<[^>]+>/g, ""),
 }))
 
 vi.mock("@/lib/email-outbox", () => ({
@@ -52,7 +53,6 @@ vi.mock("@/lib/email-outbox", () => ({
     claimed: 0,
     sent: 0,
     failed: 0,
-    requeued: 0,
   })),
 }))
 

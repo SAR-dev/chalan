@@ -31,7 +31,6 @@ vi.mock("@/lib/email-outbox", () => ({
     claimed: 0,
     sent: 0,
     failed: 0,
-    requeued: 0,
   })),
 }))
 

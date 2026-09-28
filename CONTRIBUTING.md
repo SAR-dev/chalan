@@ -61,6 +61,7 @@ src/app/
   api/audit-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/[id]/route.ts        GET detail (bodies), PATCH mark failed email as sent
+  api/admin/mail-config/test/route.ts POST — send a test email from unsaved Add Config credentials (Super Admin)
   api/cron/cleanup-sessions/route.ts  DELETE expired sessions (hourly)
   api/cron/cleanup-audit-logs/route.ts  DELETE old audit log entries (daily)
   api/cron/cleanup-email-logs/route.ts  DELETE old sent email logs (daily)
@@ -1399,12 +1400,15 @@ Key env vars:
 ## 6. Email (`src/lib/mailer.ts`)
 
 Transactional email goes through `sendMail()` from `src/lib/mailer.ts`. It uses
-nodemailer with retry/backoff. SMTP config is read from the `mail_config` DB
-table (managed via Super Admin settings). Every fully-resolved send (delivered,
-or all retries exhausted) is recorded to the `email_log` table — this is the
-Admin/Super Admin "Email logs" history at `/dashboard/email-logs`. Failed
-sends are additionally stored in `failed_mail`, kept for any future
-manual-resend tooling. HTML templates live in `src/lib/mail-templates.ts`.
+nodemailer without retries — every email is attempted exactly once. SMTP config
+is read from the `mail_config` DB table (managed via Super Admin settings;
+changing a config takes effect immediately — the SMTP transporter is cached per
+credential set). Every send attempt is recorded to the `email_log` table (SENT
+or FAILED) — this is the Admin/Super Admin "Email logs" history at
+`/dashboard/email-logs`. Failed mails are kept in the DB (the cleanup cron only
+deletes successful rows) so they can be reviewed or manually re-sent. Only the
+plain-text version of the body is stored — HTML is not persisted. HTML
+templates live in `src/lib/mail-templates.ts`.
 
 ```ts
 import { sendMail } from "@/lib/mailer"
@@ -1416,13 +1420,29 @@ await sendMail({
 })
 ```
 
+For emails that must survive a crashed/frozen request, persist a row through
+`enqueueEmail(payload, tx)` from `src/lib/email-outbox.ts` inside the same
+transaction as the domain change, then `flushEmailOutbox()` after commit. The
+drain worker (`POST /api/cron/drain-email-outbox`) delivers rows left behind by
+a crash. A failed outbox row is marked `FAILED` and kept — it is never retried.
+
 Never call nodemailer (or any SMTP client) directly outside `src/lib/mailer.ts`,
-and never insert into `email_log` / `failed_mail` from anywhere else —
-`sendMail()` is the only writer. The one allowed exception is
+and never insert into `email_log` from anywhere else — `sendMail()` is the only
+writer. The one allowed exception is
 `src/app/api/email-logs/[id]/route.ts`, which lets an Admin/Super Admin manually
 flip a `FAILED` row to `SENT` after confirming delivery or resending by hand —
 that mutation calls `logAudit()` (see [§3.5](#35-audit-log-libauditts)) so the
 override itself is traceable.
+
+The Add Mail Config dialog ("Send test email" button) hits
+`POST /api/admin/mail-config/test` (Super Admin only). It calls
+`sendTestMail()` from `src/lib/mailer.ts`, which builds a throwaway transporter
+from the *unsaved* form values — never reading the DB — so the admin can verify
+host/user/password before committing. Unlike `sendMail()`, `sendTestMail()`
+does **not** write an `email_log` row (it is a pre-save diagnostic, and the
+unsaved credentials must not appear in the delivery history). SMTP failures
+surface verbatim (e.g. nodemailer's `535 … Username and Password not accepted`)
+as a 400 so the admin can correct the form.
 
 ---
 

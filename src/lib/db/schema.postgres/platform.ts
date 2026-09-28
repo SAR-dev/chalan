@@ -23,11 +23,10 @@ import { money, ts } from "./helpers"
 // =============================================================================
 // Email log
 //
-// A row is inserted by sendMail() for every send attempt that's fully
-// resolved (either delivered, or exhausted all retries). This is the
-// complete email history shown to Admin/Super Admin — failed_mail above
-// remains untouched (and still used for any future manual-resend tooling),
-// this table is the superset that also includes successful sends.
+// A row is inserted by sendMail() for every send attempt (one attempt per
+// email — no retries). SENT rows are the delivery record; FAILED rows are kept
+// so failed mail is retained in the DB for review or manual re-send. This is
+// the complete email history shown to Admin/Super Admin.
 // =============================================================================
 
 export const emailLog = pgTable(
@@ -43,9 +42,8 @@ export const emailLog = pgTable(
     attempts: integer("attempts").notNull(),
     // Populated only when status is FAILED.
     error: text("error"),
-    // Raw HTML body of the email, stored for inspection in Email Logs.
-    body: text("body"),
-    // Plain-text version of the email body, stored for manual re-sends.
+    // Plain-text version of the email body, stored for inspection in Email
+    // Logs and for manual re-sends. The HTML version is NOT stored.
     textBody: text("textBody"),
     createdAt: ts("createdAt").notNull().defaultNow(),
     updatedAt: ts("updatedAt").notNull().defaultNow(),
@@ -72,8 +70,9 @@ export const emailLog = pgTable(
 // transaction as the domain change (via `enqueueEmail`), so a crash or a frozen
 // serverless invocation cannot lose the send. A worker/cron drains due rows
 // with `drainEmailOutbox()`, which sends through the existing mailer (writing
-// the `email_log` delivery record) and deletes the row on success. Failed rows
-// stay for retry with exponential backoff.
+// the `email_log` delivery record) and deletes the row on success, or marks it
+// FAILED. Rows are attempted once and never retried; only the plain-text body
+// is stored.
 // =============================================================================
 
 export const emailOutbox = pgTable(
@@ -84,14 +83,14 @@ export const emailOutbox = pgTable(
       .$defaultFn(() => createId()),
     to: text("to").notNull(), // comma-joined if multiple recipients
     subject: text("subject").notNull(),
-    html: text("html"),
     text: text("text"),
     status: text("status", { enum: emailOutboxStatuses })
       .notNull()
       .default("PENDING"),
     attempts: integer("attempts").notNull().default(0),
     lastError: text("lastError"),
-    // Earliest time the row may be attempted again (exponential backoff).
+    // Earliest time the row may be attempted. With no retries this is always
+    // the enqueue time; kept for the initial deliver-by contract.
     nextAttemptAt: ts("nextAttemptAt").notNull().defaultNow(),
     sentAt: ts("sentAt"),
     createdAt: ts("createdAt").notNull().defaultNow(),

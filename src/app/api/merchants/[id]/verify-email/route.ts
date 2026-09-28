@@ -63,22 +63,10 @@ export const POST = withErrorHandler(
       verificationUrl,
     })
 
-    sendMail(
-      {
-        to: current.email,
-        ...template,
-      },
-      {
-        maxRetries: 3,
-        baseDelayMs: 1000,
-        onRetry: (attempt, err) =>
-          logger.warn("Verification email retry", {
-            attempt,
-            to: current.email,
-            err,
-          }),
-      },
-    ).catch((err) => logger.error("Verification email failed", { err }))
+    sendMail({
+      to: current.email,
+      ...template,
+    }).catch((err) => logger.error("Verification email failed", { err }))
 
     return NextResponse.json({ success: true })
   },

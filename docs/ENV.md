@@ -59,6 +59,12 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 | `MAIL_DISABLED`    | No           | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)            |
 | `LOG_EMAIL_BODY`   | No           | —       | Set to `1` to add the (redacted + truncated) message body to the `Sending email` log line. **Off by default** — the body carries customer content, so stdout stays envelope-only (ROADMAP P4.4). The full body is always available in the admin-only Email Logs page. |
 
+Each email is sent **once** — there is no retry and no outbox requeue/backoff.
+Every send attempt is recorded in `email_log` (SENT or FAILED); failed mails
+are kept in the DB for review/manual re-send (the success-only cleanup cron
+never deletes them). Only the plain-text version of the body is stored — the
+HTML is not persisted.
+
 ---
 
 ## Rate Limiting
@@ -152,7 +158,7 @@ manual invocations only.
 > as a *success*, so the outbox row is deleted and no `email_log` record is
 > written — the specs that read activation/verification links out of
 > `email_log` (S42, S47) and the outbox assertions (S52) depend on the
-> "attempted, logged as FAILED, requeued" path.
+> "attempted, logged as FAILED, kept for review" path.
 
 | Variable                   | Required | Default | Description                                                    |
 | -------------------------- | -------- | ------- | -------------------------------------------------------------- |

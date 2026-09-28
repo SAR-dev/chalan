@@ -43,7 +43,10 @@ vi.mock("@/lib/db", () => {
     pool: {},
   }
 })
-vi.mock("@/lib/mailer", () => ({ sendMail: vi.fn() }))
+vi.mock("@/lib/mailer", () => ({
+  sendMail: vi.fn(),
+  toPlainText: (html: string) => html.replace(/<[^>]+>/g, ""),
+}))
 
 describe("hashActivationToken", () => {
   it("is a stable SHA-256 hex digest", () => {

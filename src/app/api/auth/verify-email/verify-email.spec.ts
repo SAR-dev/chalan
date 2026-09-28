@@ -48,6 +48,7 @@ vi.mock("@/lib/mail-templates", () => ({
 
 vi.mock("@/lib/mailer", () => ({
   sendMail: vi.fn(),
+  toPlainText: (html: string) => html.replace(/<[^>]+>/g, ""),
 }))
 
 beforeEach(() => {
