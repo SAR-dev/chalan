@@ -18,6 +18,7 @@ import { POST as createMerchant, GET as listMerchants } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
+let mailConfigEnabled = true
 
 vi.mock("@/lib/api-auth", () => ({
   requireSession: () => Promise.resolve(sessionState.value),
@@ -54,6 +55,11 @@ vi.mock("@/lib/email-outbox", () => ({
     sent: 0,
     failed: 0,
   })),
+}))
+
+vi.mock("@/lib/mail-config", () => ({
+  hasActiveMailConfig: () => Promise.resolve(mailConfigEnabled),
+  MAIL_NOT_CONFIGURED_MESSAGE: "Mail server is not set up yet.",
 }))
 
 const selectQueue: unknown[][] = []
@@ -134,6 +140,7 @@ beforeEach(() => {
   transactionError = null
   sessionState.value = null
   rateLimited = false
+  mailConfigEnabled = true
   vi.mocked(logAudit).mockClear()
 })
 
@@ -969,6 +976,26 @@ describe("POST /api/merchants/:id/verify-email", () => {
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toContain("already verified")
+  })
+
+  it("400 when no active mail config exists", async () => {
+    sessionState.value = merchantSession
+    mailConfigEnabled = false
+    selectQueue.push([
+      {
+        id: "m_1",
+        status: "PENDING",
+        email: "test@test.com",
+        ownerName: "Owner",
+        businessName: "Biz",
+        emailVerifiedAt: null,
+      },
+    ])
+    const res = await sendVerifyEmail(req("POST"), ctx())
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toContain("Mail server is not set up")
+    expect(updatePayloads).toHaveLength(0)
   })
 
   it("sends verification email for own merchant", async () => {

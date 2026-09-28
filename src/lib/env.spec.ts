@@ -25,7 +25,7 @@ const OPTIONAL_VARS = [
   "SMTP_SECRET_KEY",
   "NEXT_PUBLIC_BASE_URL",
   "TRUSTED_PROXY_HOPS",
-  "NEXT_MODE",
+  "NEXT_DEVELOPMENT_MODE",
 ]
 
 function allKeys() {
@@ -152,41 +152,41 @@ describe("validateEnv", () => {
     expect(() => validateEnv()).toThrow("PORTAL_MODE")
   })
 
-  it("accepts NEXT_MODE off", () => {
+  it("accepts NEXT_DEVELOPMENT_MODE off", () => {
     for (const value of ["false", "0"]) {
-      setEnv({ ...baseEnv(), NEXT_MODE: value })
+      setEnv({ ...baseEnv(), NEXT_DEVELOPMENT_MODE: value })
       expect(validateEnv()).toBeUndefined()
     }
   })
 
-  it("accepts NEXT_MODE on in development", () => {
+  it("accepts NEXT_DEVELOPMENT_MODE on in development", () => {
     for (const value of ["true", "1"]) {
-      setEnv({ ...baseEnv(), NEXT_MODE: value })
+      setEnv({ ...baseEnv(), NEXT_DEVELOPMENT_MODE: value })
       expect(validateEnv()).toBeUndefined()
     }
   })
 
-  it("rejects an unparseable NEXT_MODE", () => {
-    setEnv({ ...baseEnv(), NEXT_MODE: "trst" })
-    expect(() => validateEnv()).toThrow("NEXT_MODE")
+  it("rejects an unparseable NEXT_DEVELOPMENT_MODE", () => {
+    setEnv({ ...baseEnv(), NEXT_DEVELOPMENT_MODE: "trst" })
+    expect(() => validateEnv()).toThrow("NEXT_DEVELOPMENT_MODE")
   })
 
-  it("rejects NEXT_MODE in production — it would publish seed credentials", () => {
+  it("rejects NEXT_DEVELOPMENT_MODE in production — it would publish seed credentials", () => {
     setEnv({
       ...baseEnv(),
       NEXT_PUBLIC_ENV: "production",
       SMTP_SECRET_KEY: "b".repeat(64),
-      NEXT_MODE: "true",
+      NEXT_DEVELOPMENT_MODE: "true",
     })
-    expect(() => validateEnv()).toThrow("NEXT_MODE")
+    expect(() => validateEnv()).toThrow("NEXT_DEVELOPMENT_MODE")
   })
 
-  it("accepts NEXT_MODE=false in production", () => {
+  it("accepts NEXT_DEVELOPMENT_MODE=false in production", () => {
     setEnv({
       ...baseEnv(),
       NEXT_PUBLIC_ENV: "production",
       SMTP_SECRET_KEY: "b".repeat(64),
-      NEXT_MODE: "false",
+      NEXT_DEVELOPMENT_MODE: "false",
     })
     expect(validateEnv()).toBeUndefined()
   })

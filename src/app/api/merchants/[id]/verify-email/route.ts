@@ -5,6 +5,10 @@ import { badRequest, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { logger } from "@/lib/logger"
+import {
+  hasActiveMailConfig,
+  MAIL_NOT_CONFIGURED_MESSAGE,
+} from "@/lib/mail-config"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
@@ -41,6 +45,10 @@ export const POST = withErrorHandler(
 
     if (current.emailVerifiedAt) {
       return badRequest("Email is already verified")
+    }
+
+    if (!(await hasActiveMailConfig())) {
+      return badRequest(MAIL_NOT_CONFIGURED_MESSAGE)
     }
 
     // Only the hash is stored (ROADMAP P0.7); the raw token lives in the email.

@@ -91,18 +91,20 @@ function ctx(id = "z_1") {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/delivery-zones", () => {
-  it("401 when unauthenticated", async () => {
-    const res = await listActiveZones()
-    expect(res.status).toBe(401)
-  })
-
-  it("returns active zones for any signed-in role", async () => {
-    sessionState.value = merchantSession
+  it("returns active zones without a session (public)", async () => {
     selectQueue.push([{ id: "z_1", name: "Dhaka" }])
     const res = await listActiveZones()
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toHaveLength(1)
+    expect(json[0]).toEqual({ id: "z_1", name: "Dhaka" })
+  })
+
+  it("returns active zones for signed-in roles too", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([{ id: "z_1", name: "Dhaka" }])
+    const res = await listActiveZones()
+    expect(res.status).toBe(200)
   })
 })
 

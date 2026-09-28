@@ -6,8 +6,8 @@
 //
 // Add new vars here as the app grows — group them by concern.
 
+import { devModeFlagSet } from "@/lib/dev-mode"
 import { parseAllowlist } from "@/lib/ip-allowlist"
-import { nextModeFlagSet } from "@/lib/next-mode"
 
 type EnvError = { key: string; message: string }
 
@@ -217,17 +217,18 @@ export function validateEnv(): void {
     // runtime by proxy/api-auth, so changing it needs a restart.
     oneOf(e, "PORTAL_MODE", ["admin", "public", "all"], "all")
 
-    // Optional — NEXT_MODE="true" turns on the seeded-demo sign-in helper (a
-    // dropdown of the well-known dev accounts on /login). It puts account
+    // Optional — NEXT_DEVELOPMENT_MODE="true" turns on the seeded-demo helpers:
+    // a sign-in dropdown of the well-known dev accounts on /login, a demo
+    // banner, and a daily midnight reset to the basic seed. It puts account
     // credentials in the browser, so a production deployment that enables it is
     // a misconfiguration worth failing boot over.
-    if (process.env.NEXT_MODE) {
-      oneOf(e, "NEXT_MODE", ["0", "1", "true", "false"], "false")
-      // Read the raw flag, not isNextModeEnabled() — the latter is already
+    if (process.env.NEXT_DEVELOPMENT_MODE) {
+      oneOf(e, "NEXT_DEVELOPMENT_MODE", ["0", "1", "true", "false"], "false")
+      // Read the raw flag, not isDevModeEnabled() — the latter is already
       // forced off in production, which would make this check unreachable.
-      if (isProd && nextModeFlagSet()) {
+      if (isProd && devModeFlagSet()) {
         e.push({
-          key: "NEXT_MODE",
+          key: "NEXT_DEVELOPMENT_MODE",
           message:
             "Must not be enabled in production — it exposes seeded account credentials on the sign-in page.",
         })

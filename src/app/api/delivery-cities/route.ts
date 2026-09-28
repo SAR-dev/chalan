@@ -1,21 +1,15 @@
 import { asc, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { requireSession } from "@/lib/api-auth"
-import { unauthorized } from "@/lib/api-response"
-import { db } from "@/lib/db"
+import { dbRead } from "@/lib/db"
 import { deliveryCity, warehouse } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const GET = withErrorHandler(async () => {
-  const me = await requireSession()
-  if (!me) return unauthorized()
-
-  const cities = await db
+  const cities = await dbRead
     .select({
       id: deliveryCity.id,
       name: deliveryCity.name,
       warehouseId: deliveryCity.warehouseId,
-      warehouseName: warehouse.name,
       zoneId: deliveryCity.zoneId,
     })
     .from(deliveryCity)

@@ -3,7 +3,7 @@
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { SeededSignIn } from "@/lib/next-mode"
+import type { SeededSignIn } from "@/lib/dev-mode"
 import { LoginForm } from "./login-form"
 
 const push = vi.fn()
@@ -30,7 +30,7 @@ const ACCOUNTS: SeededSignIn[] = [
   { label: "Merchant", email: "merchant1@email.com", password: "12qwaszx" },
 ]
 
-describe("LoginForm demo-account picker (NEXT_MODE)", () => {
+describe("LoginForm demo-account picker (NEXT_DEVELOPMENT_MODE)", () => {
   beforeEach(() => {
     push.mockClear()
     replace.mockClear()

@@ -1,11 +1,11 @@
 import { Loader2 } from "lucide-react"
 import { Suspense } from "react"
-import { seededSignIns } from "@/lib/next-mode"
+import { seededDevSignIns } from "@/lib/dev-mode"
 import { LoginForm } from "./login-form"
 
-// Server component so NEXT_MODE stays off the client bundle: the flag is
-// resolved here and only the resulting list (empty in production) is handed to
-// the form. See src/lib/next-mode.ts.
+// Server component so NEXT_DEVELOPMENT_MODE stays off the client bundle: the
+// flag is resolved here and only the resulting list (empty in production) is
+// handed to the form. See src/lib/dev-mode.ts.
 export default function LoginPage() {
   return (
     <Suspense
@@ -15,7 +15,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginForm seededSignIns={seededSignIns()} />
+      <LoginForm seededSignIns={seededDevSignIns()} />
     </Suspense>
   )
 }

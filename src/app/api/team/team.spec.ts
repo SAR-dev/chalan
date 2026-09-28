@@ -38,6 +38,15 @@ const activationState = vi.hoisted(() => ({
   sendActivationEmail: vi.fn(async () => {}),
 }))
 
+const mailConfigState = vi.hoisted(() => ({
+  hasActiveMailConfig: vi.fn(async () => true),
+}))
+
+vi.mock("@/lib/mail-config", () => ({
+  hasActiveMailConfig: mailConfigState.hasActiveMailConfig,
+  MAIL_NOT_CONFIGURED_MESSAGE: "Mail server is not set up yet.",
+}))
+
 vi.mock("@/lib/activation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/activation")>()),
   issueActivationToken: activationState.issueActivationToken,
@@ -115,6 +124,8 @@ beforeEach(() => {
   sessionState.value = null
   activationState.issueActivationToken.mockClear()
   activationState.sendActivationEmail.mockClear()
+  mailConfigState.hasActiveMailConfig.mockReset()
+  mailConfigState.hasActiveMailConfig.mockResolvedValue(true)
   vi.mocked(logAudit).mockClear()
 })
 
@@ -281,6 +292,19 @@ describe("POST /api/team/:id/resend-activation", () => {
     ])
     const res = await resendActivation(req("POST"), ctx())
     expect(res.status).toBe(400)
+  })
+
+  it("400 when no active mail config exists", async () => {
+    sessionState.value = superAdmin
+    mailConfigState.hasActiveMailConfig.mockResolvedValue(false)
+    selectQueue.push([
+      { activatedAt: null, name: "Pat", email: "pat@test.com" },
+    ])
+    const res = await resendActivation(req("POST"), ctx())
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toContain("Mail server is not set up")
+    expect(activationState.issueActivationToken).not.toHaveBeenCalled()
   })
 
   it("issues a fresh token and emails it when pending", async () => {
