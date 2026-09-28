@@ -48,7 +48,9 @@ export async function cleanDatabase(
 
   const skip = new Set(preserve)
   const tables = SEED_CLEAN_TABLES.filter((t) => !skip.has(t))
-  await pool.query(`TRUNCATE TABLE ${tables.join(", ")} CASCADE`)
+  // Quote every name: "order" is a reserved word and needs to be `"order"`.
+  const quoted = tables.map((t) => `"${t}"`).join(", ")
+  await pool.query(`TRUNCATE TABLE ${quoted} CASCADE`)
 
   log("Clean complete.\n")
 }
