@@ -76,7 +76,7 @@ export function Timeline({
   }
 
   return (
-    <ol className="relative space-y-0">
+    <ol data-testid="track-timeline" className="relative space-y-0">
       {STEPS.map((step, index) => {
         const isLast = index === STEPS.length - 1
         const reached = currentRank >= step.rank
@@ -99,7 +99,10 @@ export function Timeline({
 
         return (
           <Fragment key={step.key}>
-            <li className="flex gap-3.5">
+            <li
+              className="flex gap-3.5"
+              aria-current={isCurrent ? "step" : undefined}
+            >
               {/* Rail */}
               <div className="flex flex-col items-center">
                 <span

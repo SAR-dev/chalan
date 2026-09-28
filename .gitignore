@@ -11,6 +11,7 @@ __v0_jsx-dev-runtime.ts
 .env*
 !.env.docker
 !.env.example
+!.env.e2e.example
 
 
 # Common ignores

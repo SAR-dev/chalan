@@ -70,7 +70,7 @@ export default async function TrackDetailPage({ params }: Props) {
       )}
       {/* Header */}
       <header className="border-border/60 bg-background/80 sticky top-0 z-10 border-b backdrop-blur-sm">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3.5">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3.5">
           <Link
             href="/track"
             className="group flex min-w-0 items-center gap-2.5"
@@ -103,7 +103,7 @@ export default async function TrackDetailPage({ params }: Props) {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl px-5 py-8">
+      <div className="mx-auto max-w-4xl px-5 py-8">
         {/* Back / search again button */}
         <Link
           href="/track"

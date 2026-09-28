@@ -136,6 +136,14 @@ e2e/selectors.ts                    # Centralized data-testid selectors
 reseeds the DB (`pnpm db:seed:full`) and starts `pnpm start` — build must be
 done first.
 
+**Separate env:** copy `.env.e2e.example` to `.env.e2e` (gitignored) to point
+e2e at its own database. `playwright.config.ts` loads it into the runner so the
+webServer and test workers inherit it; omitted keys fall back to `.env`, and
+shell values win. Set up the test DB with `pnpm db:push:e2e` (or
+`pnpm db:migrate:e2e` / `pnpm db:seed:e2e`). CI does **not** use `.env.e2e` — the
+`e2e` job in `.github/workflows/ci.yml` sets the same vars directly against a
+Postgres service container.
+
 **Credentials (seeded — all passwords `12qwaszx`):**
 - Super Admin: `admin1@email.com` / `12qwaszx`
 - Warehouse Admin: `warehouse.admin1@email.com` / `12qwaszx`

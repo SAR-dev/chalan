@@ -169,8 +169,10 @@ test.describe("S55. Public Pricing Rate Card", () => {
     await expect(page.locator(pricing.pageHeading)).toBeVisible()
     await expect(page.locator(pricing.table)).toBeVisible()
     await expect(page.getByText("Pickup ↓ / Destination →")).toBeVisible()
-    // Seeded zones produce at least one pair, so a base-rate cell exists.
-    await expect(page.locator(pricing.table).getByText(/TK$/)).toBeVisible()
+    // Seeded zones produce many pairs, so at least one base-rate cell exists.
+    await expect(
+      page.locator(pricing.table).getByText(/TK$/).first(),
+    ).toBeVisible()
   })
 })
 
