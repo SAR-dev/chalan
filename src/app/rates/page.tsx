@@ -30,6 +30,13 @@ export const metadata: Metadata = {
   },
 }
 
+// The rate card is DB-driven and must reflect the current matrix, never a
+// build-time snapshot. Without this, a production build against a database
+// that is migrated but not yet seeded caches an EMPTY rate card in the data
+// cache and serves it for the revalidate window (this is exactly how the CI
+// e2e run failed: the seed happens after the build).
+export const dynamic = "force-dynamic"
+
 // Public rate-card data is cached like the landing page's platform config:
 // zone-based prices only change when an admin edits them, so 5-minute reuse is
 // plenty for a public page.

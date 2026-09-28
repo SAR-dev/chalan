@@ -11,6 +11,7 @@ import { seedBalances } from "./balances"
 import { cleanDatabase } from "./clean"
 import { seedDeliveryCities } from "./delivery-cities"
 import { seedDeliveryZones } from "./delivery-zones"
+import { seedMailConfig } from "./mail-config"
 import { seedMerchants } from "./merchants"
 import { seedOrders } from "./orders"
 import { seedPayoutRequests } from "./payouts"
@@ -35,6 +36,7 @@ async function main() {
     await seedDeliveryCities()
     await seedZonePricing()
     await seedPlatformConfig()
+    await seedMailConfig()
     await seedRiders()
     await seedMerchants()
     await seedPickupLocations()

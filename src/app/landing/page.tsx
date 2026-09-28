@@ -110,6 +110,10 @@ export const metadata: Metadata = {
   },
 }
 
+// DB-backed pricing must reflect the current config, never a build-time
+// snapshot (see the same note in src/app/rates/page.tsx).
+export const dynamic = "force-dynamic"
+
 const features = [
   {
     icon: <Package className="size-5" />,

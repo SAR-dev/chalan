@@ -60,6 +60,10 @@ export default defineConfig({
       // (redacted) body too, so a failing run shows the mail in the server
       // console and you can follow a link by hand.
       LOG_EMAIL_BODY: "1",
+      // Insert an (unreachable) active mail_config during the seed so routes
+      // gated on hasActiveMailConfig() — resend-activation, verify-email — are
+      // reachable. Sends still fail, so `email_log` FAILED rows keep the links.
+      SEED_MAIL_CONFIG: "1",
     },
   },
 })
