@@ -7,6 +7,7 @@
 // Add new vars here as the app grows — group them by concern.
 
 import { parseAllowlist } from "@/lib/ip-allowlist"
+import { nextModeFlagSet } from "@/lib/next-mode"
 
 type EnvError = { key: string; message: string }
 
@@ -215,6 +216,23 @@ export function validateEnv(): void {
     // "all" = everything (default). Server-only (never NEXT_PUBLIC); read at
     // runtime by proxy/api-auth, so changing it needs a restart.
     oneOf(e, "PORTAL_MODE", ["admin", "public", "all"], "all")
+
+    // Optional — NEXT_MODE="true" turns on the seeded-demo sign-in helper (a
+    // dropdown of the well-known dev accounts on /login). It puts account
+    // credentials in the browser, so a production deployment that enables it is
+    // a misconfiguration worth failing boot over.
+    if (process.env.NEXT_MODE) {
+      oneOf(e, "NEXT_MODE", ["0", "1", "true", "false"], "false")
+      // Read the raw flag, not isNextModeEnabled() — the latter is already
+      // forced off in production, which would make this check unreachable.
+      if (isProd && nextModeFlagSet()) {
+        e.push({
+          key: "NEXT_MODE",
+          message:
+            "Must not be enabled in production — it exposes seeded account credentials on the sign-in page.",
+        })
+      }
+    }
 
     const provider = oneOf(e, "STORAGE_PROVIDER", ["local", "r2"], "local")
 

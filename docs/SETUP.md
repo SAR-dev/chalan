@@ -265,7 +265,7 @@ Warehouses (3), delivery zones (3), delivery cities (8), zone-pricing matrix
 (9 rows), riders (10 + 1 pending), merchants (6 incl. demo), pickup locations
 (5), admin/warehouse-admin users, announcements (6), 100 orders, 2 payout
 requests, and merchant balances. All seeded accounts share the password
-`12qwaszx` (see `SEED_PASSWORD` in `src/lib/db/seed/seed-content.ts`).
+`12qwaszx` (see `SEED_PASSWORD` in `src/lib/db/seed/seed-content/credentials.ts`).
 
 ## Drizzle CLI
 

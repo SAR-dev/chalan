@@ -137,6 +137,7 @@ deletes.
 | `NEXT_PUBLIC_SITE_URL`  | **Yes**  | —             | Canonical public URL for SEO, OG tags, sitemaps                                                     |
 | `NEXT_PUBLIC_ENV`       | **Yes**  | `development` | One of: `development`, `production`                                                                 |
 | `NEXT_PUBLIC_BASE_URL`  | No       | (same origin) | Absolute base URL for browser auth API calls (`forgot-password`). Must be a valid http(s) URL when set. |
+| `NEXT_MODE`             | No       | off          | Seeded-demo switch for local development. `true`/`1` adds a "sign in as" dropdown to `/login` listing one seeded account per role (Super Admin, Warehouse Admin, Merchant, Rider) — picking one fills the email and the shared dev password so you don't have to look it up. **Server-only** (never `NEXT_PUBLIC_*`): the login page reads it in a server component and passes the list down, so the flag and passwords stay out of the build output unless the page is rendered. **Boot fails if it is enabled while `NEXT_PUBLIC_ENV=production`** — it publishes credentials in the browser. Read at render time, so flipping it only needs a reload. |
 
 ---
 
@@ -158,7 +159,12 @@ manual invocations only.
 | `MAIL_DISABLED`            | No       | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test) |
 | `AUTH_RATE_LIMIT_DISABLED` | No       | —       | Set to `1` to disable Better Auth rate limiting (webServer sets this for the e2e suite; set manually for other test runs) |
 | `LOG_EMAIL_BODY`           | No       | —       | Set to `1` to log the redacted mail body on each send. Off by default; the e2e suite turns it on so a failing run shows the mail in the server console. The specs read links from `email_log` either way. |
-| `SEED_PASSWORD`            | No       | `12qwaszx` | Password given to every account created by `pnpm db:seed:full`. Dev/e2e default is the well-known `12qwaszx`; **both seed entrypoints refuse to run when `NODE_ENV=production` and this is unset** (ROADMAP P0.7), so a production database can never come up on a published password. |
+
+> There is no env var for the seed password: every account created by
+> `pnpm db:seed:full` gets the well-known `12qwaszx`, and both seed entrypoints
+> refuse to run when `NODE_ENV=production`. Change
+> `SEED_PASSWORD` in `src/lib/db/seed/seed-content/credentials.ts` if you need
+> a different dev password.
 
 ---
 

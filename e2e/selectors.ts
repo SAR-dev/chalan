@@ -233,6 +233,14 @@ export const activation = {
   error: "[data-testid='activate-error']",
 }
 
+// Post-activation welcome page (/activated) — the sign-out confirmation that
+// replaced the old "activate → /login?success=activated" redirect.
+export const activated = {
+  title: "[data-testid='activated-title']",
+  message: "[data-testid='activated-message']",
+  continue: "[data-testid='activated-continue']",
+}
+
 export const merchantQuota = {
   card: "[data-testid='moderator-quota-card']",
   input: "[data-testid='moderator-quota-input']",

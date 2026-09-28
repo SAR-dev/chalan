@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
+import { authClient } from "@/lib/auth-client"
 
 const BrandIcon = siteConfig.icon
 
@@ -52,7 +53,16 @@ function ActivateForm() {
         return
       }
       setDone(true)
-      router.push("/login?success=activated")
+      // The invitee may already be signed in as somebody else (shared machine,
+      // admin testing an invite). Drop that session before showing the
+      // confirmation so the next sign-in is the account they just activated.
+      try {
+        await authClient.signOut()
+      } catch {
+        // No session, or sign-out failed — the confirmation page is still
+        // correct, so don't block the navigation on it.
+      }
+      router.push("/activated")
     } catch {
       setError("Something went wrong. Please try again.")
       setSubmitting(false)
@@ -99,11 +109,11 @@ function ActivateForm() {
                   <p className="text-green-800 dark:text-green-200 text-sm">
                     Your account is active.{" "}
                     <Link
-                      href="/login?success=activated"
+                      href="/activated"
                       className="font-medium underline"
                       data-testid="activate-continue"
                     >
-                      Continue to sign in
+                      Continue
                     </Link>
                   </p>
                 </div>
