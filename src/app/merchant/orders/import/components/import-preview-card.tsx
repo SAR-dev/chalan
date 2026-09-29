@@ -14,8 +14,9 @@ import {
 import type { ResolvedRow } from "@/features/orders/bulk-import/resolve-rows"
 import { quoteParcel } from "@/features/orders/quote-parcel"
 import type { DeliveryCityOption } from "@/features/platform-config/hooks/use-delivery-cities"
+import type { PlatformPricingDefaults } from "@/features/platform-config/hooks/use-platform-pricing-public"
 import type { ZonePricingEstimate } from "@/features/platform-config/hooks/use-zone-pricing-public"
-import type { Merchant, PickupLocation } from "@/lib/types"
+import type { PickupLocation } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ParcelCard } from "../../new/components/parcel-card"
 import type { ParcelRow, ParcelState } from "../../new/types"
@@ -35,7 +36,7 @@ interface ImportPreviewCardProps {
   myLocations: PickupLocation[]
   deliveryCities: DeliveryCityOption[]
   zonePricing: ZonePricingEstimate[]
-  currentMerchant: Merchant | null
+  platformDefaults: PlatformPricingDefaults | null
   maxWeightKg: number
   onParcelChange: (line: number, key: keyof ParcelState, value: string) => void
   onRemoveRow: (line: number) => void
@@ -71,7 +72,7 @@ export function ImportPreviewCard({
   myLocations,
   deliveryCities,
   zonePricing,
-  currentMerchant,
+  platformDefaults,
   maxWeightKg,
   onParcelChange,
   onRemoveRow,
@@ -184,7 +185,8 @@ export function ImportPreviewCard({
                 pickupLocations: myLocations,
                 deliveryCities,
                 zonePricing,
-                currentMerchant,
+                platformDefaults,
+                maxWeightKg,
               })
               const parcelRow: ParcelRow = {
                 parcel,

@@ -20,7 +20,6 @@ export type ImageColumnSource = { table: AnyPgTable; column: AnyPgColumn }
 // separate rider_application table, so `rider.nid*` covers them.
 export const IMAGE_URL_COLUMNS: readonly ImageColumnSource[] = [
   { table: user, column: user.image },
-  { table: merchant, column: merchant.logoUrl },
   { table: merchant, column: merchant.nidFrontImage },
   { table: merchant, column: merchant.nidBackImage },
   { table: merchant, column: merchant.nidSelfieImage },

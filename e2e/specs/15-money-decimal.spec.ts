@@ -30,8 +30,6 @@ const MONEY_COLUMNS: [string, string][] = [
   ["merchant_balance", "pendingBalance"],
   ["zone_pricing", "baseRate"],
   ["zone_pricing", "extraRatePerKg"],
-  ["merchant", "baseRate"],
-  ["merchant", "extraRatePerKg"],
   ["order", "productCost"],
   ["order", "deliveryFee"],
   ["order", "codFee"],
@@ -45,8 +43,6 @@ const MONEY_COLUMNS: [string, string][] = [
 const NON_MONEY_COLUMNS: [string, string][] = [
   ["order", "parcelWeightKg"],
   ["merchant", "maxWeightKg"],
-  ["merchant", "freeWeightKg"],
-  ["merchant", "codFeePercentage"],
   ["zone_pricing", "freeWeightKg"],
   ["zone_pricing", "maxWeightKg"],
   ["zone_pricing", "codFeePercentage"],

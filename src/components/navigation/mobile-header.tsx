@@ -30,12 +30,12 @@ const footerActionClass =
 
 export function MobileHeader({
   config,
-  logoUrl,
+  businessName,
   brandColor,
   hidePlatformBranding = false,
 }: {
   config: SidebarConfig
-  logoUrl?: string
+  businessName?: string
   brandColor?: string
   hidePlatformBranding?: boolean
 }) {
@@ -54,18 +54,22 @@ export function MobileHeader({
       className="border-border flex h-14 items-center justify-between border-b px-3 sm:px-4 md:hidden"
       style={headerStyle}
     >
-      <Link href="/" className="flex items-center gap-2">
-        <div className="flex size-8 items-center justify-center rounded-lg">
-          {logoUrl ? (
-            <img src={logoUrl} alt="" className="size-5 object-contain" />
-          ) : (
-            <BrandIcon className="size-5" />
-          )}
-        </div>
-        {!hidePlatformBranding && (
-          <span className="text-sm font-semibold sm:text-base">
-            {BRAND_NAME}
+      <Link href="/" className="flex min-w-0 items-center gap-2">
+        {businessName ? (
+          <span className="truncate text-sm font-semibold sm:text-base">
+            {businessName}
           </span>
+        ) : (
+          <>
+            <div className="flex size-8 items-center justify-center rounded-lg">
+              <BrandIcon className="size-5" />
+            </div>
+            {!hidePlatformBranding && (
+              <span className="text-sm font-semibold sm:text-base">
+                {BRAND_NAME}
+              </span>
+            )}
+          </>
         )}
       </Link>
 
@@ -80,19 +84,19 @@ export function MobileHeader({
         <SheetContent side="left" className="p-0" style={headerStyle}>
           {/* Brand */}
           <Link href="/" className="flex h-16 items-center gap-2 px-4">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt=""
-                className="size-4 shrink-0 object-contain"
-              />
-            ) : (
-              <BrandIcon className="size-4 shrink-0" />
-            )}
-            {!hidePlatformBranding && (
-              <SheetTitle className="text-[13px] font-semibold">
-                {BRAND_NAME}
+            {businessName ? (
+              <SheetTitle className="truncate text-[13px] font-semibold">
+                {businessName}
               </SheetTitle>
+            ) : (
+              <>
+                <BrandIcon className="size-4 shrink-0" />
+                {!hidePlatformBranding && (
+                  <SheetTitle className="text-[13px] font-semibold">
+                    {BRAND_NAME}
+                  </SheetTitle>
+                )}
+              </>
             )}
             <span className="bg-sidebar-primary text-sidebar-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
               {config.roleLabel}

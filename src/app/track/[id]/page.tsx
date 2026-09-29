@@ -1,4 +1,4 @@
-import { ArrowLeft, Package } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import type { Metadata } from "next"
 import { headers } from "next/headers"
 import Link from "next/link"
@@ -83,12 +83,6 @@ export default async function TrackDetailPage({ params }: Props) {
     ? brandThemeVars(merchant.brandColor)
     : undefined
 
-  const defaultChip = (
-    <span className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-md shadow-sm transition-shadow group-hover:shadow-md">
-      <Package className="size-3.5" />
-    </span>
-  )
-
   // If not found, render a friendly not-found UI (don't use Next's notFound()
   // so we can still show the search header)
   return (
@@ -107,16 +101,6 @@ export default async function TrackDetailPage({ params }: Props) {
             href="/track"
             className="group flex min-w-0 items-center gap-2.5"
           >
-            {merchant?.logoUrl ? (
-              <img
-                src={merchant.logoUrl}
-                alt={merchant.businessName}
-                className="size-7 shrink-0 rounded-md object-contain"
-                data-testid="track-brand-logo"
-              />
-            ) : (
-              defaultChip
-            )}
             <span
               className="truncate text-sm font-semibold tracking-tight"
               data-testid="track-brand"

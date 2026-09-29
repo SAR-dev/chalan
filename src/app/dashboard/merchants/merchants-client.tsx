@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  AlertTriangle,
   Ban,
   CheckCircle2,
   Coins,
@@ -276,32 +275,12 @@ export function MerchantsPageClient({
         ),
     },
     {
-      id: "baseRate",
-      header: columnLabels.merchant.baseRate,
+      id: "maxWeightKg",
+      header: columnLabels.merchant.maxWeightKg,
       align: "right",
       sortable: true,
-      sortValue: (m) => m.baseRate,
-      cell: (m) => {
-        const needsRate = m.status === "ACTIVE" && m.baseRate <= 0
-        return needsRate ? (
-          <span className="text-chart-3 inline-flex items-center gap-1">
-            <AlertTriangle className="size-4" />
-            <span className="tabular-nums">{formatTk(m.baseRate)}</span>
-          </span>
-        ) : (
-          <span className="tabular-nums">{formatTk(m.baseRate)}</span>
-        )
-      },
-    },
-    {
-      id: "perKg",
-      header: columnLabels.merchant.perKg,
-      align: "right",
-      sortable: true,
-      sortValue: (m) => m.extraRatePerKg,
-      cell: (m) => (
-        <span className="tabular-nums">{formatTk(m.extraRatePerKg)}</span>
-      ),
+      sortValue: (m) => m.maxWeightKg,
+      cell: (m) => <span className="tabular-nums">{m.maxWeightKg} KG</span>,
     },
     {
       id: "pendingBalance",
@@ -362,7 +341,7 @@ export function MerchantsPageClient({
                 onClick={() => openPricing(m)}
               >
                 <Tag className="size-4" />
-                Set pricing
+                Set weight limit
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>

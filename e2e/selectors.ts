@@ -8,10 +8,31 @@ export const auth = {
   loginEmail: "[data-testid='login-email']",
   loginPassword: "[data-testid='login-password']",
   loginSubmit: "[data-testid='login-submit']",
+  loginError: "[data-testid='login-error']",
   registerForm: "[data-testid='register-form']",
   logout: "[data-testid='logout']",
   accountSecurityTab: "[data-testid='account-tab-security']",
   accountTwoFactorTab: "[data-testid='account-tab-two-factor']",
+}
+
+// ─── Rider application (public) ──────────────────────────────────────────────
+export const riderApplication = {
+  print: "[data-testid='rider-apply-print']",
+  name: "[data-testid='rider-name']",
+  email: "[data-testid='rider-email']",
+  phone: "[data-testid='rider-phone']",
+}
+
+// ─── Merchant registration (public) ──────────────────────────────────────────
+export const register = {
+  form: "[data-testid='register-form']",
+  businessName: "[data-testid='register-business-name']",
+  email: "[data-testid='register-email']",
+}
+
+// ─── Onboarding ──────────────────────────────────────────────────────────────
+export const onboarding = {
+  skip: "[data-testid='onboarding-skip']",
 }
 
 // ─── Two-factor authentication (H4) ─────────────────────────────────────────
@@ -69,7 +90,8 @@ export const dashboard = {
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 export const orders = {
-  table: "[data-testid='orders-table']",
+  table: "[data-testid='table-dashboard-orders']",
+  merchantTable: "[data-testid='table-merchant-orders']",
   row: (id: string) => `[data-testid='order-row-${id}']`,
   createButton: "[data-testid='create-order']",
   approveButton: "[data-testid='approve-order']",
@@ -99,11 +121,13 @@ export const orders = {
 
 // ─── Order Form ──────────────────────────────────────────────────────────────
 export const orderForm = {
+  card: "[data-testid='parcel-card']",
   pickupLocation: "[data-testid='pickup-location']",
   recipientName: "[data-testid='recipient-name']",
   recipientPhone: "[data-testid='recipient-phone']",
   deliveryCity: "[data-testid='delivery-city']",
   deliveryAddress: "[data-testid='delivery-address']",
+  deliveryMap: "[data-testid='delivery-map']",
   parcelWeight: "[data-testid='parcel-weight']",
   productCost: "[data-testid='product-cost']",
   submitOrder: "[data-testid='submit-order']",
@@ -113,8 +137,9 @@ export const orderForm = {
 
 // ─── Merchants ───────────────────────────────────────────────────────────────
 export const merchants = {
-  table: "[data-testid='merchants-table']",
-  row: (id: string) => `[data-testid='merchant-row-${id}']`,
+  table: "[data-testid='table-dashboard-merchants']",
+  row: (id: string) => `[data-testid='row-dashboard-merchants-${id}']`,
+  firstRow: "[data-testid^='row-dashboard-merchants-']",
   approveButton: "[data-testid='approve-merchant']",
   suspendButton: "[data-testid='suspend-merchant']",
   reactivateButton: "[data-testid='reactivate-merchant']",
@@ -259,7 +284,13 @@ export const merchantQuota = {
 export const team = {
   pendingBadge: "[data-testid='team-status-pending']",
   resend: "[data-testid='team-resend-activation']",
+  createOpen: "[data-testid='create-account-open']",
   createSubmit: "[data-testid='create-account-submit']",
+  nameInput: "[data-testid='team-name']",
+  emailInput: "[data-testid='team-email']",
+  phoneInput: "[data-testid='team-phone']",
+  passwordInput: "[data-testid='team-password']",
+  warehouseSelect: "[data-testid='team-warehouse']",
 }
 
 export const branding = {
@@ -272,8 +303,8 @@ export const branding = {
   previewChip: "[data-testid='preview-chip']",
   contrastWarning: "[data-testid='brand-contrast-warning']",
   trackBrand: "[data-testid='track-brand']",
-  trackBrandLogo: "[data-testid='track-brand-logo']",
   trackAccent: "[data-testid='track-accent']",
+  sidebarBrand: "[data-testid='sidebar-brand']",
 }
 
 // ─── Audit logs ──────────────────────────────────────────────────────────────
@@ -312,6 +343,8 @@ export const help = {
 export const support = {
   table: "[data-testid='support-tickets']",
   row: "[data-testid='support-row']",
+  rowActions: "[data-testid='support-row-actions']",
+  status: "[data-testid='support-status']",
   rowByTableId: (tableId: string) => `[data-testid^='row-${tableId}-']`,
   newButton: "[data-testid='support-new']",
   subjectInput: "[data-testid='support-subject']",

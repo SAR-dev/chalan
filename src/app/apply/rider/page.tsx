@@ -190,6 +190,7 @@ export default function ApplyRiderPage() {
             <Button
               variant="outline"
               size="sm"
+              data-testid="rider-apply-print"
               onClick={() => window.print()}
               className="gap-1.5"
             >
@@ -361,6 +362,7 @@ export default function ApplyRiderPage() {
                       <Label htmlFor="name">Full name</Label>
                       <Input
                         id="name"
+                        data-testid="rider-name"
                         placeholder="Karim Hossain"
                         value={form.name}
                         onChange={(e) => update("name", e.target.value)}
@@ -371,6 +373,7 @@ export default function ApplyRiderPage() {
                       <Label htmlFor="phone">Phone</Label>
                       <Input
                         id="phone"
+                        data-testid="rider-phone"
                         type="tel"
                         placeholder="+8801712345678"
                         value={form.phone}
@@ -499,6 +502,7 @@ export default function ApplyRiderPage() {
                       <Label htmlFor="email">Email</Label>
                       <Input
                         id="email"
+                        data-testid="rider-email"
                         type="email"
                         placeholder="karim@email.com"
                         value={form.email}

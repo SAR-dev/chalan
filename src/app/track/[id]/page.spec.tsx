@@ -74,7 +74,6 @@ describe("Track detail page", () => {
       {
         id: "m_1",
         businessName: "Acme Goods",
-        logoUrl: "/placeholder.svg",
         brandColor: "#2563eb",
         hidePlatformBranding: false,
       },
@@ -84,7 +83,8 @@ describe("Track detail page", () => {
     expect(screen.getByTestId("track-brand")).toHaveTextContent(
       "Fulfilled by Acme Goods",
     )
-    expect(screen.getByTestId("track-brand-logo")).toBeInTheDocument()
+    // Branding shows the business name, never the logo (ROADMAP branding change).
+    expect(screen.queryByTestId("track-brand-logo")).not.toBeInTheDocument()
     expect(screen.getByTestId("track-accent")).toBeInTheDocument()
     // Platform footer stays when hidePlatformBranding is off
     expect(screen.getByText(/All rights reserved/i)).toBeInTheDocument()

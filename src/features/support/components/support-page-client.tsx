@@ -174,7 +174,11 @@ export function SupportPageClient({
       header: columnLabels.support.status,
       sortable: true,
       sortValue: (t) => t.status,
-      cell: (t) => <SupportStatusBadge status={t.status} />,
+      cell: (t) => (
+        <span data-testid="support-status">
+          <SupportStatusBadge status={t.status} />
+        </span>
+      ),
     },
     {
       id: "created",
@@ -200,7 +204,11 @@ export function SupportPageClient({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    data-testid="support-row-actions"
+                  >
                     <MoreHorizontal className="size-4" />
                     <span className="sr-only">Actions</span>
                   </Button>

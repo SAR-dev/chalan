@@ -198,18 +198,11 @@ export const warehouseUpdateSchema = z
     { error: "Provide at least one field to update" },
   )
 
-export const merchantPricingSchema = z
-  .object({
-    baseRate: z.number().nonnegative(),
-    extraRatePerKg: z.number().nonnegative(),
-    freeWeightKg: z.number().nonnegative(),
-    maxWeightKg: z.number().positive(),
-    cancellationFee: z.number().nonnegative().optional(),
-  })
-  .refine((d) => d.freeWeightKg <= d.maxWeightKg, {
-    error: "freeWeightKg cannot exceed maxWeightKg",
-    path: ["freeWeightKg"],
-  })
+// Per-merchant parcel weight limit (ROADMAP: zone pricing owns the fees, the
+// merchant only carries a weight cap).
+export const merchantWeightLimitSchema = z.object({
+  maxWeightKg: z.number().positive("Max weight must be greater than 0"),
+})
 
 export const platformConfigSchema = z
   .object({
@@ -304,6 +297,11 @@ export const orderPickedUpSchema = z.object({
     .array(imageUrl("Each pickup proof photo"))
     .min(1, "At least one pickup proof photo is required")
     .max(10, "You can add up to 10 pickup proof photos"),
+  // The rider may correct the parcel weight at pickup (re-prices the delivery).
+  parcelWeightKg: z
+    .number()
+    .positive("Parcel weight must be greater than 0")
+    .optional(),
 })
 
 export const orderDeliveredSchema = z.object({
@@ -449,7 +447,6 @@ export const merchantProfileSchema = z.object({
 })
 
 export const merchantBrandingSchema = z.object({
-  logoUrl: z.string().nullable().optional(),
   brandColor: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color (e.g. #f97316)")

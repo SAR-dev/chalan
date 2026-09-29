@@ -29,11 +29,7 @@ export interface MerchantSeedEntry {
   onboardingCompletedAt?: string | null
   emailVerifiedAt: string | null
   phoneVerifiedAt: string | null
-  baseRate: number
-  extraRatePerKg: number
   maxWeightKg: number
-  freeWeightKg: number
-  logoUrl?: string | null
   brandColor?: string | null
   hidePlatformBranding?: boolean
   approvedBy: string | null
@@ -75,11 +71,7 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     // merchant1 is the primary e2e account — onboarded so merchant flows land
     // on the dashboard instead of racing the /welcome guard.
     onboardingCompletedAt: "2026-07-01T00:00:00.000Z",
-    baseRate: 50,
-    extraRatePerKg: 10,
     maxWeightKg: 10,
-    freeWeightKg: 1,
-    logoUrl: "/placeholder.svg",
     brandColor: "#2563eb",
     hidePlatformBranding: false,
     approvedBy: ADMIN_USER_NAMES.tanvir,
@@ -102,10 +94,7 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-02T00:00:00.000Z",
     phoneVerifiedAt: "2026-07-02T00:00:00.000Z",
-    baseRate: 60,
-    extraRatePerKg: 15,
     maxWeightKg: 10,
-    freeWeightKg: 1,
     approvedBy: ADMIN_USER_NAMES.tanvir,
     approvedAt: "2026-07-03T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -126,10 +115,7 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-03T00:00:00.000Z",
     phoneVerifiedAt: "2026-07-03T00:00:00.000Z",
-    baseRate: 70,
-    extraRatePerKg: 20,
     maxWeightKg: 10,
-    freeWeightKg: 1,
     approvedBy: ADMIN_USER_NAMES.tanvir,
     approvedAt: "2026-07-04T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -150,10 +136,7 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-04T00:00:00.000Z",
     phoneVerifiedAt: null,
-    baseRate: 80,
-    extraRatePerKg: 25,
     maxWeightKg: 10,
-    freeWeightKg: 1,
     approvedBy: "System",
     approvedAt: "2026-07-04T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -174,10 +157,7 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "SUSPENDED",
     emailVerifiedAt: "2026-07-04T00:00:00.000Z",
     phoneVerifiedAt: null,
-    baseRate: 50,
-    extraRatePerKg: 10,
     maxWeightKg: 10,
-    freeWeightKg: 1,
     approvedBy: ADMIN_USER_NAMES.tanvir,
     approvedAt: "2026-07-05T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -200,11 +180,7 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
     emailVerifiedAt: "2026-01-01T00:00:00.000Z",
     phoneVerifiedAt: "2026-01-01T00:00:00.000Z",
-    baseRate: 50,
-    extraRatePerKg: 10,
     maxWeightKg: 10,
-    freeWeightKg: 1,
-    logoUrl: "/placeholder.svg",
     brandColor: "#f97316",
     hidePlatformBranding: false,
     approvedBy: "System",

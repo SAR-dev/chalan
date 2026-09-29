@@ -255,7 +255,7 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileHeader
           config={navConfig}
-          logoUrl={currentMerchant?.logoUrl ?? undefined}
+          businessName={currentMerchant?.businessName ?? undefined}
           brandColor={currentMerchant?.brandColor ?? undefined}
           hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}
         />

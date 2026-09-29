@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { orders } from "../selectors"
+import { onboarding, orders } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
-    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.locator(onboarding.skip).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
     await waitForAppReady(page)
   }
@@ -133,10 +133,11 @@ test.describe("S40. CSV bulk import", () => {
 
     // The list is server-sorted and paginated, so search for the new rows.
     await page.locator(orders.merchantOrdersSearch).fill("E2E Import")
-    await expect(page.getByText(recipientA).first()).toBeVisible({
+    const table = page.locator(orders.merchantTable)
+    await expect(table.getByText(recipientA).first()).toBeVisible({
       timeout: 15_000,
     })
-    await expect(page.getByText(recipientB).first()).toBeVisible()
+    await expect(table.getByText(recipientB).first()).toBeVisible()
   })
 
   test("errors block the import and the error CSV downloads", async ({

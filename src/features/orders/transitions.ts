@@ -28,7 +28,8 @@ import {
   platformConfig,
   rider,
 } from "@/lib/db/schema"
-import { calcMerchantEarnings } from "@/lib/pricing"
+import { resolveRoutePricing } from "@/lib/order-pricing"
+import { calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
 import {
   orderAssignPickupRiderSchema,
   orderCancelSchema,
@@ -84,6 +85,14 @@ function warehouseOrderInScope(
   if (o.warehouseId === warehouseId) return true
   if (!o.warehouseId && o.status === "PICKED_UP") return true
   return o.status === "APPROVED" && !o.pickupRiderId
+}
+
+/** A business-rule failure raised from `buildUpdate` (mapped to a 400). */
+class TransitionError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "TransitionError"
+  }
 }
 
 export const ORDER_TRANSITIONS = {
@@ -232,12 +241,46 @@ export const ORDER_TRANSITIONS = {
       const warehouseId = o.pickupLocationId
         ? await pickupWarehouseId(o.pickupLocationId)
         : null
-      return {
+      const update: Record<string, unknown> = {
         status: "PICKED_UP",
         pickedUpAt: new Date().toISOString(),
         pickupProofRefs: body.proofRefs,
         warehouseId,
       }
+      // The rider may correct the parcel weight at pickup. Re-price the delivery
+      // and reject a weight over the merchant/route limit.
+      if (body.parcelWeightKg !== undefined) {
+        const [merchantRow] = await db
+          .select({ maxWeightKg: merchant.maxWeightKg })
+          .from(merchant)
+          .where(eq(merchant.id, o.merchantId))
+          .limit(1)
+        const pricing = await resolveRoutePricing(
+          o.warehouseId,
+          o.deliveryCityId,
+        )
+        const cap = Math.min(
+          merchantRow?.maxWeightKg ?? Number.POSITIVE_INFINITY,
+          pricing.maxWeightKg,
+        )
+        if (body.parcelWeightKg > cap) {
+          throw new TransitionError(
+            `Parcel weight exceeds the ${cap} KG limit.`,
+          )
+        }
+        const { total: deliveryFee } = calcDeliveryCharge(
+          pricing,
+          body.parcelWeightKg,
+        )
+        update.parcelWeightKg = body.parcelWeightKg
+        update.deliveryFee = deliveryFee
+        update.merchantEarnings = calcMerchantEarnings(
+          o.productCost,
+          deliveryFee,
+          o.codFee,
+        )
+      }
+      return update
     },
   }),
 
@@ -669,7 +712,15 @@ export async function applyOrderTransition(
       )
     }
 
-    const updateValues = await def.buildUpdate(ctx)
+    let updateValues: Record<string, unknown>
+    try {
+      updateValues = await def.buildUpdate(ctx)
+    } catch (err) {
+      if (err instanceof TransitionError) {
+        return NextResponse.json({ error: err.message }, { status: 400 })
+      }
+      throw err
+    }
     const [updated] = await tx
       .update(order)
       .set(updateValues)
@@ -710,6 +761,37 @@ export async function applyOrderTransition(
             updatedAt: new Date().toISOString(),
           },
         })
+    }
+
+    // A weight correction at pickup re-prices the delivery — adjust the creation
+    // charge by the delivery-fee delta.
+    if (name === "picked-up" && updated.deliveryFee !== orderRow.deliveryFee) {
+      const delta = toPaisa(updated.deliveryFee - orderRow.deliveryFee)
+      if (delta !== 0) {
+        await tx.insert(balanceTransaction).values({
+          merchantId: updated.merchantId,
+          type: delta > 0 ? "ORDER_CHARGE" : "ORDER_CHARGE_REVERSAL",
+          amount: delta,
+          status: "SETTLED",
+          note: `Order ${updated.id} picked up — weight corrected to ${updated.parcelWeightKg} kg`,
+          orderId: updated.id,
+          createdBy: me.name,
+        })
+        await tx
+          .insert(merchantBalance)
+          .values({
+            id: createId(),
+            merchantId: updated.merchantId,
+            balance: delta,
+          })
+          .onConflictDoUpdate({
+            target: merchantBalance.merchantId,
+            set: {
+              balance: sql`${merchantBalance.balance} + ${delta}`,
+              updatedAt: new Date().toISOString(),
+            },
+          })
+      }
     }
 
     // A returned order refunds the creation charge and charges the zone-pair

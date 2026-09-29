@@ -21,7 +21,7 @@ export function MerchantSidebar() {
     <RoleSidebar
       config={config}
       footerSubtitle={currentMerchant?.businessName}
-      logoUrl={currentMerchant?.logoUrl ?? undefined}
+      businessName={currentMerchant?.businessName ?? undefined}
       brandColor={currentMerchant?.brandColor ?? undefined}
       hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}
     />

@@ -331,13 +331,11 @@ describe("PATCH /api/merchants/:id", () => {
     sessionState.value = merchantSession
     updateResult.push({
       id: "m_1",
-      logoUrl: "https://example.com/logo.png",
       brandColor: "#10b981",
       hidePlatformBranding: true,
     })
     const res = await updateMerchant(
       req("PATCH", undefined, {
-        logoUrl: "https://example.com/logo.png",
         brandColor: "#10b981",
         hidePlatformBranding: true,
       }),
@@ -346,7 +344,6 @@ describe("PATCH /api/merchants/:id", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({
-      logoUrl: "https://example.com/logo.png",
       brandColor: "#10b981",
       hidePlatformBranding: true,
     })
@@ -372,17 +369,6 @@ describe("PATCH /api/merchants/:id", () => {
     )
     expect(res.status).toBe(200)
     expect(updatePayloads[0]).toMatchObject({ hidePlatformBranding: true })
-  })
-
-  it("clears logo by setting null", async () => {
-    sessionState.value = merchantSession
-    updateResult.push({ id: "m_1", logoUrl: null })
-    const res = await updateMerchant(
-      req("PATCH", undefined, { logoUrl: null }),
-      ctx(),
-    )
-    expect(res.status).toBe(200)
-    expect(updatePayloads[0]).toMatchObject({ logoUrl: null })
   })
 
   it("rejects invalid hex color", async () => {
@@ -644,9 +630,6 @@ describe("PATCH /api/merchants/:id/reactivate", () => {
 
 describe("PATCH /api/merchants/:id/pricing", () => {
   const validBody = {
-    baseRate: 60,
-    extraRatePerKg: 15,
-    freeWeightKg: 1,
     maxWeightKg: 5,
   }
 
@@ -667,19 +650,10 @@ describe("PATCH /api/merchants/:id/pricing", () => {
     expect(res.status).toBe(403)
   })
 
-  it("updates pricing", async () => {
+  it("updates the weight limit", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([
-      { baseRate: 50, extraRatePerKg: 10, freeWeightKg: 1, maxWeightKg: 3 },
-    ])
-    updateResult.push({
-      id: "m_1",
-      businessName: "Biz",
-      baseRate: 60,
-      extraRatePerKg: 10,
-      freeWeightKg: 1,
-      maxWeightKg: 3,
-    })
+    selectQueue.push([{ maxWeightKg: 3 }])
+    updateResult.push({ id: "m_1", businessName: "Biz", maxWeightKg: 5 })
     const res = await setMerchantPricing(
       req("PATCH", undefined, validBody),
       ctx(),
@@ -691,7 +665,7 @@ describe("PATCH /api/merchants/:id/pricing", () => {
       expect.objectContaining({
         action: "MERCHANT_PRICING_UPDATED",
         metadata: {
-          diff: { baseRate: { from: 50, to: 60 } },
+          diff: { maxWeightKg: { from: 3, to: 5 } },
         },
       }),
     )

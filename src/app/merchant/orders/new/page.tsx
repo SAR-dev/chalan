@@ -13,6 +13,7 @@ import { useOrders } from "@/features/orders/hooks/use-orders"
 import { quoteParcel } from "@/features/orders/quote-parcel"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { usePlatformPricingPublic } from "@/features/platform-config/hooks/use-platform-pricing-public"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import type { CreateOrderInput } from "@/lib/types"
 import {
@@ -44,6 +45,7 @@ export default function NewOrderPage() {
   const { pickupLocations } = usePickupLocations()
   const { cities: deliveryCities } = useDeliveryCities()
   const { pricing: zonePricing } = useZonePricingPublic()
+  const { platformDefaults } = usePlatformPricingPublic()
   const { createOrders } = useOrders()
 
   const myLocations = useMemo(
@@ -105,6 +107,7 @@ export default function NewOrderPage() {
         deliveryCharge,
         codFee,
         exceedsMax,
+        maxWeightKg,
         isZonePricing,
       } = quoteParcel({
         pickupLocationId: p.pickupLocationId,
@@ -114,7 +117,8 @@ export default function NewOrderPage() {
         pickupLocations,
         deliveryCities,
         zonePricing,
-        currentMerchant,
+        platformDefaults,
+        maxWeightKg: currentMerchant?.maxWeightKg ?? 3,
       })
 
       const errors: string[] = []
@@ -127,8 +131,7 @@ export default function NewOrderPage() {
         if (!p.deliveryAddress.trim())
           errors.push("Delivery address is required.")
         if (weight <= 0) errors.push("Weight must be greater than 0.")
-        if (exceedsMax)
-          errors.push(`Exceeds ${currentMerchant!.maxWeightKg} KG max.`)
+        if (exceedsMax) errors.push(`Exceeds ${maxWeightKg} KG max.`)
       }
       if (apiErrors[index]) {
         errors.push(...apiErrors[index])
@@ -154,6 +157,7 @@ export default function NewOrderPage() {
     pickupLocations,
     deliveryCities,
     zonePricing,
+    platformDefaults,
   ])
 
   const anyExceeds = rows.some((r) => r.exceedsMax)
@@ -276,6 +280,7 @@ export default function NewOrderPage() {
               </Button>
               <Button
                 type="submit"
+                data-testid="submit-order"
                 className="gap-2"
                 disabled={submitting || anyExceeds}
               >

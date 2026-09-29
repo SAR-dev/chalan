@@ -3,11 +3,11 @@ import "dotenv/config"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { branding, tracking } from "../selectors"
+import { branding, onboarding, tracking } from "../selectors"
 
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
-    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.locator(onboarding.skip).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
     await waitForAppReady(page)
   }
@@ -89,7 +89,6 @@ test.describe("S36. Merchant Branding", () => {
     const data = await merchantRes.json()
 
     // Verify branding fields exist
-    expect(data).toHaveProperty("logoUrl")
     expect(data).toHaveProperty("brandColor")
     expect(data).toHaveProperty("hidePlatformBranding")
   })
@@ -131,8 +130,21 @@ test.describe("S36. Merchant Branding", () => {
     await expect(page.locator(branding.trackBrand)).toContainText(
       "Fulfilled by Merchant 1 Business",
     )
-    await expect(page.locator(branding.trackBrandLogo)).toBeVisible()
     await expect(page.locator(branding.trackAccent)).toBeVisible()
+  })
+})
+
+// ─── S56. Merchant branding uses the business name ──────────────────────────
+test.describe("S56. Merchant branding uses the business name", () => {
+  test("the merchant sidebar shows the business name, not a logo", async ({
+    page,
+  }) => {
+    await login(page, CREDS.merchant)
+    await skipOnboardingIfNeeded(page)
+
+    const brand = page.locator(branding.sidebarBrand)
+    await expect(brand).toContainText("Merchant 1 Business")
+    await expect(brand.locator("img")).toHaveCount(0)
   })
 })
 

@@ -111,7 +111,7 @@ export function CreateAccountDialog({
         if (!next) setForm(EMPTY)
       }}
       trigger={
-        <Button>
+        <Button data-testid="create-account-open">
           <UserPlus className="size-4" />
           Create Warehouse Admin
         </Button>
@@ -133,6 +133,7 @@ export function CreateAccountDialog({
           <Label htmlFor="name">Full name</Label>
           <Input
             id="name"
+            data-testid="team-name"
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
             placeholder="Jane Doe"
@@ -147,7 +148,11 @@ export function CreateAccountDialog({
               value={form.warehouseId}
               onValueChange={(v) => update("warehouseId", v ?? "")}
             >
-              <SelectTrigger id="warehouse" className="w-full">
+              <SelectTrigger
+                id="warehouse"
+                data-testid="team-warehouse"
+                className="w-full"
+              >
                 <SelectValue placeholder="Select a warehouse">
                   {selectedWarehouse
                     ? `${selectedWarehouse.name}-${selectedWarehouse.city}`
@@ -173,6 +178,7 @@ export function CreateAccountDialog({
             <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
+              data-testid="team-phone"
               type="tel"
               value={form.phone}
               onChange={(e) => update("phone", e.target.value)}
@@ -186,6 +192,7 @@ export function CreateAccountDialog({
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
+            data-testid="team-email"
             type="email"
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
@@ -198,6 +205,7 @@ export function CreateAccountDialog({
           <Label htmlFor="password">Temporary password</Label>
           <Input
             id="password"
+            data-testid="team-password"
             type="password"
             value={form.password}
             onChange={(e) => update("password", e.target.value)}
