@@ -568,6 +568,57 @@ describe("PATCH /orders/:id/picked-up", () => {
     ).toMatchObject({ amount: 80, status: "SETTLED" })
   })
 
+  it("keeps a FLAT bundle price through a weight correction", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+          deliveryFee: 50,
+          packageRuleType: "FLAT",
+          packageRuleValue: 50,
+        }),
+      ],
+      [{ id: "pl_1", warehouseId: "wh_1" }],
+      [{ maxWeightKg: 10 }], // merchant cap
+      [
+        {
+          baseRate: 100,
+          extraRatePerKg: 20,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ], // platform defaults
+      [{ city: "Dhaka" }], // origin warehouse city
+      [{ zoneId: "ZN-1" }], // origin city zone
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "PICKED_UP",
+        parcelWeightKg: 3,
+        deliveryFee: 50,
+        codFee: 0,
+        productCost: 500,
+        packageRuleType: "FLAT",
+        packageRuleValue: 50,
+      }),
+    ]
+    const { status, payload } = await call(pickedUp, {
+      proofRefs: ["/uploads/a.png"],
+      parcelWeightKg: 3,
+    })
+    expect(status).toBe(200)
+    // The zone fee would be 140; the snapshotted FLAT rule caps it at 50, so
+    // the weight correction produces no delivery-fee delta.
+    expect(payload).toMatchObject({ parcelWeightKg: 3, deliveryFee: 50 })
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE"),
+    ).toBeUndefined()
+  })
+
   it("400 when the corrected weight exceeds the limit", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [

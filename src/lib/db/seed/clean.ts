@@ -22,6 +22,11 @@ export const SEED_CLEAN_TABLES = [
   "account",
   "user",
   "pickup_location",
+  // Package tables FK merchant, so they must be truncated before it.
+  "package_purchase_request",
+  "merchant_package",
+  "pricing_package_tier",
+  "pricing_package",
   "merchant",
   "rider",
   "warehouse",

@@ -14,6 +14,7 @@ vi.mock("@/lib/audit", () => ({
 const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
+const insertPayloads: Record<string, unknown>[] = []
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -44,7 +45,10 @@ vi.mock("@/lib/db", () => {
   }
   const makeInsertChain = () => {
     const chain: Record<string, unknown> = {
-      values: () => chain,
+      values: (payload: Record<string, unknown>) => {
+        insertPayloads.push(payload)
+        return chain
+      },
       onConflictDoUpdate: () => chain,
       onConflictDoNothing: () => chain,
       returning: () => Promise.resolve([]),
@@ -64,6 +68,7 @@ beforeEach(() => {
   selectQueue.length = 0
   updateResult.length = 0
   updatePayloads.length = 0
+  insertPayloads.length = 0
   sessionState.value = null
 })
 
@@ -99,6 +104,10 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     pickupRiderId: null,
     deliveryRiderId: null,
     parcelWeightKg: 2,
+    deliveryFee: 80,
+    codFee: 5,
+    cancellationFee: 0,
+    merchantPackageId: null,
     ...overrides,
   }
 }
@@ -226,5 +235,70 @@ describe("PATCH /api/orders/bulk/cancel", () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.count).toBe(1)
+  })
+
+  it("refunds the creation charge on cancel (bulk used to skip this)", async () => {
+    sessionState.value = admin
+    selectQueue.push([makeOrder({ status: "PENDING" })])
+    updateResult.push(makeOrder({ status: "CANCELLED" }))
+
+    const res = await cancel(req({ ids: ["o1"], reason: "duplicate" }))
+    expect(res.status).toBe(200)
+
+    const reversal = insertPayloads.find(
+      (p) => p.type === "ORDER_CHARGE_REVERSAL",
+    )
+    // deliveryFee 80 + codFee 5 = 85 credited back to the merchant.
+    expect(reversal).toMatchObject({
+      merchantId: "m1",
+      amount: -85,
+      status: "SETTLED",
+      orderId: "o1",
+    })
+  })
+
+  it("charges the cancellation fee instead once the parcel has moved", async () => {
+    sessionState.value = whAdmin
+    selectQueue.push([
+      makeOrder({
+        status: "IN_WAREHOUSE",
+        warehouseId: "wh_1",
+        cancellationFee: 12,
+      }),
+    ])
+    updateResult.push(makeOrder({ status: "CANCELLED", cancellationFee: 12 }))
+
+    const res = await cancel(req({ ids: ["o1"], reason: "returned to hub" }))
+    expect(res.status).toBe(200)
+
+    expect(
+      insertPayloads.find((p) => p.type === "ORDER_CANCELLATION"),
+    ).toMatchObject({ amount: 12, orderId: "o1" })
+  })
+
+  it("returns the bundle quota when the cancelled order had one", async () => {
+    sessionState.value = admin
+    selectQueue.push([
+      makeOrder({ status: "PENDING", merchantPackageId: "mp_1" }),
+    ])
+    updateResult.push(
+      makeOrder({ status: "CANCELLED", merchantPackageId: "mp_1" }),
+    )
+
+    const res = await cancel(req({ ids: ["o1"], reason: "duplicate" }))
+    expect(res.status).toBe(200)
+
+    // The quota refund is a GREATEST(ordersUsed - 1, 0) update on the bundle.
+    expect(updatePayloads.some((p) => "ordersUsed" in p)).toBe(true)
+  })
+
+  it("does not touch bundle quota for an order with no package", async () => {
+    sessionState.value = admin
+    selectQueue.push([makeOrder({ status: "PENDING" })])
+    updateResult.push(makeOrder({ status: "CANCELLED" }))
+
+    const res = await cancel(req({ ids: ["o1"], reason: "duplicate" }))
+    expect(res.status).toBe(200)
+    expect(updatePayloads.some((p) => "ordersUsed" in p)).toBe(false)
   })
 })

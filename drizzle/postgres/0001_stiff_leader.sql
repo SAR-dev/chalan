@@ -141,6 +141,7 @@ CREATE TABLE "zone_pricing" (
 	"freeWeightKg" double precision DEFAULT 1 NOT NULL,
 	"maxWeightKg" double precision DEFAULT 10 NOT NULL,
 	"codFeePercentage" double precision DEFAULT 1 NOT NULL,
+	"cancellationFee" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -155,11 +156,7 @@ CREATE TABLE "merchant" (
 	"businessType" text DEFAULT 'Other' NOT NULL,
 	"onboardingCompletedAt" timestamp with time zone,
 	"status" text DEFAULT 'PENDING' NOT NULL,
-	"baseRate" numeric(14, 2) DEFAULT 0 NOT NULL,
-	"extraRatePerKg" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"maxWeightKg" double precision DEFAULT 3 NOT NULL,
-	"freeWeightKg" double precision DEFAULT 1 NOT NULL,
-	"codFeePercentage" double precision DEFAULT 1 NOT NULL,
 	"maxModerators" integer DEFAULT 3 NOT NULL,
 	"emailVerifiedAt" timestamp with time zone,
 	"emailVerificationToken" text,
@@ -179,7 +176,6 @@ CREATE TABLE "merchant" (
 	"nidRejectedAt" timestamp with time zone,
 	"nidRejectedBy" text,
 	"nidRejectionReason" text,
-	"logoUrl" text,
 	"brandColor" text,
 	"hidePlatformBranding" boolean DEFAULT false NOT NULL,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
@@ -200,6 +196,7 @@ CREATE TABLE "pickup_location" (
 CREATE TABLE "order" (
 	"id" text PRIMARY KEY DEFAULT gen_entity_code('ORD', nextval('order_id_seq')) NOT NULL,
 	"trackingToken" text,
+	"idempotencyKey" text,
 	"merchantId" text NOT NULL,
 	"pickupLocationId" text NOT NULL,
 	"recipientName" text NOT NULL,
@@ -212,7 +209,13 @@ CREATE TABLE "order" (
 	"productCost" numeric(14, 2) NOT NULL,
 	"deliveryFee" numeric(14, 2) NOT NULL,
 	"codFee" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"cancellationFee" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"merchantEarnings" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"packageId" text,
+	"packageTierId" text,
+	"merchantPackageId" text,
+	"packageRuleType" text,
+	"packageRuleValue" double precision,
 	"status" text DEFAULT 'PENDING' NOT NULL,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
@@ -232,6 +235,7 @@ CREATE TABLE "order" (
 	"deliveredAt" timestamp with time zone,
 	"deliveryProofRef" text,
 	"amountCollected" numeric(14, 2),
+	"deliveryShortfallReason" text,
 	"failedAttemptAt" timestamp with time zone,
 	"failureNote" text,
 	"deliveryAttempts" integer DEFAULT 0 NOT NULL,
@@ -277,6 +281,55 @@ CREATE TABLE "payout_request" (
 	"paidAt" timestamp with time zone
 );
 --> statement-breakpoint
+CREATE TABLE "merchant_package" (
+	"id" text PRIMARY KEY NOT NULL,
+	"merchantId" text NOT NULL,
+	"packageId" text NOT NULL,
+	"ordersUsed" integer DEFAULT 0 NOT NULL,
+	"isActive" boolean DEFAULT true NOT NULL,
+	"assignedBy" text,
+	"startedAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"endedAt" timestamp with time zone,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "package_purchase_request" (
+	"id" text PRIMARY KEY NOT NULL,
+	"merchantId" text NOT NULL,
+	"packageId" text NOT NULL,
+	"amount" numeric(14, 2) NOT NULL,
+	"status" text DEFAULT 'PENDING' NOT NULL,
+	"note" text,
+	"requestedAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"reviewedBy" text,
+	"reviewedAt" timestamp with time zone,
+	"rejectReason" text,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "pricing_package" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"price" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"isActive" boolean DEFAULT true NOT NULL,
+	"createdBy" text,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "pricing_package_tier" (
+	"id" text PRIMARY KEY NOT NULL,
+	"packageId" text NOT NULL,
+	"sortOrder" integer DEFAULT 0 NOT NULL,
+	"orderCount" integer NOT NULL,
+	"ruleType" text NOT NULL,
+	"ruleValue" double precision NOT NULL,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "announcement" (
 	"id" text PRIMARY KEY NOT NULL,
 	"title" text NOT NULL,
@@ -311,7 +364,6 @@ CREATE TABLE "email_log" (
 	"status" text NOT NULL,
 	"attempts" integer NOT NULL,
 	"error" text,
-	"body" text,
 	"textBody" text,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
@@ -323,7 +375,6 @@ CREATE TABLE "email_outbox" (
 	"id" text PRIMARY KEY NOT NULL,
 	"to" text NOT NULL,
 	"subject" text NOT NULL,
-	"html" text,
 	"text" text,
 	"status" text DEFAULT 'PENDING' NOT NULL,
 	"attempts" integer DEFAULT 0 NOT NULL,
@@ -358,6 +409,8 @@ CREATE TABLE "platform_config" (
 	"defaultExtraRatePerKg" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"defaultFreeWeightKg" double precision DEFAULT 1 NOT NULL,
 	"defaultMaxWeightKg" double precision DEFAULT 3 NOT NULL,
+	"defaultCancellationFee" numeric(14, 2) DEFAULT 0 NOT NULL,
+	"refundOnCancel" boolean DEFAULT true NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -434,12 +487,20 @@ ALTER TABLE "pickup_location" ADD CONSTRAINT "pickup_location_cityId_delivery_ci
 ALTER TABLE "order" ADD CONSTRAINT "order_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_pickupLocationId_pickup_location_id_fk" FOREIGN KEY ("pickupLocationId") REFERENCES "public"."pickup_location"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_deliveryCityId_delivery_city_id_fk" FOREIGN KEY ("deliveryCityId") REFERENCES "public"."delivery_city"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "order" ADD CONSTRAINT "order_packageId_pricing_package_id_fk" FOREIGN KEY ("packageId") REFERENCES "public"."pricing_package"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "order" ADD CONSTRAINT "order_packageTierId_pricing_package_tier_id_fk" FOREIGN KEY ("packageTierId") REFERENCES "public"."pricing_package_tier"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "order" ADD CONSTRAINT "order_merchantPackageId_merchant_package_id_fk" FOREIGN KEY ("merchantPackageId") REFERENCES "public"."merchant_package"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_pickupRiderId_rider_id_fk" FOREIGN KEY ("pickupRiderId") REFERENCES "public"."rider"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_warehouseId_warehouse_id_fk" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouse"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_deliveryRiderId_rider_id_fk" FOREIGN KEY ("deliveryRiderId") REFERENCES "public"."rider"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order" ADD CONSTRAINT "order_payoutRequestId_payout_request_id_fk" FOREIGN KEY ("payoutRequestId") REFERENCES "public"."payout_request"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_status_history" ADD CONSTRAINT "order_status_history_orderId_order_id_fk" FOREIGN KEY ("orderId") REFERENCES "public"."order"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payout_request" ADD CONSTRAINT "payout_request_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "merchant_package" ADD CONSTRAINT "merchant_package_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "merchant_package" ADD CONSTRAINT "merchant_package_packageId_pricing_package_id_fk" FOREIGN KEY ("packageId") REFERENCES "public"."pricing_package"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "package_purchase_request" ADD CONSTRAINT "package_purchase_request_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "package_purchase_request" ADD CONSTRAINT "package_purchase_request_packageId_pricing_package_id_fk" FOREIGN KEY ("packageId") REFERENCES "public"."pricing_package"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "pricing_package_tier" ADD CONSTRAINT "pricing_package_tier_packageId_pricing_package_id_fk" FOREIGN KEY ("packageId") REFERENCES "public"."pricing_package"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_ticket" ADD CONSTRAINT "support_ticket_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rider" ADD CONSTRAINT "rider_warehouseId_warehouse_id_fk" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouse"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_user_id_idx" ON "account" USING btree ("userId");--> statement-breakpoint
@@ -492,8 +553,10 @@ CREATE INDEX "order_created_at_idx" ON "order" USING btree ("createdAt");--> sta
 CREATE INDEX "order_warehouse_status_created_at_idx" ON "order" USING btree ("warehouseId","status","createdAt");--> statement-breakpoint
 CREATE INDEX "order_merchant_status_created_at_idx" ON "order" USING btree ("merchantId","status","createdAt");--> statement-breakpoint
 CREATE INDEX "order_status_created_at_idx" ON "order" USING btree ("status","createdAt");--> statement-breakpoint
+CREATE UNIQUE INDEX "order_idempotency_uniq" ON "order" USING btree ("merchantId","idempotencyKey");--> statement-breakpoint
 CREATE INDEX "order_cod_settled_at_idx" ON "order" USING btree ("codSettledAt");--> statement-breakpoint
 CREATE INDEX "order_payout_request_id_idx" ON "order" USING btree ("payoutRequestId");--> statement-breakpoint
+CREATE INDEX "order_merchant_package_id_idx" ON "order" USING btree ("merchantPackageId");--> statement-breakpoint
 CREATE UNIQUE INDEX "order_tracking_token_unique" ON "order" USING btree ("trackingToken");--> statement-breakpoint
 CREATE INDEX "order_code_trgm_idx" ON "order" USING gin ("id" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "order_recipient_name_trgm_idx" ON "order" USING gin ("recipientName" gin_trgm_ops);--> statement-breakpoint
@@ -504,6 +567,17 @@ CREATE INDEX "payout_request_status_idx" ON "payout_request" USING btree ("statu
 CREATE INDEX "payout_request_requested_at_idx" ON "payout_request" USING btree ("requestedAt");--> statement-breakpoint
 CREATE INDEX "payout_request_merchant_id_status_idx" ON "payout_request" USING btree ("merchantId","status");--> statement-breakpoint
 CREATE INDEX "payout_request_code_trgm_idx" ON "payout_request" USING gin ("id" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "merchant_package_merchant_id_idx" ON "merchant_package" USING btree ("merchantId");--> statement-breakpoint
+CREATE INDEX "merchant_package_package_id_idx" ON "merchant_package" USING btree ("packageId");--> statement-breakpoint
+CREATE UNIQUE INDEX "merchant_package_one_active_uniq" ON "merchant_package" USING btree ("merchantId") WHERE "merchant_package"."isActive" = true;--> statement-breakpoint
+CREATE INDEX "package_purchase_request_merchant_id_idx" ON "package_purchase_request" USING btree ("merchantId");--> statement-breakpoint
+CREATE INDEX "package_purchase_request_status_idx" ON "package_purchase_request" USING btree ("status");--> statement-breakpoint
+CREATE UNIQUE INDEX "package_purchase_request_one_pending_uniq" ON "package_purchase_request" USING btree ("merchantId") WHERE "package_purchase_request"."status" = 'PENDING';--> statement-breakpoint
+CREATE INDEX "pricing_package_is_active_idx" ON "pricing_package" USING btree ("isActive");--> statement-breakpoint
+CREATE INDEX "pricing_package_name_trgm_idx" ON "pricing_package" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "pricing_package_tier_package_id_idx" ON "pricing_package_tier" USING btree ("packageId");--> statement-breakpoint
+CREATE UNIQUE INDEX "pricing_package_tier_package_order_uniq" ON "pricing_package_tier" USING btree ("packageId","orderCount");--> statement-breakpoint
+CREATE UNIQUE INDEX "pricing_package_tier_package_sort_uniq" ON "pricing_package_tier" USING btree ("packageId","sortOrder");--> statement-breakpoint
 CREATE INDEX "announcement_is_active_idx" ON "announcement" USING btree ("isActive");--> statement-breakpoint
 CREATE INDEX "announcement_published_at_idx" ON "announcement" USING btree ("publishedAt");--> statement-breakpoint
 CREATE INDEX "announcement_expires_at_idx" ON "announcement" USING btree ("expiresAt");--> statement-breakpoint

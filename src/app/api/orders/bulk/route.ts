@@ -15,12 +15,15 @@ import {
   deliveryCity,
   merchant,
   merchantBalance,
+  merchantPackage,
   order,
   platformConfig,
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
+import { lockAndResolveMerchantPackageRule } from "@/lib/order-pricing"
+import { applyPackageRule, pickTierForCount } from "@/lib/packages"
 import {
   calcCodFee,
   calcDeliveryCharge,
@@ -220,15 +223,24 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
 
   const created = await db.transaction(async (tx) => {
-    const values = inputs.map((input) => {
+    // Lock the merchant's active bundle once. Each order resolves its own tier
+    // against the cumulative count, so a batch that crosses a tier boundary is
+    // priced correctly order-by-order.
+    const bundle = await lockAndResolveMerchantPackageRule(tx, merchantId)
+
+    const values = inputs.map((input, index) => {
       const pricing = pricingFor(input)
 
       // Money is stored to paisa (ROADMAP P0.4) — never carry sub-paisa noise.
       const productCost = toPaisa(input.productCost)
-      const { total: deliveryFee } = calcDeliveryCharge(
+      const { total: zoneDeliveryFee } = calcDeliveryCharge(
         pricing,
         input.parcelWeightKg,
       )
+      const tier = bundle
+        ? pickTierForCount(bundle.tiers, bundle.ordersUsed + index)
+        : null
+      const deliveryFee = applyPackageRule(zoneDeliveryFee, tier)
       const codFee = calcCodFee(productCost, pricing.codFeePercentage ?? 1)
       const merchantEarnings = calcMerchantEarnings(
         productCost,
@@ -253,6 +265,11 @@ export const POST = withErrorHandler(async (req: Request) => {
         codFee,
         cancellationFee: toPaisa(pricing.cancellationFee ?? 0),
         merchantEarnings,
+        packageId: bundle?.packageId ?? null,
+        packageTierId: tier?.id ?? null,
+        merchantPackageId: bundle?.merchantPackageId ?? null,
+        packageRuleType: tier?.ruleType ?? null,
+        packageRuleValue: tier?.ruleValue ?? null,
         status: "PENDING" as const,
         deliveryAttempts: 0,
         merchantNote: input.merchantNote?.trim() || null,
@@ -309,6 +326,17 @@ export const POST = withErrorHandler(async (req: Request) => {
           updatedAt: new Date().toISOString(),
         },
       })
+
+    // Consume the batch's orders from the bundle quota.
+    if (bundle && insertedOrders.length > 0) {
+      await tx
+        .update(merchantPackage)
+        .set({
+          ordersUsed: sql`${merchantPackage.ordersUsed} + ${insertedOrders.length}`,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(merchantPackage.id, bundle.merchantPackageId))
+    }
 
     return insertedOrders
   })

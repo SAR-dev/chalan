@@ -155,7 +155,7 @@ const features = [
     icon: <LifeBuoy className="size-5" />,
     iconClass: "bg-chart-2/10 text-chart-2",
     title: "Help Center & FAQ",
-    desc: "Step-by-step guides for merchants, riders, and admins, plus a full FAQ — reachable from every page.",
+    desc: "Step-by-step guides for merchants, riders, warehouse admins, and super admins, plus a full role-filtered FAQ — reachable from every page.",
   },
   {
     icon: <ShieldCheck className="size-5" />,
@@ -651,7 +651,8 @@ export default async function LandingPage() {
                   </li>
                   <li className="flex gap-2">
                     <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
-                    30-question FAQ covering orders, COD, pricing, and returns
+                    58-question FAQ covering orders, COD, pricing, packages, and
+                    returns
                   </li>
                   <li className="flex gap-2">
                     <Check className="text-primary mt-0.5 size-3.5 shrink-0" />

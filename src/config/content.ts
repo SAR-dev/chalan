@@ -82,6 +82,11 @@ export const pageContent = {
       title: "Inbox",
       description: "Active platform announcements targeted at your role.",
     },
+    packages: {
+      title: "Packages",
+      description:
+        "Prepaid delivery bundles merchants can buy, the discount tiers each one unlocks, and the purchase requests awaiting your review.",
+    },
     settings: {
       title: "Platform settings",
       description:

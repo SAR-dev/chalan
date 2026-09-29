@@ -23,12 +23,14 @@ import {
   balanceTransaction,
   merchant,
   merchantBalance,
+  merchantPackage,
   order,
   orderStatusHistory,
   platformConfig,
   rider,
 } from "@/lib/db/schema"
 import { resolveRoutePricing } from "@/lib/order-pricing"
+import { applyPackageRule } from "@/lib/packages"
 import { calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
 import {
   orderAssignPickupRiderSchema,
@@ -268,9 +270,22 @@ export const ORDER_TRANSITIONS = {
             `Parcel weight exceeds the ${cap} KG limit.`,
           )
         }
-        const { total: deliveryFee } = calcDeliveryCharge(
+        // The bundle rule is frozen onto the order at creation, so re-apply the
+        // snapshotted rule to the re-priced zone fee. A FLAT rule is
+        // weight-independent, so a weight correction under a flat bundle yields
+        // no delivery-fee delta — exactly as at creation.
+        const { total: zoneDeliveryFee } = calcDeliveryCharge(
           pricing,
           body.parcelWeightKg,
+        )
+        const deliveryFee = applyPackageRule(
+          zoneDeliveryFee,
+          o.packageRuleType
+            ? {
+                ruleType: o.packageRuleType,
+                ruleValue: o.packageRuleValue ?? 0,
+              }
+            : null,
         )
         update.parcelWeightKg = body.parcelWeightKg
         update.deliveryFee = deliveryFee
@@ -663,6 +678,151 @@ async function applyFeeSettlement(
   }
 }
 
+/**
+ * The `refundOnCancel` platform toggle (ROADMAP B15). Read once per transaction
+ * and threaded through, so a bulk cancel does not hit the config per order.
+ */
+async function loadRefundOnCancelPolicy(tx: OrderTx): Promise<boolean> {
+  const [policy] = await tx
+    .select({ refundOnCancel: platformConfig.refundOnCancel })
+    .from(platformConfig)
+    .limit(1)
+  return policy?.refundOnCancel ?? true
+}
+
+/**
+ * Returns one order to the merchant's bundle quota. A cancelled/returned parcel
+ * never really shipped, so the quota it took at creation is given back.
+ * Clamped at zero so a double refund can never drive the counter negative.
+ */
+async function refundPackageQuota(
+  tx: OrderTx,
+  updated: OrderRow,
+): Promise<void> {
+  if (!updated.merchantPackageId) return
+  await tx
+    .update(merchantPackage)
+    .set({
+      ordersUsed: sql`GREATEST(${merchantPackage.ordersUsed} - 1, 0)`,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(merchantPackage.id, updated.merchantPackageId))
+}
+
+/**
+ * Every balance-ledger side effect of a transition, in one shared helper so the
+ * single and bulk runners cannot drift.
+ *
+ * This is what closed a real gap: the bulk runner used to apply the status
+ * change only, so bulk-cancelling never refunded the creation charge, never
+ * charged the cancellation fee, and never returned the bundle quota.
+ */
+async function settleOrderFinancials(
+  tx: OrderTx,
+  before: OrderRow,
+  updated: OrderRow,
+  name: TransitionName,
+  actorName: string,
+  refundOnCancel: boolean,
+): Promise<void> {
+  // If the order is delivered, the platform has collected the COD from the
+  // recipient — credit the merchant the GROSS amount (ROADMAP P0.4). The fee
+  // charge written at creation nets this to the merchant's earnings, so a
+  // later payout of those earnings settles the balance to zero.
+  const collectedAmount = updated.amountCollected ?? updated.productCost
+  if (name === "delivered" && collectedAmount > 0) {
+    const collected = codCollectedAmount(collectedAmount)
+
+    // Create ORDER_EARNINGS transaction — negative amount reduces merchant debt
+    await tx.insert(balanceTransaction).values({
+      merchantId: updated.merchantId,
+      type: "ORDER_EARNINGS",
+      amount: collected,
+      status: "SETTLED",
+      note: `Order ${updated.id} delivered — COD collected`,
+      orderId: updated.id,
+      createdBy: actorName,
+    })
+
+    // Upsert merchant balance — credit the collected COD
+    await tx
+      .insert(merchantBalance)
+      .values({
+        id: createId(),
+        merchantId: updated.merchantId,
+        balance: collected,
+      })
+      .onConflictDoUpdate({
+        target: merchantBalance.merchantId,
+        set: {
+          balance: sql`${merchantBalance.balance} + ${collected}`,
+          updatedAt: new Date().toISOString(),
+        },
+      })
+  }
+
+  // A weight correction at pickup re-prices the delivery — adjust the creation
+  // charge by the delivery-fee delta.
+  if (name === "picked-up" && updated.deliveryFee !== before.deliveryFee) {
+    const delta = toPaisa(updated.deliveryFee - before.deliveryFee)
+    if (delta !== 0) {
+      await tx.insert(balanceTransaction).values({
+        merchantId: updated.merchantId,
+        type: delta > 0 ? "ORDER_CHARGE" : "ORDER_CHARGE_REVERSAL",
+        amount: delta,
+        status: "SETTLED",
+        note: `Order ${updated.id} picked up — weight corrected to ${updated.parcelWeightKg} kg`,
+        orderId: updated.id,
+        createdBy: actorName,
+      })
+      await tx
+        .insert(merchantBalance)
+        .values({
+          id: createId(),
+          merchantId: updated.merchantId,
+          balance: delta,
+        })
+        .onConflictDoUpdate({
+          target: merchantBalance.merchantId,
+          set: {
+            balance: sql`${merchantBalance.balance} + ${delta}`,
+            updatedAt: new Date().toISOString(),
+          },
+        })
+    }
+  }
+
+  // A returned order refunds the creation charge and charges the zone-pair
+  // cancellation fee instead (ROADMAP B4). Net: the merchant's obligation
+  // becomes just the cancellation fee.
+  if (name === "return") {
+    await applyFeeSettlement(tx, updated, actorName, {
+      label: "returned",
+      refundFees: true,
+      cancellationFee: updated.cancellationFee,
+    })
+    await refundPackageQuota(tx, updated)
+  }
+
+  // A cancelled order is refunded the creation charge. Before pickup nothing
+  // has been rendered, so the refund is total; once the parcel has moved, the
+  // zone-pair cancellation fee applies instead (ROADMAP B4/B10). The
+  // `refundOnCancel` platform toggle can disable the refund entirely (B15).
+  if (name === "cancel") {
+    const postPickup =
+      before.status === "PICKED_UP" ||
+      before.status === "IN_WAREHOUSE" ||
+      before.status === "IN_TRANSIT"
+    await applyFeeSettlement(tx, updated, actorName, {
+      label: "cancelled",
+      refundFees: refundOnCancel,
+      cancellationFee:
+        refundOnCancel && postPickup ? updated.cancellationFee : 0,
+    })
+    await refundPackageQuota(tx, updated)
+  }
+}
+
 export async function applyOrderTransition(
   name: TransitionName,
   orderId: string,
@@ -727,104 +887,18 @@ export async function applyOrderTransition(
       .where(eq(order.id, orderId))
       .returning()
 
-    // If the order is delivered, the platform has collected the COD from the
-    // recipient — credit the merchant the GROSS amount (ROADMAP P0.4). The fee
-    // charge written at creation nets this to the merchant's earnings, so a
-    // later payout of those earnings settles the balance to zero.
-    const collectedAmount = updated.amountCollected ?? updated.productCost
-    if (name === "delivered" && collectedAmount > 0) {
-      const collected = codCollectedAmount(collectedAmount)
-
-      // Create ORDER_EARNINGS transaction — negative amount reduces merchant debt
-      await tx.insert(balanceTransaction).values({
-        merchantId: updated.merchantId,
-        type: "ORDER_EARNINGS",
-        amount: collected,
-        status: "SETTLED",
-        note: `Order ${updated.id} delivered — COD collected`,
-        orderId: updated.id,
-        createdBy: me.name,
-      })
-
-      // Upsert merchant balance — credit the collected COD
-      await tx
-        .insert(merchantBalance)
-        .values({
-          id: createId(),
-          merchantId: updated.merchantId,
-          balance: collected,
-        })
-        .onConflictDoUpdate({
-          target: merchantBalance.merchantId,
-          set: {
-            balance: sql`${merchantBalance.balance} + ${collected}`,
-            updatedAt: new Date().toISOString(),
-          },
-        })
-    }
-
-    // A weight correction at pickup re-prices the delivery — adjust the creation
-    // charge by the delivery-fee delta.
-    if (name === "picked-up" && updated.deliveryFee !== orderRow.deliveryFee) {
-      const delta = toPaisa(updated.deliveryFee - orderRow.deliveryFee)
-      if (delta !== 0) {
-        await tx.insert(balanceTransaction).values({
-          merchantId: updated.merchantId,
-          type: delta > 0 ? "ORDER_CHARGE" : "ORDER_CHARGE_REVERSAL",
-          amount: delta,
-          status: "SETTLED",
-          note: `Order ${updated.id} picked up — weight corrected to ${updated.parcelWeightKg} kg`,
-          orderId: updated.id,
-          createdBy: me.name,
-        })
-        await tx
-          .insert(merchantBalance)
-          .values({
-            id: createId(),
-            merchantId: updated.merchantId,
-            balance: delta,
-          })
-          .onConflictDoUpdate({
-            target: merchantBalance.merchantId,
-            set: {
-              balance: sql`${merchantBalance.balance} + ${delta}`,
-              updatedAt: new Date().toISOString(),
-            },
-          })
-      }
-    }
-
-    // A returned order refunds the creation charge and charges the zone-pair
-    // cancellation fee instead (ROADMAP B4). Net: the merchant's obligation
-    // becomes just the cancellation fee.
-    if (name === "return") {
-      await applyFeeSettlement(tx, updated, me.name, {
-        label: "returned",
-        refundFees: true,
-        cancellationFee: updated.cancellationFee,
-      })
-    }
-
-    // A cancelled order is refunded the creation charge. Before pickup nothing
-    // has been rendered, so the refund is total; once the parcel has moved, the
-    // zone-pair cancellation fee applies instead (ROADMAP B4/B10). The
-    // `refundOnCancel` platform toggle can disable the refund entirely (B15).
-    if (name === "cancel") {
-      const postPickup =
-        orderRow.status === "PICKED_UP" ||
-        orderRow.status === "IN_WAREHOUSE" ||
-        orderRow.status === "IN_TRANSIT"
-      const [policy] = await tx
-        .select({ refundOnCancel: platformConfig.refundOnCancel })
-        .from(platformConfig)
-        .limit(1)
-      const refundFees = policy?.refundOnCancel ?? true
-      await applyFeeSettlement(tx, updated, me.name, {
-        label: "cancelled",
-        refundFees,
-        cancellationFee: refundFees && postPickup ? updated.cancellationFee : 0,
-      })
-    }
+    // COD credit, weight-delta re-charge, terminal fee settlement and
+    // bundle-quota refund all live in one helper, shared with the bulk runner.
+    const refundOnCancel =
+      name === "cancel" ? await loadRefundOnCancelPolicy(tx) : true
+    await settleOrderFinancials(
+      tx,
+      orderRow,
+      updated,
+      name,
+      me.name,
+      refundOnCancel,
+    )
 
     // Audit and status history commit with the change they describe
     // (ROADMAP P1.4): a crash between commit and the audit write used to lose
@@ -933,6 +1007,22 @@ export async function applyBulkOrderTransition(
         .where(eq(order.id, id))
         .returning()
       if (row) updated.push(row)
+    }
+
+    // The same balance-ledger side effects the single-order path applies. This
+    // used to be missing entirely, so a bulk cancel left the creation charge on
+    // the merchant's balance and never returned the bundle quota.
+    const refundOnCancel =
+      name === "cancel" ? await loadRefundOnCancelPolicy(tx) : true
+    for (const row of updated) {
+      await settleOrderFinancials(
+        tx,
+        beforeById.get(row.id) ?? row,
+        row,
+        name,
+        me.name,
+        refundOnCancel,
+      )
     }
 
     for (const row of updated) {

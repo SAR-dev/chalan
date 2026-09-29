@@ -339,6 +339,14 @@ export const help = {
   faqLink: "[data-testid='help-faq-link']",
 }
 
+// ─── FAQ role tabs ───────────────────────────────────────────────────────────
+export const faq = {
+  tabs: "[data-testid='faq-tabs']",
+  tab: (role: string) => `[data-testid='faq-tab-${role}']`,
+  visibleSections: (role: string) => `[data-testid='faq-sections-${role}']`,
+  section: (id: string) => `[data-testid='faq-section-${id}']`,
+}
+
 // ─── Support tickets ─────────────────────────────────────────────────────────
 export const support = {
   table: "[data-testid='support-tickets']",
@@ -353,4 +361,62 @@ export const support = {
   replyOpen: "[data-testid='support-reply-open']",
   replyInput: "[data-testid='support-reply-input']",
   replySubmit: "[data-testid='support-reply-submit']",
+}
+
+// ─── Packages (admin catalogue + purchase request queue) ─────────────────────
+export const packages = {
+  // Admin: /dashboard/packages
+  table: "[data-testid='table-dashboard-packages']",
+  row: (id: string) => `[data-testid='row-dashboard-packages-${id}']`,
+  // Row ids come from the API, so specs find the row by name via this prefix
+  // then read its testid for the exact per-id selectors below.
+  rowPrefix: "[data-testid^='row-dashboard-packages-']",
+  rowIdPrefix: "row-dashboard-packages-",
+  createButton: "[data-testid='packages-create']",
+  nameInput: "[data-testid='package-name-input']",
+  descriptionInput: "[data-testid='package-description-input']",
+  priceInput: "[data-testid='package-price-input']",
+  activeSwitch: "[data-testid='package-active-switch']",
+  saveButton: "[data-testid='package-save']",
+  activeSwitchFor: (id: string) => `[data-testid='package-active-${id}']`,
+  actionsButton: (id: string) => `[data-testid='package-actions-${id}']`,
+  editItem: (id: string) => `[data-testid='package-edit-${id}']`,
+  addTierItem: (id: string) => `[data-testid='package-add-tier-${id}']`,
+  deleteItem: (id: string) => `[data-testid='package-delete-${id}']`,
+  tierLabel: (tierId: string) => `[data-testid='tier-edit-${tierId}']`,
+  deleteTierItem: (tierId: string) =>
+    `[data-testid='package-delete-tier-${tierId}']`,
+
+  // Tier dialog
+  tierOrderCountInput: "[data-testid='tier-order-count-input']",
+  tierRuleTypeSelect: "[data-testid='tier-rule-type-select']",
+  tierRuleOption: (type: string) => `[data-testid='tier-rule-${type}']`,
+  tierRuleValueInput: "[data-testid='tier-rule-value-input']",
+  tierSave: "[data-testid='tier-save']",
+
+  // Purchase request queue (same page, below the catalogue)
+  requestsTable: "[data-testid='table-dashboard-package-requests']",
+  requestRow: (id: string) =>
+    `[data-testid='row-dashboard-package-requests-${id}']`,
+  // Row ids are minted by the API, so specs locate a row by merchant name
+  // scoped to this tagged prefix (never a page-wide text selector).
+  requestRowPrefix: "[data-testid^='row-dashboard-package-requests-']",
+  requestRowIdPrefix: "row-dashboard-package-requests-",
+  requestApprove: (id: string) => `[data-testid='request-approve-${id}']`,
+  requestReject: (id: string) => `[data-testid='request-reject-${id}']`,
+  requestRejectReason: "[data-testid='request-reject-reason-input']",
+  requestRejectConfirm: "[data-testid='request-reject-confirm']",
+  requestRejectCancel: "[data-testid='request-reject-cancel']",
+  requestsTab: (tab: string) => `[data-testid='requests-tab-${tab}']`,
+
+  // Merchant: /merchant/pricing
+  activePackage: "[data-testid='merchant-active-package']",
+  ordersUsed: "[data-testid='merchant-package-orders-used']",
+  progress: "[data-testid='merchant-package-progress']",
+  pendingRequest: "[data-testid='merchant-package-pending']",
+  rejectedRequest: "[data-testid='merchant-package-rejected']",
+  catalogueCard: (id: string) => `[data-testid='package-card-${id}']`,
+  requestButton: (id: string) => `[data-testid='package-request-${id}']`,
+  requestNoteInput: "[data-testid='package-request-note-input']",
+  requestSubmit: "[data-testid='package-request-submit']",
 }

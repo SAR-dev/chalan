@@ -21,6 +21,8 @@ export {
   merchantStatuses as MERCHANT_STATUSES,
   orderDeliveryTypes as ORDER_DELIVERY_TYPES,
   orderStatuses as ORDER_STATUSES,
+  packagePurchaseStatuses as PACKAGE_PURCHASE_STATUSES,
+  packageRuleTypes as PACKAGE_RULE_TYPES,
   payoutRequestStatuses as PAYOUT_REQUEST_STATUSES,
   profileRoles as PROFILE_ROLES,
   riderStatuses as RIDER_STATUSES,

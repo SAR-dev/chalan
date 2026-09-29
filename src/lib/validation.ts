@@ -4,6 +4,7 @@ import {
   MAX_BULK_ORDERS,
   MAX_TABLE_ROWS_PER_PAGE,
   ORDER_DELIVERY_TYPES,
+  PACKAGE_RULE_TYPES,
   PROFILE_ROLES,
   RIDER_TASK_TYPES,
 } from "@/lib/constants"
@@ -353,6 +354,52 @@ export const balancePaymentSchema = z.object({
 export const balancePaymentRejectSchema = z.object({
   reason: requiredString("A rejection reason"),
 })
+
+export const packageRequestSchema = z.object({
+  note: z.string().trim().optional(),
+})
+
+export const packageRequestReviewSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approve") }),
+  z.object({
+    action: z.literal("reject"),
+    reason: requiredString("A rejection reason"),
+  }),
+])
+
+export const packageUpsertSchema = z.object({
+  name: requiredString("Package name"),
+  description: z.string().trim().optional(),
+  price: z
+    .number({ error: "Price must be a number" })
+    .min(0, "Price cannot be negative"),
+  isActive: z.boolean().optional(),
+})
+
+export const packageTierUpsertSchema = z.object({
+  orderCount: z
+    .number({ error: "Order count must be a number" })
+    .int("Order count must be a whole number")
+    .min(1, "Order count must be at least 1"),
+  ruleType: z.enum(PACKAGE_RULE_TYPES, {
+    error: "Select a valid rule type",
+  }),
+  ruleValue: z
+    .number({ error: "Rule value must be a number" })
+    .min(0, "Rule value cannot be negative"),
+  sortOrder: z.number().int().optional(),
+})
+
+/** PERCENT_OFF values are capped at 100; FLAT values are unbounded. */
+export function validateTierRule(
+  ruleType: (typeof PACKAGE_RULE_TYPES)[number],
+  ruleValue: number,
+): string | null {
+  if (ruleType === "PERCENT_OFF" && ruleValue > 100) {
+    return "A percentage discount cannot exceed 100."
+  }
+  return null
+}
 
 export const balanceAdjustSchema = z.object({
   amount: z
