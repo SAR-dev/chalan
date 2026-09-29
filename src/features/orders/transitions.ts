@@ -29,6 +29,7 @@ import {
   platformConfig,
   rider,
 } from "@/lib/db/schema"
+import { hasNavPermission } from "@/lib/nav-config"
 import { resolveRoutePricing } from "@/lib/order-pricing"
 import { applyPackageRule } from "@/lib/packages"
 import { calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
@@ -508,10 +509,12 @@ export const ORDER_TRANSITIONS = {
   }),
 
   cancel: defineTransition({
+    // Merchants cancel from the Orders surface, so a moderator needs that grant
+    // (ROADMAP 5.2 hard server checks).
     authorize: (me) =>
       me.role === "SUPER_ADMIN" ||
       me.role === "WAREHOUSE_ADMIN" ||
-      me.role === "MERCHANT",
+      (me.role === "MERCHANT" && hasNavPermission(me, "/merchant/orders")),
     schema: orderCancelSchema,
     guard: ({ order: o, session }) => {
       if (session.role === "MERCHANT") {

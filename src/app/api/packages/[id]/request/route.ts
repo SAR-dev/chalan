@@ -96,14 +96,17 @@ export const POST = withErrorHandler(
         })
         .returning()
 
-      await logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "PACKAGE_REQUESTED",
-        entityType: "package_purchase_request",
-        entityId: created.id,
-        description: `Requested package ${pkg.name} for ${pkg.price} Tk`,
-        metadata: { packageId: pkg.id, amount: pkg.price },
-      })
+      await logAudit(
+        {
+          actor: { userId: me.userId, name: me.name, role: me.role },
+          action: "PACKAGE_REQUESTED",
+          entityType: "package_purchase_request",
+          entityId: created.id,
+          description: `Requested package ${pkg.name} for ${pkg.price} Tk`,
+          metadata: { packageId: pkg.id, amount: pkg.price },
+        },
+        tx,
+      )
 
       return NextResponse.json(created, { status: 201 })
     })

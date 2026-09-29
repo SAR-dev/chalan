@@ -8,19 +8,32 @@ const raw = readFileSync(
 )
 const pkg = readFileSync(join(process.cwd(), "package.json"), "utf-8")
 
+/**
+ * The workflow with comment markers stripped.
+ *
+ * A job may be deliberately disabled by commenting it out (the `e2e` job is, to
+ * save CI minutes). Stripping the markers means the guard below still validates
+ * that job's shape and step ordering, so it cannot be silently broken while
+ * disabled — or re-enabled in the wrong order.
+ */
+const workflow = raw
+  .split("\n")
+  .map((line) => line.replace(/^\s*#\s?/, ""))
+  .join("\n")
+
 /** The `name:` job block, from its key to the next top-level job key. */
 function jobBlock(name: string): string {
-  const start = raw.search(new RegExp(`^\\s{2}${name}:`, "m"))
+  const start = workflow.search(new RegExp(`^\\s{2}${name}:`, "m"))
   if (start === -1) return ""
-  const rest = raw.slice(start + 1)
+  const rest = workflow.slice(start + 1)
   const next = rest.search(/^\s{2}[a-zA-Z0-9_-]+:/m)
-  return next === -1 ? raw.slice(start) : rest.slice(0, next)
+  return next === -1 ? workflow.slice(start) : rest.slice(0, next)
 }
 
 describe("CI workflow", () => {
-  it("runs e2e after migrating and building", () => {
-    // The e2e job is a CI gate. It must keep the ordering it depends on:
-    // migrate the DB, build the app, install browsers, then run the suite.
+  it("keeps the e2e job's migrate → build → install → test ordering", () => {
+    // Whether the job is enabled or commented out, it must keep the ordering it
+    // depends on: migrate the DB, build the app, install browsers, then run.
     const job = jobBlock("e2e")
     expect(job).not.toBe("")
 
@@ -37,14 +50,27 @@ describe("CI workflow", () => {
     expect(pkg).toContain('"test:e2e"')
   })
 
-  it("runs the coverage gate", () => {
-    expect(raw).toMatch(/^\s{2}coverage:/m)
-    expect(raw).toContain("pnpm test:coverage")
+  it("documents why the e2e job is disabled", () => {
+    // A disabled gate needs a written reason next to it, so it is a decision
+    // rather than an accident.
+    expect(raw).toContain("Disabled on purpose")
   })
 
-  it("runs the real-DB integration suite", () => {
-    expect(raw).toMatch(/^\s{2}integration:/m)
-    expect(raw).toContain("pnpm test:integration")
-    expect(raw).toContain("INTEGRATION_DATABASE_URL")
+  it("runs the coverage gate", () => {
+    expect(workflow).toMatch(/^\s{2}coverage:/m)
+    expect(workflow).toContain("pnpm test:coverage")
+  })
+
+  it("runs the real-DB integration suite against its own service container", () => {
+    expect(workflow).toMatch(/^\s{2}integration:/m)
+    expect(workflow).toContain("pnpm test:integration")
+    expect(workflow).toContain("INTEGRATION_DATABASE_URL")
+
+    // Hermetic: the job must not point at a shared remote database.
+    const job = jobBlock("integration")
+    expect(job).toContain(
+      "postgres://postgres:postgres@localhost:5432/delivery",
+    )
+    expect(job).not.toMatch(/neon\.tech|sslmode=require/)
   })
 })

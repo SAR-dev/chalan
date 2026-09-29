@@ -168,6 +168,15 @@ export const PATCH = withErrorHandler(
           .returning()
 
         if (newEmail && newEmail !== previousEmail) {
+          // A changed address is unverified until it is proven. Clearing both
+          // flags keeps the account from acting verified on an address nobody
+          // has confirmed — otherwise password reset and every platform email
+          // would follow an unverified address while the account stayed trusted.
+          await tx
+            .update(merchant)
+            .set({ emailVerifiedAt: null })
+            .where(eq(merchant.id, id))
+
           const [owner] = await tx
             .select({ userId: profile.userId })
             .from(profile)
@@ -178,7 +187,11 @@ export const PATCH = withErrorHandler(
           if (owner) {
             await tx
               .update(user)
-              .set({ email: newEmail, updatedAt: new Date().toISOString() })
+              .set({
+                email: newEmail,
+                emailVerified: false,
+                updatedAt: new Date().toISOString(),
+              })
               .where(eq(user.id, owner.userId))
           }
         }

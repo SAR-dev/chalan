@@ -119,6 +119,9 @@ export const GET = withErrorHandler(async (req: Request) => {
         sort.direction === "asc"
           ? scopedQuery.orderBy(asc(sort.column))
           : scopedQuery.orderBy(desc(sort.column))
+    } else {
+      // Stable default so OFFSET paging cannot repeat or skip rows.
+      scopedQuery = scopedQuery.orderBy(desc(rider.createdAt), desc(rider.id))
     }
 
     if (limit !== undefined) scopedQuery = scopedQuery.limit(limit)
@@ -170,6 +173,9 @@ export const GET = withErrorHandler(async (req: Request) => {
       sort.direction === "asc"
         ? q.orderBy(asc(sort.column))
         : q.orderBy(desc(sort.column))
+  } else {
+    // Stable default so OFFSET paging cannot repeat or skip rows.
+    q = q.orderBy(desc(rider.createdAt), desc(rider.id))
   }
 
   if (limit !== undefined) q = q.limit(limit)

@@ -189,6 +189,7 @@ describe("PATCH /api/admin/package-requests/:id", () => {
     expect(insertPayloads).toHaveLength(0)
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "PACKAGE_REQUEST_REJECTED" }),
+      expect.anything(),
     )
   })
 
@@ -236,6 +237,7 @@ describe("PATCH /api/admin/package-requests/:id", () => {
     })
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "PACKAGE_REQUEST_APPROVED" }),
+      expect.anything(),
     )
   })
 

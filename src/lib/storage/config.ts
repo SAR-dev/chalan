@@ -41,6 +41,26 @@ export const OWNER_ONLY_UPLOAD_FOLDERS: readonly UploadFolder[] = [
   "nids",
 ]
 
+// Public path prefix files are served from. Must match the location of
+// app/uploads/[...path]/route.ts, which enforces the policy above.
+export const UPLOADS_URL_PREFIX = "/uploads"
+
+/** True when a folder holds files only its owner (or a SUPER_ADMIN) may read. */
+export function isOwnerOnlyFolder(folder: string): boolean {
+  return OWNER_ONLY_UPLOAD_FOLDERS.includes(folder as UploadFolder)
+}
+
+/**
+ * True when a `folder/...` storage key belongs to an owner-only folder.
+ *
+ * Owner-only files must be served through the app's authenticated `/uploads`
+ * route — a direct bucket URL would expose identity documents to anyone with
+ * the link, no matter how the bucket is configured.
+ */
+export function isOwnerOnlyPath(relativePath: string): boolean {
+  return isOwnerOnlyFolder(relativePath.split("/")[0] ?? "")
+}
+
 // Longest edge (px) each upload is downscaled to client-side before it's sent.
 // Avatars only ever render small and square, so 500px keeps them crisp while
 // staying tiny; photos (delivery proof, pickup locations) keep more detail at

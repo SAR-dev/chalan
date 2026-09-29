@@ -218,7 +218,7 @@ describe("POST /api/orders", () => {
   it("creates order with warehouse routing", async () => {
     sessionState.value = merchant
     selectQueue.push(
-      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
       [{ id: "wh_hub", isActive: true }], // warehouse hub
       [
         {
@@ -245,7 +245,7 @@ describe("POST /api/orders", () => {
   it("applies the active bundle rule, snapshots it, and consumes quota", async () => {
     sessionState.value = merchant
     selectQueue.push(
-      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
       [{ id: "wh_hub", isActive: true }], // warehouse hub
       [
         {
@@ -307,7 +307,7 @@ describe("POST /api/orders", () => {
   it("leaves package columns null when the merchant has no active bundle", async () => {
     sessionState.value = merchant
     selectQueue.push(
-      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
       [{ id: "wh_hub", isActive: true }], // warehouse hub
       [
         {
@@ -367,7 +367,7 @@ describe("POST /api/orders", () => {
   it("snapshots the zone-pair cancellation fee on the order", async () => {
     sessionState.value = merchant
     selectQueue.push(
-      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
       [{ id: "wh_hub", isActive: true }], // warehouse hub
       [
         {
@@ -516,7 +516,7 @@ describe("POST /api/orders/bulk", () => {
           codFeePercentage: 1,
         },
       ],
-      [{ id: "pl_1", warehouseId: "wh_1" }],
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_1" }],
     )
     insertResult.push([{ id: "o_bulk" }])
     const res = await bulkCreate(req("POST", undefined, bulkBody))

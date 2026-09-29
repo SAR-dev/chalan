@@ -18,7 +18,11 @@ export const PATCH = withErrorHandler(
     const { id } = await params
 
     // Public unauthenticated write — throttle by IP as a second layer.
-    const limited = await rateLimitByIp(req, "receiver-note", 10, 60)
+    // failClosed: an anonymous writer must not become unthrottled just because
+    // the client IP could not be resolved.
+    const limited = await rateLimitByIp(req, "receiver-note", 10, 60, {
+      failClosed: true,
+    })
     if (limited) return limited
 
     const parsed = await parseBody(req, orderReceiverNoteSchema)

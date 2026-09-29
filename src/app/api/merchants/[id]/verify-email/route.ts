@@ -11,13 +11,19 @@ import {
 } from "@/lib/mail-config"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const POST = withErrorHandler(
-  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const me = await requireSession()
     if (!me) return unauthorized()
+
+    // Sends mail, so throttle it — otherwise an owner or admin can spam a
+    // mailbox by re-requesting verification in a loop.
+    const limited = await rateLimitByIp(req, "verify-email", 5, 60)
+    if (limited) return limited
 
     const { id } = await params
 

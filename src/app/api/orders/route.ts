@@ -22,7 +22,7 @@ import {
 import { orderChargeAmount, toPaisa } from "@/lib/balance-ledger"
 import { db, dbRead } from "@/lib/db"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
-import { pickupWarehouseId } from "@/lib/db/order-lookup"
+import { pickupLocationHubs } from "@/lib/db/order-lookup"
 import { buildWarehouseOrderScope } from "@/lib/db/order-scope"
 import {
   balanceTransaction,
@@ -37,6 +37,7 @@ import {
 } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
 import { canPlaceOrders } from "@/lib/merchant-verification"
+import { hasNavPermission } from "@/lib/nav-config"
 import {
   lockAndResolveMerchantPackageRule,
   resolveRoutePricing,
@@ -174,6 +175,10 @@ export const GET = withErrorHandler(async (req: Request) => {
       sort.direction === "asc"
         ? dbQuery.orderBy(asc(sort.column))
         : dbQuery.orderBy(desc(sort.column))
+  } else {
+    // Stable default: without a deterministic order, OFFSET paging can repeat
+    // or skip rows when the underlying set changes between pages.
+    dbQuery = dbQuery.orderBy(desc(order.createdAt), desc(order.id))
   }
 
   if (limit !== undefined) dbQuery = dbQuery.limit(limit)
@@ -182,7 +187,17 @@ export const GET = withErrorHandler(async (req: Request) => {
   // COUNT and data fetch are independent — run them in parallel.
   const [[{ count }], rows] = await Promise.all([countQuery, dbQuery])
 
-  return NextResponse.json(paginateResponse(rows, count, limit, offset))
+  // `trackingToken` is the write capability for the public receiver-note
+  // endpoint. Only the order's own merchant (and a SUPER_ADMIN) has any business
+  // with it: a warehouse admin's scope spans other merchants' orders, and riders
+  // never need it. Their UIs fall back to the order id for the /track link,
+  // which the public page resolves too.
+  const payload =
+    me.role === "MERCHANT" || me.role === "SUPER_ADMIN"
+      ? rows
+      : rows.map(({ trackingToken: _trackingToken, ...rest }) => rest)
+
+  return NextResponse.json(paginateResponse(payload, count, limit, offset))
 })
 
 export const POST = withErrorHandler(async (req: Request) => {
@@ -190,6 +205,11 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can create orders")
+  }
+  // Order creation is the New Order surface — a moderator needs the grant
+  // (ROADMAP 5.2 hard server checks).
+  if (!hasNavPermission(me, "/merchant/orders/new")) {
+    return forbidden("You don't have access to create orders.")
   }
 
   const merchantId = me.merchantId
@@ -239,7 +259,16 @@ export const POST = withErrorHandler(async (req: Request) => {
     if (existing) return NextResponse.json(existing)
   }
 
-  const hubId = await pickupWarehouseId(pickupLocationId)
+  // One query resolves both the serving warehouse and the owner: the location
+  // must belong to the caller, so a merchant can never book against another
+  // merchant's shop address.
+  const pickupHub = (await pickupLocationHubs([pickupLocationId])).get(
+    pickupLocationId,
+  )
+  if (!pickupHub || pickupHub.merchantId !== merchantId) {
+    return notFound("Pickup location not found")
+  }
+  const hubId = pickupHub.warehouseId
   if (!hubId) {
     return badRequest("Pickup location has no warehouse assigned.")
   }

@@ -38,6 +38,10 @@ export function isDevModeEnabled(): boolean {
   // Belt and braces with validateEnv: never leak seed credentials to a
   // production deployment, even if the env check is bypassed.
   if (process.env.NEXT_PUBLIC_ENV === "production") return false
+  // NODE_ENV is set by the runtime itself, so it also catches a deployment
+  // that shipped without NEXT_PUBLIC_ENV (the mistake that turns on the
+  // credential picker and the nightly database reset).
+  if (process.env.NODE_ENV === "production") return false
   return devModeFlagSet()
 }
 

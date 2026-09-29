@@ -10,7 +10,7 @@ import {
 import { logAudit } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { dbRead } from "@/lib/db"
-import { user } from "@/lib/db/schema"
+import { profile, user } from "@/lib/db/schema"
 import { logger } from "@/lib/logger"
 import { parseBody, userBanSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -29,13 +29,20 @@ export const PATCH = withErrorHandler(
 
     const { id } = await params
     const [target] = await dbRead
-      .select({ id: user.id, email: user.email })
+      .select({ id: user.id, email: user.email, role: profile.role })
       .from(user)
+      .innerJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, id))
       .limit(1)
     if (!target) return notFound("User not found")
     if (target.id === me.userId) {
       return badRequest("Cannot ban your own account")
+    }
+    // A SUPER_ADMIN banning a peer SUPER_ADMIN is a denial-of-administration
+    // vector (an attacker with one admin account could lock out the rest), so
+    // peer admins are off limits.
+    if (target.role === "SUPER_ADMIN") {
+      return forbidden("Super admin accounts cannot be banned")
     }
 
     const { reason, expiresInDays } = parsed.data

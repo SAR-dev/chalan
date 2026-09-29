@@ -11,10 +11,11 @@ import {
 } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { unauthorized } from "@/lib/api-response"
+import { forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
 import { supportStatuses, supportTicket } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
+import { hasNavPermission } from "@/lib/nav-config"
 import {
   paginateResponse,
   parsePagination,
@@ -114,6 +115,12 @@ export const GET = withErrorHandler(async (req: Request) => {
 export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
+
+  // Opening a ticket is the Support surface — a merchant moderator needs the
+  // grant (ROADMAP 5.2 hard server checks).
+  if (me.role === "MERCHANT" && !hasNavPermission(me, "/merchant/support")) {
+    return forbidden("You don't have access to Support.")
+  }
 
   const limited = await rateLimitByIp(req, "support", 10, 60)
   if (limited) return limited

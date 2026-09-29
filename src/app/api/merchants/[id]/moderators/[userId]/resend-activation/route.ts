@@ -16,13 +16,14 @@ import {
   MAIL_NOT_CONFIGURED_MESSAGE,
 } from "@/lib/mail-config"
 import { hasNavPermission } from "@/lib/nav-config"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 /** Owner re-sends (or re-issues) a PENDING moderator's activation email —
  *  overwrites any previously sent token so the old link dies. */
 export const POST = withErrorHandler(
   async (
-    _req: Request,
+    req: Request,
     { params }: { params: Promise<{ id: string; userId: string }> },
   ) => {
     const { id, userId } = await params
@@ -35,6 +36,10 @@ export const POST = withErrorHandler(
     ) {
       return forbidden()
     }
+
+    // Sends mail — throttle so a loop cannot spam the moderator's mailbox.
+    const limited = await rateLimitByIp(req, "resend-activation", 5, 60)
+    if (limited) return limited
 
     const [target] = await dbRead
       .select({

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
+import { requireSession } from "@/lib/api-auth"
 import { notFound, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
 import { db, dbRead } from "@/lib/db"
@@ -131,6 +132,13 @@ export const GET = withErrorHandler(async () => {
 // Update the signed-in user's own profile: display name, avatar (both on the
 // `user` row), and/or table rows-per-page preference (on `profile`).
 export const PATCH = withErrorHandler(async (req: Request) => {
+  // Strict gate. The GET above is deliberately lenient (it reports
+  // `pendingActivation` / `portalAllowed` so the client can explain the block),
+  // but *mutating* the profile must be refused for a deactivated, banned or
+  // policy-blocked account — otherwise a stale session can keep writing.
+  const me = await requireSession()
+  if (!me) return unauthorized()
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) {
     return unauthorized()

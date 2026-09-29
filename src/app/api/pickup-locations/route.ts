@@ -1,9 +1,10 @@
-import { and, eq, sql } from "drizzle-orm"
+import { and, desc, eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
 import { deliveryCity, pickupLocation, rider } from "@/lib/db/schema"
+import { hasNavPermission } from "@/lib/nav-config"
 import { paginateResponse, parsePagination } from "@/lib/pagination"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, pickupLocationSchema } from "@/lib/validation"
@@ -90,6 +91,8 @@ export const GET = withErrorHandler(async (req: Request) => {
     q = q.where(where)
     countQ = countQ.where(where)
   }
+  // Stable default order so OFFSET paging cannot repeat or skip rows.
+  q = q.orderBy(desc(pickupLocation.createdAt), desc(pickupLocation.id))
   if (limit !== undefined) q = q.limit(limit)
   if (offset !== undefined) q = q.offset(offset)
 
@@ -112,6 +115,11 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden()
+  }
+  // Pickup locations live under Business Settings, which is owner-only — a
+  // moderator never passes `hasNavPermission` for it (ROADMAP 5.2).
+  if (!hasNavPermission(me, "/merchant/settings")) {
+    return forbidden("Only the account owner can manage pickup locations.")
   }
 
   const limited = await rateLimitByIp(req, "pickup-locations", 10, 60)

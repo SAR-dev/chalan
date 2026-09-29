@@ -140,15 +140,29 @@ function portalModeGuard(pathname: string): Response | null {
 }
 
 // ---------------------------------------------------------------------------
-// Admin IP allowlist — defense-in-depth for the admin portal. Scope: paths
-// starting /dashboard and /api/admin; other admin-gated APIs rely on role
+// Admin IP allowlist — defense-in-depth for the admin portal.
+//
+// Scope: /dashboard pages plus the API prefixes that are SUPER_ADMIN-exclusive.
+// Prefixes shared with other roles (payouts, packages, announcements,
+// rider-applications) are deliberately NOT listed — a merchant or rider hitting
+// those from outside the allowlist must still work. Those endpoints rely on role
 // authz instead. Disabled (null) when ADMIN_IP_ALLOWLIST is unset or empty.
 // ---------------------------------------------------------------------------
 
 const ADMIN_IP_ALLOWLIST = parseAllowlist(process.env.ADMIN_IP_ALLOWLIST)
 
+/** API prefixes only a SUPER_ADMIN can reach. */
+const ADMIN_API_PREFIXES = [
+  "/api/admin",
+  "/api/team",
+  "/api/audit-logs",
+  "/api/email-logs",
+  "/api/platform-config",
+] as const
+
 function isAdminPath(pathname: string): boolean {
-  return pathname.startsWith("/dashboard") || pathname.startsWith("/api/admin")
+  if (pathname.startsWith("/dashboard")) return true
+  return ADMIN_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
 function proxyClientIp(req: NextRequest): string | null {
@@ -205,8 +219,7 @@ export function proxy(req: NextRequest) {
   const requestId = resolveRequestId(req.headers.get(REQUEST_ID_HEADER))
 
   // 1. Admin IP allowlist — reject non-listed IPs before anything else.
-  //    /api/admin only enters the matcher for this check, so pass allowed
-  //    requests through without the page-route CSP nonce.
+  //    API requests leave here without the page-route CSP nonce.
   if (isAdminPath(pathname)) {
     if (ADMIN_IP_ALLOWLIST) {
       const ip = proxyClientIp(req)
@@ -222,7 +235,7 @@ export function proxy(req: NextRequest) {
         )
       }
     }
-    if (pathname.startsWith("/api/admin")) {
+    if (pathname.startsWith("/api/")) {
       return withRequestId(NextResponse.next(), requestId)
     }
   }

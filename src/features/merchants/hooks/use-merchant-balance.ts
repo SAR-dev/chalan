@@ -58,7 +58,7 @@ export function useMerchantBalance(merchantId: string | null) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -76,7 +76,7 @@ export function useMerchantBalance(merchantId: string | null) {
         `/api/merchants/${merchantId}/balance/payment/${txId}/confirm`,
         { method: "PATCH" },
       )
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -98,7 +98,7 @@ export function useMerchantBalance(merchantId: string | null) {
           body: JSON.stringify({ reason }),
         },
       )
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -117,7 +117,7 @@ export function useMerchantBalance(merchantId: string | null) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount, note }),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,

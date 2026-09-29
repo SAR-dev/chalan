@@ -95,6 +95,9 @@ export const GET = withErrorHandler(async (req: Request) => {
         sort.direction === "asc"
           ? q.orderBy(asc(sort.column))
           : q.orderBy(desc(sort.column))
+    } else {
+      // Stable default so OFFSET paging cannot repeat or skip rows.
+      q = q.orderBy(desc(payoutRequest.requestedAt), desc(payoutRequest.id))
     }
 
     if (limit !== undefined) q = q.limit(limit)
@@ -163,6 +166,9 @@ export const GET = withErrorHandler(async (req: Request) => {
       sort.direction === "asc"
         ? q.orderBy(asc(sort.column))
         : q.orderBy(desc(sort.column))
+  } else {
+    // Stable default so OFFSET paging cannot repeat or skip rows.
+    q = q.orderBy(desc(payoutRequest.requestedAt), desc(payoutRequest.id))
   }
 
   if (limit !== undefined) q = q.limit(limit)
@@ -209,15 +215,10 @@ export const POST = withErrorHandler(async (req: Request) => {
   // a merchant who owes the platform (positive balance from cancelled orders,
   // COD fees, or shortfalls) can never be paid cash beyond their credit.
   const result = await db.transaction(async (tx) => {
-    const [balanceRow] = await tx
-      .select({ balance: merchantBalance.balance })
-      .from(merchantBalance)
-      .where(eq(merchantBalance.merchantId, me.merchantId!))
-      .for("update")
-      .limit(1)
-    const available = Math.max(0, -(balanceRow?.balance ?? 0))
-    if (available <= 0) return null
-
+    // Lock in the SAME order the order-transition path uses (`order` rows, then
+    // `merchant_balance`). Locking the balance first here would invert that and
+    // let a payout request and an order transition for one merchant deadlock
+    // (each holding what the other wants).
     const payableOrders = await tx
       .select({ id: order.id, merchantEarnings: order.merchantEarnings })
       .from(order)
@@ -231,6 +232,15 @@ export const POST = withErrorHandler(async (req: Request) => {
       )
       .orderBy(asc(order.createdAt))
       .for("update")
+
+    const [balanceRow] = await tx
+      .select({ balance: merchantBalance.balance })
+      .from(merchantBalance)
+      .where(eq(merchantBalance.merchantId, me.merchantId!))
+      .for("update")
+      .limit(1)
+    const available = Math.max(0, -(balanceRow?.balance ?? 0))
+    if (available <= 0) return null
 
     // Link only as many orders as the credit covers (oldest first).
     const linked: { id: string; merchantEarnings: number }[] = []

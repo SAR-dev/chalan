@@ -199,13 +199,17 @@ export default function NewOrderPage() {
 
     setSubmitting(true)
     setApiErrors({})
-    const result = await createOrders(payload)
-    if (result.ok && result.orders) {
-      toast.success(
-        `${result.orders.length} order${result.orders.length > 1 ? "s" : ""} created.`,
-      )
-      router.push("/merchant/orders")
-    } else {
+    // try/finally: a thrown fetch (offline, gateway error) must not leave the
+    // submit button disabled forever.
+    try {
+      const result = await createOrders(payload)
+      if (result.ok && result.orders) {
+        toast.success(
+          `${result.orders.length} order${result.orders.length > 1 ? "s" : ""} created.`,
+        )
+        router.push("/merchant/orders")
+        return
+      }
       if (result.issues) {
         const mapped: Record<number, string[]> = {}
         for (const issue of result.issues) {
@@ -219,6 +223,9 @@ export default function NewOrderPage() {
       } else {
         toast.error(result.error ?? "Unable to create orders.")
       }
+    } catch {
+      toast.error("Could not reach the server. Please try again.")
+    } finally {
       setSubmitting(false)
     }
   }

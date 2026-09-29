@@ -167,6 +167,7 @@ describe("POST /api/packages/:id/request", () => {
     })
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "PACKAGE_REQUESTED" }),
+      expect.anything(),
     )
   })
 

@@ -31,6 +31,7 @@ vi.mock("@/lib/db", () => {
       from: () => chain,
       innerJoin: () => chain,
       where: () => chain,
+      orderBy: () => chain,
       limit: () => chain,
       offset: () => chain,
       $dynamic: () => chain,

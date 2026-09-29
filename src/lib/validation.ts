@@ -92,14 +92,17 @@ export async function parseBody<T extends z.ZodType>(
 }
 
 export function formatError(
-  data: {
-    error?: string
-    issues?: Array<{ path: (string | number)[]; message: string }>
-  },
+  data:
+    | {
+        error?: string
+        issues?: Array<{ path: (string | number)[]; message: string }>
+      }
+    | null
+    | undefined,
   fallback = "Request failed.",
 ): string {
-  if (!data.issues || data.issues.length === 0) {
-    return data.error ?? fallback
+  if (!data || !data.issues || data.issues.length === 0) {
+    return data?.error ?? fallback
   }
   const msgs = data.issues.map((i) => {
     const field = i.path

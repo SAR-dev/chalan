@@ -1,23 +1,26 @@
-import { readFile, stat } from "node:fs/promises"
-import { extname, join, normalize, sep } from "node:path"
+import { extname } from "node:path"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, notFound, unauthorized } from "@/lib/api-response"
+import { readFile } from "@/lib/storage"
 import {
   OWNER_ONLY_UPLOAD_FOLDERS,
   PUBLIC_UPLOAD_FOLDERS,
   type UploadFolder,
 } from "@/lib/storage/config"
-import { LOCAL_UPLOADS_DIR } from "@/lib/storage/local"
 
-// Serves locally-stored uploads with a folder-based access policy (ROADMAP
-// P0.2). Previously every stored file was world-readable, which exposed NID
+// Serves stored uploads with a folder-based access policy (ROADMAP P0.2).
+// Previously every stored file was world-readable, which exposed NID
 // documents. Policy lives in lib/storage/config.ts:
 //   - `logos` is public (merchant branding on the public tracking page).
 //   - `avatars` / `nids` are readable only by their owner or a SUPER_ADMIN.
 //   - everything else requires any authenticated session.
 // Auth is checked BEFORE the file is touched, so an unauthorized caller cannot
 // even probe which paths exist.
+//
+// Reads go through lib/storage, so this route serves owner-only files from
+// either backend — the R2 driver hands back an `/uploads/...` URL precisely so
+// identity documents keep this check instead of a public bucket URL.
 
 const CONTENT_TYPES: Record<string, string> = {
   ".png": "image/png",
@@ -35,7 +38,7 @@ export async function GET(
 
   if (
     segments.length === 0 ||
-    segments.some((s) => s === ".." || s === "." || s.includes(sep))
+    segments.some((s) => s === ".." || s === "." || s.includes("/") || s === "")
   ) {
     return notFound()
   }
@@ -53,33 +56,24 @@ export async function GET(
   }
 
   const relativePath = segments.join("/")
-  const targetPath = normalize(join(LOCAL_UPLOADS_DIR, relativePath))
-  const root = normalize(LOCAL_UPLOADS_DIR + sep)
-  if (!targetPath.startsWith(root)) {
+  const file = await readFile(relativePath)
+  if (!file) {
     return notFound()
   }
 
-  try {
-    const fileStat = await stat(targetPath)
-    if (!fileStat.isFile()) {
-      return notFound()
-    }
-    const buffer = await readFile(targetPath)
-    const contentType =
-      CONTENT_TYPES[extname(targetPath).toLowerCase()] ??
-      "application/octet-stream"
+  const contentType =
+    file.contentType ??
+    CONTENT_TYPES[extname(relativePath).toLowerCase()] ??
+    "application/octet-stream"
 
-    return new NextResponse(buffer, {
-      headers: {
-        "Content-Type": contentType,
-        // Public assets may be cached by shared caches; private ones stay in
-        // the browser only (they are immutable by UUID naming).
-        "Cache-Control": isPublic
-          ? "public, max-age=31536000, immutable"
-          : "private, max-age=31536000, immutable",
-      },
-    })
-  } catch {
-    return notFound()
-  }
+  return new NextResponse(new Uint8Array(file.buffer), {
+    headers: {
+      "Content-Type": contentType,
+      // Public assets may be cached by shared caches; private ones stay in
+      // the browser only (they are immutable by UUID naming).
+      "Cache-Control": isPublic
+        ? "public, max-age=31536000, immutable"
+        : "private, max-age=31536000, immutable",
+    },
+  })
 }

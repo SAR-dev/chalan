@@ -18,12 +18,13 @@ vi.mock("@aws-sdk/client-s3", () => {
   return {
     S3Client: MockS3Client,
     PutObjectCommand: commandFor("PutObject"),
+    GetObjectCommand: commandFor("GetObject"),
     ListObjectsV2Command: commandFor("ListObjectsV2"),
     DeleteObjectCommand: commandFor("DeleteObject"),
   }
 })
 
-import { deleteR2File, listR2Files, saveR2File } from "./r2"
+import { deleteR2File, listR2Files, readR2File, saveR2File } from "./r2"
 
 describe("saveR2File", () => {
   const originalEnv = { ...process.env }
@@ -44,12 +45,24 @@ describe("saveR2File", () => {
 
   it("uploads file and returns path + publicUrl", async () => {
     const result = await saveR2File(
-      "avatars/user1/img.png",
+      "delivery-proofs/user1/img.png",
       Buffer.from("data"),
       "image/png",
     )
-    expect(result.path).toBe("avatars/user1/img.png")
-    expect(result.publicUrl).toBe("https://pub.r2.dev/avatars/user1/img.png")
+    expect(result.path).toBe("delivery-proofs/user1/img.png")
+    expect(result.publicUrl).toBe(
+      "https://pub.r2.dev/delivery-proofs/user1/img.png",
+    )
+  })
+
+  it("serves owner-only folders through the app route, never the bucket URL", async () => {
+    // A public bucket URL for an NID/avatar would expose identity documents to
+    // anyone holding the link, so those folders must keep the authenticated
+    // /uploads route.
+    for (const key of ["nids/user1/img.png", "avatars/user1/img.png"]) {
+      const result = await saveR2File(key, Buffer.from("data"), "image/png")
+      expect(result.publicUrl).toBe(`/uploads/${key}`)
+    }
   })
 
   it("strips trailing slash from public URL", async () => {
@@ -174,6 +187,52 @@ describe("listR2Files", () => {
   it("throws when R2 credentials are missing", async () => {
     delete process.env.R2_ACCOUNT_ID
     await expect(listR2Files()).rejects.toThrow("Missing R2 credentials")
+  })
+})
+
+describe("readR2File", () => {
+  const originalEnv = { ...process.env }
+
+  beforeEach(() => {
+    process.env.R2_ACCOUNT_ID = "test-account"
+    process.env.R2_ACCESS_KEY_ID = "test-key"
+    process.env.R2_SECRET_ACCESS_KEY = "test-secret"
+    process.env.R2_BUCKET_NAME = "test-bucket"
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    process.env = { ...originalEnv }
+  })
+
+  it("returns the object bytes and content type", async () => {
+    mockSend.mockResolvedValue({
+      Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) },
+      ContentType: "image/png",
+    })
+
+    const file = await readR2File("nids/u1/a.png")
+
+    expect(file?.buffer).toEqual(Buffer.from([1, 2, 3]))
+    expect(file?.contentType).toBe("image/png")
+    const callArg = mockSend.mock.calls[0][0]
+    expect(callArg.kind).toBe("GetObject")
+    expect(callArg.input).toEqual({
+      Bucket: "test-bucket",
+      Key: "nids/u1/a.png",
+    })
+  })
+
+  it("returns null when the key is missing", async () => {
+    mockSend.mockRejectedValue(new Error("NoSuchKey"))
+    await expect(readR2File("nids/u1/missing.png")).resolves.toBeNull()
+  })
+
+  it("throws when R2_BUCKET_NAME is missing", async () => {
+    delete process.env.R2_BUCKET_NAME
+    await expect(readR2File("nids/u1/a.png")).rejects.toThrow(
+      "Missing env var: R2_BUCKET_NAME",
+    )
   })
 })
 

@@ -63,14 +63,17 @@ export const PATCH = withErrorHandler(
           .where(eq(packagePurchaseRequest.id, requestId))
           .returning()
 
-        await logAudit({
-          actor: { userId: me.userId, name: me.name, role: me.role },
-          action: "PACKAGE_REQUEST_REJECTED",
-          entityType: "package_purchase_request",
-          entityId: requestId,
-          description: `Rejected package request ${requestId} for merchant ${current.merchantId}`,
-          metadata: { rejectReason, amount: current.amount },
-        })
+        await logAudit(
+          {
+            actor: { userId: me.userId, name: me.name, role: me.role },
+            action: "PACKAGE_REQUEST_REJECTED",
+            entityType: "package_purchase_request",
+            entityId: requestId,
+            description: `Rejected package request ${requestId} for merchant ${current.merchantId}`,
+            metadata: { rejectReason, amount: current.amount },
+          },
+          tx,
+        )
 
         return NextResponse.json(rejected)
       }
@@ -136,18 +139,21 @@ export const PATCH = withErrorHandler(
           },
         })
 
-      await logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "PACKAGE_REQUEST_APPROVED",
-        entityType: "package_purchase_request",
-        entityId: requestId,
-        description: `Approved package purchase of ${Math.abs(credit)} Tk for merchant ${current.merchantId}`,
-        metadata: {
-          merchantPackageId: activated.id,
-          packageId: current.packageId,
-          amount: current.amount,
+      await logAudit(
+        {
+          actor: { userId: me.userId, name: me.name, role: me.role },
+          action: "PACKAGE_REQUEST_APPROVED",
+          entityType: "package_purchase_request",
+          entityId: requestId,
+          description: `Approved package purchase of ${Math.abs(credit)} Tk for merchant ${current.merchantId}`,
+          metadata: {
+            merchantPackageId: activated.id,
+            packageId: current.packageId,
+            amount: current.amount,
+          },
         },
-      })
+        tx,
+      )
 
       return NextResponse.json({
         request: approved,

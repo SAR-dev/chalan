@@ -32,7 +32,11 @@ async function deleteUserQuietly(userId: string): Promise<void> {
 }
 
 export const POST = withErrorHandler(async (req: Request) => {
-  const limited = await rateLimitByIp(req, "rider-apply", 3, 60)
+  // failClosed: this creates an auth user and sends mail, so it must stay
+  // throttled even when the client IP cannot be resolved.
+  const limited = await rateLimitByIp(req, "rider-apply", 3, 60, {
+    failClosed: true,
+  })
   if (limited) return limited
 
   const parsed = await parseBody(req, riderApplySchema)

@@ -9,7 +9,7 @@ import {
 } from "@/lib/api-response"
 import { orderChargeAmount, toPaisa } from "@/lib/balance-ledger"
 import { db, dbRead } from "@/lib/db"
-import { pickupWarehouseIds } from "@/lib/db/order-lookup"
+import { pickupLocationHubs } from "@/lib/db/order-lookup"
 import {
   balanceTransaction,
   deliveryCity,
@@ -22,6 +22,7 @@ import {
   zonePricing,
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
+import { hasNavPermission } from "@/lib/nav-config"
 import { lockAndResolveMerchantPackageRule } from "@/lib/order-pricing"
 import { applyPackageRule, pickTierForCount } from "@/lib/packages"
 import {
@@ -39,6 +40,10 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can create orders")
+  }
+  // Bulk creation is the same New Order surface — moderators need the grant.
+  if (!hasNavPermission(me, "/merchant/orders/new")) {
+    return forbidden("You don't have access to create orders.")
   }
 
   const limited = await rateLimitByIp(req, "orders-bulk", 10, 60)
@@ -91,16 +96,21 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   const merchantId = me.merchantId
 
-  // Resolve warehouse for each unique pickup location via city → warehouse.
+  // Resolve warehouse + owner for each unique pickup location via city →
+  // warehouse. Every location must belong to the caller — never book against
+  // another merchant's shop address.
   const pickupLocationIds = [...new Set(inputs.map((i) => i.pickupLocationId))]
-  const pickupWarehouses = await pickupWarehouseIds(pickupLocationIds)
+  const hubs = await pickupLocationHubs(pickupLocationIds)
   const warehouseByPickup: Record<string, string> = {}
   for (const p of pickupLocationIds) {
-    const warehouseId = pickupWarehouses.get(p) ?? null
-    if (!warehouseId) {
+    const hub = hubs.get(p)
+    if (!hub || hub.merchantId !== merchantId) {
+      return notFound("Pickup location not found")
+    }
+    if (!hub.warehouseId) {
       return badRequest(`Pickup location ${p} has no warehouse assigned.`)
     }
-    warehouseByPickup[p] = warehouseId
+    warehouseByPickup[p] = hub.warehouseId
   }
 
   // ── Pre-fetch zone pricing for all unique city pairs ──

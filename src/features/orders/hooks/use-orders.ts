@@ -160,7 +160,10 @@ export function useOrders({
               }
             : {}),
         })
-        const resData = await res.json().catch(() => null)
+        const resData = await res
+          .json()
+          .catch(() => null)
+          .catch(() => null)
         if (!res.ok) {
           throw new ApiError(resData?.error ?? "Action failed.")
         }
@@ -228,7 +231,7 @@ export function useOrders({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok) {
         const msg = formatError(resData)
         return { ok: false, error: msg }
@@ -260,14 +263,14 @@ export function useOrders({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orders: inputs }),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok) {
         const msg = formatError(resData)
         return {
           ok: false,
           error: msg,
-          issues: resData.issues ?? null,
-          rows: resData.rows ?? null,
+          issues: resData?.issues ?? null,
+          rows: resData?.rows ?? null,
         }
       }
       await mutate()
@@ -382,7 +385,10 @@ export function useOrders({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ merchantNote }),
             })
-            const resData = await res.json().catch(() => null)
+            const resData = await res
+              .json()
+              .catch(() => null)
+              .catch(() => null)
             if (!res.ok) {
               throw new ApiError(resData?.error ?? "Failed to save note.")
             }
@@ -433,7 +439,10 @@ export function useOrders({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ receiverNote }),
             })
-            const resData = await res.json().catch(() => null)
+            const resData = await res
+              .json()
+              .catch(() => null)
+              .catch(() => null)
             if (!res.ok) {
               throw new ApiError(resData?.error ?? "Failed to save note.")
             }

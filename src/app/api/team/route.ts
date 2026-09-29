@@ -81,6 +81,9 @@ export const GET = withErrorHandler(async (req: Request) => {
       sort.direction === "asc"
         ? q.orderBy(asc(sort.column))
         : q.orderBy(desc(sort.column))
+  } else {
+    // Stable default so OFFSET paging cannot repeat or skip rows.
+    q = q.orderBy(desc(user.createdAt), desc(user.id))
   }
 
   if (limit !== undefined) q = q.limit(limit)

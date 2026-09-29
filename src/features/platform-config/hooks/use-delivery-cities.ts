@@ -51,7 +51,7 @@ export function useDeliveryCities() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -70,7 +70,7 @@ export function useDeliveryCities() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -85,7 +85,10 @@ export function useDeliveryCities() {
   const deleteCity = useCallback(
     async (id: string): Promise<Result> => {
       const res = await fetch(`${ADMIN_KEY}/${id}`, { method: "DELETE" })
-      const data = await res.json().catch(() => null)
+      const data = await res
+        .json()
+        .catch(() => null)
+        .catch(() => null)
       if (!res.ok)
         return {
           ok: false,

@@ -6,7 +6,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireSession } from "@/lib/api-auth"
-import { forbidden } from "@/lib/api-response"
+import { badRequest, forbidden } from "@/lib/api-response"
+import { isPrivateHost } from "@/lib/host-guard"
+import { logger } from "@/lib/logger"
 import { sendTestMail } from "@/lib/mailer"
 import { parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -31,15 +33,22 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (parsed.error) return parsed.error
 
   const { to, ...config } = parsed.data
+
+  // SSRF guard: this endpoint makes the server open a connection to an
+  // operator-supplied host, so internal addresses are off limits.
+  if (isPrivateHost(config.host)) {
+    return badRequest("That host is not allowed.")
+  }
+
   try {
     const result = await sendTestMail(config, to ?? config.fromEmail)
     return NextResponse.json({ ok: true, messageId: result.messageId })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    // Surface the SMTP error verbatim (e.g. nodemailer's "Invalid login: 535
-    // 5.7.8 Username and Password not accepted") so the admin can correct it.
+    // Log the real SMTP error, but do not echo it: connection failures can
+    // leak internal hostnames/addresses back to the caller.
+    logger.error("Test mail failed", { err, host: config.host })
     return NextResponse.json(
-      { error: message || "Failed to send test email." },
+      { error: "Could not send the test email. Check the server logs." },
       { status: 400 },
     )
   }
