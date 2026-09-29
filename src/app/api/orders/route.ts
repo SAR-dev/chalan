@@ -29,6 +29,7 @@ import {
   deliveryCity as deliveryCityTable,
   merchant,
   merchantBalance,
+  merchantPackage,
   order,
   orderStatuses,
   pickupLocation,
@@ -36,7 +37,11 @@ import {
 } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
 import { canPlaceOrders } from "@/lib/merchant-verification"
-import { resolveRoutePricing } from "@/lib/order-pricing"
+import {
+  lockAndResolveMerchantPackageRule,
+  resolveRoutePricing,
+} from "@/lib/order-pricing"
+import { applyPackageRule } from "@/lib/packages"
 import {
   paginateResponse,
   parseDateRange,
@@ -286,7 +291,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   const destCityId = parsed.data.deliveryCityId
   const pricing = await resolveRoutePricing(hub.id, destCityId ?? null)
 
-  const { total: deliveryFee, exceedsMax } = calcDeliveryCharge(
+  const { total: zoneDeliveryFee, exceedsMax } = calcDeliveryCharge(
     pricing,
     parcelWeightKg,
   )
@@ -299,13 +304,19 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
   const codFee = calcCodFee(productCost, pricing.codFeePercentage ?? 1)
   const cancellationFee = toPaisa(pricing.cancellationFee ?? 0)
-  const merchantEarnings = calcMerchantEarnings(
-    productCost,
-    deliveryFee,
-    codFee,
-  )
 
   const created = await db.transaction(async (tx) => {
+    // Lock the merchant's active bundle (if any) and resolve the tier unlocked
+    // at the current order count. The zone fee is discounted by the rule and
+    // the rule is snapshotted onto the order below.
+    const bundle = await lockAndResolveMerchantPackageRule(tx, merchantId)
+    const deliveryFee = applyPackageRule(zoneDeliveryFee, bundle?.rule)
+    const merchantEarnings = calcMerchantEarnings(
+      productCost,
+      deliveryFee,
+      codFee,
+    )
+
     const [inserted] = await tx
       .insert(order)
       .values({
@@ -326,6 +337,11 @@ export const POST = withErrorHandler(async (req: Request) => {
         codFee,
         cancellationFee,
         merchantEarnings,
+        packageId: bundle?.packageId ?? null,
+        packageTierId: bundle?.tierId ?? null,
+        merchantPackageId: bundle?.merchantPackageId ?? null,
+        packageRuleType: bundle?.rule?.ruleType ?? null,
+        packageRuleValue: bundle?.rule?.ruleValue ?? null,
         status: "PENDING",
         deliveryAttempts: 0,
         merchantNote: merchantNote?.trim() || null,
@@ -381,6 +397,18 @@ export const POST = withErrorHandler(async (req: Request) => {
           updatedAt: new Date().toISOString(),
         },
       })
+
+    // Consume one order from the bundle's quota (only on a real insert — a
+    // replayed idempotent request must not double-count).
+    if (bundle) {
+      await tx
+        .update(merchantPackage)
+        .set({
+          ordersUsed: sql`${merchantPackage.ordersUsed} + 1`,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(merchantPackage.id, bundle.merchantPackageId))
+    }
 
     return { replay: false as const, order: inserted }
   })

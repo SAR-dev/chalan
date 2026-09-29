@@ -242,6 +242,111 @@ describe("POST /api/orders", () => {
     expect(json).toMatchObject({ id: "o_new" })
   })
 
+  it("applies the active bundle rule, snapshots it, and consumes quota", async () => {
+    sessionState.value = merchant
+    selectQueue.push(
+      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "wh_hub", isActive: true }], // warehouse hub
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+        },
+      ], // merchant
+      // resolveRoutePricing: platform defaults, then two empty lookups.
+      [
+        {
+          baseRate: 80,
+          extraRatePerKg: 0,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ],
+      [], // warehouse city
+      [], // delivery city
+      // lockAndResolveMerchantPackageRule: bundle, package, tiers
+      [{ merchantPackageId: "mp_1", packageId: "pk_1", ordersUsed: 120 }],
+      [{ isActive: true }],
+      [
+        {
+          id: "t1",
+          orderCount: 100,
+          sortOrder: 0,
+          ruleType: "PERCENT_OFF",
+          ruleValue: 25,
+        },
+      ],
+    )
+    insertResult.push({ id: "o_pkg", status: "PENDING" })
+
+    const res = await createOrder(req("POST", undefined, validOrderBody))
+    expect(res.status).toBe(201)
+
+    const orderInsert = insertPayloads.find(
+      (p) => (p as { recipientName?: string }).recipientName === "Bob",
+    ) as Record<string, unknown> | undefined
+
+    // 25% off the 80 Tk zone fee.
+    expect(orderInsert?.deliveryFee).toBe(60)
+    expect(orderInsert?.packageId).toBe("pk_1")
+    expect(orderInsert?.packageTierId).toBe("t1")
+    expect(orderInsert?.merchantPackageId).toBe("mp_1")
+    expect(orderInsert?.packageRuleType).toBe("PERCENT_OFF")
+    expect(orderInsert?.packageRuleValue).toBe(25)
+
+    // Quota incremented by one.
+    expect(updatePayloads.some((p) => "ordersUsed" in p)).toBe(true)
+  })
+
+  it("leaves package columns null when the merchant has no active bundle", async () => {
+    sessionState.value = merchant
+    selectQueue.push(
+      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "wh_hub", isActive: true }], // warehouse hub
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+        },
+      ], // merchant
+      [
+        {
+          baseRate: 80,
+          extraRatePerKg: 0,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ],
+      [], // warehouse city
+      [], // delivery city
+      [], // no active bundle
+    )
+    insertResult.push({ id: "o_plain", status: "PENDING" })
+
+    const res = await createOrder(req("POST", undefined, validOrderBody))
+    expect(res.status).toBe(201)
+
+    const orderInsert = insertPayloads.find(
+      (p) => (p as { recipientName?: string }).recipientName === "Bob",
+    ) as Record<string, unknown> | undefined
+    expect(orderInsert?.deliveryFee).toBe(80)
+    expect(orderInsert?.packageId).toBeNull()
+    expect(orderInsert?.merchantPackageId).toBeNull()
+    expect(updatePayloads.some((p) => "ordersUsed" in p)).toBe(false)
+  })
+
   it("returns the original order for a repeated Idempotency-Key (ROADMAP B13)", async () => {
     sessionState.value = merchant
     selectQueue.push([{ id: "o_orig", status: "PENDING" }])

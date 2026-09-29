@@ -1,11 +1,19 @@
 import { and, eq } from "drizzle-orm"
-import { dbRead } from "@/lib/db"
+import { db, dbRead } from "@/lib/db"
 import {
   deliveryCity,
+  merchantPackage,
   platformConfig,
+  pricingPackage,
+  pricingPackageTier,
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
+import {
+  type PackageRule,
+  type PackageTierRule,
+  pickTierForCount,
+} from "@/lib/packages"
 
 export interface ResolvedPricing {
   baseRate: number
@@ -83,4 +91,129 @@ export async function resolveRoutePricing(
     if (zp) return zp
   }
   return fallback
+}
+
+// =============================================================================
+// Package (prepaid bundle) resolution
+//
+// The active bundle is per-merchant and locked with `.for("update")` on the
+// order-creation path so a concurrent create cannot double-spend a tier. The
+// returned snapshot is written onto the order row, freezing the rule for the
+// order's lifetime (later reassignment or tier edits never move a past fee).
+// =============================================================================
+
+export type OrderPricingTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+export interface MerchantPackageSnapshot {
+  merchantPackageId: string
+  packageId: string
+  ordersUsed: number
+  tierId: string | null
+  rule: PackageRule | null
+  /** All tiers, so a bulk create can resolve a rule per order as the count
+   *  advances across a tier boundary. */
+  tiers: PackageTierRule[]
+}
+
+interface ActiveBundleRow {
+  merchantPackageId: string
+  packageId: string
+  ordersUsed: number
+}
+
+const ACTIVE_BUNDLE_COLUMNS = {
+  merchantPackageId: merchantPackage.id,
+  packageId: merchantPackage.packageId,
+  ordersUsed: merchantPackage.ordersUsed,
+}
+
+const TIER_COLUMNS = {
+  id: pricingPackageTier.id,
+  orderCount: pricingPackageTier.orderCount,
+  sortOrder: pricingPackageTier.sortOrder,
+  ruleType: pricingPackageTier.ruleType,
+  ruleValue: pricingPackageTier.ruleValue,
+}
+
+function snapshotFor(
+  active: ActiveBundleRow,
+  packageActive: boolean,
+  tiers: readonly PackageTierRule[],
+): MerchantPackageSnapshot | null {
+  if (!packageActive) return null
+  const tier = pickTierForCount(tiers, active.ordersUsed)
+  return {
+    merchantPackageId: active.merchantPackageId,
+    packageId: active.packageId,
+    ordersUsed: active.ordersUsed,
+    tierId: tier?.id ?? null,
+    rule: tier ? { ruleType: tier.ruleType, ruleValue: tier.ruleValue } : null,
+    tiers: [...tiers],
+  }
+}
+
+/** Read the merchant's active bundle (no lock) — for previews and the UI. */
+export async function resolveMerchantPackageRule(
+  merchantId: string,
+): Promise<MerchantPackageSnapshot | null> {
+  const [active] = await dbRead
+    .select(ACTIVE_BUNDLE_COLUMNS)
+    .from(merchantPackage)
+    .where(
+      and(
+        eq(merchantPackage.merchantId, merchantId),
+        eq(merchantPackage.isActive, true),
+      ),
+    )
+    .limit(1)
+  if (!active) return null
+
+  const [pkg] = await dbRead
+    .select({ isActive: pricingPackage.isActive })
+    .from(pricingPackage)
+    .where(eq(pricingPackage.id, active.packageId))
+    .limit(1)
+
+  const tiers = await dbRead
+    .select(TIER_COLUMNS)
+    .from(pricingPackageTier)
+    .where(eq(pricingPackageTier.packageId, active.packageId))
+
+  return snapshotFor(active, pkg?.isActive ?? false, tiers)
+}
+
+/**
+ * Lock the merchant's active bundle row and resolve its tier. MUST be called
+ * inside a transaction on the order-creation path so the `ordersUsed` bump is
+ * serialized against concurrent creates.
+ */
+export async function lockAndResolveMerchantPackageRule(
+  tx: OrderPricingTx,
+  merchantId: string,
+): Promise<MerchantPackageSnapshot | null> {
+  const [active] = await tx
+    .select(ACTIVE_BUNDLE_COLUMNS)
+    .from(merchantPackage)
+    .where(
+      and(
+        eq(merchantPackage.merchantId, merchantId),
+        eq(merchantPackage.isActive, true),
+      ),
+    )
+    .for("update")
+    .limit(1)
+  if (!active) return null
+
+  const [pkg] = await tx
+    .select({ isActive: pricingPackage.isActive })
+    .from(pricingPackage)
+    .where(eq(pricingPackage.id, active.packageId))
+    .limit(1)
+
+  const tiers = await tx
+    .select(TIER_COLUMNS)
+    .from(pricingPackageTier)
+    .where(eq(pricingPackageTier.packageId, active.packageId))
+
+  return snapshotFor(active, pkg?.isActive ?? false, tiers)
 }

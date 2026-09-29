@@ -134,6 +134,12 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       group: "Operations",
     },
     {
+      href: "/dashboard/packages",
+      label: "Packages",
+      icon: Package,
+      group: "Operations",
+    },
+    {
       href: "/dashboard/delivery-performance",
       label: "Delivery Performance",
       icon: BarChart3,

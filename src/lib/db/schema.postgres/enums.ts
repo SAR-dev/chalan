@@ -77,3 +77,14 @@ export const emailOutboxStatuses = [
 // Support ticket lifecycle: OPEN (submitted) → ANSWERED (admin replied) →
 // CLOSED (either party closed it). Drizzle-only enum hint.
 export const supportStatuses = ["OPEN", "ANSWERED", "CLOSED"] as const
+
+// How a package tier adjusts the delivery fee: FLAT = fixed charge (Tk),
+// PERCENT_OFF = percentage discount off the zone fee. Drizzle-only enum hint.
+export const packageRuleTypes = ["FLAT", "PERCENT_OFF"] as const
+
+// Package purchase request lifecycle. Drizzle-only enum hint.
+export const packagePurchaseStatuses = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+] as const

@@ -19,6 +19,7 @@ import { cleanDatabase } from "./clean"
 import { seedDeliveryCities } from "./delivery-cities"
 import { seedDeliveryZones } from "./delivery-zones"
 import { seedMerchants } from "./merchants"
+import { seedPackages } from "./packages"
 import { seedPlatformConfig } from "./platform-config"
 import { seedRiders } from "./riders"
 import { assertSeedAllowedInDev } from "./seed-content/credentials"
@@ -37,5 +38,6 @@ export async function seedBasicDatabase(): Promise<void> {
   await seedPlatformConfig()
   await seedRiders()
   await seedMerchants()
+  await seedPackages()
   await seedUsers()
 }

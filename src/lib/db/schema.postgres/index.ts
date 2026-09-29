@@ -12,6 +12,7 @@ export {
 export * from "./logistics"
 export * from "./merchants"
 export * from "./orders"
+export * from "./packages"
 export * from "./platform"
 export * from "./support"
 export * from "./warehouses"

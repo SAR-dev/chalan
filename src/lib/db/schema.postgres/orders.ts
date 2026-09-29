@@ -12,11 +12,13 @@ import {
 import {
   orderDeliveryTypes,
   orderStatuses,
+  packageRuleTypes,
   payoutRequestStatuses,
 } from "./enums"
 import { money, ts } from "./helpers"
 import { deliveryCity } from "./logistics"
 import { merchant, pickupLocation } from "./merchants"
+import { merchantPackage, pricingPackage, pricingPackageTier } from "./packages"
 import { rider, warehouse } from "./warehouses"
 
 // =============================================================================
@@ -108,6 +110,23 @@ export const order = pgTable(
     // delivery/COD fees refunded) if the parcel is returned to the merchant.
     cancellationFee: money("cancellationFee").notNull().default(0),
     merchantEarnings: money("merchantEarnings").notNull().default(0),
+
+    // Package/bundle snapshot at creation. The rule is frozen here so later
+    // reassignment or tier edits never change a past order's fee. FKs are
+    // `set null` so deactivating a package keeps the order history readable.
+    packageId: text("packageId").references(() => pricingPackage.id, {
+      onDelete: "set null",
+    }),
+    packageTierId: text("packageTierId").references(
+      () => pricingPackageTier.id,
+      { onDelete: "set null" },
+    ),
+    merchantPackageId: text("merchantPackageId").references(
+      () => merchantPackage.id,
+      { onDelete: "set null" },
+    ),
+    packageRuleType: text("packageRuleType", { enum: packageRuleTypes }),
+    packageRuleValue: doublePrecision("packageRuleValue"),
 
     status: text("status", { enum: orderStatuses })
       .notNull()
@@ -210,6 +229,7 @@ export const order = pgTable(
     uniqueIndex("order_idempotency_uniq").on(t.merchantId, t.idempotencyKey),
     index("order_cod_settled_at_idx").on(t.codSettledAt),
     index("order_payout_request_id_idx").on(t.payoutRequestId),
+    index("order_merchant_package_id_idx").on(t.merchantPackageId),
     // Public tracking lookups resolve by token (and the token is unique).
     uniqueIndex("order_tracking_token_unique").on(t.trackingToken),
     index("order_code_trgm_idx").using("gin", sql`${t.id} gin_trgm_ops`),

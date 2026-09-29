@@ -57,6 +57,20 @@
       "when": 1790622608221,
       "tag": "0007_clammy_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790659198474,
+      "tag": "0008_narrow_iron_patriot",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790661674361,
+      "tag": "0009_adorable_captain_flint",
+      "breakpoints": true
     }
   ]
 }

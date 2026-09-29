@@ -14,6 +14,7 @@ import { seedDeliveryZones } from "./delivery-zones"
 import { seedMailConfig } from "./mail-config"
 import { seedMerchants } from "./merchants"
 import { seedOrders } from "./orders"
+import { seedPackages } from "./packages"
 import { seedPayoutRequests } from "./payouts"
 import { seedPickupLocations } from "./pickup-locations"
 import { seedPlatformConfig } from "./platform-config"
@@ -39,6 +40,7 @@ async function main() {
     await seedMailConfig()
     await seedRiders()
     await seedMerchants()
+    await seedPackages()
     await seedPickupLocations()
     await seedUsers()
     await seedAnnouncements()
