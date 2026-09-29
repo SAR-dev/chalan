@@ -1,1 +1,0 @@
-ALTER TABLE "package_purchase_request" ADD COLUMN "amount" numeric(14, 2) NOT NULL;

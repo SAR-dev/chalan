@@ -26,108 +26,19 @@ that drains as the merchant ships.
 - **Admin can still assign a package directly** (ops override / comped deals).
 - **Bundles adjust the delivery fee only.** COD and cancellation fees are
   unchanged; no new ledger transaction types.
-
-## Open questions — all resolved
-
-- [x] `pricing_package` carries a **price** (`money`) — implemented in Phase 1.
-- [x] An approved purchase writes a **`PAYMENT_CONFIRMED` credit** to
-      `balance_transaction` (negative amount, `paymentMethod: "PACKAGE"`), so the
-      wallet history shows the whole story and `merchant_balance.balance` still
-      equals the sum of settled ledger rows.
-- [x] The request **snapshots the price** into `package_purchase_request.amount`
-      (migration **0009**), so a later `pricing_package.price` edit cannot change
-      what an already-requested purchase is worth.
-- [x] Bundles are **quota-only — no expiry**. A bundle stays active until its
-      quota is used up or an admin ends it; no `expiresAt` column.
-- [x] A merchant **cannot request while a bundle is active** (no renew/upgrade
-      stacking). The current bundle must be exhausted or ended first. Approval
-      still defensively deactivates any leftover active bundle.
+- **Price is snapshotted onto the request** in `package_purchase_request.amount`
+  (migration **0009**), so editing `pricing_package.price` later cannot change
+  what an already-requested purchase is worth. Approval credits the wallet with a
+  `PAYMENT_CONFIRMED` row (`paymentMethod: "PACKAGE"`).
+- **Bundles are quota-only — no expiry.** A bundle stays active until its quota
+  is used up or an admin ends it; no `expiresAt` column.
+- **No stacking while active, one request at a time.** A merchant cannot request
+  while a bundle is active or another request is `PENDING` (a settled request is
+  history, not a lock). Approval defensively deactivates any leftover bundle.
 
 ---
 
-## Phase 1 — Schema + migration
-
-- [x] `src/lib/db/schema.postgres/packages.ts`:
-  - `pricing_package` (id, name, description, price, isActive, timestamps)
-  - `pricing_package_tier` (id, packageId, sortOrder, orderCount, ruleType,
-    ruleValue)
-  - `merchant_package` (id, merchantId, packageId, ordersUsed, startedAt,
-    isActive, assignedBy) + partial unique index: one active per merchant
-    (pattern: `finance.ts:90`)
-  - `package_purchase_request` (id, merchantId, packageId, status, requestedAt,
-    reviewedBy, reviewedAt, rejectReason) + partial unique: one PENDING per
-    merchant
-- [x] Add `packageRuleTypes = ["FLAT", "PERCENT_OFF"]` to `enums.ts`
-- [x] Order snapshot columns (`orders.ts`): `packageId`, `packageTierId`,
-      `merchantPackageId`, `packageRuleType`, `packageRuleValue`
-      (FKs `onDelete: "set null"`)
-- [x] Export from `schema.postgres/index.ts`
-- [x] Migration **0008** (`pnpm db:generate` → `pnpm db:migrate`)
-
-## Phase 2 — Rule engine
-
-- [x] `src/lib/packages.ts` (pure, client-safe — no db import):
-      `pickTierForCount`, `nextTierForCount`, `applyPackageRule`, `tierLabel`
-- [x] `src/lib/order-pricing.ts`: `resolveMerchantPackageRule` +
-      `lockAndResolveMerchantPackageRule` (`FOR UPDATE`), returning the active
-      bundle (tier may be locked) so quota is tracked even before a discount
-- [x] Unit tests: boundaries, exhaustion, FLAT, PERCENT_OFF, rounding
-
-## Phase 3 — Order creation (single + bulk)
-
-- [x] `src/app/api/orders/route.ts`: lock+resolve inside the tx, apply rule to
-      the zone fee, snapshot the package columns, atomic `ordersUsed += 1` only
-      on the non-conflict insert (a replayed idempotent key must not count)
-- [x] `src/app/api/orders/bulk/route.ts`: lock once, resolve the tier **per
-      order** against the cumulative count (`ordersUsed + index`) so a batch
-      crossing a boundary is priced correctly; `ordersUsed += N`
-- [x] Extend `orders.spec.ts` (bundle applied + snapshot + quota; no bundle →
-      null package columns, zone fee untouched)
-
-## Phase 4 — Settlement + quota refund
-
-- [x] Extract shared `settleOrderFinancials()` (`transitions.ts`) — COD credit,
-      pickup weight-delta, terminal fee settlement — used by both the single and
-      bulk runners so they cannot drift
-- [x] **Fixed known gap:** bulk cancel never settled anything. The bulk runner
-      only wrote the status change, so it left the creation `ORDER_CHARGE` on the
-      merchant's balance, never charged the cancellation fee, and never returned
-      quota. `loadRefundOnCancelPolicy()` reads the toggle once per transaction
-      instead of per order.
-- [x] Refund quota on cancel/return via `GREATEST(ordersUsed - 1, 0)` on the
-      snapshotted `merchantPackageId`
-- [x] Specs: `bulk/cancel/cancel.spec.ts` covers the reversal, the post-pickup
-      cancellation fee, quota refund, and the no-package case
-
-## Phase 5 — Pickup re-price
-
-- [x] `src/features/orders/transitions.ts` (`picked-up` → `buildUpdate`): re-apply
-      the **snapshotted** `packageRuleType`/`packageRuleValue` to the recomputed
-      zone fee. A FLAT rule is weight-independent, so a rider weight correction
-      under a flat bundle now yields **no** delivery-fee delta — same as at
-      creation. Previously a weight correction re-priced at the full zone fee and
-      charged the merchant the difference, silently undoing the bundle.
-- [x] Spec: weight 2 → 3 KG under `FLAT 50` keeps `deliveryFee: 50` and writes no
-      `ORDER_CHARGE` delta
-
-## Phase 6 — Purchase request + wallet
-
-- [x] `package_purchase_request.amount` price snapshot — migration **0009**
-- [x] API `POST /api/packages/[id]/request` (merchant) — creates a PENDING request
-      with the price snapshotted; 409 when a request is already awaiting review,
-      409 when a bundle is already active, 400 when the package is inactive
-- [x] API `PATCH /api/admin/package-requests/[id]` (SUPER_ADMIN) — approve/reject
-      on a discriminated-union body; the request row is locked `.for("update")`
-      so two admins cannot both act on it
-- [x] Approve: deactivate any leftover active bundle, insert a fresh
-      `merchant_package` (`ordersUsed = 0`), mark APPROVED, and credit the wallet
-      with a `PAYMENT_CONFIRMED` row
-- [x] Reject: store the reason, no ledger row
-- [x] No global order-blocking (bundles-only)
-- [x] Specs: `packages/[id]/request/request.spec.ts` (11) +
-      `admin/package-requests/[id]/package-requests.spec.ts` (11)
-
-### Phase 6b — Wallet / Top-ups tab + request top-up
+## Phase 6b — Wallet / Top-ups tab + request top-up
 
 Top-up history already exists in the append-only `balance_transaction` ledger
 (`type` `PAYMENT_PENDING` → `PAYMENT_CONFIRMED`, or `REJECTED` with a reason),
@@ -151,49 +62,31 @@ returned by `GET /api/merchants/[id]/balance` (`balance/route.ts`). Reusing
 
 ## Phase 7 — Admin UI
 
-- [x] `/dashboard/packages`: list + create/edit dialog with repeatable **tier
-      editor** (validate: `orderCount > 0`, strictly increasing cumulative,
-      `PERCENT_OFF` 0–100)
-- [x] Requests queue (tab on the packages page) — approve inline, reject opens
-      `RejectRequestDialog` with a required reason
-- [x] Delete package: `DELETE /api/packages/[id]` is archive-if-referenced
-      (`merchant_package` / `package_purchase_request` are `restrict` FKs), so a
-      bought package is hidden from the catalogue while the ledger and snapshots
-      survive; an untouched one is removed outright
 - [ ] Assign-package action on the merchant row/detail (reuse action-menu
       pattern; `ConfirmDialog`)
-- [x] Nav: add "Packages" to `SUPER_ADMIN_SIDEBAR` (`nav-config.ts`)
 
 ## Phase 8 — Merchant UI
 
-- [x] Rebuild `/merchant/pricing`:
-  - [x] assigned bundle card (quota progress + next tier)
+- Rebuild `/merchant/pricing`:
   - [ ] calculator (reuse `DeliveryFeeCalculator`)
   - [ ] zone rate card matrix
-  - [x] available packages catalogue + **Request purchase**
-        (blocks only on an active bundle or a **PENDING** request — a settled
-        request is history, not a lock)
 - [ ] `DeliveryFeeCalculator` — add optional `packageRule` prop
 - [ ] `quoteParcel()` (`features/orders/quote-parcel.ts`) — add optional
       `packageRule` so the order-form preview matches the charge
 
-## Phase 9 — Seeds + tests
+## Phase 9 — Tests
 
-- [x] Seed a demo package + assignment (`seed/packages.ts`, wired into
-      `index-full.ts` and `basic.ts`; `clean.ts` truncates the package tables)
-      — 3 packages / 8 tiers, merchant1 mid-bundle, merchant2 pending request
-- [x] API specs (colocated `<resource>.spec.ts`) — packages root/tier/request,
-      admin review queue, delete + patch
 - [ ] Integration: partial unique indexes, snapshot FK `set null`
-- [ ] E2E (next serial **S58**): request → approve → fee adjusted → cancel
-      refunds quota; bulk create spanning a boundary
+- [ ] E2E (next serial **S61**): cancel/return refunds quota; bulk create
+      spanning a tier boundary. S58–S60 already cover admin CRUD, request →
+      approve → active bundle, rejection not locking the merchant out, and
+      quota / next-tier progress
 - [ ] Keep coverage floors (48/41/37/49); raise after
 
 ---
 
 ## Definition of done
 
-- [ ] `pnpm ci:check`, `pnpm test:coverage`, `pnpm build`, `pnpm test:e2e` green
 - [ ] Ledger reconciliation invariant still holds with a bundle applied
 - [ ] Concurrency test: two creates at a tier boundary
 - [ ] No change to ledger transaction types

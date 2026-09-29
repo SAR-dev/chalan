@@ -339,6 +339,14 @@ export const help = {
   faqLink: "[data-testid='help-faq-link']",
 }
 
+// ─── FAQ role tabs ───────────────────────────────────────────────────────────
+export const faq = {
+  tabs: "[data-testid='faq-tabs']",
+  tab: (role: string) => `[data-testid='faq-tab-${role}']`,
+  visibleSections: (role: string) => `[data-testid='faq-sections-${role}']`,
+  section: (id: string) => `[data-testid='faq-section-${id}']`,
+}
+
 // ─── Support tickets ─────────────────────────────────────────────────────────
 export const support = {
   table: "[data-testid='support-tickets']",

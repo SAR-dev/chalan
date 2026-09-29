@@ -15,20 +15,35 @@ describe("FAQ page", () => {
     expect(screen.getByRole("heading", { name: /faq/i })).toBeInTheDocument()
   })
 
-  it("answers questions in every group", async () => {
+  it("renders a tab for every role", async () => {
+    await importPage()
+    for (const role of [
+      "all",
+      "merchant",
+      "rider",
+      "warehouse",
+      "super-admin",
+    ]) {
+      expect(screen.getByTestId(`faq-tab-${role}`)).toBeInTheDocument()
+    }
+  })
+
+  it("shows shared and role sections by default", async () => {
     await importPage()
     expect(
       screen.getByRole("heading", { name: "Getting started" }),
     ).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Orders" })).toBeInTheDocument()
     expect(
-      screen.getByRole("heading", { name: "Pricing & COD" }),
+      screen.getByRole("heading", { name: "For merchants: orders" }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole("heading", { name: "Pickup & delivery" }),
+      screen.getByRole("heading", { name: "For riders" }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole("heading", { name: "Account & security" }),
+      screen.getByRole("heading", { name: "For warehouse admins" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { name: "For super admins" }),
     ).toBeInTheDocument()
   })
 })

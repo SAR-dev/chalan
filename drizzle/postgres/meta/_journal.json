@@ -12,64 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1790510520520,
-      "tag": "0001_crazy_lily_hollister",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1790566120214,
-      "tag": "0002_married_wendigo",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1790599633077,
-      "tag": "0003_right_scarlet_spider",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1790604016204,
-      "tag": "0004_simple_ben_grimm",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1790607518584,
-      "tag": "0005_daffy_starjammers",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1790618660622,
-      "tag": "0006_yummy_wrecker",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1790622608221,
-      "tag": "0007_clammy_gambit",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1790659198474,
-      "tag": "0008_narrow_iron_patriot",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1790661674361,
-      "tag": "0009_adorable_captain_flint",
+      "when": 1790679302605,
+      "tag": "0001_stiff_leader",
       "breakpoints": true
     }
   ]

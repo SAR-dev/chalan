@@ -63,13 +63,13 @@ Operating tasks for Super Admins running {{APP_NAME}} from the admin console at 
 3. **Email Logs** (`/dashboard/email-logs`) — outgoing message history and delivery state.
 4. **Account** (`/dashboard/account`) — update your name and change your password (current password + at least 8 characters).
 
-## 9. The Warehouse Admin console
+## 9. Working with warehouse admins
 
-Warehouse Admins run the hub floor at **{{APP_URL}}/warehouse**:
+Warehouse Admins run the hub floor from their own console at **{{APP_URL}}/warehouse** — intake, dispatch, exceptions, rider cash, and COD settlement for their hub. Their day-to-day tasks are covered in the [Warehouse admin guide]({{APP_URL}}/help/warehouse-admin).
 
-1. **Intake queue** (`/warehouse`) — parcels picked up and waiting to be received.
-2. **Dispatch desk** (`/warehouse/dispatch`) — assign pickup and delivery riders from the hub's roster.
-3. **Order progress** (`/warehouse/orders`) — every parcel touching this hub.
-4. **Riders** (`/warehouse/riders`) — this hub's riders only.
-5. **Exceptions** (`/warehouse/exceptions`) — failed attempts and returns: schedule a reattempt or send the parcel back.
-6. **COD settlement** (`/warehouse/cod-settlement`) — settle cash on delivered parcels, which unlocks merchant payouts.
+From your side:
+
+1. **Warehouses** (`/dashboard/warehouses`) — create hubs, rename them, and activate or deactivate them. Every pickup location resolves to a warehouse through its delivery city.
+2. **Admins** (`/dashboard/team`) — create the Warehouse Admin accounts and set which hub they belong to.
+3. **Riders** (`/dashboard/riders`) — add riders and move them between hubs; warehouse admins can only dispatch riders already attached to their own hub.
+4. Both roles can settle COD — the warehouse settles its own hub at `/warehouse/cod-settlement`, and **COD Settlement** (`/dashboard/cod-settlement`) gives you the platform-wide view.

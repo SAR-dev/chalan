@@ -4,6 +4,7 @@ import {
   CircleHelp,
   PackageSearch,
   ScrollText,
+  Warehouse,
 } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
@@ -16,7 +17,7 @@ import { HELP_GUIDES } from "./guides"
 
 export const metadata: Metadata = {
   title: "Help Center",
-  description: `${siteConfig.name} help center — role-based guides for merchants, riders, and admins, plus answers to common questions.`,
+  description: `${siteConfig.name} help center — role-based guides for merchants, riders, warehouse admins, and super admins, plus answers to common questions.`,
 }
 
 const GUIDE_ICONS: Record<
@@ -27,6 +28,7 @@ const GUIDE_ICONS: Record<
 > = {
   merchant: PackageSearch,
   rider: Bike,
+  "warehouse-admin": Warehouse,
   admin: ScrollText,
 }
 
@@ -37,7 +39,7 @@ export default function HelpPage() {
       <div className="mx-auto max-w-3xl px-6 py-12">
         <PageHeader
           title="Help Center"
-          description={`Task-by-task guides for every ${siteConfig.name} role, plus a FAQ covering accounts, orders, pricing, and payouts.`}
+          description={`Task-by-task guides for every ${siteConfig.name} role, plus a FAQ covering accounts, orders, pricing, packages, and payouts.`}
         />
 
         <div className="flex flex-col gap-4">
