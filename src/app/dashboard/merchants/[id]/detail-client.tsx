@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
-import { formatTk } from "@/lib/pricing"
 import type { Merchant } from "@/lib/types"
 
 function VerificationBadge({ verified }: { verified: boolean }) {
@@ -417,35 +416,13 @@ export function MerchantDetailClient({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="size-4" />
-                Pricing
+                Weight limit
               </CardTitle>
             </CardHeader>
             <CardContent className="divide-border divide-y py-0">
               <div className="flex items-center justify-between py-2">
-                <span className="text-muted-foreground text-sm">Base rate</span>
-                <span className="text-sm font-medium tabular-nums">
-                  {formatTk(merchant.baseRate)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground text-sm">
-                  Extra per kg
-                </span>
-                <span className="text-sm font-medium tabular-nums">
-                  {formatTk(merchant.extraRatePerKg)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-muted-foreground text-sm">
-                  Free weight
-                </span>
-                <span className="text-sm font-medium tabular-nums">
-                  {merchant.freeWeightKg} KG
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-muted-foreground text-sm">
-                  Max weight
+                  Max parcel weight
                 </span>
                 <span className="text-sm font-medium tabular-nums">
                   {merchant.maxWeightKg} KG

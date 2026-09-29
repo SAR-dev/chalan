@@ -20,7 +20,6 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { FormErrors } from "@/components/form-errors"
-import { ImageUpload } from "@/components/image-upload"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -43,7 +42,6 @@ import { ModeratorsCard } from "@/features/merchants/components/moderators-card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { PickupLocationsManager } from "@/features/pickup-locations/components/pickup-locations-manager"
 import { brandThemeVars, lowContrastSides } from "@/lib/brand-color"
-import { formatTk } from "@/lib/pricing"
 import { merchantProfileSchema, validateFormData } from "@/lib/validation"
 
 const BRAND_PRESETS = [
@@ -90,9 +88,6 @@ export default function MerchantSettingsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   // Branding state
-  const [logoUrl, setLogoUrl] = useState<string | null>(
-    () => currentMerchant?.logoUrl ?? null,
-  )
   const [brandColor, setBrandColor] = useState(
     () => currentMerchant?.brandColor ?? "",
   )
@@ -120,7 +115,6 @@ export default function MerchantSettingsPage() {
     setBusinessName(currentMerchant.businessName)
     setPhone(currentMerchant.phone)
     setAddress(currentMerchant.address)
-    setLogoUrl(currentMerchant.logoUrl ?? null)
     setBrandColor(currentMerchant.brandColor ?? "")
     setHidePlatformBranding(currentMerchant.hidePlatformBranding ?? false)
   }, [currentMerchant])
@@ -201,7 +195,6 @@ export default function MerchantSettingsPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          logoUrl: logoUrl || null,
           brandColor: brandColor || null,
           hidePlatformBranding,
         }),
@@ -320,21 +313,6 @@ export default function MerchantSettingsPage() {
                     Preview
                   </p>
                   <div className="flex items-center gap-3">
-                    {logoUrl ? (
-                      <img
-                        src={logoUrl}
-                        alt=""
-                        data-testid="preview-logo"
-                        className="bg-muted h-10 w-16 shrink-0 rounded-md border p-1 object-contain"
-                      />
-                    ) : (
-                      <div
-                        className="bg-primary text-primary-foreground flex h-10 w-16 shrink-0 items-center justify-center rounded-md border text-xs font-semibold"
-                        data-testid="preview-logo-placeholder"
-                      >
-                        Logo
-                      </div>
-                    )}
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">
                         {currentMerchant.businessName}
@@ -391,22 +369,6 @@ export default function MerchantSettingsPage() {
                       </p>
                     </div>
                   )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Business logo</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Shown in the sidebar, on the public order tracking page, and
-                    in emails.
-                  </p>
-                  <ImageUpload
-                    value={logoUrl}
-                    onChange={setLogoUrl}
-                    folder="logos"
-                    label="Upload logo"
-                    previewClassName="max-h-16 w-auto object-contain"
-                    className="max-w-xs"
-                  />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -594,7 +556,7 @@ export default function MerchantSettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Tag className="size-4" />
-                Delivery pricing
+                Weight limit
               </CardTitle>
               <CardDescription>
                 Set by the platform. Contact an admin to make changes.
@@ -602,19 +564,7 @@ export default function MerchantSettingsPage() {
             </CardHeader>
             <CardContent className="divide-border divide-y py-0">
               <PricingRow
-                label="Base rate"
-                value={formatTk(currentMerchant.baseRate)}
-              />
-              <PricingRow
-                label="Extra per kg"
-                value={formatTk(currentMerchant.extraRatePerKg)}
-              />
-              <PricingRow
-                label="Free weight"
-                value={`${currentMerchant.freeWeightKg} KG`}
-              />
-              <PricingRow
-                label="Max weight"
+                label="Max parcel weight"
                 value={`${currentMerchant.maxWeightKg} KG`}
               />
             </CardContent>

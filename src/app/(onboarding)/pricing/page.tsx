@@ -60,31 +60,18 @@ export default function OnboardingPricingPage() {
         </div>
 
         <div className="rounded-lg border p-4">
-          <h3 className="mb-2 text-sm font-medium">Your pricing</h3>
+          <h3 className="mb-2 text-sm font-medium">Your weight limit</h3>
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Base rate:</dt>
-              <dd className="font-medium">৳{currentMerchant?.baseRate ?? 0}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Per kg extra:</dt>
-              <dd className="font-medium">
-                ৳{currentMerchant?.extraRatePerKg ?? 0}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Free weight:</dt>
-              <dd className="font-medium">
-                {currentMerchant?.freeWeightKg ?? 1} kg
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Max weight:</dt>
+              <dt className="text-muted-foreground">Max parcel weight:</dt>
               <dd className="font-medium">
                 {currentMerchant?.maxWeightKg ?? 3} kg
               </dd>
             </div>
           </dl>
+          <p className="text-muted-foreground mt-2 text-xs">
+            Delivery and COD fees are set per route by the platform.
+          </p>
         </div>
 
         {error ? (

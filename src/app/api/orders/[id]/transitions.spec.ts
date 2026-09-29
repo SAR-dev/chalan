@@ -102,7 +102,7 @@ vi.mock("@/lib/db", () => {
     // change which calls happen, only that they're grouped.
     transaction: <T>(fn: (tx: MockDb) => Promise<T>) => fn(db),
   }
-  return { db, pool: {} }
+  return { db, dbRead: db, pool: {} }
 })
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -517,6 +517,84 @@ describe("PATCH /orders/:id/picked-up", () => {
     sessionState.value = riderSession("rider_1")
     const { status } = await call(pickedUp, { proofRefs: [] })
     expect(status).toBe(400)
+  })
+
+  it("re-prices the delivery when the rider corrects the weight", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+          parcelWeightKg: 1,
+          deliveryFee: 60,
+          codFee: 0,
+          productCost: 500,
+        }),
+      ], // order
+      [{ id: "pl_1", warehouseId: "wh_9" }], // pickup location
+      [{ maxWeightKg: 10 }], // merchant cap
+      [
+        {
+          baseRate: 100,
+          extraRatePerKg: 20,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ], // platform defaults
+      [{ city: "Dhaka" }], // origin warehouse city
+      [{ zoneId: "ZN-1" }], // origin city zone (no deliveryCityId → fallback)
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "PICKED_UP",
+        parcelWeightKg: 3,
+        deliveryFee: 140,
+        codFee: 0,
+        productCost: 500,
+      }),
+    ]
+    const { status, payload } = await call(pickedUp, {
+      proofRefs: ["/uploads/a.png"],
+      parcelWeightKg: 3,
+    })
+    expect(status).toBe(200)
+    expect(payload).toMatchObject({ parcelWeightKg: 3, deliveryFee: 140 })
+    // 140 − 60 = +80 charge adjustment.
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE"),
+    ).toMatchObject({ amount: 80, status: "SETTLED" })
+  })
+
+  it("400 when the corrected weight exceeds the limit", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+      [{ id: "pl_1", warehouseId: "wh_9" }],
+      [{ maxWeightKg: 5 }], // merchant cap 5
+      [
+        {
+          baseRate: 100,
+          extraRatePerKg: 20,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ],
+      [{ city: "Dhaka" }],
+      [{ zoneId: "ZN-1" }],
+    ]
+    const { status, json } = await call(pickedUp, {
+      proofRefs: ["/uploads/a.png"],
+      parcelWeightKg: 6,
+    })
+    expect(status).toBe(400)
+    expect(json).toMatchObject({
+      error: expect.stringMatching(/exceeds the 5 KG limit/i),
+    })
   })
 })
 

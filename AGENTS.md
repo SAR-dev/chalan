@@ -150,12 +150,21 @@ Postgres service container.
 - Merchant: `merchant1@email.com` / `12qwaszx`
 - Rider: `rider1@email.com` / `12qwaszx`
 
-**Selector policy:** use `data-testid` selectors wherever possible. Add a
-`data-testid` attribute to the component under test and a constant in
-`e2e/selectors.ts` before writing an assertion against it. `getByRole` /
-`getByText` are fallbacks only for elements that cannot carry a test id
-(headings, generic text) — never for buttons, inputs, rows, or dialogs that
-you can tag. When fixing or writing e2e tests, prefer/convert to test ids.
+**Selector policy — `data-testid` first, always.** Text and roles change
+frequently (copy edits, i18n, layout), so **use `data-testid` as much as
+possible** — it is the default, not a nicety. Before writing any assertion:
+
+1. Add a `data-testid` attribute to the component under test.
+2. Add a constant for it in `e2e/selectors.ts` (namespaced export).
+3. Reference that constant in the spec — never a raw string or a text matcher.
+
+`getByRole` / `getByText` are **fallbacks only** for elements that genuinely
+cannot carry a test id (headings, static/generic text) — **never** for buttons,
+inputs, links, options, rows, cells, tabs, dialogs, or toasts, all of which can
+be tagged. When fixing or writing e2e tests, **convert** existing `getByText` /
+`getByRole` selectors on taggable elements to `data-testid` as you go. If you
+must match text, scope it to a tagged container (e.g.
+`page.locator(selectors.x.table).getByText(...)`), not the whole page.
 
 **Suite naming:** every `test.describe` must be prefixed with a unique scenario
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New

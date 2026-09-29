@@ -17,7 +17,7 @@ const R2_BASE = "https://pub.r2.dev"
 
 describe("IMAGE_URL_COLUMNS", () => {
   it("covers every schema image column", () => {
-    expect(IMAGE_URL_COLUMNS).toHaveLength(10)
+    expect(IMAGE_URL_COLUMNS).toHaveLength(9)
     expect(IMAGE_URL_COLUMNS).toContainEqual({
       table: user,
       column: user.image,

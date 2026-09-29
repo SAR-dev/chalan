@@ -6,9 +6,11 @@ import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
-import { merchantPricingSchema, parseBody } from "@/lib/validation"
+import { merchantWeightLimitSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
+/** Super Admin sets a merchant's max parcel weight. Delivery/COD/cancellation
+ *  fees come from zone pricing, not from per-merchant rates. */
 export const PATCH = withErrorHandler(
   async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const me = await requireSession()
@@ -16,24 +18,12 @@ export const PATCH = withErrorHandler(
     if (me.role !== "SUPER_ADMIN") return forbidden()
 
     const { id } = await params
-    const parsed = await parseBody(req, merchantPricingSchema)
+    const parsed = await parseBody(req, merchantWeightLimitSchema)
     if (parsed.error) return parsed.error
-    const {
-      baseRate,
-      extraRatePerKg,
-      freeWeightKg,
-      maxWeightKg,
-      cancellationFee,
-    } = parsed.data
+    const { maxWeightKg } = parsed.data
 
     const [current] = await db
-      .select({
-        baseRate: merchant.baseRate,
-        extraRatePerKg: merchant.extraRatePerKg,
-        freeWeightKg: merchant.freeWeightKg,
-        maxWeightKg: merchant.maxWeightKg,
-        cancellationFee: merchant.cancellationFee,
-      })
+      .select({ maxWeightKg: merchant.maxWeightKg })
       .from(merchant)
       .where(eq(merchant.id, id))
       .limit(1)
@@ -42,32 +32,20 @@ export const PATCH = withErrorHandler(
 
     const [updated] = await db
       .update(merchant)
-      .set({
-        baseRate,
-        extraRatePerKg,
-        freeWeightKg,
-        maxWeightKg,
-        ...(cancellationFee !== undefined ? { cancellationFee } : {}),
-      })
+      .set({ maxWeightKg })
       .where(eq(merchant.id, id))
       .returning()
 
     if (!updated) return notFound()
 
-    const diff = diffEntity(current, updated, [
-      "baseRate",
-      "extraRatePerKg",
-      "freeWeightKg",
-      "maxWeightKg",
-      "cancellationFee",
-    ])
+    const diff = diffEntity(current, updated, ["maxWeightKg"])
 
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: "MERCHANT_PRICING_UPDATED",
       entityType: "merchant",
       entityId: updated.id,
-      description: `Updated pricing for merchant ${updated.businessName}`,
+      description: `Updated weight limit for merchant ${updated.businessName}`,
       metadata: diff ? { diff } : null,
     })
 

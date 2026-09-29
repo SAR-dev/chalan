@@ -24,7 +24,7 @@ export function RoleSidebar({
   footerSubtitle,
   fallbackName,
   fallbackInitials = "?",
-  logoUrl,
+  businessName,
   brandColor,
   hidePlatformBranding = false,
 }: {
@@ -32,7 +32,7 @@ export function RoleSidebar({
   footerSubtitle?: string | null
   fallbackName?: string
   fallbackInitials?: string
-  logoUrl?: string
+  businessName?: string
   brandColor?: string
   hidePlatformBranding?: boolean
 }) {
@@ -50,19 +50,23 @@ export function RoleSidebar({
       className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden md:flex"
       style={sidebarStyle}
     >
-      {/* Brand — logo sized with the text, role badge in accent color */}
-      <Link href="/" className="flex h-16 items-center gap-2 px-4">
-        {logoUrl ? (
-          <img
-            src={logoUrl}
-            alt=""
-            className="size-4 shrink-0 object-contain"
-          />
+      {/* Brand — the merchant's business name (no logo), or the platform brand */}
+      <Link
+        href="/"
+        data-testid="sidebar-brand"
+        className="flex h-16 items-center gap-2 px-4"
+      >
+        {businessName ? (
+          <span className="truncate text-[13px] font-semibold">
+            {businessName}
+          </span>
         ) : (
-          <BrandIcon className="size-4 shrink-0" />
-        )}
-        {!hidePlatformBranding && (
-          <p className="text-[13px] font-semibold">{BRAND_NAME}</p>
+          <>
+            <BrandIcon className="size-4 shrink-0" />
+            {!hidePlatformBranding && (
+              <p className="text-[13px] font-semibold">{BRAND_NAME}</p>
+            )}
+          </>
         )}
         <span className="bg-sidebar-primary text-sidebar-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
           {config.roleLabel}

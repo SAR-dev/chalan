@@ -98,6 +98,7 @@ export default function OnboardingWelcomePage() {
         <Button
           variant="outline"
           className="w-full"
+          data-testid="onboarding-skip"
           onClick={handleSkip}
           disabled={loading}
         >

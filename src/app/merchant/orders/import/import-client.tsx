@@ -23,6 +23,7 @@ import {
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { usePlatformPricingPublic } from "@/features/platform-config/hooks/use-platform-pricing-public"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { downloadCsv } from "@/lib/csv"
 import { formatError } from "@/lib/validation"
@@ -51,6 +52,7 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
   const { pickupLocations } = usePickupLocations()
   const { cities } = useDeliveryCities()
   const { pricing: zonePricing } = useZonePricingPublic()
+  const { platformDefaults } = usePlatformPricingPublic()
   const { createOrders } = useOrders()
 
   const [parseError, setParseError] = useState<string | null>(null)
@@ -323,7 +325,7 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
           myLocations={myLocations}
           deliveryCities={cities}
           zonePricing={zonePricing}
-          currentMerchant={currentMerchant}
+          platformDefaults={platformDefaults}
           maxWeightKg={lookups.maxWeightKg}
           onParcelChange={handleParcelChange}
           onRemoveRow={handleRemoveRow}

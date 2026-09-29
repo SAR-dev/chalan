@@ -4,7 +4,7 @@ import { createHash, createHmac } from "node:crypto"
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
 import { login, waitForAppReady } from "../helpers"
-import { email } from "../selectors"
+import { email, onboarding } from "../selectors"
 
 const PASSWORD = "testpass123"
 const SITE_ORIGIN = "http://localhost:3000"
@@ -15,7 +15,7 @@ const SITE_ORIGIN = "http://localhost:3000"
 async function skipOnboardingIfNeeded(page: Page) {
   await page.goto("/merchant")
   await waitForAppReady(page).catch(() => {})
-  const skip = page.getByRole("button", { name: /skip for now/i })
+  const skip = page.locator(onboarding.skip)
   try {
     await skip.waitFor({ state: "visible", timeout: 5_000 })
   } catch {

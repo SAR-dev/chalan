@@ -1,0 +1,1 @@
+ALTER TABLE "merchant" DROP COLUMN "logoUrl";

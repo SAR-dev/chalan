@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Base ----------------------------------------------------------------
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 # tzdata so the pinned business timezone resolves inside the container
 # (ROADMAP P1.3); libc6-compat + curl for the healthcheck.
 RUN apk add --no-cache libc6-compat curl tzdata

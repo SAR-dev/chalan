@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
 import { totpSecretFromUri } from "@/lib/two-factor"
 import { CREDS, type E2ECredential, login, waitForAppReady } from "../helpers"
-import { auth, twoFactor } from "../selectors"
+import { auth, onboarding, twoFactor } from "../selectors"
 import { totp } from "../totp"
 
 const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider|welcome)/
@@ -18,7 +18,7 @@ async function openTwoFactorTab(page: Page, path = "/dashboard/account") {
 /** Skip onboarding if the merchant landed on /welcome */
 async function skipOnboardingIfNeeded(page: Page) {
   if (page.url().includes("/welcome")) {
-    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.locator(onboarding.skip).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
     await waitForAppReady(page)
   }

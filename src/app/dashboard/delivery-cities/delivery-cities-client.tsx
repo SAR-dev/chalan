@@ -149,7 +149,7 @@ export function DeliveryCitiesPageClient() {
         title="Delivery Cities"
         description="Manage the list of cities merchants can select when creating orders."
       >
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button data-testid="add-city" onClick={() => setCreateOpen(true)}>
           <Plus className="size-4" />
           Add City
         </Button>

@@ -269,18 +269,15 @@ describe("POST /api/orders", () => {
           id: "m_1",
           status: "ACTIVE",
           maxWeightKg: 10,
-          baseRate: 50,
-          extraRatePerKg: 10,
-          freeWeightKg: 1,
           emailVerifiedAt: new Date(),
           phoneVerifiedAt: new Date(),
           nidVerifiedAt: new Date(),
-          codFeePercentage: 1,
         },
       ], // merchant
-      [{ zoneId: "ZN-2" }], // destination city zone
+      [], // platform config (empty → defaults)
       [{ city: "Dhaka" }], // origin warehouse city
       [{ zoneId: "ZN-1" }], // origin city zone
+      [{ zoneId: "ZN-2" }], // destination city zone
       [
         {
           fromZoneId: "ZN-1",

@@ -1,11 +1,22 @@
-import { expect, test } from "@playwright/test"
+import "dotenv/config"
+
+import { expect, request as pwRequest, test } from "@playwright/test"
+import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { help, pricing } from "../selectors"
+import {
+  auth,
+  help,
+  merchants,
+  onboarding,
+  orderForm,
+  pricing,
+  riderApplication,
+} from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
-    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.locator(onboarding.skip).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
     await waitForAppReady(page)
   }
@@ -20,27 +31,31 @@ test.describe("S1. Full Order Lifecycle", () => {
     await page.goto("/merchant/orders/new")
     await waitForAppReady(page)
 
+    const card = page.locator(orderForm.card).first()
+
     // Select pickup location
-    await page.locator("[id^='pickup-']").first().click()
+    await card.locator(orderForm.pickupLocation).click()
     await page.getByRole("option").first().click()
 
     // Fill recipient details
-    await page.getByLabel("Recipient name").fill("E2E Test Recipient")
-    await page.getByLabel("Recipient phone").fill("01712345678")
+    await card.locator(orderForm.recipientName).fill("E2E Test Recipient")
+    await card.locator(orderForm.recipientPhone).fill("01712345678")
 
     // Select delivery city
-    await page.locator("[id^='city-']").first().click()
+    await card.locator(orderForm.deliveryCity).click()
     await page.getByRole("option").first().click()
 
     // Fill delivery address
-    await page.getByLabel("Delivery address").fill("123 E2E Test Street, Dhaka")
+    await card
+      .locator(orderForm.deliveryAddress)
+      .fill("123 E2E Test Street, Dhaka")
 
     // Fill weight and COD amount
-    await page.getByLabel("Parcel weight").fill("1")
-    await page.getByLabel("COD amount").fill("500")
+    await card.locator(orderForm.parcelWeight).fill("1")
+    await card.locator(orderForm.productCost).fill("500")
 
     // Submit order
-    await page.getByRole("button", { name: /confirm/i }).click()
+    await page.locator(orderForm.submitOrder).click()
     await waitForAppReady(page)
 
     // Admin views orders
@@ -56,7 +71,7 @@ test.describe("S6. Merchant Suspend & Reactivate", () => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/merchants")
     await waitForAppReady(page)
-    await expect(page.getByText(/merchants/i).first()).toBeVisible()
+    await expect(page.locator(merchants.table)).toBeVisible()
   })
 })
 
@@ -256,7 +271,7 @@ test.describe("S26. Merchant Dashboard", () => {
 test.describe("S27. Rider Application", () => {
   test("application page has print button", async ({ page }) => {
     await page.goto("/apply/rider")
-    await expect(page.getByRole("button", { name: /print/i })).toBeVisible()
+    await expect(page.locator(riderApplication.print)).toBeVisible()
   })
 })
 
@@ -264,18 +279,18 @@ test.describe("S27. Rider Application", () => {
 test.describe("S28. Auth", () => {
   test("login page renders correctly", async ({ page }) => {
     await page.goto("/login")
-    await expect(page.locator("[data-testid='login-email']")).toBeVisible()
-    await expect(page.locator("[data-testid='login-password']")).toBeVisible()
-    await expect(page.locator("[data-testid='login-submit']")).toBeVisible()
+    await expect(page.locator(auth.loginEmail)).toBeVisible()
+    await expect(page.locator(auth.loginPassword)).toBeVisible()
+    await expect(page.locator(auth.loginSubmit)).toBeVisible()
     await expect(page.getByText("Welcome back")).toBeVisible()
   })
 
   test("invalid credentials show error", async ({ page }) => {
     await page.goto("/login")
-    await page.locator("[data-testid='login-email']").fill("wrong@email.com")
-    await page.locator("[data-testid='login-password']").fill("wrongpass")
-    await page.getByRole("button", { name: /sign in/i }).click()
-    await expect(page.getByRole("alert")).toBeVisible({ timeout: 10_000 })
+    await page.locator(auth.loginEmail).fill("wrong@email.com")
+    await page.locator(auth.loginPassword).fill("wrongpass")
+    await page.locator(auth.loginSubmit).click()
+    await expect(page.locator(auth.loginError)).toBeVisible({ timeout: 10_000 })
   })
 
   test("server-side logout redirects with next= and returns there after login", async ({
@@ -308,5 +323,115 @@ test.describe("S28. Auth", () => {
 
     await login(page, CREDS.merchant, { waitFor: /\/merchant/ })
     expect(page.url()).toContain("/merchant/finance")
+  })
+})
+
+// ─── S57. Rider corrects the parcel weight at pickup ─────────────────────────
+const BASE_URL = "http://localhost:3000"
+
+async function loginContext(cred: {
+  email: string
+  password: string
+  home?: string
+}) {
+  const ctx = await pwRequest.newContext({ baseURL: BASE_URL })
+  const res = await ctx.post("/api/auth/sign-in/email", {
+    data: {
+      email: cred.email,
+      password: cred.password,
+      callbackURL: cred.home,
+    },
+  })
+  expect(res.ok(), `sign-in ${cred.email} -> ${res.status()}`).toBeTruthy()
+  return ctx
+}
+
+function rows(json: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(json)) return json
+  const data = (json as { data?: unknown }).data
+  return Array.isArray(data) ? data : []
+}
+
+async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set")
+  const client = new Client({ connectionString: process.env.DATABASE_URL })
+  await client.connect()
+  try {
+    return await fn(client)
+  } finally {
+    await client.end()
+  }
+}
+
+test.describe("S57. Rider corrects the parcel weight at pickup", () => {
+  test("re-prices the delivery and adjusts the ledger", async () => {
+    // Merchant creates an order with a declared 1 kg parcel.
+    const merchant = await loginContext(CREDS.merchant)
+    const pickupLocations = rows(
+      await (await merchant.get("/api/pickup-locations")).json(),
+    )
+    const cities = rows(
+      await (await merchant.get("/api/delivery-cities")).json(),
+    )
+    expect(pickupLocations.length).toBeGreaterThan(0)
+    expect(cities.length).toBeGreaterThan(0)
+
+    const createRes = await merchant.post("/api/orders", {
+      data: {
+        pickupLocationId: pickupLocations[0].id,
+        recipientName: "E2E Weight",
+        recipientPhone: "01712345678",
+        deliveryAddress: "1 Weight St",
+        deliveryCityId: cities[0].id,
+        parcelWeightKg: 1,
+        deliveryType: "STANDARD",
+        productCost: 500,
+      },
+    })
+    expect(createRes.ok()).toBeTruthy()
+    const order = await createRes.json()
+    const originalFee = order.deliveryFee as number
+    await merchant.dispose()
+
+    // Admin approves.
+    const admin = await loginContext(CREDS.superAdmin)
+    expect(
+      (await admin.patch(`/api/orders/${order.id}/approve`)).ok(),
+    ).toBeTruthy()
+    await admin.dispose()
+
+    // Warehouse admin assigns the seeded pickup rider (RID-100001E, same hub).
+    const warehouse = await loginContext(CREDS.warehouseAdmin)
+    expect(
+      (
+        await warehouse.patch(`/api/orders/${order.id}/assign-pickup-rider`, {
+          data: { riderId: "RID-100001E" },
+        })
+      ).ok(),
+    ).toBeTruthy()
+    await warehouse.dispose()
+
+    // Rider picks up and corrects the weight upward.
+    const rider = await loginContext(CREDS.rider)
+    const pickRes = await rider.patch(`/api/orders/${order.id}/picked-up`, {
+      data: { proofRefs: ["https://example.com/proof.png"], parcelWeightKg: 3 },
+    })
+    expect(pickRes.ok()).toBeTruthy()
+    const picked = await pickRes.json()
+    await rider.dispose()
+    expect(picked.parcelWeightKg).toBe(3)
+    expect(picked.deliveryFee).toBeGreaterThan(originalFee)
+
+    // The ledger records the delivery-fee delta.
+    const delta = (picked.deliveryFee as number) - originalFee
+    await withDb(async (client) => {
+      const res = await client.query(
+        `SELECT amount FROM balance_transaction
+         WHERE "orderId" = $1 AND note LIKE '%weight corrected%'`,
+        [order.id],
+      )
+      expect(res.rows.length).toBe(1)
+      expect(Number(res.rows[0].amount)).toBeCloseTo(delta, 2)
+    })
   })
 })

@@ -246,16 +246,9 @@ describe("merchant branding in emails", () => {
     ownerName: "Bob Smith",
     businessName: "Acme Corp",
     verificationUrl: "http://localhost:3000/verify?token=abc",
-    logoUrl: "https://cdn.example.com/logo.png",
     brandColor: "#10b981",
     hidePlatformBranding: true,
   }
-
-  it("embeds the merchant logo with the merchant name as alt text", async () => {
-    const { html } = await merchantRegisteredTemplate(branded)
-    expect(html).toContain("https://cdn.example.com/logo.png")
-    expect(html).toContain('alt="Acme Corp"')
-  })
 
   it("uses the brand color as the accent", async () => {
     const { html } = await merchantRegisteredTemplate(branded)
@@ -290,11 +283,9 @@ describe("merchant branding in emails", () => {
   it("order emails carry branding fields", async () => {
     const { html, text } = await orderApprovedTemplate({
       ...data,
-      logoUrl: "https://cdn.example.com/logo.png",
       brandColor: "#ef4444",
       hidePlatformBranding: true,
     })
-    expect(html).toContain("https://cdn.example.com/logo.png")
     expect(html).toContain("#ef4444")
     expect(html).not.toContain("automated message")
     expect(text).not.toContain("automated message")

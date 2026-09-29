@@ -11,6 +11,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { ImageGalleryUpload } from "@/components/image-upload"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { InfoRow } from "@/features/orders/components/info-row"
@@ -33,6 +34,13 @@ export function PickupConfirmDialog({
   const { markOrderPickedUp } = useOrders()
   const [submitting, setSubmitting] = useState(false)
   const [proofUrls, setProofUrls] = useState<string[]>([])
+  const [weight, setWeight] = useState("")
+  const [syncedId, setSyncedId] = useState<string | null>(null)
+
+  if (order && order.id !== syncedId) {
+    setSyncedId(order.id)
+    setWeight(String(order.parcelWeightKg))
+  }
 
   if (!order) return null
 
@@ -48,7 +56,14 @@ export function PickupConfirmDialog({
   async function handleConfirm() {
     setSubmitting(true)
     try {
-      const result = await markOrderPickedUp(order!.id, proofUrls)
+      const parsed = Number(weight)
+      const parcelWeightKg =
+        Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+      const result = await markOrderPickedUp(
+        order!.id,
+        proofUrls,
+        parcelWeightKg,
+      )
       if (result.ok) {
         toast.success(`${order!.id} marked as picked up.`)
         handleOpenChange(false)
@@ -99,6 +114,22 @@ export function PickupConfirmDialog({
             icon={Package}
             label="Parcel"
             value={`${order.parcelWeightKg} KG · ${order.deliveryType}`}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="pickup-weight">Actual parcel weight (KG)</Label>
+          <p className="text-muted-foreground text-xs">
+            Correct this if it differs from the declared {order.parcelWeightKg}{" "}
+            KG — the delivery fee is recalculated.
+          </p>
+          <Input
+            id="pickup-weight"
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
           />
         </div>
 

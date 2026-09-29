@@ -16,6 +16,7 @@ import {
   merchant,
   merchantBalance,
   order,
+  platformConfig,
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
@@ -50,11 +51,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       status: merchant.status,
       emailVerifiedAt: merchant.emailVerifiedAt,
       nidVerifiedAt: merchant.nidVerifiedAt,
-      baseRate: merchant.baseRate,
-      extraRatePerKg: merchant.extraRatePerKg,
-      freeWeightKg: merchant.freeWeightKg,
       maxWeightKg: merchant.maxWeightKg,
-      codFeePercentage: merchant.codFeePercentage,
     })
     .from(merchant)
     .where(eq(merchant.id, me.merchantId))
@@ -161,32 +158,70 @@ export const POST = withErrorHandler(async (req: Request) => {
         .where(inArray(zonePricing.fromZoneId, allZoneIds))
     : []
 
+  // Platform defaults are the fallback when a city pair has no zone row.
+  const [config] = await dbRead
+    .select({
+      defaultBaseRate: platformConfig.defaultBaseRate,
+      defaultExtraRatePerKg: platformConfig.defaultExtraRatePerKg,
+      defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
+      defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
+      defaultCodFeePercentage: platformConfig.defaultCodFeePercentage,
+      defaultCancellationFee: platformConfig.defaultCancellationFee,
+    })
+    .from(platformConfig)
+    .limit(1)
+
+  type PricingInput = {
+    baseRate: number
+    extraRatePerKg: number
+    freeWeightKg: number
+    maxWeightKg: number
+    codFeePercentage: number
+    cancellationFee: number
+  }
+  const platformPricing: PricingInput = {
+    baseRate: config?.defaultBaseRate ?? 0,
+    extraRatePerKg: config?.defaultExtraRatePerKg ?? 0,
+    freeWeightKg: config?.defaultFreeWeightKg ?? 1,
+    maxWeightKg: config?.defaultMaxWeightKg ?? 3,
+    codFeePercentage: config?.defaultCodFeePercentage ?? 1,
+    cancellationFee: config?.defaultCancellationFee ?? 0,
+  }
+  const pricingFor = (input: (typeof inputs)[number]): PricingInput => {
+    const origWarehouseCity =
+      warehouseCityMap[warehouseByPickup[input.pickupLocationId]]
+    const destZoneId = input.deliveryCityId
+      ? destZoneMap[input.deliveryCityId]
+      : undefined
+    const origZoneId = origWarehouseCity
+      ? origZoneByName[origWarehouseCity]
+      : undefined
+    if (origZoneId && destZoneId) {
+      const zonePrice = allZonePricing.find(
+        (z) => z.fromZoneId === origZoneId && z.toZoneId === destZoneId,
+      )
+      if (zonePrice) return zonePrice
+    }
+    return platformPricing
+  }
+
+  // The rate is undefined above its own max weight — reject those rows too.
+  const overRouteLimit = inputs
+    .map((o, i) => ({ i, weight: o.parcelWeightKg, pricing: pricingFor(o) }))
+    .filter((o) => o.weight > o.pricing.maxWeightKg)
+  if (overRouteLimit.length > 0) {
+    return NextResponse.json(
+      {
+        error: `${overRouteLimit.length} parcel(s) exceed the route weight limit.`,
+        rows: overRouteLimit.map((o) => o.i),
+      },
+      { status: 400 },
+    )
+  }
+
   const created = await db.transaction(async (tx) => {
     const values = inputs.map((input) => {
-      // Resolve pricing: zone-to-zone → fallback to merchant
-      type PricingInput = {
-        baseRate: number
-        extraRatePerKg: number
-        freeWeightKg: number
-        maxWeightKg: number
-        codFeePercentage?: number | null
-      }
-      let pricing: PricingInput = merchantRow
-      const origWarehouseCity =
-        warehouseCityMap[warehouseByPickup[input.pickupLocationId]]
-      const destZoneId = input.deliveryCityId
-        ? destZoneMap[input.deliveryCityId]
-        : undefined
-      const origZoneId = origWarehouseCity
-        ? origZoneByName[origWarehouseCity]
-        : undefined
-
-      if (origZoneId && destZoneId) {
-        const zonePrice = allZonePricing.find(
-          (z) => z.fromZoneId === origZoneId && z.toZoneId === destZoneId,
-        )
-        if (zonePrice) pricing = zonePrice
-      }
+      const pricing = pricingFor(input)
 
       // Money is stored to paisa (ROADMAP P0.4) — never carry sub-paisa noise.
       const productCost = toPaisa(input.productCost)
@@ -194,10 +229,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         pricing,
         input.parcelWeightKg,
       )
-      const codFee = calcCodFee(
-        productCost,
-        pricing.codFeePercentage ?? merchantRow.codFeePercentage ?? 1,
-      )
+      const codFee = calcCodFee(productCost, pricing.codFeePercentage ?? 1)
       const merchantEarnings = calcMerchantEarnings(
         productCost,
         deliveryFee,
@@ -219,6 +251,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         productCost,
         deliveryFee,
         codFee,
+        cancellationFee: toPaisa(pricing.cancellationFee ?? 0),
         merchantEarnings,
         status: "PENDING" as const,
         deliveryAttempts: 0,

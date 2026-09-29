@@ -2,7 +2,7 @@ import "dotenv/config"
 
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
-import { auth } from "../selectors"
+import { auth, register } from "../selectors"
 
 // ─── S47. Public signup is closed (ROADMAP P0.7) ────────────────────────────
 //
@@ -53,7 +53,7 @@ test.describe("S47. Public signup is closed", () => {
     // account is created server-side from this application form.
     await page.goto("/register")
     await expect(page.locator(auth.registerForm)).toBeVisible()
-    await expect(page.getByLabel("Business name")).toBeVisible()
-    await expect(page.getByLabel("Email")).toBeVisible()
+    await expect(page.locator(register.businessName)).toBeVisible()
+    await expect(page.locator(register.email)).toBeVisible()
   })
 })

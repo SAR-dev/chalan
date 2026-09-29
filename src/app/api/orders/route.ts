@@ -32,12 +32,11 @@ import {
   order,
   orderStatuses,
   pickupLocation,
-  platformConfig,
   warehouse,
-  zonePricing,
 } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
 import { canPlaceOrders } from "@/lib/merchant-verification"
+import { resolveRoutePricing } from "@/lib/order-pricing"
 import {
   paginateResponse,
   parseDateRange,
@@ -254,12 +253,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       status: merchant.status,
       emailVerifiedAt: merchant.emailVerifiedAt,
       nidVerifiedAt: merchant.nidVerifiedAt,
-      baseRate: merchant.baseRate,
-      extraRatePerKg: merchant.extraRatePerKg,
-      freeWeightKg: merchant.freeWeightKg,
       maxWeightKg: merchant.maxWeightKg,
-      codFeePercentage: merchant.codFeePercentage,
-      cancellationFee: merchant.cancellationFee,
     })
     .from(merchant)
     .where(eq(merchant.id, merchantId))
@@ -285,83 +279,26 @@ export const POST = withErrorHandler(async (req: Request) => {
     )
   }
 
-  // ── Zone-to-zone pricing lookup ──
-  // 1. Destination zone from delivery city
+  // ── Pricing: the zone-pair row wins; platform defaults are the fallback.
+  //    Per-merchant rate fields were removed — zone pricing is the single
+  //    source for delivery, COD and cancellation fees. Shared with the
+  //    pickup-time re-pricing so the two can never drift.
   const destCityId = parsed.data.deliveryCityId
-  const [destCity] = destCityId
-    ? await dbRead
-        .select({ zoneId: deliveryCityTable.zoneId })
-        .from(deliveryCityTable)
-        .where(eq(deliveryCityTable.id, destCityId))
-        .limit(1)
-    : []
+  const pricing = await resolveRoutePricing(hub.id, destCityId ?? null)
 
-  // 2. Origin zone from warehouse's city
-  const [origWarehouse] = await dbRead
-    .select({ city: warehouse.city })
-    .from(warehouse)
-    .where(eq(warehouse.id, hub.id))
-    .limit(1)
-
-  const [origCity] = origWarehouse?.city
-    ? await dbRead
-        .select({ zoneId: deliveryCityTable.zoneId })
-        .from(deliveryCityTable)
-        .where(eq(deliveryCityTable.name, origWarehouse.city))
-        .limit(1)
-    : []
-
-  // 3. Look up zone-to-zone pricing (use merchant pricing as base, override with zone)
-  type PricingInput = {
-    baseRate: number
-    extraRatePerKg: number
-    freeWeightKg: number
-    maxWeightKg: number
-    codFeePercentage?: number | null
-  }
-  let pricing: PricingInput = merchantRow
-  // Cancellation fee is resolved alongside the delivery fee: the zone-pair row
-  // wins, otherwise the platform default applies. Snapshotted on the order so a
-  // later return is priced at creation time, not at return time.
-  let cancellationFee: number | null = null
-  if (origCity?.zoneId && destCity?.zoneId) {
-    // At most one row per (fromZone, toZone) — `zone_pricing_pair_uniq`
-    // (ROADMAP P1.1), so this pick is deterministic. The limit is kept as a
-    // guard against a pair that somehow predates the index.
-    const [zonePrice] = await dbRead
-      .select()
-      .from(zonePricing)
-      .where(
-        and(
-          eq(zonePricing.fromZoneId, origCity.zoneId),
-          eq(zonePricing.toZoneId, destCity.zoneId),
-        ),
-      )
-      .limit(1)
-    if (zonePrice) {
-      pricing = zonePrice
-      cancellationFee = toPaisa(zonePrice.cancellationFee)
-    }
-  }
-  // Cancellation fee resolves through the same chain as the delivery rate
-  // (ROADMAP B6): zone-pair row wins, then the merchant's own fee, then the
-  // platform default. A merchant fee of 0 means "inherit the platform default".
-  if (cancellationFee === null) {
-    cancellationFee = toPaisa(merchantRow.cancellationFee ?? 0)
-  }
-  if (cancellationFee === 0) {
-    const [config] = await dbRead
-      .select({ fee: platformConfig.defaultCancellationFee })
-      .from(platformConfig)
-      .limit(1)
-    cancellationFee = toPaisa(config?.fee ?? 0)
-  }
-
-  const { total: deliveryFee } = calcDeliveryCharge(pricing, parcelWeightKg)
-  const codFee = calcCodFee(
-    productCost,
-    pricing.codFeePercentage ?? merchantRow.codFeePercentage ?? 1,
+  const { total: deliveryFee, exceedsMax } = calcDeliveryCharge(
+    pricing,
+    parcelWeightKg,
   )
+  // The rate is undefined above its own max weight — enforce it as well as the
+  // per-merchant cap checked above.
+  if (exceedsMax) {
+    return badRequest(
+      `Parcel weight exceeds the ${pricing.maxWeightKg} KG limit for this route.`,
+    )
+  }
+  const codFee = calcCodFee(productCost, pricing.codFeePercentage ?? 1)
+  const cancellationFee = toPaisa(pricing.cancellationFee ?? 0)
   const merchantEarnings = calcMerchantEarnings(
     productCost,
     deliveryFee,

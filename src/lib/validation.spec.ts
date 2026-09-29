@@ -7,7 +7,7 @@ import {
   idsSchema,
   isValidBdPhone,
   merchantBrandingSchema,
-  merchantPricingSchema,
+  merchantWeightLimitSchema,
   normalizePhone,
   orderCreateSchema,
   parseBody,
@@ -69,38 +69,19 @@ describe("idsSchema", () => {
   })
 })
 
-describe("merchantPricingSchema", () => {
-  it("accepts valid pricing", () => {
-    const result = merchantPricingSchema.safeParse({
-      baseRate: 60,
-      extraRatePerKg: 20,
-      freeWeightKg: 2,
-      maxWeightKg: 30,
-    })
+describe("merchantWeightLimitSchema", () => {
+  it("accepts a positive weight", () => {
+    const result = merchantWeightLimitSchema.safeParse({ maxWeightKg: 30 })
     expect(result.success).toBe(true)
   })
 
-  it("rejects freeWeightKg exceeding maxWeightKg", () => {
-    const result = merchantPricingSchema.safeParse({
-      baseRate: 60,
-      extraRatePerKg: 20,
-      freeWeightKg: 10,
-      maxWeightKg: 5,
-    })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(JSON.stringify(result.error)).toContain("freeWeightKg")
-    }
-  })
-
-  it("rejects negative values", () => {
-    const result = merchantPricingSchema.safeParse({
-      baseRate: -1,
-      extraRatePerKg: 20,
-      freeWeightKg: 2,
-      maxWeightKg: 30,
-    })
-    expect(result.success).toBe(false)
+  it("rejects zero or negative weight", () => {
+    expect(
+      merchantWeightLimitSchema.safeParse({ maxWeightKg: 0 }).success,
+    ).toBe(false)
+    expect(
+      merchantWeightLimitSchema.safeParse({ maxWeightKg: -1 }).success,
+    ).toBe(false)
   })
 })
 
@@ -355,16 +336,12 @@ describe("merchantBrandingSchema", () => {
   })
 
   it("accepts null values", () => {
-    const result = merchantBrandingSchema.safeParse({
-      logoUrl: null,
-      brandColor: null,
-    })
+    const result = merchantBrandingSchema.safeParse({ brandColor: null })
     expect(result.success).toBe(true)
   })
 
   it("accepts all fields", () => {
     const result = merchantBrandingSchema.safeParse({
-      logoUrl: "https://example.com/logo.png",
       brandColor: "#10b981",
       hidePlatformBranding: true,
     })

@@ -41,11 +41,7 @@ export const GET = withErrorHandler(
         onboardingCompletedAt: merchant.onboardingCompletedAt,
         emailVerifiedAt: merchant.emailVerifiedAt,
         phoneVerifiedAt: merchant.phoneVerifiedAt,
-        baseRate: merchant.baseRate,
-        extraRatePerKg: merchant.extraRatePerKg,
-        freeWeightKg: merchant.freeWeightKg,
         maxWeightKg: merchant.maxWeightKg,
-        codFeePercentage: merchant.codFeePercentage,
         maxModerators: merchant.maxModerators,
         nidSubmittedAt: merchant.nidSubmittedAt,
         nidVerifiedAt: merchant.nidVerifiedAt,
@@ -59,7 +55,6 @@ export const GET = withErrorHandler(
         nidSelfieImage: merchant.nidSelfieImage,
         approvedBy: merchant.approvedBy,
         approvedAt: merchant.approvedAt,
-        logoUrl: merchant.logoUrl,
         brandColor: merchant.brandColor,
         hidePlatformBranding: merchant.hidePlatformBranding,
         createdAt: merchant.createdAt,
@@ -126,8 +121,7 @@ export const PATCH = withErrorHandler(
     }
 
     if (brandingParsed.success) {
-      const { logoUrl, brandColor, hidePlatformBranding } = brandingParsed.data
-      if (logoUrl !== undefined) updates.logoUrl = logoUrl
+      const { brandColor, hidePlatformBranding } = brandingParsed.data
       if (brandColor !== undefined) updates.brandColor = brandColor
       if (hidePlatformBranding !== undefined)
         updates.hidePlatformBranding = hidePlatformBranding

@@ -149,12 +149,8 @@ export interface MerchantRegistrationInput {
   password: string
 }
 
-export interface MerchantPricingInput {
-  baseRate: number
-  extraRatePerKg: number
-  freeWeightKg: number
+export interface MerchantWeightLimitInput {
   maxWeightKg: number
-  cancellationFee?: number
 }
 
 export interface PlatformConfigInput {

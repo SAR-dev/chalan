@@ -51,7 +51,7 @@ export function ParcelCard({
 }: ParcelCardProps) {
   const p = row.parcel
   return (
-    <Card>
+    <Card data-testid="parcel-card">
       <CardHeader className="space-y-0 [.border-b]:pb-(--card-spacing)">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <CardTitle className="text-base">Parcel {index + 1}</CardTitle>
@@ -90,6 +90,7 @@ export function ParcelCard({
               <Label htmlFor={`name-${p.id}`}>Recipient name</Label>
               <Input
                 id={`name-${p.id}`}
+                data-testid="recipient-name"
                 value={p.recipientName}
                 onChange={(e) =>
                   updateParcel(p.id, "recipientName", e.target.value)
@@ -102,6 +103,7 @@ export function ParcelCard({
               <Label htmlFor={`phone-${p.id}`}>Recipient phone</Label>
               <Input
                 id={`phone-${p.id}`}
+                data-testid="recipient-phone"
                 type="tel"
                 value={p.recipientPhone}
                 onChange={(e) =>
@@ -120,7 +122,11 @@ export function ParcelCard({
                   updateParcel(p.id, "deliveryCityId", v ?? "")
                 }}
               >
-                <SelectTrigger id={`city-${p.id}`} className="w-full">
+                <SelectTrigger
+                  id={`city-${p.id}`}
+                  data-testid="delivery-city"
+                  className="w-full"
+                >
                   <SelectValue placeholder="Select city" />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,6 +143,7 @@ export function ParcelCard({
               <Label htmlFor={`address-${p.id}`}>Delivery address</Label>
               <Input
                 id={`address-${p.id}`}
+                data-testid="delivery-address"
                 value={p.deliveryAddress}
                 onChange={(e) =>
                   updateParcel(p.id, "deliveryAddress", e.target.value)
@@ -152,6 +159,7 @@ export function ParcelCard({
               </Label>
               <Input
                 id={`map-${p.id}`}
+                data-testid="delivery-map"
                 type="url"
                 value={p.deliveryMapLink}
                 onChange={(e) =>
@@ -171,7 +179,11 @@ export function ParcelCard({
                   updateParcel(p.id, "pickupLocationId", v ?? "")
                 }
               >
-                <SelectTrigger id={`pickup-${p.id}`} className="w-full">
+                <SelectTrigger
+                  id={`pickup-${p.id}`}
+                  data-testid="pickup-location"
+                  className="w-full"
+                >
                   <SelectValue placeholder="Select pickup location">
                     {(value) => {
                       const loc = myLocations.find((l) => l.id === value)
@@ -193,6 +205,7 @@ export function ParcelCard({
               <Label htmlFor={`weight-${p.id}`}>Parcel weight (KG)</Label>
               <Input
                 id={`weight-${p.id}`}
+                data-testid="parcel-weight"
                 type="text"
                 inputMode="decimal"
                 pattern="[0-9]*\.?[0-9]*"
@@ -207,6 +220,7 @@ export function ParcelCard({
               <Label htmlFor={`cost-${p.id}`}>COD amount (TK)</Label>
               <Input
                 id={`cost-${p.id}`}
+                data-testid="product-cost"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"

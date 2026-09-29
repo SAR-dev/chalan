@@ -2069,7 +2069,7 @@ SELECT cron.unschedule('cleanup-sessions');
 
 ## Docker deployment
 
-The `docker/Dockerfile` produces a multi-stage, minimal image based on Node 22 Alpine.
+The `docker/Dockerfile` produces a multi-stage, minimal image based on Node 24 Alpine.
 Two compose files support different deployment modes from the same image:
 
 | Mode            | Compose file                  | Database                                          |

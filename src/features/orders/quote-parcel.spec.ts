@@ -12,12 +12,13 @@ const deliveryCities = [
   { id: "CTY-C", name: "Sylhet", zoneId: "ZN-3" },
 ]
 
-const merchant = {
+const platformDefaults = {
   baseRate: 60,
   extraRatePerKg: 20,
   freeWeightKg: 2,
   maxWeightKg: 30,
   codFeePercentage: 1,
+  cancellationFee: 5,
 }
 
 /** Dhaka (ZN-1) → Chattogram (ZN-2). */
@@ -31,7 +32,7 @@ const zonePricing = [
     freeWeightKg: 5,
     maxWeightKg: 25,
     codFeePercentage: 2,
-    cancellationFee: 0,
+    cancellationFee: 8,
   },
 ]
 
@@ -44,13 +45,14 @@ function args(overrides: Partial<ParcelQuoteArgs> = {}): ParcelQuoteArgs {
     pickupLocations,
     deliveryCities,
     zonePricing,
-    currentMerchant: merchant,
+    platformDefaults,
+    maxWeightKg: 30,
     ...overrides,
   }
 }
 
 describe("quoteParcel", () => {
-  it("falls back to the merchant's flat rate when there is no zone pricing", () => {
+  it("falls back to platform defaults when there is no zone pricing", () => {
     const quote = quoteParcel(args({ zonePricing: [] }))
     expect(quote.isZonePricing).toBe(false)
     expect(quote.breakdown).toEqual({
@@ -61,6 +63,7 @@ describe("quoteParcel", () => {
       exceedsMax: false,
     })
     expect(quote.deliveryCharge).toBe(60)
+    expect(quote.cancellationFee).toBe(5)
   })
 
   it("uses the origin→destination zone price when it matches", () => {
@@ -69,26 +72,33 @@ describe("quoteParcel", () => {
     // 100 base + ceil(6 − 5) × 30
     expect(quote.deliveryCharge).toBe(130)
     expect(quote.breakdown?.baseRate).toBe(100)
+    expect(quote.cancellationFee).toBe(8)
   })
 
-  it("falls back to merchant pricing when the destination has no zone price", () => {
+  it("falls back to platform defaults when the destination has no zone price", () => {
     const quote = quoteParcel(args({ deliveryCityId: "CTY-C" }))
     expect(quote.isZonePricing).toBe(false)
     expect(quote.deliveryCharge).toBe(60)
   })
 
-  it("flags an overweight parcel against the applied pricing", () => {
-    const merchantQuote = quoteParcel(
+  it("flags an overweight parcel against the rate's own max", () => {
+    const platformQuote = quoteParcel(
       args({ zonePricing: [], parcelWeightKg: "31" }),
     )
-    expect(merchantQuote.exceedsMax).toBe(true)
+    expect(platformQuote.exceedsMax).toBe(true)
 
     const zoneQuote = quoteParcel(args({ parcelWeightKg: "26" }))
     expect(zoneQuote.exceedsMax).toBe(true)
     expect(zoneQuote.isZonePricing).toBe(true)
   })
 
-  it("charges the COD fee at the merchant percentage without a zone price", () => {
+  it("flags a parcel over the merchant's limit even when the rate allows it", () => {
+    const quote = quoteParcel(args({ maxWeightKg: 5, parcelWeightKg: "6" }))
+    expect(quote.maxWeightKg).toBe(5)
+    expect(quote.exceedsMax).toBe(true)
+  })
+
+  it("charges the COD fee at the platform percentage without a zone price", () => {
     const quote = quoteParcel(args({ zonePricing: [], productCost: "2000" }))
     expect(quote.productCost).toBe(2000)
     expect(quote.codFee).toBe(20)
@@ -110,9 +120,9 @@ describe("quoteParcel", () => {
     expect(quote.exceedsMax).toBe(false)
   })
 
-  it("quotes nothing when there is no merchant and no zone price", () => {
+  it("quotes nothing when there is no platform default and no zone price", () => {
     const quote = quoteParcel(
-      args({ zonePricing: [], currentMerchant: null, parcelWeightKg: "10" }),
+      args({ zonePricing: [], platformDefaults: null, parcelWeightKg: "10" }),
     )
     expect(quote.breakdown).toBeNull()
     expect(quote.deliveryCharge).toBe(0)

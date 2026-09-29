@@ -9,7 +9,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core"
 import { merchantStatuses } from "./enums"
-import { money, ts } from "./helpers"
+import { ts } from "./helpers"
 import { deliveryCity } from "./logistics"
 
 // =============================================================================
@@ -46,16 +46,10 @@ export const merchant = pgTable(
     status: text("status", { enum: merchantStatuses })
       .notNull()
       .default("PENDING"),
-    // Delivery pricing — set by an Admin after approval.
-    baseRate: money("baseRate").notNull().default(0),
-    extraRatePerKg: money("extraRatePerKg").notNull().default(0),
+    // Max parcel weight this merchant may ship — set by an Admin. Delivery,
+    // COD and cancellation fees come from zone pricing (platform defaults as
+    // the fallback), not from per-merchant rates.
     maxWeightKg: doublePrecision("maxWeightKg").notNull().default(3),
-    freeWeightKg: doublePrecision("freeWeightKg").notNull().default(1),
-    // COD fee percentage (per merchant, default 1%)
-    codFeePercentage: doublePrecision("codFeePercentage").notNull().default(1),
-    // Per-merchant cancellation fee fallback (0 = inherit the platform default).
-    // Zone-pair pricing still wins; this mirrors how baseRate etc. fall back.
-    cancellationFee: money("cancellationFee").notNull().default(0),
     // Moderator quota (ROADMAP 5.2): how many ACTIVE+PENDING staff logins the
     // owner may hold. SUPER_ADMIN-managed (0 = moderators disabled).
     maxModerators: integer("maxModerators").notNull().default(3),
@@ -82,8 +76,8 @@ export const merchant = pgTable(
     nidRejectedAt: ts("nidRejectedAt"),
     nidRejectedBy: text("nidRejectedBy"),
     nidRejectionReason: text("nidRejectionReason"),
-    // Branding — merchant-specific customizations for white-label display.
-    logoUrl: text("logoUrl"),
+    // Branding — merchant-specific color + platform-branding toggle. The
+    // business name is the brand mark (no logos).
     brandColor: text("brandColor"),
     hidePlatformBranding: boolean("hidePlatformBranding")
       .notNull()

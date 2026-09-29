@@ -1,9 +1,17 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
+import {
+  deliveryCities,
+  dialog,
+  merchants,
+  onboarding,
+  register,
+  riderApplication,
+} from "../selectors"
 
 async function skipOnboardingIfNeeded(page: any) {
   if (page.url().includes("/welcome")) {
-    await page.getByRole("button", { name: /skip for now/i }).click()
+    await page.locator(onboarding.skip).click()
     await page.waitForURL(/\/merchant/, { timeout: 15_000 })
     await waitForAppReady(page)
   }
@@ -15,9 +23,7 @@ test.describe("S2. Merchant Onboarding", () => {
     await page.goto("/register")
     await waitForAppReady(page)
     // Verify registration form exists
-    await expect(
-      page.getByText(/register|create.*account/i).first(),
-    ).toBeVisible()
+    await expect(page.locator(register.form)).toBeVisible()
   })
 
   test("registered merchant sees pending status", async ({ page }) => {
@@ -109,11 +115,11 @@ test.describe("S14. Delivery City Management", () => {
     await expect(page.getByRole("heading").first()).toBeVisible()
 
     // Click Add City button
-    const addBtn = page.getByRole("button", { name: /add.*city/i })
+    const addBtn = page.locator(deliveryCities.addButton)
     if (await addBtn.isVisible()) {
       await addBtn.click()
       // Dialog should open
-      await expect(page.getByRole("dialog")).toBeVisible()
+      await expect(page.locator(dialog.formDialog)).toBeVisible()
     }
   })
 })
@@ -124,10 +130,10 @@ test.describe("S15. Rider Application", () => {
     await page.goto("/apply/rider")
     await waitForAppReady(page)
     // Verify form fields exist
-    await expect(page.getByLabel(/name/i)).toBeVisible()
-    await expect(page.getByLabel(/email/i)).toBeVisible()
-    await expect(page.getByLabel(/phone/i)).toBeVisible()
-    await expect(page.getByRole("button", { name: /print/i })).toBeVisible()
+    await expect(page.locator(riderApplication.name)).toBeVisible()
+    await expect(page.locator(riderApplication.email)).toBeVisible()
+    await expect(page.locator(riderApplication.phone)).toBeVisible()
+    await expect(page.locator(riderApplication.print)).toBeVisible()
   })
 })
 
@@ -164,10 +170,7 @@ test.describe("S23. Merchant Balance & Payment", () => {
     await page.goto("/dashboard/merchants")
     await waitForAppReady(page)
     // Click on a merchant to view their balance
-    const row = page
-      .getByRole("row")
-      .filter({ hasText: /merchant/i })
-      .first()
+    const row = page.locator(merchants.firstRow).first()
     if (await row.isVisible()) {
       await row.click()
       await waitForAppReady(page)
@@ -207,10 +210,7 @@ test.describe("S31. Admin Merchant Management", () => {
     await expect(page.getByRole("heading").first()).toBeVisible()
 
     // Click on first merchant row
-    const row = page
-      .getByRole("row")
-      .filter({ hasText: /merchant/i })
-      .first()
+    const row = page.locator(merchants.firstRow).first()
     if (await row.isVisible()) {
       await row.click()
       await waitForAppReady(page)

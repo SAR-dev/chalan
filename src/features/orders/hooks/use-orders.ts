@@ -293,8 +293,11 @@ export function useOrders({
     [patchOrder],
   )
   const markOrderPickedUp = useCallback(
-    (orderId: string, proofRefs: string[]) =>
-      patchOrder(orderId, "picked-up", { proofRefs }),
+    (orderId: string, proofRefs: string[], parcelWeightKg?: number) =>
+      patchOrder(orderId, "picked-up", {
+        proofRefs,
+        ...(parcelWeightKg !== undefined ? { parcelWeightKg } : {}),
+      }),
     [patchOrder],
   )
   const receiveOrderAtWarehouse = useCallback(

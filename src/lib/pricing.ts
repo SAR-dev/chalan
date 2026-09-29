@@ -1,6 +1,5 @@
 import { toPaisa } from "@/lib/balance-ledger"
 import { CURRENCY_SUFFIX } from "@/lib/constants"
-import type { Merchant } from "@/lib/types"
 
 export interface DeliveryChargeBreakdown {
   baseRate: number
@@ -8,6 +7,14 @@ export interface DeliveryChargeBreakdown {
   extraWeightCharge: number
   total: number
   exceedsMax: boolean
+}
+
+/** The rate fields a delivery charge needs (zone-pair row or platform default). */
+export interface DeliveryRate {
+  baseRate: number
+  extraRatePerKg: number
+  freeWeightKg: number
+  maxWeightKg: number
 }
 
 /**
@@ -18,10 +25,7 @@ export interface DeliveryChargeBreakdown {
  * - orders above `maxWeightKg` are rejected
  */
 export function calcDeliveryCharge(
-  pricing: Pick<
-    Merchant,
-    "baseRate" | "extraRatePerKg" | "freeWeightKg" | "maxWeightKg"
-  >,
+  pricing: DeliveryRate,
   weightKg: number,
 ): DeliveryChargeBreakdown {
   const exceedsMax = weightKg > pricing.maxWeightKg

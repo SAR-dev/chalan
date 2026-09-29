@@ -11,7 +11,6 @@ export interface OrderEmailData {
   merchantName: string
   recipientName: string
   deliveryAddress: string
-  logoUrl?: string
   brandColor?: string
   hidePlatformBranding?: boolean
 }
@@ -20,7 +19,6 @@ export interface MerchantEmailData {
   ownerName: string
   businessName: string
   verificationUrl?: string
-  logoUrl?: string
   brandColor?: string
   hidePlatformBranding?: boolean
 }
@@ -29,22 +27,16 @@ export interface MerchantVerifyEmailData {
   ownerName: string
   businessName: string
   verificationUrl: string
-  logoUrl?: string
   brandColor?: string
   hidePlatformBranding?: boolean
 }
 
 /** Fields every merchant-scoped template threads into the shared builder. */
 function brandFields(data: {
-  logoUrl?: string
   brandColor?: string
   hidePlatformBranding?: boolean
-  businessName?: string
-  merchantName?: string
 }) {
   return {
-    logoUrl: data.logoUrl,
-    logoAlt: data.businessName ?? data.merchantName ?? siteConfig.name,
     brandColor: data.brandColor,
     hidePlatformBranding: data.hidePlatformBranding,
   }
@@ -72,8 +64,6 @@ const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? ""
 const DEFAULT_ACCENT = "#2563eb"
 
 interface RenderOptions {
-  logoUrl?: string
-  logoAlt?: string
   brandColor?: string
   hidePlatformBranding?: boolean
 }
@@ -92,9 +82,7 @@ async function renderEmail(
     opts?.brandColor && isValidHexColor(opts.brandColor)
       ? opts.brandColor.trim()
       : DEFAULT_ACCENT
-  const logoHtml = opts?.logoUrl
-    ? `<mj-text padding="0"><img src="${esc(opts.logoUrl)}" alt="${esc(opts.logoAlt ?? brand)}" height="32" style="height:32px" /></mj-text>`
-    : `<mj-text font-size="14px" color="#6b7280">${brand}</mj-text>`
+  const brandHtml = `<mj-text font-size="14px" color="#6b7280">${brand}</mj-text>`
   const footer = opts?.hidePlatformBranding
     ? ""
     : `
@@ -114,7 +102,7 @@ async function renderEmail(
   <mj-body background-color="#ffffff" width="480px">
     <mj-section padding="32px 24px 8px">
       <mj-column>
-        ${logoHtml}
+        ${brandHtml}
         <mj-text font-size="20px" font-weight="bold" padding-top="4px" color="${accent}">${esc(status)}</mj-text>
       </mj-column>
     </mj-section>
@@ -169,8 +157,6 @@ interface EmailTemplate {
   rows?: [string, string][]
   cta?: { href: string; label: string }
   footnote?: string
-  logoUrl?: string
-  logoAlt?: string
   brandColor?: string
   hidePlatformBranding?: boolean
 }
@@ -183,8 +169,6 @@ async function buildTemplate(t: EmailTemplate) {
       ? t.brandColor.trim()
       : DEFAULT_ACCENT
   const opts: RenderOptions = {
-    logoUrl: t.logoUrl,
-    logoAlt: t.logoAlt,
     brandColor: t.brandColor,
     hidePlatformBranding: t.hidePlatformBranding,
   }

@@ -10,6 +10,7 @@ import {
   merchantQuota,
   moderators,
   nav,
+  onboarding,
   orders,
   team,
 } from "../selectors"
@@ -20,7 +21,7 @@ import {
 async function skipOnboardingIfNeeded(page: Page) {
   await page.goto("/merchant")
   await waitForAppReady(page).catch(() => {})
-  const skip = page.getByRole("button", { name: /skip for now/i })
+  const skip = page.locator(onboarding.skip)
   try {
     await skip.waitFor({ state: "visible", timeout: 5_000 })
   } catch {
@@ -279,7 +280,9 @@ test.describe("S41. Merchant moderator accounts", () => {
     })
     await page.waitForURL("**/merchant/orders")
     await page.locator(orders.merchantOrdersSearch).fill("E2E Mod Order")
-    await expect(page.getByText(recipient).first()).toBeVisible({
+    await expect(
+      page.locator(orders.merchantTable).getByText(recipient).first(),
+    ).toBeVisible({
       timeout: 15_000,
     })
   })
@@ -323,11 +326,11 @@ test.describe("S42. Warehouse admin activation", () => {
     await waitForAppReady(page)
 
     // Create a Warehouse Admin with a temporary password.
-    await page.getByRole("button", { name: /create warehouse admin/i }).click()
-    await page.getByLabel("Full name").fill("E2E Warehouse Admin")
-    await page.getByLabel("Email").fill(WA_EMAIL)
-    await page.getByLabel("Phone").fill(`017${String(stamp).slice(-8)}`)
-    await page.getByLabel("Temporary password").fill(WA_PASSWORD)
+    await page.locator(team.createOpen).click()
+    await page.locator(team.nameInput).fill("E2E Warehouse Admin")
+    await page.locator(team.emailInput).fill(WA_EMAIL)
+    await page.locator(team.phoneInput).fill(`017${String(stamp).slice(-8)}`)
+    await page.locator(team.passwordInput).fill(WA_PASSWORD)
     await page.locator(team.createSubmit).click()
     await expect(
       toast(page, "Warehouse Admin created. Activation email sent."),

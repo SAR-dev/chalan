@@ -248,6 +248,7 @@ export default function RegisterPage() {
                       <Label htmlFor="businessName">Business name</Label>
                       <Input
                         id="businessName"
+                        data-testid="register-business-name"
                         placeholder="Threadline Apparel"
                         value={form.businessName}
                         onChange={(e) => update("businessName", e.target.value)}
@@ -308,6 +309,7 @@ export default function RegisterPage() {
                         <Label htmlFor="email">Email</Label>
                         <Input
                           id="email"
+                          data-testid="register-email"
                           type="email"
                           placeholder="you@business.com"
                           value={form.email}
