@@ -132,7 +132,7 @@ describe("numeric parsing", () => {
   })
 })
 
-describe("note auto-tag (§7)", () => {
+describe("note auto-tag", () => {
   it("tags an empty note with today's CSV import marker", () => {
     const [resolved] = resolveRows([validRow({ merchant_note: "" })], lookups)
     expect(resolved.errors).toEqual([])

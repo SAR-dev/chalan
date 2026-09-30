@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { pageContent } from "@/config/content"
 import { CreateMailConfigDialog } from "@/features/platform-config/dialogs/create-mail-config-dialog"
@@ -101,8 +102,6 @@ export default function DashboardSettingsPage() {
   useEffect(() => {
     loadMailConfigs()
   }, [])
-
-  if (isLoading) return null
 
   async function handleSave() {
     setSaving(true)
@@ -302,27 +301,49 @@ export default function DashboardSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <div>
-              <Label htmlFor="refund-on-cancel">
-                Refund fees on cancellation
-              </Label>
-              <p className="text-muted-foreground text-xs">
-                When off, a cancelled order keeps its delivery and COD fees.
-              </p>
+          {isLoading ? (
+            // Withheld, not blanked. The header, the card title and the
+            // description are true the moment the page mounts, so rendering
+            // them costs nothing and keeps the layout from jumping. What
+            // cannot be shown is the switch: `refundOnCancel` starts at its
+            // optimistic default, and before `/api/platform-config` resolves
+            // it would display a policy the server may not hold. One
+            // placeholder row is the honest minimum.
+            <div
+              className="flex items-center justify-between gap-4 rounded-lg border p-3"
+              data-testid="cancellation-policy-loading"
+            >
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-64" />
+              </div>
+              <Skeleton className="h-6 w-11" />
             </div>
-            <Switch
-              id="refund-on-cancel"
-              data-testid="refund-on-cancel-switch"
-              checked={refundOnCancel}
-              onCheckedChange={(v) => setRefundOnCancel(v)}
-            />
-          </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div>
+                <Label htmlFor="refund-on-cancel">
+                  Refund fees on cancellation
+                </Label>
+                <p className="text-muted-foreground text-xs">
+                  When off, a cancelled order keeps its delivery and COD fees.
+                </p>
+              </div>
+              <Switch
+                id="refund-on-cancel"
+                data-testid="refund-on-cancel-switch"
+                checked={refundOnCancel}
+                onCheckedChange={(v) => setRefundOnCancel(v)}
+              />
+            </div>
+          )}
         </CardContent>
         <CardFooter className="justify-end">
           <Button
             onClick={handleSave}
-            disabled={saving}
+            // A save before the config arrives would write a value the client
+            // guessed rather than one the admin read off the switch.
+            disabled={saving || isLoading}
             data-testid="save-policy"
           >
             {saving ? (

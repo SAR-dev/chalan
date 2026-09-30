@@ -7,6 +7,7 @@ import {
   orders,
   register,
   riderApplication,
+  riders,
 } from "../selectors"
 
 // ─── S2. Merchant Registration ─────────────────────────────────────────────────
@@ -210,7 +211,35 @@ test.describe("S32. Admin Rider Management", () => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/riders")
     await waitForAppReady(page)
-    await expect(page.getByRole("heading").first()).toBeVisible()
+    await expect(page.locator(riders.table)).toBeVisible()
+
+    // The list is server-sorted by `createdAt` desc, so an individual rider is
+    // not guaranteed to be on the first page. Search narrows to the seeded
+    // rider, which puts its row at a known address.
+    await page.locator(riders.search).fill("Rider 1")
+    const row = page.locator(riders.row("RID-100001E"))
+    await expect(row).toBeVisible()
+
+    // The vehicle column the admin reads before assigning a parcel. RID-100001E
+    // is seeded with a motorbike + plate, so this asserts the column renders a
+    // real value rather than only that a row exists.
+    await expect(row.locator(riders.vehicleCell)).toContainText("Motorbike")
+    await expect(row.locator(riders.vehicleCell)).toContainText("DHAKA-11111")
+  })
+
+  test("riders with no vehicle are labelled, not left blank", async ({
+    page,
+  }) => {
+    await login(page, CREDS.superAdmin)
+    await page.goto("/dashboard/riders")
+    await waitForAppReady(page)
+    await page.locator(riders.search).fill("Rider 5")
+
+    // Only riders 1-3 are seeded with a vehicle. A blank cell would be
+    // indistinguishable from one that failed to load, so the gap is labelled.
+    const row = page.locator(riders.row("RID-100005E"))
+    await expect(row).toBeVisible()
+    await expect(row.locator(riders.vehicleCell)).toContainText("Not recorded")
   })
 
   test("admin can view rider applications", async ({ page }) => {

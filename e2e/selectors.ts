@@ -118,7 +118,7 @@ export const orders = {
   searchInput: "[data-testid='orders-search']",
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
   tab: (name: string) => `[data-testid='tab-${name}']`,
-  // CSV bulk import (§5 of docs/CSV-IMPORT.md)
+  // CSV bulk import — the page and its testids.
   bulkImportOpen: "[data-testid='bulk-import-open']",
   bulkImportTemplate: "[data-testid='bulk-import-template']",
   bulkImportFile: "[data-testid='bulk-import-file']",
@@ -165,8 +165,14 @@ export const merchants = {
 
 // ─── Riders ──────────────────────────────────────────────────────────────────
 export const riders = {
-  table: "[data-testid='riders-table']",
-  row: (id: string) => `[data-testid='rider-row-${id}']`,
+  // The DataTable derives these from `id="dashboard-riders"` and
+  // `getRowKey={(r) => r.id}`: the table is `table-<id>` and each `<tr>` is
+  // `row-<id>-<rowKey>`. Both values were previously hardcoded to
+  // `riders-table` / `rider-row-<id>`, which exist nowhere in `src/` — a
+  // selector nothing can ever satisfy.
+  table: "[data-testid='table-dashboard-riders']",
+  row: (id: string) => `[data-testid='row-dashboard-riders-${id}']`,
+  search: "[data-testid='table-search-dashboard-riders']",
   // Vehicle: type + registration number, set by an admin. Displayed on the list
   // and in the assign-rider dialogs so an admin can see who can take what.
   // `vehicleCell` repeats per row — always scope it inside `row(id)`.

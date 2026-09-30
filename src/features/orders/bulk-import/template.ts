@@ -1,7 +1,11 @@
 /**
- * CSV import template format. The canonical column order (§3.2), the forgiving
- * header aliases (§3.3), and the two CSV builders (template + error export).
+ * CSV import template format. The canonical column order, the forgiving
+ * header aliases, and the two CSV builders (template + error export).
  * Parsing lives in `csv-parse.ts`; row resolution in `resolve-rows.ts`.
+ *
+ * This file is the specification: there is no separate document. The column
+ * list, the aliases and the required/optional split all live below, and the
+ * tests in `template.spec.ts` pin them.
  */
 
 import { toCsv } from "@/lib/csv"
@@ -94,7 +98,7 @@ export function resolveImportHeader(header: string): OrderImportHeader | null {
   return headerAliases[normalized] ?? null
 }
 
-/** Used when the merchant has no pickup locations yet (§3.1). */
+/** Used when the merchant has no pickup locations yet. */
 export const PLACEHOLDER_PICKUP_LOCATION = "MY PICKUP LOCATION"
 
 export interface TemplateSample {

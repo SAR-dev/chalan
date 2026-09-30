@@ -164,10 +164,6 @@ read-only visibility**, not a verification step.
 - [ ] `reuseExistingServer` is `true` locally, so a stray `pnpm start` makes
       Playwright **skip `db:seed:full`**. Stop any running server before
       `pnpm test:e2e`, or tests may pass against stale data.
-- [ ] A `docs/CSV-IMPORT.md` still does not exist — `bulk-import/template.tsx`
-      refers to sections of it (§3.2, §3.4, §6, §7) that were never written.
-      `item_type` should be part of that write-up, but writing the spec is its
-      own piece of work, not a follow-up to this one.
 
 ## Verification
 

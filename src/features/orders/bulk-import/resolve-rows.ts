@@ -1,9 +1,9 @@
 /**
- * Row resolution and validation for bulk order import (§6). Pure module: the
+ * Row resolution and validation for bulk order import. Pure module: the
  * import page injects the lookup maps (pickup locations, active cities). Each
- * row is normalized per §3.2, mapped to IDs, auto-tagged per §7, then validated
- * with `orderCreateSchema`; errors come back as `Row N: ...` instructions via
- * the `formatError` pattern.
+ * row is normalized, mapped to IDs, auto-tagged with the import marker, then
+ * validated with `orderCreateSchema`; errors come back as `Row N: ...`
+ * instructions via the `formatError` pattern.
  *
  * Note what is NOT here: any weight limit. The limit belongs to the lane
  * (`zone_pricing.maxWeightKg`) and depends on both endpoints of the row, so it
@@ -237,7 +237,7 @@ export function resolveRow(
   return { line, raw: values, input, errors, fieldErrors }
 }
 
-/** Normalizes, resolves and validates every parsed row against §6. */
+/** Normalizes, resolves and validates every parsed row in one pass. */
 export function resolveRows(
   rows: RawOrderRow[],
   lookups: ResolveLookups,

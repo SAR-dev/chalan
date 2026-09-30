@@ -56,10 +56,11 @@ test.describe("S63. Settings — cancellation policy", () => {
   }) => {
     await login(page, CREDS.superAdmin)
 
-    // The page renders nothing until `/api/platform-config` resolves — it cannot
-    // show a truthful toggle state before then. Arm the listener BEFORE the
-    // navigation so the response cannot be missed, and fail with a precise
-    // timeout if the request never happens at all.
+    // The page renders a placeholder switch until `/api/platform-config`
+    // resolves — it cannot show a truthful toggle state before then, so only
+    // that row is withheld (the header and card still render). Arm the
+    // listener BEFORE the navigation so the response cannot be missed, and
+    // fail with a precise timeout if the request never happens at all.
     const loaded = page.waitForResponse(
       (res) =>
         res.url().includes("/api/platform-config") && res.status() === 200,
@@ -89,8 +90,8 @@ test.describe("S63. Settings — cancellation policy", () => {
       await expect(toast(page, "Cancellation policy updated.")).toBeVisible()
     }
 
-    // Normalise to ON first. The page only renders the card once the config has
-    // loaded, so the switch shows the authoritative value — which means the save
+    // Normalise to ON first. The page only renders the switch once the config
+    // has loaded, so it shows the authoritative value — which means the save
     // below always writes a value opposite to the one it started from, and the
     // reload can only read it back if the write actually persisted.
     if ((await toggle.getAttribute("aria-checked")) !== "true") {

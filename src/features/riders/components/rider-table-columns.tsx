@@ -112,11 +112,15 @@ export function useRiderColumns({
       if (!vehicle) {
         // Spelled out rather than an em dash: a dash here is indistinguishable
         // from "no vehicle" vs "column too narrow to show", and an admin
-        // scanning for who can take a van needs to see the gap.
+        // scanning for who can take a van needs to see the gap. Wrapped in the
+        // same testid as the populated branch so a row can be located either
+        // way — otherwise "Not recorded" is the one cell with no address.
         return (
-          <CellContent className="text-muted-foreground">
-            Not recorded
-          </CellContent>
+          <span data-testid="rider-vehicle-cell" className="block">
+            <CellContent className="text-muted-foreground">
+              Not recorded
+            </CellContent>
+          </span>
         )
       }
       return (
