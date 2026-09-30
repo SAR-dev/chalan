@@ -5,6 +5,16 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: no job here needs to write to the repo.
+permissions:
+  contents: read
+
+# A newer push to the same ref supersedes the in-flight run instead of queueing
+# behind it, so rapid pushes don't stack full runs and burn runner minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NEXT_PUBLIC_ENV: development
   NEXT_PUBLIC_SITE_URL: http://localhost:3000
@@ -46,20 +56,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test:unit:run
-
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -69,6 +68,24 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Smoke the built artifact: a build that compiles but cannot boot is caught
+      # here rather than only in the (currently disabled) e2e job. /api/health is
+      # deliberately DB-free, so this needs no database.
+      - name: Smoke test the built app
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+          BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          NEXT_PUBLIC_ENV: development
+        run: |
+          pnpm start &
+          SERVER_PID=$!
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:3000/api/health
+          kill "$SERVER_PID"
 
   security:
     runs-on: ubuntu-latest
@@ -105,8 +122,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Fails if statements/branches/functions/lines fall below the floors in
-      # vitest.config.ts, so coverage cannot silently regress (ROADMAP P3).
+      # Runs the whole unit suite AND enforces the floors in vitest.config.ts, so
+      # it supersedes a separate `pnpm test:unit:run` job (same tests, plus the
+      # regression gate) — one fewer full install + transform per run.
       - run: pnpm test:coverage
       - uses: actions/upload-artifact@v4
         if: failure()

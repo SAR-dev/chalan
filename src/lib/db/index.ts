@@ -9,9 +9,19 @@ import * as schema from "./schema.postgres"
 // stays authoritative regardless, but this keeps ad-hoc SQL consistent too.
 const SESSION_TIMEZONE = `-c timezone=${BUSINESS_TIMEZONE}`
 
+// A pool per process. `max` is the *per-process* ceiling, so the effective
+// connection count is `max × instances` — keep it modest for serverless, where
+// many short-lived instances each open their own pool and would otherwise
+// exhaust Postgres. A long-lived container (or a pooled serverless setup via
+// DATABASE_URL pointing at PgBouncer/Supavisor) can afford more.
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
+)
+const POOL_MAX = IS_SERVERLESS ? 5 : 20
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,
+  max: POOL_MAX,
   idleTimeoutMillis: 10_000,
   options: SESSION_TIMEZONE,
 })
@@ -25,6 +35,8 @@ const readUrl = process.env.DATABASE_URL_READ_ONLY
 export const readPool = readUrl
   ? new Pool({
       connectionString: readUrl,
+      max: POOL_MAX,
+      idleTimeoutMillis: 10_000,
       options: SESSION_TIMEZONE,
     })
   : pool

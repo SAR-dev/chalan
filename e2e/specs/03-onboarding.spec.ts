@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
+import { nav } from "../selectors"
 
 // ─── Onboarding Flow ─────────────────────────────────────────────────────────
 test.describe("S35. Merchant Onboarding Flow", () => {
@@ -40,8 +41,8 @@ test.describe("S35. Merchant Onboarding Flow", () => {
 
     // Verify we're on /merchant — NOT /welcome (onboarding guard) and NOT /login (auth guard)
     expect(page.url()).toMatch(/\/merchant/)
-    // Verify the page has merchant content (not an error page)
-    await expect(page.locator("text=Dashboard").first()).toBeVisible({
+    // Verify the page has merchant content (not an error page).
+    await expect(page.locator(nav.sidebarLink("Dashboard"))).toBeVisible({
       timeout: 5000,
     })
   })

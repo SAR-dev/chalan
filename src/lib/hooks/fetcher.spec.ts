@@ -16,7 +16,9 @@ describe("ApiError", () => {
 
 describe("RESOURCE_KEYS", () => {
   it("contains resource keys", () => {
-    expect(RESOURCE_KEYS).toHaveLength(10)
+    // Every entry must be a real, paginated endpoint the aggregator can probe.
+    expect(RESOURCE_KEYS).toHaveLength(9)
+    expect(RESOURCE_KEYS).not.toContain("/api/security-config")
   })
 
   it("all start with /api/", () => {

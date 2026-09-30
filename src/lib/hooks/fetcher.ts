@@ -6,7 +6,8 @@ import type { SWRConfiguration } from "swr"
 export class ApiError extends Error {}
 
 // Every resource endpoint the old loadAll() fetched, in one place. Used by the
-// data-error aggregator to subscribe to / revalidate the full set.
+// data-error aggregator to subscribe to / revalidate the full set. All of these
+// are paginated list endpoints, so the aggregator probes them with `limit=1`.
 export const RESOURCE_KEYS = [
   "/api/team",
   "/api/merchants",
@@ -15,14 +16,13 @@ export const RESOURCE_KEYS = [
   "/api/pickup-locations",
   "/api/riders",
   "/api/warehouses",
-  "/api/security-config",
   "/api/audit-logs",
   "/api/email-logs",
 ] as const
 
 // Shared fetcher for every resource hook. Throws on non-2xx so SWR surfaces
 // the failure through its `error` channel (mirrors the old loadAll() behavior
-// of treating any failed response as a failed load).\
+// of treating any failed response as a failed load).
 export async function jsonFetcher<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" })
   if (!res.ok) {

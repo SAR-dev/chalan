@@ -93,9 +93,13 @@ export const orders = {
   table: "[data-testid='table-dashboard-orders']",
   merchantTable: "[data-testid='table-merchant-orders']",
   row: (id: string) => `[data-testid='order-row-${id}']`,
+  rowPrefix: "[data-testid^='order-row-']",
   createButton: "[data-testid='create-order']",
   approveButton: "[data-testid='approve-order']",
+  // The order detail page (`/merchant/orders/<code>`) owns the cancel flow.
   cancelOrderButton: "[data-testid='cancel-order']",
+  cancelOrderSubmit: "[data-testid='cancel-order-submit']",
+  cancelReasonInput: "[data-testid='cancel-reason-input']",
   bulkApprove: "[data-testid='bulk-approve']",
   bulkCancel: "[data-testid='bulk-cancel']",
   selectAll: "[data-testid='select-all']",

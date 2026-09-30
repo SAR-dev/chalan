@@ -13,6 +13,21 @@ import { formatError } from "@/lib/validation"
 
 const KEY = "/api/orders"
 
+/**
+ * SWR keys that go stale when an order changes. Beyond the order lists
+ * themselves (the `KEY` prefix also covers `/api/orders/counts` and
+ * `/api/orders/payable`), an order moves money and consumes package quota, so
+ * merchant balance and the package catalogue must be revalidated too — otherwise
+ * the balance and "orders used" figures stay stale until a manual refresh.
+ */
+function isOrderRelatedKey(key: string): boolean {
+  return (
+    key.startsWith(KEY) ||
+    key.startsWith("/api/merchants") ||
+    key.startsWith("/api/packages")
+  )
+}
+
 type Result = { ok: boolean; error?: string }
 
 type BulkAction =
@@ -177,12 +192,7 @@ export function useOrders({
               ),
             }) as PaginatedResponse<Order>,
         )
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch (err) {
         if (err instanceof ApiError) return { ok: false, error: err.message }
@@ -208,12 +218,7 @@ export function useOrders({
         if (!res.ok) {
           return { ok: false, error: data?.error ?? "Bulk action failed." }
         }
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch {
         return { ok: false, error: "Network error. Please try again." }
@@ -237,12 +242,7 @@ export function useOrders({
         return { ok: false, error: msg }
       }
       await mutate()
-      _globalMutate(
-        (key: string) =>
-          key.startsWith(KEY) ||
-          key.startsWith(`${KEY}/counts`) ||
-          key.startsWith(`${KEY}/payable`),
-      ).catch(() => {})
+      _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
       return { ok: true, order: resData }
     },
     [mutate, _globalMutate],
@@ -274,12 +274,7 @@ export function useOrders({
         }
       }
       await mutate()
-      _globalMutate(
-        (key: string) =>
-          key.startsWith(KEY) ||
-          key.startsWith(`${KEY}/counts`) ||
-          key.startsWith(`${KEY}/payable`),
-      ).catch(() => {})
+      _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
       return { ok: true, orders: resData }
     },
     [mutate, _globalMutate],
@@ -412,12 +407,7 @@ export function useOrders({
             revalidate: false,
           },
         )
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch (err) {
         if (err instanceof ApiError) return { ok: false, error: err.message }
@@ -466,12 +456,7 @@ export function useOrders({
             revalidate: false,
           },
         )
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch (err) {
         if (err instanceof ApiError) return { ok: false, error: err.message }

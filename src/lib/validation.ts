@@ -716,3 +716,50 @@ export const userBanSchema = z.object({
     .max(365, "Duration cannot exceed 365 days")
     .optional(),
 })
+
+// ---------------------------------------------------------------------------
+// Mail configuration
+// ---------------------------------------------------------------------------
+
+export const createMailConfigSchema = z.object({
+  label: z.string().min(1, "Label is required"),
+  host: z.string().min(1, "Host is required"),
+  port: z.string().min(1, "Port is required"),
+  secure: z.boolean(),
+  user: z.string().min(1, "User is required"),
+  pass: z.string().min(1, "Password is required"),
+  fromEmail: z.string().email("Invalid email"),
+  fromName: z.string().min(1, "From name is required"),
+})
+
+/** Diagnostic send from the Add Config dialog, before the config is saved. */
+export const testMailSchema = z.object({
+  host: z.string().min(1, "Host is required"),
+  port: z.string().min(1, "Port is required"),
+  secure: z.boolean(),
+  user: z.string().min(1, "User is required"),
+  pass: z.string().min(1, "Password is required"),
+  fromEmail: z.string().email("Invalid email"),
+  fromName: z.string().min(1, "From name is required"),
+  // Defaults to fromEmail; lets a caller route the test to any address.
+  to: z.string().email("Invalid email").optional(),
+})
+
+/** Public "resend my activation email" request. */
+export const resendVerificationSchema = z.object({
+  email: z.email("A valid email is required"),
+})
+
+/**
+ * Bulk assign a rider to a set of orders. Shared by the dispatch and
+ * assign-pickup-rider endpoints — the bodies are identical.
+ */
+export const bulkAssignRiderSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(100),
+  riderId: z.string().min(1, "Rider is required"),
+})
+
+/** Admin direct-assign of a package to a merchant (ops override / comp). */
+export const packageAssignSchema = z.object({
+  packageId: z.string().min(1, "Package is required"),
+})

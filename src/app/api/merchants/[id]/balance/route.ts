@@ -1,11 +1,19 @@
-import { asc, desc, eq, sql } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { dbRead as db } from "@/lib/db"
 import { balanceTransaction, merchantBalance } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
 import { withErrorHandler } from "@/lib/with-error-handler"
+
+/**
+ * Top-up rows. A submission is `PAYMENT_PENDING`; confirming flips the type to
+ * `PAYMENT_CONFIRMED`, while rejecting leaves the type and sets
+ * `status = "REJECTED"` — so this pair covers pending, confirmed and rejected.
+ */
+const PAYMENT_TX_TYPES = ["PAYMENT_PENDING", "PAYMENT_CONFIRMED"] as const
 
 export const GET = withErrorHandler(
   async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
@@ -36,13 +44,27 @@ export const GET = withErrorHandler(
 
     // It is valid for a merchant to have no balance row yet (no orders placed).
     const balance = balanceRow?.balance ?? 0
+    const pendingBalance = balanceRow?.pendingBalance ?? 0
 
-    const { limit, offset } = parsePagination(req)
+    const { limit, offset } = parsePagination(req, {
+      defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+    })
+
+    // `?kind=payments` narrows the feed to top-up rows so the Wallet tab is
+    // filtered server-side — its pagination and total stay correct.
+    const paymentsOnly =
+      new URL(req.url).searchParams.get("kind") === "payments"
+    const where = paymentsOnly
+      ? and(
+          eq(balanceTransaction.merchantId, merchantId),
+          inArray(balanceTransaction.type, [...PAYMENT_TX_TYPES]),
+        )
+      : eq(balanceTransaction.merchantId, merchantId)
 
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(balanceTransaction)
-      .where(eq(balanceTransaction.merchantId, merchantId))
+      .where(where)
 
     const sortColumnMap = {
       date: balanceTransaction.createdAt,
@@ -68,7 +90,7 @@ export const GET = withErrorHandler(
         createdAt: balanceTransaction.createdAt,
       })
       .from(balanceTransaction)
-      .where(eq(balanceTransaction.merchantId, merchantId))
+      .where(where)
       .$dynamic()
 
     if (sort) {
@@ -87,6 +109,7 @@ export const GET = withErrorHandler(
 
     return NextResponse.json({
       balance,
+      pendingBalance,
       ...paginateResponse(transactions, count, limit, offset),
     })
   },

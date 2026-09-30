@@ -231,6 +231,30 @@ export function usePackages() {
     [mutate],
   )
 
+  /**
+   * Admin direct-assign: gives a merchant a package without a purchase request
+   * (ops override / comped deal). No ledger row is written.
+   */
+  const assignPackage = useCallback(
+    async (merchantId: string, packageId: string): Promise<Result> => {
+      const res = await fetch(`/api/merchants/${merchantId}/package`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageId }),
+      })
+      const body = await res.json().catch(() => null)
+      if (!res.ok) {
+        return {
+          ok: false,
+          error: formatError(body, "Could not assign the package."),
+        }
+      }
+      await mutate()
+      return { ok: true }
+    },
+    [mutate],
+  )
+
   return {
     packages: data?.packages ?? [],
     activePackage: data?.activePackage ?? null,
@@ -245,5 +269,6 @@ export function usePackages() {
     updateTier,
     deleteTier,
     requestPackage,
+    assignPackage,
   }
 }

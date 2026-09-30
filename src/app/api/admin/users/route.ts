@@ -2,6 +2,7 @@ import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { dbRead } from "@/lib/db"
 import { profile, profileRoles, user } from "@/lib/db/schema"
 import { enumValue } from "@/lib/db-helpers"
@@ -13,7 +14,9 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
   const url = new URL(req.url)
   const search = url.searchParams.get("q")?.trim()
   const roleFilter = enumValue(

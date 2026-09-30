@@ -4,26 +4,13 @@
 // work before committing them.
 
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden } from "@/lib/api-response"
 import { isPrivateHost } from "@/lib/host-guard"
 import { logger } from "@/lib/logger"
 import { sendTestMail } from "@/lib/mailer"
-import { parseBody } from "@/lib/validation"
+import { parseBody, testMailSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
-
-const testMailSchema = z.object({
-  host: z.string().min(1, "Host is required"),
-  port: z.string().min(1, "Port is required"),
-  secure: z.boolean(),
-  user: z.string().min(1, "User is required"),
-  pass: z.string().min(1, "Password is required"),
-  fromEmail: z.string().email("Invalid email"),
-  fromName: z.string().min(1, "From name is required"),
-  // Defaults to fromEmail; lets a caller route the test to any address.
-  to: z.string().email("Invalid email").optional(),
-})
 
 export const POST = withErrorHandler(async (req: Request) => {
   const me = await requireSession()

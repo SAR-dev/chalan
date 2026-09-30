@@ -9,13 +9,27 @@ import { formatError } from "@/lib/validation"
 
 type BalanceResponse = {
   balance: number
+  pendingBalance: number
   data: BalanceTransaction[]
   total: number
 }
 
 type Result = { ok: boolean; error?: string; data?: BalanceTransaction }
 
-export function useMerchantBalance(merchantId: string | null) {
+export interface UseMerchantBalanceOptions {
+  /**
+   * `"payments"` narrows the feed to top-up rows (pending / confirmed /
+   * rejected) for the Wallet tab. Filtered server-side so the pagination and
+   * total stay correct.
+   */
+  kind?: "all" | "payments"
+}
+
+export function useMerchantBalance(
+  merchantId: string | null,
+  options: UseMerchantBalanceOptions = {},
+) {
+  const { kind = "all" } = options
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(DEFAULT_TABLE_ROWS_PER_PAGE)
   const [sortId, setSortId] = useState("")
@@ -28,6 +42,7 @@ export function useMerchantBalance(merchantId: string | null) {
     const sp = new URLSearchParams()
     sp.set("limit", String(limit))
     sp.set("offset", String((page - 1) * limit))
+    if (kind === "payments") sp.set("kind", "payments")
     if (sortId) {
       sp.set("sort", sortId)
       sp.set("sortDir", sortDir)
@@ -39,12 +54,12 @@ export function useMerchantBalance(merchantId: string | null) {
     useSWR<BalanceResponse>(buildUrl(), jsonFetcher, swrOptions)
 
   const balance = data?.balance ?? 0
+  // Authoritative: maintained by the payment submit/confirm/reject routes.
+  const pendingBalance = data?.pendingBalance ?? 0
   const transactions = data?.data ?? []
   const total = data?.total ?? 0
 
-  const hasPendingPayment = transactions.some(
-    (t) => t.type === "PAYMENT_PENDING" && t.status === "PENDING",
-  )
+  const hasPendingPayment = pendingBalance > 0
 
   const submitPayment = useCallback(
     async (input: {
@@ -140,6 +155,7 @@ export function useMerchantBalance(merchantId: string | null) {
 
   return {
     balance,
+    pendingBalance,
     transactions,
     total,
     hasPendingPayment,

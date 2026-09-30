@@ -3,7 +3,7 @@ import "dotenv/config"
 import { createHash, createHmac } from "node:crypto"
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
-import { login, waitForAppReady } from "../helpers"
+import { login, toast, waitForAppReady } from "../helpers"
 import { email, onboarding } from "../selectors"
 
 const PASSWORD = "testpass123"
@@ -150,9 +150,7 @@ test.describe("S39. Change email", () => {
     // Request the change — verification is sent to the NEW address.
     await page.locator(email.input).fill(newEmail)
     await page.locator(email.submit).click()
-    await expect(
-      page.getByText(`Verification sent to ${newEmail}`),
-    ).toBeVisible()
+    await expect(toast(page, `Verification sent to ${newEmail}`)).toBeVisible()
     await expect(page.locator(email.input)).toHaveValue("")
 
     // Confirm with the token better-auth emailed (re-signed above — the e2e
@@ -215,7 +213,7 @@ test.describe("S39. Change email", () => {
       )}`,
     )
     await expect(
-      page.getByText("That verification link has expired"),
+      toast(page, "That verification link has expired"),
     ).toBeVisible()
   })
 })

@@ -20,6 +20,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { orderChargeAmount, toPaisa } from "@/lib/balance-ledger"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { db, dbRead } from "@/lib/db"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
 import { pickupLocationHubs } from "@/lib/db/order-lookup"
@@ -124,7 +125,9 @@ export const GET = withErrorHandler(async (req: Request) => {
     where = where ? and(where, dateClause) : dateClause
   }
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
 
   // Lean projection for list view — omits wide/rarely-rendered columns such as
   // pickupProofRefs and the ~15 lifecycle timestamps.

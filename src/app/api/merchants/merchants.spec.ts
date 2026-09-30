@@ -694,6 +694,38 @@ describe("GET /api/merchants/:id/balance", () => {
     expect(json.balance).toBe(500)
     expect(json.total).toBe(2)
   })
+
+  it("returns pendingBalance for the Wallet tab", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push(
+      [{ balance: -300, pendingBalance: 1000 }],
+      [{ count: 1 }],
+      [{ id: "tx_1", amount: -1000, status: "PENDING" }],
+    )
+    const res = await getMerchantBalance(req("GET"), ctx())
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    // Negative balance is credit the merchant holds.
+    expect(json.balance).toBe(-300)
+    expect(json.pendingBalance).toBe(1000)
+  })
+
+  it("narrows to payment rows when ?kind=payments", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push(
+      [{ balance: 0, pendingBalance: 0 }],
+      [{ count: 1 }],
+      [{ id: "tx_pay", type: "PAYMENT_PENDING" }],
+    )
+    const res = await getMerchantBalance(
+      req("GET", "http://test.local/api/merchants/m_1/balance?kind=payments"),
+      ctx(),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.total).toBe(1)
+    expect(json.data[0].type).toBe("PAYMENT_PENDING")
+  })
 })
 
 describe("POST /api/merchants/:id/balance/adjust", () => {

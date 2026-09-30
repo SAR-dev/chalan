@@ -1,6 +1,7 @@
 import "dotenv/config"
 
 import { expect, type Page, test } from "@playwright/test"
+import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import { dialog, onboarding, packages } from "../selectors"
 
@@ -27,6 +28,59 @@ const MERCHANT_3 = {
 
 const MERCHANT_2_NAME = "Merchant 2 Business"
 const MERCHANT_3_NAME = "Merchant 3 Business"
+
+async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set - .env failed to load")
+  }
+  const client = new Client({ connectionString: process.env.DATABASE_URL })
+  await client.connect()
+  try {
+    return await fn(client)
+  } finally {
+    await client.end()
+  }
+}
+
+/**
+ * The S59 flow leaves MERCHANT_3 holding a live bundle and the approval credit
+ * that paid for it, so a CI retry would start from the wrong state (the test
+ * asserts "no bundle yet"). Reset that merchant's package state and rebuild the
+ * balance from the ledger, the same way the payouts suite does.
+ */
+async function resetMerchant3Packages(): Promise<void> {
+  await withDb(async (client) => {
+    const { rows } = await client.query(
+      `SELECT id FROM merchant WHERE email = $1`,
+      ["merchant3@email.com"],
+    )
+    const merchantId = rows[0]?.id as string | undefined
+    if (!merchantId) return
+
+    await client.query(`DELETE FROM merchant_package WHERE "merchantId" = $1`, [
+      merchantId,
+    ])
+    await client.query(
+      `DELETE FROM package_purchase_request WHERE "merchantId" = $1`,
+      [merchantId],
+    )
+    await client.query(
+      `DELETE FROM balance_transaction
+        WHERE "merchantId" = $1 AND type = 'PAYMENT_CONFIRMED'
+          AND "paymentMethod" = 'PACKAGE'`,
+      [merchantId],
+    )
+    await client.query(
+      `UPDATE merchant_balance mb
+          SET balance = (SELECT coalesce(sum(bt.amount), 0)
+                           FROM balance_transaction bt
+                          WHERE bt."merchantId" = mb."merchantId"
+                            AND bt.status = 'SETTLED')
+        WHERE mb."merchantId" = $1`,
+      [merchantId],
+    )
+  })
+}
 
 async function skipOnboardingIfNeeded(page: Page) {
   if (page.url().includes("/welcome")) {
@@ -159,6 +213,9 @@ test.describe("S59. Package purchase request and approval", () => {
   test("merchant requests a package, admin approves, bundle activates", async ({
     page,
   }) => {
+    // Retry-safe: clear any bundle/request a previous run left behind.
+    await resetMerchant3Packages()
+
     await login(page, MERCHANT_3)
     await openMerchantPricing(page)
 

@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden } from "@/lib/api-response"
 import { encryptSecret } from "@/lib/crypto"
 import { db, dbRead } from "@/lib/db"
 import { mailConfig } from "@/lib/db/schema"
-import { parseBody } from "@/lib/validation"
+import { createMailConfigSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
-
-const createMailConfigSchema = z.object({
-  label: z.string().min(1, "Label is required"),
-  host: z.string().min(1, "Host is required"),
-  port: z.string().min(1, "Port is required"),
-  secure: z.boolean(),
-  user: z.string().min(1, "User is required"),
-  pass: z.string().min(1, "Password is required"),
-  fromEmail: z.string().email("Invalid email"),
-  fromName: z.string().min(1, "From name is required"),
-})
 
 type MailConfigRow = typeof mailConfig.$inferSelect
 

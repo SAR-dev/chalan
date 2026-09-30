@@ -12,6 +12,7 @@ import {
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { db, dbRead } from "@/lib/db"
 import { supportStatuses, supportTicket } from "@/lib/db/schema"
 import { enumValues } from "@/lib/db-helpers"
@@ -30,7 +31,9 @@ export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
   const url = new URL(req.url)
   const search = url.searchParams.get("q")?.trim()
   const statuses = parseStatusFilter(req, supportStatuses)

@@ -1,4 +1,3 @@
-import mjml from "mjml"
 import { siteConfig } from "@/config/site"
 import { isValidHexColor } from "@/lib/brand-color"
 
@@ -91,6 +90,10 @@ async function renderEmail(
         <mj-text font-size="12px" color="#9ca3af">This is an automated message. Please do not reply.</mj-text>
       </mj-column>
     </mj-section>`
+  // Loaded lazily: this module is reachable from `auth.ts` → `api-auth.ts`, so a
+  // top-level import would pull mjml (and its whole tree) into the module graph
+  // of nearly every API route, for a dependency only mail rendering needs.
+  const { default: mjml } = await import("mjml")
   const result = await mjml(`
 <mjml>
   <mj-head>

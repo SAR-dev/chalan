@@ -2,6 +2,7 @@ import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { dbRead } from "@/lib/db"
 import { rider, riderTaskTypes } from "@/lib/db/schema"
 import { enumValue } from "@/lib/db-helpers"
@@ -40,7 +41,9 @@ export const GET = withErrorHandler(async (req: Request) => {
     return NextResponse.json(paginateResponse(rows, rows.length))
   }
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
   const search = new URL(req.url).searchParams.get("q")?.trim()
   const warehouseIdParam = new URL(req.url).searchParams
     .get("warehouseId")

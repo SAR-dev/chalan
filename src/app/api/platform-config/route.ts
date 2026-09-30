@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
-import { db } from "@/lib/db"
+import { db, dbRead } from "@/lib/db"
 import { platformConfig } from "@/lib/db/schema"
 import { parseBody, platformConfigSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -13,7 +13,7 @@ export const GET = withErrorHandler(async () => {
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
 
-  const config = await db
+  const config = await dbRead
     .select({
       id: platformConfig.id,
       defaultCodFeePercentage: platformConfig.defaultCodFeePercentage,

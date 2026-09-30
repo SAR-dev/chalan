@@ -137,4 +137,51 @@ describe("quoteParcel", () => {
     expect(quote.isZonePricing).toBe(false)
     expect(quote.deliveryCharge).toBe(60)
   })
+
+  it("applies a FLAT bundle rule to the delivery fee only", () => {
+    // Zone fee is 130 (100 base + 1 extra KG × 30); FLAT 50 replaces it.
+    const quote = quoteParcel(
+      args({
+        parcelWeightKg: "6",
+        packageRule: { ruleType: "FLAT", ruleValue: 50 },
+      }),
+    )
+    expect(quote.deliveryChargeBeforePackage).toBe(130)
+    expect(quote.deliveryCharge).toBe(50)
+    expect(quote.packageDiscountApplied).toBe(true)
+    // COD and cancellation fees are untouched by a bundle.
+    expect(quote.codFee).toBe(20)
+    expect(quote.cancellationFee).toBe(8)
+  })
+
+  it("applies a PERCENT_OFF bundle rule to the delivery fee", () => {
+    const quote = quoteParcel(
+      args({
+        parcelWeightKg: "6",
+        packageRule: { ruleType: "PERCENT_OFF", ruleValue: 25 },
+      }),
+    )
+    // 130 − 25% = 97.5
+    expect(quote.deliveryCharge).toBe(97.5)
+    expect(quote.packageDiscountApplied).toBe(true)
+  })
+
+  it("never charges more than the zone fee under a FLAT rule", () => {
+    // A FLAT rule above the zone fee must not raise the price.
+    const quote = quoteParcel(
+      args({
+        parcelWeightKg: "6",
+        packageRule: { ruleType: "FLAT", ruleValue: 9999 },
+      }),
+    )
+    expect(quote.deliveryCharge).toBe(130)
+    expect(quote.packageDiscountApplied).toBe(false)
+  })
+
+  it("reports no discount when there is no bundle rule", () => {
+    const quote = quoteParcel(args({ parcelWeightKg: "6" }))
+    expect(quote.deliveryCharge).toBe(130)
+    expect(quote.deliveryChargeBeforePackage).toBe(130)
+    expect(quote.packageDiscountApplied).toBe(false)
+  })
 })

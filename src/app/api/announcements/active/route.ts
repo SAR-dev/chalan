@@ -10,8 +10,11 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // "Live" = isActive AND publishedAt <= now AND (expiresAt IS NULL OR expiresAt > now)
 // AND targetRoles contains the caller's role.
 //
-// No pagination — active announcements are expected to be small in number.
-// The client is responsible for read/unread state (localStorage).
+// Bounded by MAX_ACTIVE_ANNOUNCEMENTS rather than paginated — active
+// announcements are small in number, but the query must still be bounded. The
+// client is responsible for read/unread state (localStorage).
+const MAX_ACTIVE_ANNOUNCEMENTS = 50
+
 export const GET = withErrorHandler(async () => {
   const me = await requireSession()
   if (!me) return unauthorized()
@@ -34,6 +37,10 @@ export const GET = withErrorHandler(async () => {
     .where(
       and(
         eq(announcement.isActive, true),
+        // jsonb containment: targetRoles includes the caller's role. Postgres
+        // only (there is no sqlite driver), so this can stay in SQL instead of
+        // fetching every live row and filtering in JS.
+        sql`${announcement.targetRoles} @> ${JSON.stringify([me.role])}::jsonb`,
         // publishedAt is set and in the past
         and(
           sql`${announcement.publishedAt} is not null`,
@@ -47,12 +54,7 @@ export const GET = withErrorHandler(async () => {
       ),
     )
     .orderBy(sql`${announcement.publishedAt} desc`)
+    .limit(MAX_ACTIVE_ANNOUNCEMENTS)
 
-  // Filter server-side by targetRoles since jsonb containment queries differ
-  // between postgres and sqlite. This list is small so in-process filtering is fine.
-  const forMe = rows.filter((a) =>
-    (a.targetRoles as string[]).includes(me.role),
-  )
-
-  return NextResponse.json(forMe)
+  return NextResponse.json(rows)
 })

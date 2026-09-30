@@ -27,13 +27,15 @@ export const GET = withErrorHandler(async () => {
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN" && me.role !== "MERCHANT") return forbidden()
 
-  const packages = await dbRead
+  // Merchants only ever see published packages, so filter in SQL rather than
+  // fetching the whole catalogue and discarding rows in JS.
+  const visible = await dbRead
     .select()
     .from(pricingPackage)
+    .where(
+      me.role === "SUPER_ADMIN" ? undefined : eq(pricingPackage.isActive, true),
+    )
     .orderBy(asc(pricingPackage.name))
-
-  const visible =
-    me.role === "SUPER_ADMIN" ? packages : packages.filter((p) => p.isActive)
 
   const tiers =
     visible.length === 0

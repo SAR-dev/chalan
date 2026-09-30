@@ -36,17 +36,37 @@ export default defineConfig({
         "src/**/*.spec.{ts,tsx}",
         "src/**/__tests__/**",
         "src/lib/db/schema*",
-        "src/proxy.ts",
+        // Declarative fixture data, not logic. Counting ~60 untested seed files
+        // in the denominator made the headline number incomparable and let a
+        // real regression in src/lib hide behind the dilution.
+        "src/lib/db/seed/**",
         "src/instrumentation*.ts",
       ],
-      // Global floors, set just under the measured baseline (statements 49.5,
-      // branches 42.7, functions 38.6, lines 50.1) so a drop fails the gate.
+      // Global floors, set just under the measured baseline (statements 50.96,
+      // branches 44.4, functions 39.15, lines 51.66) so a drop fails the gate.
       // They are a regression guard, not a target — raise them as tests land.
+      //
+      // The glob floors exist because a *global* number can be met while a
+      // whole directory rots: `src/features/**` is deliberately not unit-tested
+      // (feature hooks are covered through API specs and e2e), so it drags the
+      // global figure down and would mask a real regression in src/lib.
       thresholds: {
-        statements: 48,
-        branches: 41,
+        statements: 49,
+        branches: 42,
         functions: 37,
-        lines: 49,
+        lines: 50,
+        "src/lib/**": {
+          statements: 80,
+          branches: 74,
+          functions: 85,
+          lines: 80,
+        },
+        "src/app/api/**": {
+          statements: 85,
+          branches: 72,
+          functions: 91,
+          lines: 87,
+        },
       },
     },
   },

@@ -58,6 +58,7 @@ vi.mock("@/features/orders/hooks/use-orders", () => ({
 vi.mock("@/features/merchants/hooks/use-merchant-balance", () => ({
   useMerchantBalance: () => ({
     balance: 500,
+    pendingBalance: 0,
     transactions: [],
     total: 0,
     hasPendingPayment: false,
@@ -78,7 +79,10 @@ vi.mock("@/features/merchants/hooks/use-merchant-balance", () => ({
     mutate: vi.fn(),
   }),
 }))
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 let mockUser: ReturnType<typeof makeUser> | null
 let mockOrdersState: MockOrdersState

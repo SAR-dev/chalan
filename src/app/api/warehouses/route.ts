@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { conflict, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { db, dbRead } from "@/lib/db"
 import { warehouse } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
@@ -13,7 +14,9 @@ export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
   const search = new URL(req.url).searchParams.get("q")?.trim()
   let where
   if (search) {

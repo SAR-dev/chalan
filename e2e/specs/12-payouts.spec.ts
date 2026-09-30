@@ -36,15 +36,49 @@ test.describe("S45. Payout settlement", () => {
   }) => {
     await signInAsAdmin(request)
 
+    // Retry-safe: a previous run (or a CI retry) has already marked this payout
+    // PAID and written its PAYOUT ledger row, which would leave nothing in the
+    // APPROVED state to settle. Reset the payout and rebuild the balance from
+    // the ledger - the same invariant the second test in this file asserts.
+    const targetId = await withDb(async (client) => {
+      const { rows } = await client.query(
+        `SELECT id, "merchantId" FROM payout_request ORDER BY id LIMIT 1`,
+      )
+      const row = rows[0] as { id: string; merchantId: string } | undefined
+      if (!row) throw new Error("No seeded payout request found")
+
+      await client.query(
+        `DELETE FROM balance_transaction WHERE type = 'PAYOUT' AND "merchantId" = $1`,
+        [row.merchantId],
+      )
+      // Leave `amount` alone: the seeded value already matches the orders
+      // linked to the request, and the endpoint recomputes it anyway.
+      await client.query(
+        `UPDATE payout_request SET status = 'APPROVED', "paidAt" = NULL
+          WHERE id = $1`,
+        [row.id],
+      )
+      await client.query(
+        `UPDATE merchant_balance mb
+            SET balance = (SELECT coalesce(sum(bt.amount), 0)
+                             FROM balance_transaction bt
+                            WHERE bt."merchantId" = mb."merchantId"
+                              AND bt.status = 'SETTLED')
+          WHERE mb."merchantId" = $1`,
+        [row.merchantId],
+      )
+      return row.id
+    })
+
     const before = await withDb(async (client) => {
       const payout = await client.query(
-        `SELECT id, "merchantId", amount FROM payout_request
-         WHERE status = 'APPROVED' ORDER BY id LIMIT 1`,
+        `SELECT id, "merchantId", amount FROM payout_request WHERE id = $1`,
+        [targetId],
       )
       const row = payout.rows[0] as
         | { id: string; merchantId: string; amount: string }
         | undefined
-      if (!row) throw new Error("No seeded APPROVED payout request found")
+      if (!row) throw new Error("Payout request vanished during reset")
 
       const balance = await client.query(
         `SELECT balance FROM merchant_balance WHERE "merchantId" = $1`,
