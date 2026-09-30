@@ -80,14 +80,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
       # No `pnpm install` here on purpose: `pnpm audit` resolves the tree from
       # pnpm-lock.yaml and queries the registry, and the dependency-review
       # action diffs the lockfile against the base ref. Neither needs
       # node_modules, so the install would be pure runner minutes.
+      #
+      # Consequently there is also no `cache: pnpm` below: setup-node's cache
+      # adds a post-job save step, and with nothing ever populating the store it
+      # fails the job with "Path Validation Error: Path(s) specified in the
+      # action for caching do(es) not exist". The cache and the install have to
+      # travel together — ci-workflow.spec.ts enforces that across every job.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       # Advisory gate (H1): blocks on any high/critical vulnerability in the
       # dependency tree. Moderate/low findings are printed but do not block.
       # Fixes: bump the package or add an override in pnpm-workspace.yaml.
