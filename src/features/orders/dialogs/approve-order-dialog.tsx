@@ -17,14 +17,19 @@ import type { Order } from "@/lib/types"
 function DetailRow({
   label,
   value,
+  testId,
 }: {
   label: string
   value: React.ReactNode
+  /** Optional so only rows a test needs to address carry one. */
+  testId?: string
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium">{value}</dd>
+      <dd className="text-right font-medium" data-testid={testId}>
+        {value}
+      </dd>
     </div>
   )
 }
@@ -93,6 +98,10 @@ export function ApproveOrderDialog({
       submittingLabel="Approving"
       submitLabel="Approve order"
       submitIcon={<ShieldCheck className="size-4" />}
+      // The E2E addresses this specific dialog rather than a generic submit id —
+      // several FormDialogs can be on screen and `submitTestId` is how the
+      // selector policy resolves which one.
+      submitTestId="approve-order"
       submitDisabled={exceedsWeight}
     >
       {/* Order summary */}
@@ -121,6 +130,17 @@ export function ApproveOrderDialog({
             laneLimit !== null ? ` / ${laneLimit} KG max` : ""
           }`}
         />
+        {/* What is in the parcel, so the approver is confirming a concrete
+            object rather than a weight. Rendered only when the merchant stated
+            one: a permanently empty row on every legacy order trains readers to
+            skip the row that actually carries a value. */}
+        {order.itemType ? (
+          <DetailRow
+            label="Contents"
+            value={order.itemType}
+            testId="approve-order-item-type"
+          />
+        ) : null}
         <DetailRow label="Delivery type" value={order.deliveryType} />
         <DetailRow label="COD amount" value={formatTk(order.productCost)} />
       </dl>

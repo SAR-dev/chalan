@@ -33,6 +33,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { SiteIcon, siteConfig } from "@/config/site"
+import {
+  VEHICLE_TYPE_OPTIONS,
+  VEHICLE_TYPES_REQUIRING_PLATE,
+  vehicleTypeLabel,
+} from "@/features/riders/dialogs/task-type"
+import type { RiderVehicleType } from "@/lib/types"
 import { riderApplySchema, validateFormData } from "@/lib/validation"
 
 interface FormState {
@@ -47,6 +53,9 @@ interface FormState {
   nidSelfieImage: string
   warehouseId: string
   password: string
+  /** Vehicle type as typed into the select; `""` means "not stated". */
+  vehicleType: RiderVehicleType | ""
+  vehiclePlate: string
 }
 
 const EMPTY: FormState = {
@@ -61,6 +70,8 @@ const EMPTY: FormState = {
   nidSelfieImage: "",
   warehouseId: "",
   password: "",
+  vehicleType: "",
+  vehiclePlate: "",
 }
 
 interface WarehouseOption {
@@ -156,6 +167,15 @@ export default function ApplyRiderPage() {
           nidSelfieImage: form.nidSelfieImage,
           warehouseId: form.warehouseId,
           password: form.password,
+          // Sent even when blank, as an explicit null. Omitting the keys would
+          // leave them absent, and a reader of the record could not tell
+          // "declared nothing" from "the form never asked".
+          vehicleType: form.vehicleType || null,
+          vehiclePlate:
+            form.vehicleType &&
+            VEHICLE_TYPES_REQUIRING_PLATE.has(form.vehicleType)
+              ? form.vehiclePlate.trim()
+              : null,
         }),
       })
       const data = await res.json().catch(() => null)
@@ -429,6 +449,75 @@ export default function ApplyRiderPage() {
                         required
                       />
                     </div>
+
+                    {/* Vehicle — both fields optional; see riderApplySchema.
+                        The plate only appears for vehicles that have one, so
+                        a bicycle applicant is never asked for a registration
+                        number they cannot supply. */}
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="vehicleType">Vehicle</Label>
+                      <Select
+                        value={form.vehicleType}
+                        onValueChange={(v) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            vehicleType: (v as RiderVehicleType) ?? "",
+                          }))
+                        }
+                      >
+                        <SelectTrigger
+                          id="vehicleType"
+                          className="w-full"
+                          data-testid="rider-apply-vehicle-type"
+                        >
+                          <SelectValue placeholder="Not stated">
+                            {(value) =>
+                              value
+                                ? vehicleTypeLabel(value as RiderVehicleType)
+                                : "Not stated"
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VEHICLE_TYPE_OPTIONS.map((o) => (
+                            <SelectItem
+                              key={o.value}
+                              value={o.value}
+                              data-testid={`rider-apply-vehicle-option-${o.value}`}
+                            >
+                              <span className="flex flex-col">
+                                <span>{o.label}</span>
+                                <span className="text-muted-foreground text-xs">
+                                  {o.description}
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-muted-foreground text-xs">
+                        Optional. Whoever reviews your application sees this
+                        before approving it.
+                      </p>
+                    </div>
+                    {form.vehicleType &&
+                      VEHICLE_TYPES_REQUIRING_PLATE.has(form.vehicleType) && (
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="vehiclePlate">
+                            Registration number
+                          </Label>
+                          <Input
+                            id="vehiclePlate"
+                            data-testid="rider-apply-vehicle-plate"
+                            value={form.vehiclePlate}
+                            onChange={(e) =>
+                              update("vehiclePlate", e.target.value)
+                            }
+                            placeholder="DHAKA-1234"
+                            className="uppercase"
+                          />
+                        </div>
+                      )}
 
                     {/* NID section */}
                     <div className="flex flex-col gap-2">

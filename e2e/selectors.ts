@@ -11,6 +11,8 @@ export const auth = {
   loginError: "[data-testid='login-error']",
   registerForm: "[data-testid='register-form']",
   logout: "[data-testid='logout']",
+  mobileMenu: "[data-testid='mobile-menu']",
+  mobileLogout: "[data-testid='mobile-logout']",
   accountSecurityTab: "[data-testid='account-tab-security']",
   accountTwoFactorTab: "[data-testid='account-tab-two-factor']",
 }
@@ -103,10 +105,21 @@ export const dashboard = {
 export const orders = {
   table: "[data-testid='table-dashboard-orders']",
   merchantTable: "[data-testid='table-merchant-orders']",
-  row: (id: string) => `[data-testid='order-row-${id}']`,
-  rowPrefix: "[data-testid^='order-row-']",
+  // The DataTable tags rows `row-<tableId>-<rowKey>`, and both order lists key
+  // on the order id. The previous `order-row-<id>` form matched nothing in
+  // `src/` — the same stale copy the riders selectors had, fixed to the
+  // pattern `packages` already used correctly.
+  row: (id: string) => `[data-testid='row-dashboard-orders-${id}']`,
+  rowPrefix: "[data-testid^='row-dashboard-orders-']",
+  merchantRow: (id: string) => `[data-testid='row-merchant-orders-${id}']`,
+  merchantRowPrefix: "[data-testid^='row-merchant-orders-']",
   createButton: "[data-testid='create-order']",
+  // The submit button of `approve-order-dialog`, wired via `submitTestId`.
   approveButton: "[data-testid='approve-order']",
+  approveItemType: "[data-testid='approve-order-item-type']",
+  // Row-level: the actions menu and its items are one per order.
+  actionsButton: (id: string) => `[data-testid='order-actions-${id}']`,
+  reviewOrder: (id: string) => `[data-testid='order-review-${id}']`,
   // The order detail page (`/merchant/orders/<code>`) owns the cancel flow.
   cancelOrderButton: "[data-testid='cancel-order']",
   cancelOrderSubmit: "[data-testid='cancel-order-submit']",
@@ -115,7 +128,10 @@ export const orders = {
   bulkCancel: "[data-testid='bulk-cancel']",
   selectAll: "[data-testid='select-all']",
   selectRow: (id: string) => `[data-testid='select-${id}']`,
-  searchInput: "[data-testid='orders-search']",
+  // The toolbar's search field. The previous `orders-search` value matched
+  // nothing in `src/`; `SearchInput` carries no testid of its own and the
+  // DataTable prefixes its toolbar field with the table id.
+  searchInput: "[data-testid='table-search-dashboard-orders']",
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
   tab: (name: string) => `[data-testid='tab-${name}']`,
   // CSV bulk import — the page and its testids.
@@ -158,7 +174,12 @@ export const merchants = {
   table: "[data-testid='table-dashboard-merchants']",
   row: (id: string) => `[data-testid='row-dashboard-merchants-${id}']`,
   firstRow: "[data-testid^='row-dashboard-merchants-']",
-  approveButton: "[data-testid='approve-merchant']",
+  // No `approveButton` here. It used to be, but the merchants list has no
+  // approve action: approving a merchant happens through
+  // `/api/merchants/[id]/approve`, which no screen calls — and
+  // `merchants.spec.tsx` asserts outright that no inline "Approve" button
+  // renders for a PENDING merchant. Keeping the selector would advertise an
+  // affordance that the UI deliberately does not have.
   suspendButton: "[data-testid='suspend-merchant']",
   reactivateButton: "[data-testid='reactivate-merchant']",
 }
@@ -182,6 +203,16 @@ export const riders = {
   editVehicleOption: (type: string) =>
     `[data-testid='edit-rider-vehicle-option-${type}']`,
   editVehiclePlate: "[data-testid='edit-rider-vehicle-plate']",
+}
+
+// ─── Sign-out confirmation ───────────────────────────────────────────────────
+// These are `ConfirmDialog`'s generic ids, so they address the sign-out
+// confirmation only while it is the sole open dialog — true here, since
+// sign-out is the one confirm flow reachable without first opening another.
+export const signOut = {
+  dialog: "[data-testid='confirm-dialog']",
+  confirm: "[data-testid='confirm-button']",
+  cancel: "[data-testid='cancel-button']", // also keeps the session alive
 }
 
 // ─── Users (admin user management) ──────────────────────────────────────────
@@ -226,24 +257,44 @@ export const rider = {
 export const payouts = {
   table: "[data-testid='payouts-table']",
   requestButton: "[data-testid='request-payout']",
+  // Both point at the same ConfirmDialog, whose confirm button now carries a
+  // per-action id — see `payouts-client`. `mark-paid` never existed in `src`;
+  // the real value is `mark-paid-payout`.
   approveButton: "[data-testid='approve-payout']",
   rejectButton: "[data-testid='reject-payout']",
-  markPaidButton: "[data-testid='mark-paid']",
+  markPaidButton: "[data-testid='mark-paid-payout']",
 }
 
-// ─── Rider parcel column (weight + contents) ─────────────────────────────────
+// ─── Rider parcel column (weight) ────────────────────────────────────────────
 // The DataTable tags each `<tr>` as `row-<tableId>-<rowKey>`, and the rider
-// queues key on the order id, so a single order's parcel cell is addressable
-// without matching on its contents.
+// queues key on the order id, so a single order's row is addressable without
+// matching on its contents. Row-level on purpose: these tests need "this
+// parcel's row shows the weight and does not leak the contents", which the row
+// text answers without a cell-level hook that would exist only for them.
 export const riderParcel = {
-  cell: "[data-testid='rider-parcel-cell']",
   pickupRow: (orderId: string) => `[data-testid='row-rider-pickup-${orderId}']`,
   deliveryRow: (orderId: string) =>
     `[data-testid='row-rider-delivery-${orderId}']`,
-  pickupCell: (orderId: string) =>
-    `[data-testid='row-rider-pickup-${orderId}'] [data-testid='rider-parcel-cell']`,
-  deliveryCell: (orderId: string) =>
-    `[data-testid='row-rider-delivery-${orderId}'] [data-testid='rider-parcel-cell']`,
+}
+
+// ─── Rider applications (admin review queue) ─────────────────────────────────
+export const riderApplications = {
+  table: "[data-testid='table-dashboard-rider-applications']",
+  search: "[data-testid='table-search-dashboard-rider-applications']",
+  viewButton: (id: string) => `[data-testid='rider-app-view-${id}']`,
+  openApprove: "[data-testid='rider-app-approve']",
+  confirmApprove: "[data-testid='rider-app-confirm-approve']",
+  vehicleValue: "[data-testid='approve-vehicle-type']",
+  vehiclePlate: "[data-testid='approve-vehicle-plate']",
+  submittedNote: "[data-testid='approve-vehicle-submitted']",
+}
+
+// ─── Rider registration form (public /apply/rider) ──────────────────────────
+export const riderApplyForm = {
+  vehicleType: "[data-testid='rider-apply-vehicle-type']",
+  vehicleOption: (type: string) =>
+    `[data-testid='rider-apply-vehicle-option-${type}']`,
+  vehiclePlate: "[data-testid='rider-apply-vehicle-plate']",
 }
 
 // ─── Zone Pricing ────────────────────────────────────────────────────────────

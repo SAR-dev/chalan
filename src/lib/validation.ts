@@ -463,6 +463,13 @@ export const riderApplySchema = z.object({
   nidSelfieImage: z.string().trim().optional(),
   warehouseId: requiredString("Warehouse"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  // Both optional, and they have to be: the plate only applies to a subset of
+  // vehicles (see `VEHICLE_TYPES_REQUIRING_PLATE`), so no applicant can satisfy
+  // it universally, and someone without a motorbike yet is a legitimate
+  // applicant. The approver sees whatever is submitted rather than a blank
+  // field — see `rider-application-detail-dialog`.
+  vehicleType: riderVehicleTypeSchema.nullish(),
+  vehiclePlate: riderVehiclePlateSchema,
 })
 
 export const riderApproveSchema = z.object({

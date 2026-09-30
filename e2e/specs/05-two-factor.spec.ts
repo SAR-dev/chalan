@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
 import { totpSecretFromUri } from "@/lib/two-factor"
 import { CREDS, type E2ECredential, login, waitForAppReady } from "../helpers"
-import { auth, twoFactor } from "../selectors"
+import { auth, signOut, twoFactor } from "../selectors"
 import { totp } from "../totp"
 
 const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider|welcome)/
@@ -105,7 +105,11 @@ test.describe("S37. Two-factor authentication", () => {
     await expect(page.locator(twoFactor.status)).toHaveText("Enabled")
 
     // ── Sign out ──────────────────────────────────────────────────────────
+    // Sign out is confirmed first, so the click opens a dialog rather than
+    // ending the session — the redirect only follows the confirm.
     await page.locator(auth.logout).click()
+    await expect(page.locator(signOut.confirm)).toBeVisible()
+    await page.locator(signOut.confirm).click()
     await page.waitForURL(/\/login/, { timeout: 15_000 })
 
     // ── Sign in again — password step is followed by a 2FA challenge ─────

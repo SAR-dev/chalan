@@ -289,7 +289,14 @@ export function OrdersPageClient({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    // Scoped by order: this column is one menu per row, so an
+                    // unqualified "Actions" would be ambiguous on any list with
+                    // more than one pending order — which is most of them.
+                    data-testid={`order-actions-${o.id}`}
+                  >
                     <MoreHorizontal className="size-4" />
                     <span className="sr-only">Actions</span>
                   </Button>
@@ -297,7 +304,10 @@ export function OrdersPageClient({
               />
               <DropdownMenuContent align="end" className="w-48">
                 {canApprove && (
-                  <DropdownMenuItem onClick={() => openApprove(o)}>
+                  <DropdownMenuItem
+                    onClick={() => openApprove(o)}
+                    data-testid={`order-review-${o.id}`}
+                  >
                     <ShieldCheck className="size-4" />
                     Review order
                   </DropdownMenuItem>

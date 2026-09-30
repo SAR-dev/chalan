@@ -2,7 +2,14 @@ import "dotenv/config"
 
 import { expect, request as pwRequest, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { orderForm, pricing, riderParcel, riders, zones } from "../selectors"
+import {
+  orderForm,
+  orders,
+  pricing,
+  riderParcel,
+  riders,
+  zones,
+} from "../selectors"
 
 const BASE_URL = "http://localhost:3000"
 
@@ -99,9 +106,30 @@ test.describe("S66. Item type, rider vehicle, and pricing view", () => {
     await login(page, CREDS.rider)
     await page.goto("/rider/pickup")
     await waitForAppReady(page)
-    const parcel = page.locator(riderParcel.pickupCell(String(order.id)))
+
+    // The rider queue is one of the places item type must NOT appear any more:
+    // the four permitted surfaces are the create form, the approve
+    // confirmation, the order details page and the merchant orders list. The
+    // weight stays, because the rider still needs it to decide whether they
+    // can take the parcel.
+    const parcel = page.locator(riderParcel.pickupRow(String(order.id)))
     await expect(parcel).toContainText("1 KG")
-    await expect(parcel).toContainText("Cotton saree")
+    await expect(parcel).not.toContainText("Cotton saree")
+  })
+
+  test("the merchant's orders list shows what they stated", async ({
+    page,
+  }) => {
+    await login(page, CREDS.merchant)
+    await page.goto("/merchant/orders")
+    await waitForAppReady(page)
+
+    // The merchant orders list is the fourth permitted surface, and it is the
+    // one this round added — it previously carried no item type at all.
+    await page.locator(orders.merchantOrdersSearch).fill("E2E Contents")
+    const row = page.locator(orders.merchantRowPrefix).first()
+    await expect(row).toBeVisible()
+    await expect(row).toContainText("Cotton saree")
   })
 
   test("merchant can type an item type on the new-order form", async ({
@@ -124,8 +152,8 @@ test.describe("S66. Item type, rider vehicle, and pricing view", () => {
     await expect(field).toHaveValue("")
   })
 
-  // The seed gives riders 1-3 a vehicle and leaves the rest without one, so
-  // these two tests each start from a known state.
+  // The seed gives riders 1-3 a vehicle and leaves the rest without one.
+  // `NO_VEHICLE_RIDER` relies on that; `TO_EDIT_RIDER` does not — see below.
   const NO_VEHICLE_RIDER = "RID-100005E"
   const TO_EDIT_RIDER = "RID-100004E"
 
@@ -133,8 +161,17 @@ test.describe("S66. Item type, rider vehicle, and pricing view", () => {
     page,
   }) => {
     const admin = await loginContext(CREDS.superAdmin)
-    // This rider is seeded without a vehicle, so this is the not-declared ->
-    // declared transition rather than a no-op.
+
+    // Establish the precondition rather than inheriting it from the seed. A
+    // previous run of this very test leaves a bike on this rider, so an
+    // assertion of "no vehicle yet" would pass only right after a reseed —
+    // making the test quietly depend on the fixture rather than the feature.
+    const clear = await admin.patch(`/api/riders/${TO_EDIT_RIDER}`, {
+      data: { vehicleType: null, vehiclePlate: null },
+    })
+    expect(clear.ok(), `clear -> ${clear.status()}`).toBeTruthy()
+
+    // Now the not-declared -> declared transition, rather than a no-op.
     const before = await admin.get(`/api/riders/${TO_EDIT_RIDER}`)
     expect(before.ok()).toBeTruthy()
     expect(

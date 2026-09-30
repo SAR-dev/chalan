@@ -1,5 +1,5 @@
 {
-  "id": "be9bc824-6f31-4cfe-85c5-9c25a9fadfb2",
+  "id": "738f0952-9d29-4714-930b-759721908d4f",
   "prevId": "63ac0b4a-c601-4b43-928e-2c106106bda4",
   "version": "7",
   "dialect": "postgresql",
@@ -1468,12 +1468,6 @@
           "notNull": true,
           "default": "'Other'"
         },
-        "onboardingCompletedAt": {
-          "name": "onboardingCompletedAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -2011,6 +2005,12 @@
           "type": "double precision",
           "primaryKey": false,
           "notNull": true
+        },
+        "itemType": {
+          "name": "itemType",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "deliveryType": {
           "name": "deliveryType",
@@ -4557,6 +4557,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'DELIVERY'"
+        },
+        "vehicleType": {
+          "name": "vehicleType",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehiclePlate": {
+          "name": "vehiclePlate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "warehouseId": {
           "name": "warehouseId",

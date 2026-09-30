@@ -15,6 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { SignOutConfirmDialog } from "@/features/account/dialogs/sign-out-confirm-dialog"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { BRAND_NAME } from "@/lib/constants"
 import { isNavItemActive, type SidebarConfig } from "@/lib/nav-config"
@@ -40,8 +41,9 @@ export function MobileHeader({
   hidePlatformBranding?: boolean
 }) {
   const pathname = usePathname()
-  const { currentUser, logout } = useAuth()
+  const { currentUser } = useAuth()
   const [open, setOpen] = useState(false)
+  const [signOutOpen, setSignOutOpen] = useState(false)
   const BrandIcon = config.brandIcon
   const navItems = config.items
 
@@ -76,7 +78,12 @@ export function MobileHeader({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           render={
-            <Button variant="outline" size="icon-sm" aria-label="Open menu">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Open menu"
+              data-testid="mobile-menu"
+            >
               <Menu className="size-4" />
             </Button>
           }
@@ -156,8 +163,10 @@ export function MobileHeader({
               variant="ghost"
               size="sm"
               onClick={() => {
+                // Close the menu first so the confirmation appears over the
+                // page rather than over a sheet that is animating away.
                 setOpen(false)
-                logout()
+                setSignOutOpen(true)
               }}
               data-testid="mobile-logout"
               className={footerActionClass}
@@ -168,6 +177,12 @@ export function MobileHeader({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      {/* Deliberately outside <Sheet>: closing the sheet unmounts anything
+          inside it, and the confirmation has to outlive the menu it was
+          opened from — otherwise the dialog would vanish the instant the
+          mobile nav finished closing. Radix portals it to <body> anyway, so
+          its position here is about React ownership, not layout. */}
+      <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </header>
   )
 }

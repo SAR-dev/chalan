@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   FileText,
   Loader2,
-  Mail,
   MapPin,
   Palette,
   PanelLeft,
@@ -298,8 +297,8 @@ export default function MerchantSettingsPage() {
                   Branding
                 </CardTitle>
                 <CardDescription>
-                  Customize how your business appears in the sidebar, order
-                  tracking, and emails.
+                  Customize how your business appears in the sidebar and on
+                  order tracking.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-6">
@@ -351,10 +350,10 @@ export default function MerchantSettingsPage() {
                         <Store className="size-3.5" />
                         Order tracking page
                       </li>
-                      <li className="flex items-center gap-1.5">
-                        <Mail className="size-3.5" />
-                        Customer emails
-                      </li>
+                      {/* Emails are deliberately absent: they are greyscale, so
+                          a merchant colour has nowhere to go in one. Listing
+                          it here would promise a result the sender never
+                          delivers. */}
                     </ul>
                   </div>
 
@@ -416,8 +415,9 @@ export default function MerchantSettingsPage() {
                   <div className="flex flex-col gap-1">
                     <Label>Hide platform branding</Label>
                     <p className="text-muted-foreground text-xs">
-                      Show only your logo in the sidebar, hiding the platform
-                      name.
+                      Show only your logo in the sidebar. It also removes the
+                      platform name and footer note from your emails — the one
+                      setting here that reaches them.
                     </p>
                   </div>
                   <Switch

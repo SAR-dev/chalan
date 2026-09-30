@@ -439,6 +439,12 @@ export function PayoutsPageClient({
         }
         confirmLabel={confirmAction === "approve" ? "Approve" : "Mark as paid"}
         variant={confirmAction === "markPaid" ? "destructive" : "default"}
+        // One dialog serves both actions, so the button has to say which it is —
+        // a shared `confirm-button` could not be addressed without also
+        // matching the other, nor distinguished from the bulk dialogs below.
+        testId={
+          confirmAction === "approve" ? "approve-payout" : "mark-paid-payout"
+        }
         onConfirm={handleConfirm}
       />
 

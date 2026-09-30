@@ -83,9 +83,6 @@ export function AssignPickupRiderDialog({
             label="Parcel"
             value={`${order.parcelWeightKg} KG · ${order.deliveryType}`}
           />
-          {order.itemType ? (
-            <InfoRow icon={Package} label="Contents" value={order.itemType} />
-          ) : null}
           <InfoRow
             icon={Phone}
             label="Recipient"

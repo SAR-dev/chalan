@@ -246,13 +246,18 @@ describe("merchant branding in emails", () => {
     ownerName: "Bob Smith",
     businessName: "Acme Corp",
     verificationUrl: "http://localhost:3000/verify?token=abc",
-    brandColor: "#10b981",
     hidePlatformBranding: true,
   }
 
-  it("uses the brand color as the accent", async () => {
+  // Emails are greyscale now. The merchant branding setting still themes the
+  // web UI — it is only the email path that dropped it — so what remains to
+  // prove here is that no merchant-supplied colour reaches the markup. The
+  // property is gone from the spec types rather than accepted and ignored, so
+  // a caller passing one gets a type error instead of a silent no-op.
+  it("renders no brand colour into the markup", async () => {
     const { html } = await merchantRegisteredTemplate(branded)
-    expect(html).toContain("#10b981")
+    expect(html).not.toContain("#10b981")
+    expect(html).not.toContain("#2563eb")
   })
 
   it("drops the platform footer when hidePlatformBranding is set", async () => {
@@ -271,22 +276,11 @@ describe("merchant branding in emails", () => {
     expect(text).toContain("automated message")
   })
 
-  it("falls back to the platform accent for invalid brand colors", async () => {
-    const { html } = await merchantRegisteredTemplate({
-      ...branded,
-      brandColor: "not-a-color",
-    })
-    expect(html).toContain("#2563eb")
-    expect(html).not.toContain("not-a-color")
-  })
-
-  it("order emails carry branding fields", async () => {
+  it("order emails carry the branding toggle", async () => {
     const { html, text } = await orderApprovedTemplate({
       ...data,
-      brandColor: "#ef4444",
       hidePlatformBranding: true,
     })
-    expect(html).toContain("#ef4444")
     expect(html).not.toContain("automated message")
     expect(text).not.toContain("automated message")
   })

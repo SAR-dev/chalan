@@ -35,7 +35,6 @@ import {
   deliveryAddressColumn,
   deliveryRiderWithPhoneColumn,
   deliveryTypeColumn,
-  itemTypeColumn,
   merchantColumn,
   orderCodeColumn,
   recipientNameColumn,
@@ -263,10 +262,6 @@ export function WarehouseDispatchPageClient({
       recipientNameColumn(),
       deliveryAddressColumn(),
       unassignedDeliveryRiderColumn,
-      // Contents sit next to the delivery type: at dispatch the question is
-      // "what is going out on this van", and "3 kg, FRAGILE" only half answers
-      // it.
-      itemTypeColumn(),
       deliveryTypeColumn(),
       collectibleColumn(),
       statusColumn(),

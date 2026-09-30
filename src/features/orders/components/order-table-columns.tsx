@@ -210,52 +210,22 @@ export function parcelWeightColumn(): DataTableColumn<Order> {
 }
 
 /**
- * What is in the parcel, in the merchant's own words.
+ * Parcel weight on the rider's own lists.
  *
- * Not sortable: it is free text the merchant typed, so an ORDER BY would be
- * alphabetical noise ("Cotton saree" next to "charger") rather than a grouping
- * an admin would find useful. Hidden on narrow screens — the weight is the
- * column a warehouse actually scans for, and this is context beside it.
- */
-export function itemTypeColumn(): DataTableColumn<Order> {
-  return {
-    id: "itemType",
-    header: columnLabels.order.itemType,
-    headClassName: "hidden lg:table-cell",
-    cellClassName: "hidden lg:table-cell",
-    cell: (o) =>
-      o.itemType ? (
-        <CellContent>{o.itemType}</CellContent>
-      ) : (
-        // Blank would be indistinguishable from a column that failed to load.
-        <CellContent className="text-muted-foreground">Not stated</CellContent>
-      ),
-  }
-}
-
-/**
- * Weight and contents as one column, for the rider's own lists.
- *
- * The two are shown together because they are one decision for the rider: "3 kg
- * of cotton saree" is collectable, "3 kg" of nothing in particular is not. Not
- * sortable — the contents are free text a merchant typed, so sorting on them
- * would be alphabetical noise, and the lists are short enough that the rider
- * reads down them rather than ordering them.
+ * Weight only — the merchant-stated contents were removed from rider screens
+ * along with every other surface outside the four the item-type requirement
+ * allows. The rider still needs the weight to decide whether they can carry
+ * the parcel, and that is not restricted.
  */
 export function riderParcelColumn(): DataTableColumn<Order> {
   return {
     id: "parcel",
     header: columnLabels.rider.parcel,
+    align: "right",
+    sortable: true,
+    sortValue: (o) => o.parcelWeightKg,
     cell: (o) => (
-      <div className="flex flex-col" data-testid="rider-parcel-cell">
-        <span className="tabular-nums">{o.parcelWeightKg} KG</span>
-        {/* Kept visible even when empty: the rider is told "not stated" rather
-            than left to infer it, because a missing value here looks exactly
-            like a column that failed to load. */}
-        <span className="text-muted-foreground text-xs">
-          {o.itemType ?? "Contents not stated"}
-        </span>
-      </div>
+      <CellContent className="tabular-nums">{o.parcelWeightKg} KG</CellContent>
     ),
   }
 }
@@ -659,7 +629,6 @@ export function useOrderColumns(): DataTableColumn<Order>[] {
     pickupLabelColumn(pickupLocationFn),
     pickupAddressColumn(pickupLocationFn),
     weightColumn,
-    itemTypeColumn(),
     collectibleColumn(),
     deliveryFeeColumn(),
     codFeeColumn(),

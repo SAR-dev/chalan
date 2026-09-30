@@ -73,12 +73,19 @@ export function RiderApplicationDetailDialog({
   useEffect(() => {
     if (application && mode === "approve") {
       setWarehouseId(application.warehouseId ?? "")
-      // Reset the vehicle each time the approve form is opened. Without this the
-      // previous applicant's motorbike and plate would still be sitting in the
-      // fields — a silent mis-assignment, since nothing about the form changes
-      // to make the leftover visible.
-      setVehicleType("")
-      setVehiclePlate("")
+      // Prefill from what the applicant submitted instead of starting blank.
+      //
+      // Blank was wrong twice over. It threw the submitted value away, and the
+      // payload below then sent `vehicleType || null` — so approving would
+      // write null over a vehicle the registration form had just collected.
+      // Approval silently destroyed the data it was meant to review.
+      //
+      // Prefilling *from this application* also preserves the original reason
+      // the reset existed (the comment above it used to warn about the
+      // previous applicant's motorbike leaking onto this one): each open
+      // re-reads from the row being approved, so that leak cannot happen.
+      setVehicleType(application.vehicleType ?? "")
+      setVehiclePlate(application.vehiclePlate ?? "")
     }
   }, [application, mode])
 
@@ -94,10 +101,12 @@ export function RiderApplicationDetailDialog({
           body: JSON.stringify({
             taskType,
             warehouseId,
-            // Sent even when blank, as an explicit null. Omitting the key would
-            // leave whatever was on the record, and on a fresh application that
-            // is nothing — so blank and "not asked" would be indistinguishable
-            // to anyone reading the audit trail later.
+            // Sent even when blank, as an explicit null. The value now starts
+            // as whatever the applicant submitted, so `null` here can only mean
+            // nobody declared a vehicle — never "the form did not load in
+            // time". Omitting the key instead would leave the record untouched
+            // and make "cleared by the approver" indistinguishable from "not
+            // asked", which is the distinction an audit trail needs.
             vehicleType: vehicleType || null,
             vehiclePlate:
               vehicleType && VEHICLE_TYPES_REQUIRING_PLATE.has(vehicleType)
@@ -314,9 +323,29 @@ export function RiderApplicationDetailDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-muted-foreground text-xs">
-                    Recorded now so parcels can be assigned to this rider
-                    sensibly. Leave blank if not known yet.
+                  {/* The review step: say where the value came from, because a
+                      pre-filled field reads identically whether the applicant
+                      supplied it or a previous reviewer did. */}
+                  <p
+                    className="text-muted-foreground text-xs"
+                    data-testid={
+                      application?.vehicleType
+                        ? "approve-vehicle-submitted"
+                        : "approve-vehicle-unstated"
+                    }
+                  >
+                    {application?.vehicleType ? (
+                      <>
+                        Submitted by the applicant. Change it if it is wrong —
+                        this is what the pickup and dispatch dialogs show when a
+                        parcel is assigned.
+                      </>
+                    ) : (
+                      <>
+                        Not stated by the applicant. Add it now so parcels can
+                        be assigned to this rider sensibly.
+                      </>
+                    )}
                   </p>
                 </div>
                 {vehicleType &&
@@ -391,10 +420,16 @@ export function RiderApplicationDetailDialog({
                   <Button
                     variant="destructive"
                     onClick={() => setMode("reject")}
+                    data-testid="rider-app-reject"
                   >
                     Reject
                   </Button>
-                  <Button onClick={() => setMode("approve")}>Approve</Button>
+                  <Button
+                    onClick={() => setMode("approve")}
+                    data-testid="rider-app-approve"
+                  >
+                    Approve
+                  </Button>
                 </>
               )}
             </>
@@ -407,7 +442,11 @@ export function RiderApplicationDetailDialog({
               >
                 Back
               </Button>
-              <Button onClick={handleApprove} disabled={loadingApprove}>
+              <Button
+                onClick={handleApprove}
+                disabled={loadingApprove}
+                data-testid="rider-app-confirm-approve"
+              >
                 {loadingApprove ? "Approving..." : "Confirm Approval"}
               </Button>
             </>

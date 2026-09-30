@@ -10,7 +10,6 @@ export interface OrderEmailData {
   merchantName: string
   recipientName: string
   deliveryAddress: string
-  brandColor?: string
   hidePlatformBranding?: boolean
 }
 
@@ -18,7 +17,6 @@ export interface MerchantEmailData {
   ownerName: string
   businessName: string
   verificationUrl?: string
-  brandColor?: string
   hidePlatformBranding?: boolean
 }
 
@@ -26,19 +24,20 @@ export interface MerchantVerifyEmailData {
   ownerName: string
   businessName: string
   verificationUrl: string
-  brandColor?: string
   hidePlatformBranding?: boolean
 }
 
-/** Fields every merchant-scoped template threads into the shared builder. */
-function brandFields(data: {
-  brandColor?: string
-  hidePlatformBranding?: boolean
-}) {
-  return {
-    brandColor: data.brandColor,
-    hidePlatformBranding: data.hidePlatformBranding,
-  }
+/**
+ * Fields every merchant-scoped template threads into the shared builder.
+ *
+ * Only `hidePlatformBranding` is left. `brandColor` used to ride along here
+ * too, but emails are greyscale now, so a colour reaching this point would
+ * have nowhere to go — it was dropped rather than left unused, which would
+ * have looked like a working feature. The merchant branding setting itself is
+ * untouched; it still themes the web UI.
+ */
+function brandFields(data: { hidePlatformBranding?: boolean }) {
+  return { hidePlatformBranding: data.hidePlatformBranding }
 }
 
 // ---------------------------------------------------------------------------
