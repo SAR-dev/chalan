@@ -42,7 +42,7 @@ export function useZonePricing() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -57,7 +57,10 @@ export function useZonePricing() {
   const deletePricing = useCallback(
     async (id: string): Promise<Result> => {
       const res = await fetch(`${KEY}/${id}`, { method: "DELETE" })
-      const data = await res.json().catch(() => null)
+      const data = await res
+        .json()
+        .catch(() => null)
+        .catch(() => null)
       if (!res.ok)
         return {
           ok: false,

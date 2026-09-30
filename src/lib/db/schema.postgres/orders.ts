@@ -53,9 +53,13 @@ export const payoutRequest = pgTable(
     paidAt: ts("paidAt"),
   },
   (t) => [
-    index("payout_request_merchant_id_idx").on(t.merchantId),
     index("payout_request_status_idx").on(t.status),
     index("payout_request_requested_at_idx").on(t.requestedAt),
+    // Leading merchantId also covers the plain merchant lookup.
+    index("payout_request_merchant_requested_at_idx").on(
+      t.merchantId,
+      t.requestedAt,
+    ),
     index("payout_request_merchant_id_status_idx").on(t.merchantId, t.status),
     index("payout_request_code_trgm_idx").using(
       "gin",
@@ -202,15 +206,18 @@ export const order = pgTable(
     payoutRequestId: text("payoutRequestId").references(() => payoutRequest.id),
   },
   (t) => [
-    // Role-scoped list queries (most common access pattern)
-    index("order_merchant_id_idx").on(t.merchantId),
-    index("order_warehouse_id_idx").on(t.warehouseId),
+    // Role-scoped list queries (most common access pattern). The owner+createdAt
+    // composites below also cover the plain owner lookups, so no single-column
+    // owner index is needed.
+    index("order_merchant_created_at_idx").on(t.merchantId, t.createdAt),
+    index("order_warehouse_created_at_idx").on(t.warehouseId, t.createdAt),
+    index("order_delivery_rider_created_at_idx").on(
+      t.deliveryRiderId,
+      t.createdAt,
+    ),
+    index("order_pickup_rider_created_at_idx").on(t.pickupRiderId, t.createdAt),
     index("order_delivery_city_id_idx").on(t.deliveryCityId),
-    index("order_pickup_rider_id_idx").on(t.pickupRiderId),
-    index("order_delivery_rider_id_idx").on(t.deliveryRiderId),
     index("order_pickup_location_id_idx").on(t.pickupLocationId),
-    // Status filtering and sorting (used on every list page)
-    index("order_status_idx").on(t.status),
     index("order_created_at_idx").on(t.createdAt),
     // Composite covering indexes for common sorted list queries (warehouse admin, merchant, admin)
     index("order_warehouse_status_created_at_idx").on(
@@ -223,6 +230,7 @@ export const order = pgTable(
       t.status,
       t.createdAt,
     ),
+    // Also serves plain `WHERE status = …` (status is the leading column).
     index("order_status_created_at_idx").on(t.status, t.createdAt),
     // A merchant cannot reuse an idempotency key (ROADMAP B13); NULL keys are
     // distinct, so orders without a key are unconstrained.

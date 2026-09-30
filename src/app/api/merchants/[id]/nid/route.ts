@@ -9,6 +9,7 @@ import {
 } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
+import { hasNavPermission } from "@/lib/nav-config"
 import { nidSubmitSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -36,6 +37,10 @@ export const PATCH = withErrorHandler(
     const isAdmin = me.role === "SUPER_ADMIN"
     if (!isOwner && !isAdmin) {
       return forbidden("You can only submit NID for your own account")
+    }
+    // NID submission is the Verification surface — a moderator needs the grant.
+    if (isOwner && !hasNavPermission(me, "/merchant/verify-nid")) {
+      return forbidden("You don't have access to Verification.")
     }
 
     if (current.nidVerifiedAt) {

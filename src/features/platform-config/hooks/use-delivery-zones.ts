@@ -42,7 +42,7 @@ export function useDeliveryZones() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       if (!res.ok)
         return { ok: false, error: formatError(data, "Could not create zone.") }
       await mutate()
@@ -61,7 +61,7 @@ export function useDeliveryZones() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -76,7 +76,10 @@ export function useDeliveryZones() {
   const deleteZone = useCallback(
     async (id: string): Promise<Result> => {
       const res = await fetch(`${ADMIN_KEY}/${id}`, { method: "DELETE" })
-      const data = await res.json().catch(() => null)
+      const data = await res
+        .json()
+        .catch(() => null)
+        .catch(() => null)
       if (!res.ok)
         return { ok: false, error: formatError(data, "Could not delete zone.") }
       await mutate()

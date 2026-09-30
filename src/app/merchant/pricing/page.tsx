@@ -4,12 +4,14 @@ import {
   CheckCircle2,
   Clock,
   Info,
+  MapPinned,
   Package,
   Scale,
   TriangleAlert,
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { DeliveryFeeCalculator } from "@/components/delivery-fee-calculator"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +29,9 @@ import {
   type PackageRow,
   usePackages,
 } from "@/features/packages/hooks/use-packages"
+import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
+import { usePlatformPricingPublic } from "@/features/platform-config/hooks/use-platform-pricing-public"
+import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { formatTk } from "@/lib/pricing"
 
 function TierList({ pkg }: { pkg: PackageRow }) {
@@ -58,6 +63,11 @@ function TierList({ pkg }: { pkg: PackageRow }) {
 export default function MerchantPricingPage() {
   const { currentMerchant } = useMerchants()
   const { packages, activePackage, latestRequest, isLoading } = usePackages()
+  const { platformDefaults } = usePlatformPricingPublic()
+  const { zones } = useDeliveryZones()
+  const { pricing: zoneRates } = useZonePricingPublic()
+
+  const zoneName = (id: string) => zones.find((z) => z.id === id)?.name ?? id
   const [requesting, setRequesting] = useState<PackageRow | null>(null)
 
   if (!currentMerchant) return null
@@ -212,6 +222,18 @@ export default function MerchantPricingPage() {
 
       {/* Catalogue */}
       <h2 className="mb-3 text-lg font-semibold">Prepaid packages</h2>
+      <p className="text-muted-foreground mb-4 text-sm">
+        Paying by manual transfer?{" "}
+        <Link
+          href="/merchant/finance?tab=wallet"
+          data-testid="pricing-top-up-link"
+          className="text-primary hover:underline"
+        >
+          Top up your wallet
+        </Link>{" "}
+        first — approved top-ups become credit you can spend on orders and
+        packages.
+      </p>
       {isLoading ? (
         <Card>
           <CardContent className="text-muted-foreground py-10 text-center text-sm">
@@ -256,6 +278,76 @@ export default function MerchantPricingPage() {
           ))}
         </div>
       )}
+
+      {/* Fee estimator, pre-loaded with the merchant's active bundle tier so the
+          preview matches what order creation actually charges. */}
+      {platformDefaults ? (
+        <div className="mt-8" data-testid="merchant-fee-calculator">
+          <DeliveryFeeCalculator
+            defaultPricing={platformDefaults}
+            packageRule={prevTier ?? null}
+          />
+        </div>
+      ) : null}
+
+      {zoneRates.length > 0 ? (
+        <Card className="mt-8" data-testid="merchant-zone-rate-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPinned className="size-4" />
+              Zone rate card
+            </CardTitle>
+            <CardDescription>
+              Delivery rates by origin and destination zone. A route with no row
+              here falls back to the platform defaults.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">Route</th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Base rate
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Extra / KG
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">Free</th>
+                    <th className="px-4 py-2 text-right font-medium">COD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zoneRates.map((r) => (
+                    <tr
+                      key={r.id}
+                      className="border-border border-t"
+                      data-testid={`zone-rate-${r.id}`}
+                    >
+                      <td className="px-4 py-2">
+                        {zoneName(r.fromZoneId)} → {zoneName(r.toZoneId)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {formatTk(r.baseRate)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {formatTk(r.extraRatePerKg)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {r.freeWeightKg} KG
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {r.codFeePercentage}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <Card>

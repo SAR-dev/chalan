@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server"
 import { isAuthorizedCron } from "@/lib/cron-auth"
 import { drainEmailOutbox } from "@/lib/email-outbox"
+import { logger } from "@/lib/logger"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const POST = withErrorHandler(async (req: Request) => {
@@ -21,6 +22,6 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   const result = await drainEmailOutbox({ limit: 50 })
   const payload = { ...result, ranAt: new Date().toISOString() }
-  console.log("[cron/drain-email-outbox]", payload)
+  logger.info("drain-email-outbox finished", payload)
   return NextResponse.json(payload)
 })

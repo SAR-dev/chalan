@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { db, dbRead } from "@/lib/db"
 import { profile, rider, riderStatuses, user, warehouse } from "@/lib/db/schema"
 import { isUniqueViolation } from "@/lib/db-errors"
@@ -32,7 +33,11 @@ async function deleteUserQuietly(userId: string): Promise<void> {
 }
 
 export const POST = withErrorHandler(async (req: Request) => {
-  const limited = await rateLimitByIp(req, "rider-apply", 3, 60)
+  // failClosed: this creates an auth user and sends mail, so it must stay
+  // throttled even when the client IP cannot be resolved.
+  const limited = await rateLimitByIp(req, "rider-apply", 3, 60, {
+    failClosed: true,
+  })
   if (limited) return limited
 
   const parsed = await parseBody(req, riderApplySchema)
@@ -160,7 +165,9 @@ export const GET = withErrorHandler(async (req: Request) => {
     return forbidden()
   }
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
   const search = new URL(req.url).searchParams.get("q")?.trim()
   let where = search
     ? or(

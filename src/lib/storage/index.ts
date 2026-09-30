@@ -1,5 +1,10 @@
-import { deleteLocalFile, listLocalFiles, saveLocalFile } from "./local"
-import { deleteR2File, listR2Files, saveR2File } from "./r2"
+import {
+  deleteLocalFile,
+  listLocalFiles,
+  readLocalFile,
+  saveLocalFile,
+} from "./local"
+import { deleteR2File, listR2Files, readR2File, saveR2File } from "./r2"
 
 // Unified storage entry point. Set STORAGE_PROVIDER in your .env to switch
 // backends without touching any other code.
@@ -64,4 +69,18 @@ export async function deleteFile(key: string): Promise<void> {
 
   if (provider === "r2") return deleteR2File(key)
   return deleteLocalFile(key)
+}
+
+/**
+ * Reads one stored file by provider-relative key, or null when it is missing.
+ * Used by app/uploads/[...path]/route.ts so owner-only folders are readable
+ * whichever backend holds them.
+ */
+export async function readFile(
+  key: string,
+): Promise<{ buffer: Buffer; contentType: string | null } | null> {
+  const provider = getProvider()
+
+  if (provider === "r2") return readR2File(key)
+  return readLocalFile(key)
 }

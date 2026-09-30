@@ -2,6 +2,7 @@ import { and, eq, gte, isNull, lte, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { dbRead as db } from "@/lib/db"
 import { sumMoney } from "@/lib/db/money-sql"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
@@ -21,7 +22,9 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const url = new URL(req.url)
   const requestedMerchantId = url.searchParams.get("merchantId")?.trim()
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
 
   // Merchants can only ever see their own payable orders — a merchantId in
   // the query string must not let them (or any other non-admin role) read

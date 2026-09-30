@@ -86,7 +86,8 @@ export const merchant = pgTable(
     updatedAt: ts("updatedAt").notNull().defaultNow(),
   },
   (t) => [
-    index("merchant_status_idx").on(t.status),
+    // Also serves plain `WHERE status = …` (status is the leading column).
+    index("merchant_status_created_at_idx").on(t.status, t.createdAt),
     index("merchant_created_at_idx").on(t.createdAt),
     // `user.email` is unique; the merchant link must be too or a
     // check-then-insert race can create duplicate merchant rows per email.

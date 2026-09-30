@@ -1,7 +1,7 @@
 // Server component: renders a slim top strip warning that this is a demo
 // server whose database is wiped and re-seeded at midnight. Reads the
-// NEXT_DEVELOPMENT_MODE flag server-side so it never reaches the client bundle
-// when off.
+// NEXT_PUBLIC_ENV scope server-side, so a production deployment never renders
+// it.
 
 import { isDevModeEnabled } from "@/lib/dev-mode"
 

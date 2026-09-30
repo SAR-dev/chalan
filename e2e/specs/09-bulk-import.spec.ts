@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { CREDS, login, waitForAppReady } from "../helpers"
+import { CREDS, login, toast, waitForAppReady } from "../helpers"
 import { onboarding, orders } from "../selectors"
 
 /** Skip onboarding if the merchant landed on /welcome */
@@ -77,9 +77,6 @@ async function openOrdersPage(page: any) {
   await page.goto("/merchant/orders")
   await waitForAppReady(page)
 }
-
-const toast = (page: any, text: string) =>
-  page.locator("[data-sonner-toast]").filter({ hasText: text })
 
 // ─── S40. CSV bulk import ────────────────────────────────────────────────────
 test.describe("S40. CSV bulk import", () => {

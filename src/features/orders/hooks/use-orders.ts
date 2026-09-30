@@ -13,6 +13,21 @@ import { formatError } from "@/lib/validation"
 
 const KEY = "/api/orders"
 
+/**
+ * SWR keys that go stale when an order changes. Beyond the order lists
+ * themselves (the `KEY` prefix also covers `/api/orders/counts` and
+ * `/api/orders/payable`), an order moves money and consumes package quota, so
+ * merchant balance and the package catalogue must be revalidated too — otherwise
+ * the balance and "orders used" figures stay stale until a manual refresh.
+ */
+function isOrderRelatedKey(key: string): boolean {
+  return (
+    key.startsWith(KEY) ||
+    key.startsWith("/api/merchants") ||
+    key.startsWith("/api/packages")
+  )
+}
+
 type Result = { ok: boolean; error?: string }
 
 type BulkAction =
@@ -160,7 +175,10 @@ export function useOrders({
               }
             : {}),
         })
-        const resData = await res.json().catch(() => null)
+        const resData = await res
+          .json()
+          .catch(() => null)
+          .catch(() => null)
         if (!res.ok) {
           throw new ApiError(resData?.error ?? "Action failed.")
         }
@@ -174,12 +192,7 @@ export function useOrders({
               ),
             }) as PaginatedResponse<Order>,
         )
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch (err) {
         if (err instanceof ApiError) return { ok: false, error: err.message }
@@ -205,12 +218,7 @@ export function useOrders({
         if (!res.ok) {
           return { ok: false, error: data?.error ?? "Bulk action failed." }
         }
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch {
         return { ok: false, error: "Network error. Please try again." }
@@ -228,18 +236,13 @@ export function useOrders({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok) {
         const msg = formatError(resData)
         return { ok: false, error: msg }
       }
       await mutate()
-      _globalMutate(
-        (key: string) =>
-          key.startsWith(KEY) ||
-          key.startsWith(`${KEY}/counts`) ||
-          key.startsWith(`${KEY}/payable`),
-      ).catch(() => {})
+      _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
       return { ok: true, order: resData }
     },
     [mutate, _globalMutate],
@@ -260,23 +263,18 @@ export function useOrders({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orders: inputs }),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok) {
         const msg = formatError(resData)
         return {
           ok: false,
           error: msg,
-          issues: resData.issues ?? null,
-          rows: resData.rows ?? null,
+          issues: resData?.issues ?? null,
+          rows: resData?.rows ?? null,
         }
       }
       await mutate()
-      _globalMutate(
-        (key: string) =>
-          key.startsWith(KEY) ||
-          key.startsWith(`${KEY}/counts`) ||
-          key.startsWith(`${KEY}/payable`),
-      ).catch(() => {})
+      _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
       return { ok: true, orders: resData }
     },
     [mutate, _globalMutate],
@@ -382,7 +380,10 @@ export function useOrders({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ merchantNote }),
             })
-            const resData = await res.json().catch(() => null)
+            const resData = await res
+              .json()
+              .catch(() => null)
+              .catch(() => null)
             if (!res.ok) {
               throw new ApiError(resData?.error ?? "Failed to save note.")
             }
@@ -406,12 +407,7 @@ export function useOrders({
             revalidate: false,
           },
         )
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch (err) {
         if (err instanceof ApiError) return { ok: false, error: err.message }
@@ -433,7 +429,10 @@ export function useOrders({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ receiverNote }),
             })
-            const resData = await res.json().catch(() => null)
+            const resData = await res
+              .json()
+              .catch(() => null)
+              .catch(() => null)
             if (!res.ok) {
               throw new ApiError(resData?.error ?? "Failed to save note.")
             }
@@ -457,12 +456,7 @@ export function useOrders({
             revalidate: false,
           },
         )
-        _globalMutate(
-          (key: string) =>
-            key.startsWith(KEY) ||
-            key.startsWith(`${KEY}/counts`) ||
-            key.startsWith(`${KEY}/payable`),
-        ).catch(() => {})
+        _globalMutate((key: string) => isOrderRelatedKey(key)).catch(() => {})
         return { ok: true }
       } catch (err) {
         if (err instanceof ApiError) return { ok: false, error: err.message }

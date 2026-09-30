@@ -2,6 +2,7 @@ import { asc, desc, ilike, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { unauthorized } from "@/lib/api-response"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { dbRead as db } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
 import { paginateResponse, parsePagination, parseSort } from "@/lib/pagination"
@@ -14,7 +15,9 @@ export const GET = withErrorHandler(async (req: Request) => {
     return NextResponse.json(paginateResponse([], 0), { status: 200 })
   }
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
   const search = new URL(req.url).searchParams.get("q")?.trim()
   const where = search
     ? (() => {

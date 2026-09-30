@@ -2,10 +2,11 @@ import "dotenv/config"
 
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
-import { CREDS, login, waitForAppReady } from "../helpers"
+import { CREDS, login, toast, waitForAppReady } from "../helpers"
 import {
   activated,
   activation,
+  auth,
   dialog,
   merchantQuota,
   moderators,
@@ -31,9 +32,6 @@ async function skipOnboardingIfNeeded(page: Page) {
   await page.waitForURL(/\/merchant/, { timeout: 15_000 })
   await waitForAppReady(page)
 }
-
-const toast = (page: Page, text: string) =>
-  page.locator("[data-sonner-toast]").filter({ hasText: text })
 
 /**
  * Read the latest activation email for an address straight from Postgres —
@@ -308,9 +306,7 @@ test.describe("S41. Merchant moderator accounts", () => {
     await page.locator("[data-testid='login-email']").fill(modEmail)
     await page.locator("[data-testid='login-password']").fill(MOD_PASSWORD2)
     await page.locator("[data-testid='login-submit']").click()
-    await expect(
-      page.getByRole("alert").filter({ hasText: /deactivated/i }),
-    ).toBeVisible({
+    await expect(page.locator(auth.loginError)).toContainText(/deactivated/i, {
       timeout: 15_000,
     })
   })

@@ -5,12 +5,27 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: no job here needs to write to the repo.
+permissions:
+  contents: read
+
+# A newer push to the same ref supersedes the in-flight run instead of queueing
+# behind it, so rapid pushes don't stack full runs and burn runner minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NEXT_PUBLIC_ENV: development
   NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
 jobs:
-  typecheck:
+  # `pnpm ci:check` is the repo's definition of the quality gate
+  # (typecheck && lint:check && format:check). One job running it instead of
+  # three jobs running each half: a full `pnpm install` to reach a ~1.5s Biome
+  # check is the real cost here, and splitting it paid that three times over.
+  # The failing step is still named in the PR checks list.
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,46 +35,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint:check
-
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test:unit:run
+      - run: pnpm ci:check
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -69,17 +49,50 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Smoke the built artifact: a build that compiles but cannot boot is caught
+      # here rather than only in the (currently disabled) e2e job. /api/health is
+      # deliberately DB-free, so this needs no database.
+      #
+      # `validateEnv` runs from instrumentation on boot and refuses to start on a
+      # missing required var, so this env must satisfy it in full — not just the
+      # vars the health route happens to read. CRON_SECRET is required outright;
+      # LOCAL_UPLOADS_DIR is required once STORAGE_PROVIDER resolves to `local`
+      # (the default). NEXT_PUBLIC_* come from the workflow-level env block.
+      - name: Smoke test the built app
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+          BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
+          CRON_SECRET: ci-cron-secret-0000000000000000000000
+          STORAGE_PROVIDER: local
+          LOCAL_UPLOADS_DIR: ./.uploads
+        run: |
+          pnpm start &
+          SERVER_PID=$!
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:3000/api/health
+          kill "$SERVER_PID"
 
   security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+      # No `pnpm install` here on purpose: `pnpm audit` resolves the tree from
+      # pnpm-lock.yaml and queries the registry, and the dependency-review
+      # action diffs the lockfile against the base ref. Neither needs
+      # node_modules, so the install would be pure runner minutes.
+      #
+      # Consequently there is also no `cache: pnpm` below: setup-node's cache
+      # adds a post-job save step, and with nothing ever populating the store it
+      # fails the job with "Path Validation Error: Path(s) specified in the
+      # action for caching do(es) not exist". The cache and the install have to
+      # travel together — ci-workflow.spec.ts enforces that across every job.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       # Advisory gate (H1): blocks on any high/critical vulnerability in the
       # dependency tree. Moderate/low findings are printed but do not block.
       # Fixes: bump the package or add an override in pnpm-workspace.yaml.
@@ -105,8 +118,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Fails if statements/branches/functions/lines fall below the floors in
-      # vitest.config.ts, so coverage cannot silently regress (ROADMAP P3).
+      # Runs the whole unit suite AND enforces the floors in vitest.config.ts, so
+      # it supersedes a separate `pnpm test:unit:run` job (same tests, plus the
+      # regression gate) — one fewer full install + transform per run.
       - run: pnpm test:coverage
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -133,9 +147,11 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://neondb_owner:npg_Xsd3J8aQLKEr@ep-winter-flower-ao2mptb0-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      # The postgres service container declared above — hermetic, and it means
+      # a bad migration or fixture can never touch a shared remote database.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
       BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
-      INTEGRATION_DATABASE_URL: postgresql://neondb_owner:npg_Xsd3J8aQLKEr@ep-winter-flower-ao2mptb0-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      INTEGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -149,56 +165,59 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm test:integration
 
-  e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: delivery
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    # No `.env`/`.env.e2e` file in CI — env comes from here (shell values win
-    # over any file anyway). Playwright's webServer inherits these and adds its
-    # own (AUTH_RATE_LIMIT_DISABLED, TRUSTED_PROXY_HOPS, LOG_EMAIL_BODY); the
-    # test workers read DATABASE_URL / CRON_SECRET directly.
-    env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
-      BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
-      CRON_SECRET: ci-cron-secret-0000000000000000000000
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
-      NEXT_PUBLIC_ENV: development
-      STORAGE_PROVIDER: local
-      LOCAL_UPLOADS_DIR: ./.uploads
-      TZ: Asia/Dhaka
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # Schema first: the webServer seeds (pnpm db:seed:full) before it starts.
-      - run: pnpm db:migrate
-      - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
-      # Playwright boots its own server: `pnpm db:seed:full && pnpm start`.
-      - run: pnpm test:e2e
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
-
+  # Disabled on purpose to save CI minutes. Run it locally with:
+  #   pnpm build && pnpm test:e2e
+  # `src/app/__tests__/ci-workflow.spec.ts` still validates the step ordering
+  # below (it strips comment markers), so re-enabling this job must keep it.
+  #   e2e:
+  #     runs-on: ubuntu-latest
+  #     timeout-minutes: 40
+  #     services:
+  #       postgres:
+  #         image: postgres:17
+  #         env:
+  #           POSTGRES_USER: postgres
+  #           POSTGRES_PASSWORD: postgres
+  #           POSTGRES_DB: delivery
+  #         ports:
+  #           - 5432:5432
+  #         options: >-
+  #           --health-cmd pg_isready
+  #           --health-interval 10s
+  #           --health-timeout 5s
+  #           --health-retries 5
+  #     # No `.env`/`.env.e2e` file in CI — env comes from here (shell values win
+  #     # over any file anyway). Playwright's webServer inherits these and adds its
+  #     # own (AUTH_RATE_LIMIT_DISABLED, TRUSTED_PROXY_HOPS, LOG_EMAIL_BODY); the
+  #     # test workers read DATABASE_URL / CRON_SECRET directly.
+  #     env:
+  #       DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
+  #       BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
+  #       CRON_SECRET: ci-cron-secret-0000000000000000000000
+  #       NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  #       NEXT_PUBLIC_ENV: development
+  #       STORAGE_PROVIDER: local
+  #       LOCAL_UPLOADS_DIR: ./.uploads
+  #       TZ: Asia/Dhaka
+  #     steps:
+  #       - uses: actions/checkout@v4
+  #       - uses: pnpm/action-setup@v4
+  #       - uses: actions/setup-node@v4
+  #         with:
+  #           node-version: 24
+  #           cache: pnpm
+  #       - run: pnpm install --frozen-lockfile
+  #       # Schema first: the webServer seeds (pnpm db:seed:full) before it starts.
+  #       - run: pnpm db:migrate
+  #       - run: pnpm build
+  #       - run: pnpm exec playwright install --with-deps chromium
+  #       # Playwright boots its own server: `pnpm db:seed:full && pnpm start`.
+  #       - run: pnpm test:e2e
+  #       - uses: actions/upload-artifact@v4
+  #         if: failure()
+  #         with:
+  #           name: playwright-report
+  #           path: |
+  #             playwright-report/
+  #             test-results/
+  #           retention-days: 7

@@ -8,6 +8,7 @@ import {
   Mail,
   MailCheck,
   MoreHorizontal,
+  PackagePlus,
   Phone,
   RotateCcw,
   Store,
@@ -41,6 +42,7 @@ import { columnLabels } from "@/config/table-column-labels"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
 import { PricingDialog } from "@/features/merchants/dialogs/pricing-dialog"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { AssignPackageDialog } from "@/features/packages/dialogs/assign-package-dialog"
 import { formatTk } from "@/lib/pricing"
 import type { Merchant } from "@/lib/types"
 
@@ -127,6 +129,7 @@ export function MerchantsPageClient({
 
   const [pricingMerchant, setPricingMerchant] = useState<Merchant | null>(null)
   const [pricingOpen, setPricingOpen] = useState(false)
+  const [assignTarget, setAssignTarget] = useState<Merchant | null>(null)
   const [confirmMerchant, setConfirmMerchant] = useState<Merchant | null>(null)
   const [confirmAction, setConfirmAction] = useState<
     "suspend" | "reactivate" | null
@@ -351,6 +354,13 @@ export function MerchantsPageClient({
                 <Coins className="size-4" />
                 View balance
               </DropdownMenuItem>
+              <DropdownMenuItem
+                data-testid={`merchant-assign-package-${m.id}`}
+                onClick={() => setAssignTarget(m)}
+              >
+                <PackagePlus className="size-4" />
+                Assign package
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {m.status === "SUSPENDED" ? (
                 <DropdownMenuItem onClick={() => openConfirm(m, "reactivate")}>
@@ -549,6 +559,15 @@ export function MerchantsPageClient({
         merchant={pricingMerchant}
         open={pricingOpen}
         onOpenChange={setPricingOpen}
+      />
+
+      <AssignPackageDialog
+        merchant={
+          assignTarget
+            ? { id: assignTarget.id, businessName: assignTarget.businessName }
+            : null
+        }
+        onClose={() => setAssignTarget(null)}
       />
 
       <ConfirmDialog

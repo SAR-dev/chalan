@@ -44,7 +44,11 @@ test.describe("S53. Typed counts", () => {
     const res = await request.get("/api/orders/counts?warehouseId=WH-100001E")
     expect(res.ok()).toBeTruthy()
     const json = (await res.json()) as Record<string, unknown>
-    expect(Object.keys(json).length).toBeGreaterThan(0)
+    // Pin the exact shape: a silent rename or a dropped count would otherwise
+    // pass the "all numbers" loop below.
+    expect(Object.keys(json).sort()).toEqual(
+      ["failedAttempt", "returned", "unsettled"].sort(),
+    )
     for (const [key, value] of Object.entries(json)) {
       expect(typeof value, `orders/counts.${key}`).toBe("number")
     }

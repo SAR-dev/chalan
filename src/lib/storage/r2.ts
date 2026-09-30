@@ -1,16 +1,25 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3"
+import { isOwnerOnlyPath, UPLOADS_URL_PREFIX } from "./config"
 
 // Cloudflare R2 storage backend. Drop-in replacement for lib/storage/local.ts.
 //
 // R2 is S3-compatible, so we use the AWS SDK pointed at the R2 endpoint.
-// Files are written to R2 under {folder}/{userId}/{uuid}.{ext} and served
-// directly from R2's public URL — the app/uploads/[...path] serving route is
-// no longer needed.
+// Files are written to R2 under {folder}/{userId}/{uuid}.{ext}.
+//
+// How they are served depends on the folder's read policy
+// (lib/storage/config.ts):
+//   - owner-only folders (`avatars`, `nids`) get an app-relative
+//     `/uploads/...` URL, so reads go through app/uploads/[...path]/route.ts
+//     and keep their owner check. A direct bucket URL would make identity
+//     documents world-readable.
+//   - every other folder gets the public R2 URL and is served from R2
+//     directly (the CDN path).
 //
 // Required env vars (add to .env and your deployment secrets):
 //   R2_ACCOUNT_ID        — Cloudflare account ID (Dashboard → right sidebar)
@@ -69,7 +78,38 @@ export async function saveR2File(
 
   return {
     path: relativePath,
-    publicUrl: `${publicUrl.replace(/\/$/, "")}/${relativePath}`,
+    // Owner-only folders are served through the app's authenticated route, so
+    // the returned URL must be app-relative — never the public bucket URL.
+    publicUrl: isOwnerOnlyPath(relativePath)
+      ? `${UPLOADS_URL_PREFIX}/${relativePath}`
+      : `${publicUrl.replace(/\/$/, "")}/${relativePath}`,
+  }
+}
+
+/**
+ * Reads one object by provider-relative key, or null when it is missing. Used
+ * by the `/uploads` serving route for owner-only folders.
+ */
+export async function readR2File(
+  key: string,
+): Promise<{ buffer: Buffer; contentType: string | null } | null> {
+  const bucket = process.env.R2_BUCKET_NAME
+  if (!bucket) throw new Error("Missing env var: R2_BUCKET_NAME")
+
+  const client = getR2Client()
+  try {
+    const res = await client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+    )
+    if (!res.Body) return null
+    const bytes = await res.Body.transformToByteArray()
+    return {
+      buffer: Buffer.from(bytes),
+      contentType: res.ContentType ?? null,
+    }
+  } catch {
+    // Missing key / access denied both mean "not readable" to the caller.
+    return null
   }
 }
 

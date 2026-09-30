@@ -9,6 +9,7 @@ import {
   settledTotal,
   toPaisa,
 } from "@/lib/balance-ledger"
+import { balanceTxTypes } from "@/lib/db/schema.postgres/enums"
 
 describe("toPaisa", () => {
   it("rounds money to 2 decimals", () => {
@@ -135,5 +136,38 @@ describe("settledTotal (reconciliation invariant)", () => {
       { amount: 0.2, status: "SETTLED" },
     ]
     expect(settledTotal(rows)).toBe(0.3)
+  })
+
+  it("still balances when a bundle credit is mixed in", () => {
+    // The prepaid package is money already in hand, so approving one writes a
+    // PAYMENT_CONFIRMED credit. The reconciliation invariant must survive it.
+    const rows = [
+      { amount: 52, status: "SETTLED" }, // ORDER_CHARGE for the order below
+      { amount: -500, status: "SETTLED" }, // package purchase approved
+      { amount: -300, status: "PENDING" }, // top-up awaiting confirmation
+    ]
+    expect(settledTotal(rows)).toBe(-448)
+  })
+})
+
+// Prepaid packages deliberately add NO ledger type: approving a purchase
+// reuses PAYMENT_CONFIRMED (with `paymentMethod: "PACKAGE"`) and a direct
+// admin assign writes nothing at all, because no money moved. This pins the
+// whole enum so a future "just add a PACKAGE_CREDIT type" shortcut fails here.
+describe("balanceTxTypes", () => {
+  it("has no package-specific type", () => {
+    expect(balanceTxTypes).toEqual([
+      "ORDER_CHARGE",
+      "ORDER_CHARGE_REVERSAL",
+      "ORDER_EARNINGS",
+      "ORDER_CANCELLATION",
+      "PAYOUT",
+      "PAYMENT_PENDING",
+      "PAYMENT_CONFIRMED",
+      "ADJUSTMENT",
+    ])
+    expect(
+      balanceTxTypes.filter((type) => /PACKAGE|BUNDLE|TIER/i.test(type)),
+    ).toEqual([])
   })
 })

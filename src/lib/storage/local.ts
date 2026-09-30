@@ -1,5 +1,13 @@
-import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises"
-import { dirname, join, normalize, sep } from "node:path"
+import {
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises"
+import { dirname, extname, join, normalize, sep } from "node:path"
+import { UPLOADS_URL_PREFIX } from "./config"
 
 // Server-only local-disk storage backend. Writes files to a directory on the
 // host (mounted as a Docker volume in production so uploads survive
@@ -14,7 +22,8 @@ export const LOCAL_UPLOADS_DIR = process.env.LOCAL_UPLOADS_DIR!
 
 // Public path prefix files are served from (handled by
 // app/uploads/[...path]/route.ts). Must match that route's location.
-export const UPLOADS_URL_PREFIX = "/uploads"
+// Re-exported from the shared config so the storage backends agree on one value.
+export { UPLOADS_URL_PREFIX }
 
 export type LocalUploadResult = { path: string; publicUrl: string }
 
@@ -47,6 +56,52 @@ export async function saveLocalFile(
 }
 
 export type LocalFileEntry = { key: string; size: number; lastModified: Date }
+
+/**
+ * Reads one stored file by provider-relative key, or null when it is missing or
+ * the key escapes the uploads directory. Used by the `/uploads` serving route so
+ * the local and R2 backends share one read path.
+ */
+export async function readLocalFile(
+  key: string,
+): Promise<{ buffer: Buffer; contentType: string | null } | null> {
+  const segments = key.split("/")
+  if (
+    segments.length === 0 ||
+    segments.some(
+      (segment) =>
+        segment === "" ||
+        segment === "." ||
+        segment === ".." ||
+        segment.includes(sep),
+    )
+  ) {
+    return null
+  }
+
+  const targetPath = normalize(join(LOCAL_UPLOADS_DIR, ...segments))
+  const root = normalize(LOCAL_UPLOADS_DIR + sep)
+  if (!targetPath.startsWith(root)) return null
+
+  try {
+    const fileStat = await stat(targetPath)
+    if (!fileStat.isFile()) return null
+    const ext = extname(targetPath).toLowerCase()
+    const contentType =
+      ext === ".png"
+        ? "image/png"
+        : ext === ".jpg" || ext === ".jpeg"
+          ? "image/jpeg"
+          : ext === ".webp"
+            ? "image/webp"
+            : ext === ".gif"
+              ? "image/gif"
+              : null
+    return { buffer: await readFile(targetPath), contentType }
+  } catch {
+    return null
+  }
+}
 
 /**
  * Lists every file under LOCAL_UPLOADS_DIR as provider-relative keys

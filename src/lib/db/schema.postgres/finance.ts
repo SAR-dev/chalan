@@ -73,7 +73,6 @@ export const balanceTransaction = pgTable(
     updatedAt: ts("updatedAt").notNull().defaultNow(),
   },
   (t) => [
-    index("balance_tx_merchant_id_idx").on(t.merchantId),
     index("balance_tx_status_idx").on(t.status),
     index("balance_tx_type_idx").on(t.type),
     index("balance_tx_order_id_idx").on(t.orderId),

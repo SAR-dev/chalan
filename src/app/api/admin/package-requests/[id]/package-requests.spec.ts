@@ -189,6 +189,7 @@ describe("PATCH /api/admin/package-requests/:id", () => {
     expect(insertPayloads).toHaveLength(0)
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "PACKAGE_REQUEST_REJECTED" }),
+      expect.anything(),
     )
   })
 
@@ -236,6 +237,7 @@ describe("PATCH /api/admin/package-requests/:id", () => {
     })
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "PACKAGE_REQUEST_APPROVED" }),
+      expect.anything(),
     )
   })
 
@@ -249,5 +251,24 @@ describe("PATCH /api/admin/package-requests/:id", () => {
     expect(res.status).toBe(200)
     const ledger = insertPayloads.find((p) => p.type === "PAYMENT_CONFIRMED")
     expect(ledger).toMatchObject({ amount: -750 })
+  })
+
+  it("approve reuses PAYMENT_CONFIRMED rather than a package-only type", async () => {
+    // Packages add no new ledger type: the bundle row and one existing-type
+    // credit are the only inserts an approval makes.
+    sessionState.value = admin
+    selectQueue.push([pendingRequest])
+    insertResult.push({ id: "mp_new" })
+    updateResult.push({ ...pendingRequest, status: "APPROVED" })
+
+    const res = await review(req({ action: "approve" }), params)
+    expect(res.status).toBe(200)
+
+    const types = insertPayloads.flatMap((p) => ("type" in p ? [p.type] : []))
+    expect(types).toEqual(["PAYMENT_CONFIRMED"])
+    // The credit is tagged as a package payment for the admin queue to show.
+    expect(insertPayloads).toContainEqual(
+      expect.objectContaining({ paymentMethod: "PACKAGE" }),
+    )
   })
 })

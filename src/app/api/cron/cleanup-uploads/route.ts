@@ -71,7 +71,10 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   if (dryRun) {
     for (const file of orphans) {
-      console.log("[cron/cleanup-uploads] dry-run orphan", file.key, file.size)
+      logger.info("cleanup-uploads dry-run orphan", {
+        key: file.key,
+        size: file.size,
+      })
     }
   } else {
     // Safety rail: re-read the referenced set immediately before the delete
@@ -94,7 +97,10 @@ export const POST = withErrorHandler(async (req: Request) => {
         await deleteFile(file.key)
         deleted += 1
         bytesFreed += file.size
-        console.log("[cron/cleanup-uploads] deleted", file.key, file.size)
+        logger.info("cleanup-uploads deleted", {
+          key: file.key,
+          size: file.size,
+        })
       } catch (err) {
         // One bad file must never fail the whole job.
         failed += 1
@@ -116,6 +122,6 @@ export const POST = withErrorHandler(async (req: Request) => {
     ranAt: now.toISOString(),
   }
 
-  console.log("[cron/cleanup-uploads]", result)
+  logger.info("cleanup-uploads finished", result)
   return NextResponse.json(result)
 })

@@ -4,20 +4,14 @@ import type { Metadata } from "next"
 import { Markdown } from "@/components/markdown"
 import { PublicFooter } from "@/components/public-footer"
 import { PublicHeader } from "@/components/public-header"
-import { appContent, siteConfig } from "@/config/site"
+import { siteConfig } from "@/config/site"
+import { replaceContentKeywords } from "@/lib/content-keywords"
 import { parseFaqSections } from "./faq-sections"
 import { FaqTabs } from "./faq-tabs"
 
 export const metadata: Metadata = {
   title: "Frequently Asked Questions",
   description: `${siteConfig.name} FAQ — answers for merchants, riders, warehouse admins, and super admins about accounts, orders, pricing, prepaid packages, pickups, deliveries, and payouts.`,
-}
-
-function replaceContentKeywords(content: string): string {
-  return content
-    .replace(/\{\{APP_NAME\}\}/g, appContent.APP_NAME)
-    .replace(/\{\{APP_URL\}\}/g, appContent.APP_URL)
-    .replace(/\{\{APP_EMAIL\}\}/g, appContent.APP_EMAIL)
 }
 
 export default function FaqPage() {

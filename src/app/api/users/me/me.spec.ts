@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { GET as getMe, PATCH as updateMe } from "./route"
 
-vi.mock("@/lib/api-auth", () => ({}))
+// PATCH gates on requireSession() (the GET stays lenient on purpose so the
+// client can render the pending-activation state).
+vi.mock("@/lib/api-auth", () => ({
+  requireSession: () =>
+    Promise.resolve(
+      sessionState.value
+        ? { userId: "u1", role: "MERCHANT", name: "Test User" }
+        : null,
+    ),
+}))
 
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),

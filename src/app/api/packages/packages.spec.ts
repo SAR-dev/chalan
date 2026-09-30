@@ -13,6 +13,20 @@ vi.mock("@/lib/audit", () => ({
 }))
 
 const selectQueue: unknown[][] = []
+const whereCalls: unknown[] = []
+
+/**
+ * Walks a Drizzle SQL predicate's chunk tree looking for a column reference.
+ * (The predicate object is circular, so it cannot be JSON-stringified.)
+ */
+function mentionsColumn(name: string): (value: unknown) => boolean {
+  return function walk(value: unknown): boolean {
+    if (!value || typeof value !== "object") return false
+    if ((value as { name?: string }).name === name) return true
+    const chunks = (value as { queryChunks?: unknown[] }).queryChunks
+    return Array.isArray(chunks) ? chunks.some(walk) : false
+  }
+}
 const insertResult: unknown[] = []
 const insertPayloads: Record<string, unknown>[] = []
 
@@ -20,7 +34,10 @@ vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
     const chain: Record<string, unknown> = {
       from: () => chain,
-      where: () => chain,
+      where: (predicate: unknown) => {
+        whereCalls.push(predicate)
+        return chain
+      },
       limit: () => chain,
       orderBy: () => chain,
       innerJoin: () => chain,
@@ -54,6 +71,7 @@ vi.mock("@/lib/db", () => {
 
 beforeEach(() => {
   selectQueue.length = 0
+  whereCalls.length = 0
   insertResult.length = 0
   insertPayloads.length = 0
   sessionState.value = null
@@ -108,7 +126,9 @@ describe("GET /api/packages", () => {
 
   it("a merchant only sees active packages", async () => {
     sessionState.value = merchant
-    selectQueue.push([starter, retired])
+    // Postgres applies the `isActive` predicate, so the fake DB returns only
+    // what the real query would.
+    selectQueue.push([starter])
     selectQueue.push([{ id: "t_1", packageId: "pkg_1" }])
     selectQueue.push([]) // active bundle
     selectQueue.push([]) // latest request
@@ -119,6 +139,8 @@ describe("GET /api/packages", () => {
     expect(json.packages[0].id).toBe("pkg_1")
     // Tiers are nested onto their package for the catalogue card.
     expect(json.packages[0].tiers).toHaveLength(1)
+    // ...and the catalogue is filtered in SQL rather than in JS.
+    expect(whereCalls.some(mentionsColumn("isActive"))).toBe(true)
   })
 
   it("a merchant gets their active bundle and latest request", async () => {

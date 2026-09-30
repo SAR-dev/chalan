@@ -115,7 +115,7 @@ export function usePayouts({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -134,7 +134,7 @@ export function usePayouts({
       const res = await fetch(`${KEY}/${requestId}/approve`, {
         method: "PATCH",
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -175,7 +175,7 @@ export function usePayouts({
         method: "PATCH",
         body: JSON.stringify({ reason }),
       })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,
@@ -213,7 +213,7 @@ export function usePayouts({
   const markPayoutPaid = useCallback(
     async (requestId: string): Promise<Result> => {
       const res = await fetch(`${KEY}/${requestId}/paid`, { method: "PATCH" })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,

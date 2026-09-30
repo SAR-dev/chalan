@@ -22,10 +22,16 @@ export function isAllowedOrigin(req: Request): boolean {
     const allowed = new Set<string>()
 
     if (SITE_URL) {
+      // A configured site origin is authoritative: do NOT also trust origins
+      // derived from the request, or a caller able to influence the Host header
+      // could make an arbitrary Origin match.
       allowed.add(new URL(SITE_URL).origin)
+      return allowed.has(origin)
     }
-    allowed.add(new URL(req.url).origin)
 
+    // No configured origin (local dev, tests): fall back to the request's own
+    // origin, which is the best signal available.
+    allowed.add(new URL(req.url).origin)
     const host = req.headers.get("host")
     if (host) {
       allowed.add(`${new URL(req.url).protocol}//${host}`)

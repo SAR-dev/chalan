@@ -6,7 +6,6 @@
 //
 // Add new vars here as the app grows — group them by concern.
 
-import { devModeFlagSet } from "@/lib/dev-mode"
 import { parseAllowlist } from "@/lib/ip-allowlist"
 
 type EnvError = { key: string; message: string }
@@ -100,11 +99,10 @@ export function validateEnv(): void {
     }
 
     // A deploy with NEXT_PUBLIC_ENV=development in production would silently
-    // disable Vercel Analytics and keep localhost in trustedOrigins, so make
-    // sure that var is explicitly validated rather than left to its fallback.
-    // A deploy with NEXT_PUBLIC_ENV=development in production would silently
-    // disable Vercel Analytics — validate the var rather than trusting its
-    // fallback.
+    // disable Vercel Analytics, keep localhost in trustedOrigins, and turn on
+    // the seeded-demo helpers — so validate the var explicitly rather than
+    // leaving it to a fallback. It also scopes the demo sign-in picker, banner
+    // and nightly reseed to development deployments (see src/lib/dev-mode.ts).
     oneOf(e, "NEXT_PUBLIC_ENV", ["development", "production"], "development")
 
     // Used to authenticate the /api/cron/cleanup-sessions endpoint.
@@ -216,24 +214,6 @@ export function validateEnv(): void {
     // "all" = everything (default). Server-only (never NEXT_PUBLIC); read at
     // runtime by proxy/api-auth, so changing it needs a restart.
     oneOf(e, "PORTAL_MODE", ["admin", "public", "all"], "all")
-
-    // Optional — NEXT_DEVELOPMENT_MODE="true" turns on the seeded-demo helpers:
-    // a sign-in dropdown of the well-known dev accounts on /login, a demo
-    // banner, and a daily midnight reset to the basic seed. It puts account
-    // credentials in the browser, so a production deployment that enables it is
-    // a misconfiguration worth failing boot over.
-    if (process.env.NEXT_DEVELOPMENT_MODE) {
-      oneOf(e, "NEXT_DEVELOPMENT_MODE", ["0", "1", "true", "false"], "false")
-      // Read the raw flag, not isDevModeEnabled() — the latter is already
-      // forced off in production, which would make this check unreachable.
-      if (isProd && devModeFlagSet()) {
-        e.push({
-          key: "NEXT_DEVELOPMENT_MODE",
-          message:
-            "Must not be enabled in production — it exposes seeded account credentials on the sign-in page.",
-        })
-      }
-    }
 
     const provider = oneOf(e, "STORAGE_PROVIDER", ["local", "r2"], "local")
 

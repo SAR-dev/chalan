@@ -228,6 +228,7 @@ export function OrderDetailView({
             variant="outline"
             size="sm"
             className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 shrink-0"
+            data-testid="cancel-order"
             onClick={() => setCancelOpen(true)}
           >
             <Ban className="size-3.5" />

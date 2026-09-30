@@ -44,7 +44,7 @@ export function useEmailLogs() {
   const markAsSent = useCallback(
     async (id: string): Promise<Result> => {
       const res = await fetch(`${KEY}/${id}`, { method: "PATCH" })
-      const resData = await res.json()
+      const resData = await res.json().catch(() => null)
       if (!res.ok)
         return {
           ok: false,

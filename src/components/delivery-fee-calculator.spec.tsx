@@ -79,4 +79,32 @@ describe("DeliveryFeeCalculator", () => {
     })
     expect(screen.getAllByText("60 TK").length).toBeGreaterThan(0)
   })
+
+  it("discounts the delivery fee by an active bundle rule", async () => {
+    vi.stubGlobal("fetch", mockFetch([dhaka, chattogram], [dhakaChattogramRow]))
+    render(
+      <DeliveryFeeCalculator
+        defaultPricing={defaultPricing}
+        packageRule={{ ruleType: "PERCENT_OFF", ruleValue: 25 }}
+      />,
+    )
+
+    // Zone base rate 80 → 25% off = 60, with the discount called out.
+    await waitFor(() => {
+      expect(screen.getByTestId("calc-delivery-fee")).toHaveTextContent("60 TK")
+    })
+    expect(screen.getByTestId("calc-bundle-discount")).toHaveTextContent(
+      /Bundle discount −20 TK \(was 80 TK\)/,
+    )
+  })
+
+  it("shows no bundle line when there is no active rule", async () => {
+    vi.stubGlobal("fetch", mockFetch([dhaka, chattogram], [dhakaChattogramRow]))
+    render(<DeliveryFeeCalculator defaultPricing={defaultPricing} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("calc-delivery-fee")).toHaveTextContent("80 TK")
+    })
+    expect(screen.queryByTestId("calc-bundle-discount")).not.toBeInTheDocument()
+  })
 })

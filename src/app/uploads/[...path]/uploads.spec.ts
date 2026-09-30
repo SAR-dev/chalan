@@ -3,27 +3,26 @@ import { GET } from "./route"
 
 const state = vi.hoisted(() => ({
   session: null as Record<string, unknown> | null,
-  statThrows: false,
-  statCalls: 0,
+  fileMissing: false,
+  readCalls: 0,
 }))
 
 vi.mock("@/lib/api-auth", () => ({
   requireSession: () => Promise.resolve(state.session),
 }))
 
-// Avoid depending on a real uploads directory.
-vi.mock("@/lib/storage/local", () => ({
-  LOCAL_UPLOADS_DIR: "C:/tmp/uploads",
-}))
-
-vi.mock("node:fs/promises", () => ({
-  stat: () => {
-    state.statCalls += 1
-    return state.statThrows
-      ? Promise.reject(new Error("ENOENT"))
-      : Promise.resolve({ isFile: () => true })
+// The route reads through the storage abstraction (so the local and R2
+// backends share one path), so mock that rather than the filesystem.
+vi.mock("@/lib/storage", () => ({
+  readFile: () => {
+    state.readCalls += 1
+    return state.fileMissing
+      ? Promise.resolve(null)
+      : Promise.resolve({
+          buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+          contentType: null,
+        })
   },
-  readFile: () => Promise.resolve(Buffer.from([0x89, 0x50, 0x4e, 0x47])),
 }))
 
 function req(
@@ -40,8 +39,8 @@ const superAdmin = { userId: "u_admin", role: "SUPER_ADMIN" }
 
 beforeEach(() => {
   state.session = null
-  state.statThrows = false
-  state.statCalls = 0
+  state.fileMissing = false
+  state.readCalls = 0
 })
 
 describe("GET /uploads/[...path] access policy", () => {
@@ -55,14 +54,14 @@ describe("GET /uploads/[...path] access policy", () => {
     const res = await GET(...req(["nids", "u_1", "id.png"]))
     expect(res.status).toBe(401)
     // Auth is checked before touching the filesystem.
-    expect(state.statCalls).toBe(0)
+    expect(state.readCalls).toBe(0)
   })
 
   it("403s for another user's NID", async () => {
     state.session = merchant
     const res = await GET(...req(["nids", "u_other", "id.png"]))
     expect(res.status).toBe(403)
-    expect(state.statCalls).toBe(0)
+    expect(state.readCalls).toBe(0)
   })
 
   it("serves the owner their own NID with a private cache", async () => {
@@ -96,12 +95,12 @@ describe("GET /uploads/[...path] access policy", () => {
   it("404s for traversal attempts", async () => {
     const res = await GET(...req(["nids", "..", "secret.png"]))
     expect(res.status).toBe(404)
-    expect(state.statCalls).toBe(0)
+    expect(state.readCalls).toBe(0)
   })
 
   it("404s when the file does not exist", async () => {
     state.session = merchant
-    state.statThrows = true
+    state.fileMissing = true
     const res = await GET(...req(["nids", "u_1", "missing.png"]))
     expect(res.status).toBe(404)
   })
