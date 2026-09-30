@@ -1,5 +1,5 @@
 import { siteConfig } from "@/config/site"
-import { isValidHexColor } from "@/lib/brand-color"
+import type { EmailSpec } from "@/lib/email/templates"
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -45,87 +45,14 @@ function brandFields(data: {
 // Small helpers
 // ---------------------------------------------------------------------------
 
-/** Escape a value before it goes into HTML. Every piece of user/DB data
- *  (names, addresses, order codes, notes) must pass through this. */
-function esc(value: string): string {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-}
-
 const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? ""
 
-/** Platform accent — merchants without a brand color keep this exact color,
- *  so unbranded emails render byte-identical to before. */
-const DEFAULT_ACCENT = "#2563eb"
-
-interface RenderOptions {
-  brandColor?: string
-  hidePlatformBranding?: boolean
-}
-
-// ---------------------------------------------------------------------------
-// MJML wrapper — one plain header, one accent color, no per-status theming
-// ---------------------------------------------------------------------------
-
-async function renderEmail(
-  status: string,
-  body: string,
-  opts?: RenderOptions,
-): Promise<string> {
-  const brand = esc(siteConfig.name)
-  const accent =
-    opts?.brandColor && isValidHexColor(opts.brandColor)
-      ? opts.brandColor.trim()
-      : DEFAULT_ACCENT
-  const brandHtml = `<mj-text font-size="14px" color="#6b7280">${brand}</mj-text>`
-  const footer = opts?.hidePlatformBranding
-    ? ""
-    : `
-    <mj-section padding="16px 24px" border-top="1px solid #e5e7eb">
-      <mj-column>
-        <mj-text font-size="12px" color="#9ca3af">This is an automated message. Please do not reply.</mj-text>
-      </mj-column>
-    </mj-section>`
-  // Loaded lazily: this module is reachable from `auth.ts` → `api-auth.ts`, so a
-  // top-level import would pull mjml (and its whole tree) into the module graph
-  // of nearly every API route, for a dependency only mail rendering needs.
-  const { default: mjml } = await import("mjml")
-  const result = await mjml(`
-<mjml>
-  <mj-head>
-    <mj-attributes>
-      <mj-all font-family="Arial, sans-serif" />
-      <mj-text color="#1f2937" />
-    </mj-attributes>
-  </mj-head>
-  <mj-body background-color="#ffffff" width="480px">
-    <mj-section padding="32px 24px 8px">
-      <mj-column>
-        ${brandHtml}
-        <mj-text font-size="20px" font-weight="bold" padding-top="4px" color="${accent}">${esc(status)}</mj-text>
-      </mj-column>
-    </mj-section>
-
-    <mj-section padding="8px 24px 24px">
-      <mj-column>
-        ${body}
-      </mj-column>
-    </mj-section>
-${footer}
-  </mj-body>
-</mjml>`)
-  return result.html
-}
-
-/** Plain-text counterpart, unchanged in spirit — simple and readable. */
+/** Plain-text counterpart — simple and readable, and the only copy recorded in
+ *  `email_log` (see mailer.ts). */
 function renderText(
   status: string,
   lines: (string | false | null | undefined)[],
-  opts?: Pick<RenderOptions, "hidePlatformBranding">,
+  opts?: { hidePlatformBranding?: boolean },
 ): string {
   const body = lines.filter(Boolean).join("\n\n")
   const header = opts?.hidePlatformBranding
@@ -137,58 +64,16 @@ function renderText(
   return [header, body, footer].filter(Boolean).join("\n\n")
 }
 
-/** One row renderer for the "field: value" facts every email shows. */
-function factRows(rows: [string, string][]): string {
-  return rows
-    .map(
-      ([label, value]) => `
-      <mj-text font-size="14px" padding="4px 0">
-        <span style="color:#6b7280">${esc(label)}:</span> <strong>${esc(value)}</strong>
-      </mj-text>`,
-    )
-    .join("")
-}
-
-function ctaButton(href: string, label: string, accent: string): string {
-  return `<mj-button href="${esc(href)}" background-color="${accent}" border-radius="6px" font-size="14px" padding="16px 0 0">${esc(label)}</mj-button>`
-}
-
-interface EmailTemplate {
-  status: string
-  greetingName: string
-  message: string
-  rows?: [string, string][]
-  cta?: { href: string; label: string }
-  footnote?: string
-  brandColor?: string
-  hidePlatformBranding?: boolean
-}
-
 /** One shared builder every template below funnels through — this is what
- *  keeps the six near-identical order emails from being six copies. */
-async function buildTemplate(t: EmailTemplate) {
-  const accent =
-    t.brandColor && isValidHexColor(t.brandColor)
-      ? t.brandColor.trim()
-      : DEFAULT_ACCENT
-  const opts: RenderOptions = {
-    brandColor: t.brandColor,
-    hidePlatformBranding: t.hidePlatformBranding,
-  }
-  const html = await renderEmail(
-    t.status,
-    `
-    <mj-text font-size="15px" line-height="1.6">
-      <p>Hi ${esc(t.greetingName)},</p>
-      <p>${esc(t.message)}</p>
-    </mj-text>
-    ${t.rows ? factRows(t.rows) : ""}
-    ${t.footnote ? `<mj-text font-size="14px" line-height="1.6" color="#6b7280" padding-top="8px"><p>${esc(t.footnote)}</p></mj-text>` : ""}
-    ${t.cta ? ctaButton(t.cta.href, t.cta.label, accent) : ""}
-    `,
-    opts,
-  )
-
+ *  keeps the six near-identical order emails from being six copies.
+ *
+ *  HTML comes from the React Email tree in `src/lib/email/templates.tsx`,
+ *  loaded here rather than imported: this module is reachable from
+ *  `auth.ts` → `api-auth.ts`, so a static import would put the renderer in the
+ *  module graph of nearly every API route. */
+async function buildTemplate(t: EmailSpec) {
+  const { renderEmailHtml } = await import("@/lib/email/templates")
+  const html = await renderEmailHtml(t)
   const text = renderText(
     t.status,
     [
@@ -198,7 +83,7 @@ async function buildTemplate(t: EmailTemplate) {
       t.footnote,
       t.cta ? `${t.cta.label}: ${t.cta.href}` : null,
     ],
-    opts,
+    t,
   )
 
   return { html, text }

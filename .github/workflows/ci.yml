@@ -20,7 +20,12 @@ env:
   NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
 jobs:
-  typecheck:
+  # `pnpm ci:check` is the repo's definition of the quality gate
+  # (typecheck && lint:check && format:check). One job running it instead of
+  # three jobs running each half: a full `pnpm install` to reach a ~1.5s Biome
+  # check is the real cost here, and splitting it paid that three times over.
+  # The failing step is still named in the PR checks list.
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,31 +35,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint:check
-
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
+      - run: pnpm ci:check
 
   build:
     runs-on: ubuntu-latest
@@ -71,12 +52,19 @@ jobs:
       # Smoke the built artifact: a build that compiles but cannot boot is caught
       # here rather than only in the (currently disabled) e2e job. /api/health is
       # deliberately DB-free, so this needs no database.
+      #
+      # `validateEnv` runs from instrumentation on boot and refuses to start on a
+      # missing required var, so this env must satisfy it in full — not just the
+      # vars the health route happens to read. CRON_SECRET is required outright;
+      # LOCAL_UPLOADS_DIR is required once STORAGE_PROVIDER resolves to `local`
+      # (the default). NEXT_PUBLIC_* come from the workflow-level env block.
       - name: Smoke test the built app
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
           BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
-          NEXT_PUBLIC_SITE_URL: http://localhost:3000
-          NEXT_PUBLIC_ENV: development
+          CRON_SECRET: ci-cron-secret-0000000000000000000000
+          STORAGE_PROVIDER: local
+          LOCAL_UPLOADS_DIR: ./.uploads
         run: |
           pnpm start &
           SERVER_PID=$!
@@ -96,7 +84,10 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      # No `pnpm install` here on purpose: `pnpm audit` resolves the tree from
+      # pnpm-lock.yaml and queries the registry, and the dependency-review
+      # action diffs the lockfile against the base ref. Neither needs
+      # node_modules, so the install would be pure runner minutes.
       # Advisory gate (H1): blocks on any high/critical vulnerability in the
       # dependency tree. Moderate/low findings are printed but do not block.
       # Fixes: bump the package or add an override in pnpm-workspace.yaml.

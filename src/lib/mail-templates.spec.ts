@@ -215,7 +215,7 @@ describe("merchantVerifyEmailTemplate", () => {
   })
 })
 
-describe("XSS protection via esc()", () => {
+describe("XSS protection via React escaping", () => {
   const xssData = {
     orderCode: '<script>alert("xss")</script>',
     merchantName: "Bob <img src=x onerror=alert(1)>",

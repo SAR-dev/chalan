@@ -61,6 +61,29 @@ describe("CI workflow", () => {
     expect(workflow).toContain("pnpm test:coverage")
   })
 
+  it("runs the quality gate as one job behind a single install", () => {
+    // `pnpm ci:check` is typecheck && lint:check && format:check. Keeping it in
+    // one job is deliberate: splitting it paid a full dependency install per
+    // check to reach a ~1.5s Biome invocation.
+    const job = jobBlock("quality")
+    expect(job).not.toBe("")
+    expect(job).toContain("pnpm ci:check")
+    expect(
+      job.match(/run: pnpm install --frozen-lockfile/g) ?? [],
+    ).toHaveLength(1)
+    // ...and the three jobs it replaced must not creep back in.
+    expect(workflow).not.toMatch(/^\s{2}(typecheck|lint|format):/m)
+    // The gate itself must stay runnable locally.
+    expect(pkg).toContain('"ci:check"')
+  })
+
+  it("keeps the dependency install out of the security job", () => {
+    // `pnpm audit` resolves the tree from pnpm-lock.yaml and the dependency
+    // review diffs the lockfile — neither needs node_modules.
+    expect(jobBlock("security")).not.toContain("run: pnpm install")
+    expect(jobBlock("security")).toContain("pnpm audit")
+  })
+
   it("runs the real-DB integration suite against its own service container", () => {
     expect(workflow).toMatch(/^\s{2}integration:/m)
     expect(workflow).toContain("pnpm test:integration")
@@ -72,5 +95,47 @@ describe("CI workflow", () => {
       "postgres://postgres:postgres@localhost:5432/delivery",
     )
     expect(job).not.toMatch(/neon\.tech|sslmode=require/)
+  })
+
+  it("boots the smoke step with every var validateEnv requires", () => {
+    // `validateEnv()` runs from instrumentation on `pnpm start` and throws on the
+    // first missing required var, so an incomplete env fails at boot with a wall
+    // of "required but not set" lines instead of a curl timeout — and it does so
+    // in the `build` job, which reads as a build failure rather than a config one.
+    // The vars it needs are spread across the workflow-level and step-level env
+    // blocks, so assert against the union `pnpm start` actually sees.
+    const stepStart = workflow.indexOf("- name: Smoke test the built app")
+    expect(stepStart).toBeGreaterThan(-1)
+    const stepEnd = workflow.indexOf("\n        run:", stepStart)
+    const stepEnv = workflow.slice(
+      stepStart,
+      stepEnd === -1 ? undefined : stepEnd,
+    )
+
+    const topEnv = workflow.slice(
+      workflow.search(/^env:$/m),
+      workflow.indexOf("\njobs:"),
+    )
+
+    const keysAt = (indent: number, text: string) =>
+      [
+        ...text.matchAll(new RegExp(`^ {${indent}}([A-Z][A-Z0-9_]*):`, "gm")),
+      ].map((m) => m[1])
+
+    // Unconditional requirements from `src/lib/env.ts` validateEnv, plus the
+    // LOCAL_UPLOADS_DIR that STORAGE_PROVIDER=local pulls in. NEXT_PUBLIC_* come
+    // from the workflow-level block, which is why they are absent from the step.
+    // Adding a required var to env.ts means adding it here.
+    expect(
+      [...new Set([...keysAt(2, topEnv), ...keysAt(10, stepEnv)])].sort(),
+    ).toEqual([
+      "BETTER_AUTH_SECRET",
+      "CRON_SECRET",
+      "DATABASE_URL",
+      "LOCAL_UPLOADS_DIR",
+      "NEXT_PUBLIC_ENV",
+      "NEXT_PUBLIC_SITE_URL",
+      "STORAGE_PROVIDER",
+    ])
   })
 })

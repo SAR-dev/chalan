@@ -282,11 +282,19 @@ async function insertOrder(opts: {
 /** Postgres SQLSTATE for unique_violation. */
 const UNIQUE_VIOLATION = "23505"
 /**
- * Postgres SQLSTATE for restrict_violation — what an `ON DELETE RESTRICT` FK
- * raises (RI uses this rather than the plain `23503` foreign_key_violation,
- * which is what NO ACTION / missing-row failures report).
+ * The SQLSTATEs Postgres raises when a foreign key refuses a delete.
+ *
+ * These are NOT interchangeable across server majors: PostgreSQL 18 added a
+ * dedicated `23001` restrict_violation for `ON DELETE RESTRICT`, whereas
+ * through 17 the identical statement against the identical schema reports the
+ * plain `23503` foreign_key_violation (`ri_ReportViolation` gained the
+ * restrict branch in 18). Both mean the same thing — "still referenced,
+ * refused" — so a test that pins one code is really pinning the server
+ * version. Accept either and let the catalog assertion carry the real weight.
  */
-const RESTRICT_VIOLATION = "23001"
+const FK_DELETE_REFUSAL = /^(?:23001|23503)$/
+/** `pg_constraint.confdeltype` value for `ON DELETE RESTRICT`. */
+const ON_DELETE_RESTRICT = "r"
 
 beforeAll(async () => {
   if (!connectionString) return
@@ -536,11 +544,40 @@ suite("packages & wallet partial constraints (Phase 9)", () => {
     )
     track("package_purchase_request", "id", requestId)
 
+    // Assert the schema first, and read it from the catalog rather than inferring
+    // it from an error code: both child FKs must be ON DELETE RESTRICT. `c`
+    // (cascade) would silently destroy a merchant's bundle and purchase request,
+    // which is exactly the data loss the archive-instead-of-delete rule exists to
+    // prevent — and it would leave this test passing for the wrong reason.
+    const { rows: fks } = await client.query<{ confdeltype: string }>(
+      `SELECT confdeltype
+         FROM pg_constraint
+        WHERE contype = 'f'
+          AND confrelid = 'pricing_package'::regclass
+          AND conrelid = ANY (ARRAY['merchant_package', 'package_purchase_request']::regclass[])`,
+    )
+    expect(fks.map((fk) => fk.confdeltype)).toEqual([
+      ON_DELETE_RESTRICT,
+      ON_DELETE_RESTRICT,
+    ])
+
     // This is the "archive instead of delete" rule: the restrict FKs force the
     // soft-delete path in the API rather than cascading bundles/requests away.
     await expect(
       client.query(`DELETE FROM pricing_package WHERE id = $1`, [packageId]),
-    ).rejects.toMatchObject({ code: RESTRICT_VIOLATION })
+    ).rejects.toMatchObject({ code: expect.stringMatching(FK_DELETE_REFUSAL) })
+
+    // A refusal must leave the referencing rows intact — proof the FK refused
+    // rather than cascading, and that afterEach still has rows to clean up.
+    const { rows: survivors } = await client.query<{ count: string }>(
+      `SELECT (
+         SELECT count(*) FROM merchant_package WHERE id = $1
+       ) + (
+         SELECT count(*) FROM package_purchase_request WHERE id = $2
+       ) AS count`,
+      [bundleId, requestId],
+    )
+    expect(survivors[0].count).toBe("2")
   })
 
   it("nulls the order snapshot FKs when the package goes away", async () => {
