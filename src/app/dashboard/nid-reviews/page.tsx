@@ -39,6 +39,7 @@ export default function NidReviewsPage() {
     total,
     setPage,
     isLoading,
+    isRefreshing,
     setLimit,
     query,
     setQuery,
@@ -307,7 +308,7 @@ export default function NidReviewsPage() {
                     ? "No rejected NIDs."
                     : "No NID submissions."
             }
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

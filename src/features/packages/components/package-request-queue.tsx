@@ -20,7 +20,8 @@ type TabFilter = "PENDING" | "APPROVED" | "REJECTED" | "ALL"
 
 /** Admin review queue for package purchase requests. */
 export function PackageRequestQueue() {
-  const { requests, approve, reject, isLoading } = usePackageRequests()
+  const { requests, approve, reject, isLoading, isRefreshing } =
+    usePackageRequests()
   const [tab, setTab] = useState<TabFilter>("PENDING")
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<(typeof requests)[number] | null>(
@@ -192,7 +193,7 @@ export function PackageRequestQueue() {
             data={rows}
             getRowKey={(r) => r.id}
             emptyMessage="No package purchase requests."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
           />
         </CardContent>
       </Card>

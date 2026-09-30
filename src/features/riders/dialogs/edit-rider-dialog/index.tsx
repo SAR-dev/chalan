@@ -17,9 +17,15 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
-import type { RiderTaskType } from "@/lib/types"
+import type { RiderTaskType, RiderVehicleType } from "@/lib/types"
 import { riderUpdateSchema, validateFormData } from "@/lib/validation"
-import { TASK_TYPE_OPTIONS, taskTypeLabel } from "../task-type"
+import {
+  TASK_TYPE_OPTIONS,
+  taskTypeLabel,
+  VEHICLE_TYPE_OPTIONS,
+  VEHICLE_TYPES_REQUIRING_PLATE,
+  vehicleTypeLabel,
+} from "../task-type"
 import type { EditRiderDialogProps } from "./types"
 
 export function EditRiderDialog({
@@ -38,6 +44,8 @@ export function EditRiderDialog({
     zone: "",
     warehouseId: "",
     taskType: "DELIVERY" as RiderTaskType,
+    vehicleType: "" as RiderVehicleType | "",
+    vehiclePlate: "",
     isActive: true,
   })
   const [openCount, setOpenCount] = useState(0)
@@ -53,6 +61,8 @@ export function EditRiderDialog({
         zone: rider.zone,
         warehouseId: rider.warehouseId,
         taskType: rider.taskType,
+        vehicleType: rider.vehicleType ?? "",
+        vehiclePlate: rider.vehiclePlate ?? "",
         isActive: rider.isActive,
       })
     }
@@ -69,12 +79,23 @@ export function EditRiderDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!rider) return
+    // A plate for a vehicle that does not need one (a bicycle) is a data-entry
+    // slip, not information — dropped here rather than stored and then shown
+    // back as a confusing "Bicycle · XYZ" to whoever reads it later.
+    const vehicleType = form.vehicleType || null
+    const rawPlate = form.vehiclePlate.trim()
+    const vehiclePlate =
+      vehicleType && !VEHICLE_TYPES_REQUIRING_PLATE.has(vehicleType)
+        ? null
+        : rawPlate || null
     const fieldErrors = validateFormData(riderUpdateSchema, {
       name: form.name.trim(),
       phone: form.phone.trim(),
       zone: form.zone.trim(),
       warehouseId: canReassignWarehouse ? form.warehouseId : undefined,
       taskType: form.taskType,
+      vehicleType,
+      vehiclePlate,
       isActive: form.isActive,
     })
     if (Object.keys(fieldErrors).length > 0) {
@@ -89,6 +110,8 @@ export function EditRiderDialog({
         phone: form.phone.trim(),
         zone: form.zone.trim(),
         taskType: form.taskType,
+        vehicleType,
+        vehiclePlate,
         ...(canReassignWarehouse ? { warehouseId: form.warehouseId } : {}),
       })
       if (form.isActive !== rider.isActive) {
@@ -180,9 +203,70 @@ export function EditRiderDialog({
           </Select>
         </div>
 
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="edit-rider-vehicle-type">Vehicle</Label>
+          <Select
+            value={form.vehicleType}
+            onValueChange={(v) =>
+              update("vehicleType", (v as RiderVehicleType) || "")
+            }
+          >
+            <SelectTrigger
+              id="edit-rider-vehicle-type"
+              className="w-full"
+              data-testid="edit-rider-vehicle-type"
+            >
+              <SelectValue placeholder="No vehicle recorded">
+                {(value) =>
+                  value
+                    ? vehicleTypeLabel(value as RiderVehicleType)
+                    : "No vehicle recorded"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {VEHICLE_TYPE_OPTIONS.map((o) => (
+                <SelectItem
+                  key={o.value}
+                  value={o.value}
+                  data-testid={`edit-rider-vehicle-option-${o.value}`}
+                >
+                  <span className="flex flex-col">
+                    <span>{o.label}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {o.description}
+                    </span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-muted-foreground text-xs">
+            Shown beside the rider when a parcel is assigned, so the admin can
+            pick someone whose vehicle suits the load.
+          </span>
+        </div>
+
+        {form.vehicleType &&
+          VEHICLE_TYPES_REQUIRING_PLATE.has(form.vehicleType) && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-rider-vehicle-plate">
+                Registration number
+              </Label>
+              <Input
+                id="edit-rider-vehicle-plate"
+                data-testid="edit-rider-vehicle-plate"
+                value={form.vehiclePlate}
+                onChange={(e) => update("vehiclePlate", e.target.value)}
+                placeholder="DHAKA-1234"
+                className="uppercase"
+              />
+            </div>
+          )}
+
         {canReassignWarehouse && (
           <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-rider-warehouse">Warehouse</Label>
+            <Label htmlFor="edit-rider-warehouse">Warehouse</Label>{" "}
             <Select
               value={form.warehouseId}
               onValueChange={(v) => update("warehouseId", v ?? "")}

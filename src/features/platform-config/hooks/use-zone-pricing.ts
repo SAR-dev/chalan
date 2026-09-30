@@ -21,6 +21,7 @@ export function useZonePricing() {
     data: pricing,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<ZonePricing[]>(isAdmin ? KEY : null, jsonFetcher, swrOptions)
 
@@ -75,6 +76,7 @@ export function useZonePricing() {
   return {
     pricing: allPricing,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     upsertPricing,

@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
+import { riderParcelColumn } from "@/features/orders/components/order-table-columns"
 import { DeliveryAttemptDialog } from "@/features/orders/dialogs/delivery-attempt-dialog"
 import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
 import { OutForDeliveryDialog } from "@/features/orders/dialogs/out-for-delivery-dialog"
@@ -45,6 +46,7 @@ export default function RiderDeliveryQueuePage() {
     query,
     setQuery,
     isLoading,
+    isRefreshing,
     dateFrom,
     setDateFrom,
     dateTo,
@@ -114,6 +116,10 @@ export default function RiderDeliveryQueuePage() {
         </div>
       ),
     },
+    // Weight and contents: on a delivery the rider may be asked to hand over
+    // cash, take a return, or refuse a visibly wrong item — all of which need
+    // to know what the parcel is before they knock.
+    riderParcelColumn(),
     {
       id: "destination",
       header: columnLabels.rider.destination,
@@ -246,7 +252,7 @@ export default function RiderDeliveryQueuePage() {
             data={myDeliveries}
             getRowKey={(o) => o.id}
             initialSortId="order"
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             emptyMessage="No deliveries waiting. Parcels appear here once a Warehouse Admin dispatches them to you."
             serverPaginated
             total={total}

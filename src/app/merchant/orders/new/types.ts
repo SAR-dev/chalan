@@ -9,6 +9,7 @@ export interface ParcelState {
   deliveryCityId: string
   deliveryAddress: string
   parcelWeightKg: string
+  itemType: string
   productCost: string
   deliveryType: DeliveryType
   deliveryMapLink: string

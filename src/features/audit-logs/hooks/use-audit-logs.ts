@@ -34,6 +34,7 @@ export function useAuditLogs({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<AuditLog>>(
     currentUser ? url : null,
@@ -66,6 +67,7 @@ export function useAuditLogs({
     sortDir: filters.sortDir,
     onSortChange: filters.onSortChange,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
   }

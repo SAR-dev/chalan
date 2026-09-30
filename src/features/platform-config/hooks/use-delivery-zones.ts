@@ -22,6 +22,7 @@ export function useDeliveryZones() {
     data: zones,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<DeliveryZone[]>(
     isAdmin ? ADMIN_KEY : null,
@@ -91,6 +92,7 @@ export function useDeliveryZones() {
   return {
     zones: activeZones,
     isLoading: isAdmin ? isLoading : isPublicLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createZone,

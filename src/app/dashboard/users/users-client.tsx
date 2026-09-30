@@ -68,6 +68,7 @@ export function UsersPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     currentUserId,
     resetPassword,
     banUser,
@@ -215,7 +216,7 @@ export function UsersPageClient({
             data={users}
             getRowKey={(u) => u.id}
             emptyMessage="No users match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

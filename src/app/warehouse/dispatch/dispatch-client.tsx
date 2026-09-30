@@ -35,6 +35,7 @@ import {
   deliveryAddressColumn,
   deliveryRiderWithPhoneColumn,
   deliveryTypeColumn,
+  itemTypeColumn,
   merchantColumn,
   orderCodeColumn,
   recipientNameColumn,
@@ -78,6 +79,7 @@ export function WarehouseDispatchPageClient({
     setQuery,
     setStatuses,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
@@ -261,6 +263,10 @@ export function WarehouseDispatchPageClient({
       recipientNameColumn(),
       deliveryAddressColumn(),
       unassignedDeliveryRiderColumn,
+      // Contents sit next to the delivery type: at dispatch the question is
+      // "what is going out on this van", and "3 kg, FRAGILE" only half answers
+      // it.
+      itemTypeColumn(),
       deliveryTypeColumn(),
       collectibleColumn(),
       statusColumn(),
@@ -328,7 +334,7 @@ export function WarehouseDispatchPageClient({
             columns={columns}
             data={data}
             getRowKey={(o) => o.id}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             emptyMessage={
               tab === "PICKUP"
                 ? "No approved orders ready for pickup."

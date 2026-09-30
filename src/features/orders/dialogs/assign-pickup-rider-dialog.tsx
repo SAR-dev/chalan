@@ -15,6 +15,7 @@ import {
 import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { canPickup, useRiders } from "@/features/riders/hooks/use-riders"
+import { riderVehicleLabel } from "@/features/riders/vehicle-label"
 import type { Order } from "@/lib/types"
 
 export function AssignPickupRiderDialog({
@@ -82,6 +83,9 @@ export function AssignPickupRiderDialog({
             label="Parcel"
             value={`${order.parcelWeightKg} KG · ${order.deliveryType}`}
           />
+          {order.itemType ? (
+            <InfoRow icon={Package} label="Contents" value={order.itemType} />
+          ) : null}
           <InfoRow
             icon={Phone}
             label="Recipient"
@@ -115,11 +119,31 @@ export function AssignPickupRiderDialog({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {pickupRiders.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name} · {r.zone}
-                  </SelectItem>
-                ))}
+                {pickupRiders.map((r) => {
+                  const vehicle = riderVehicleLabel(r)
+                  return (
+                    <SelectItem
+                      key={r.id}
+                      value={r.id}
+                      data-testid={`pickup-rider-option-${r.id}`}
+                    >
+                      <span className="flex flex-col">
+                        <span>
+                          {r.name} · {r.zone}
+                        </span>
+                        {/* The vehicle is shown, never used to filter: a rider
+                            without one is still assignable, and hiding them
+                            would make the list look emptier than it is. */}
+                        <span
+                          className="text-muted-foreground text-xs"
+                          data-testid={`pickup-rider-vehicle-${r.id}`}
+                        >
+                          {vehicle ?? "No vehicle recorded"}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           )}
@@ -129,6 +153,15 @@ export function AssignPickupRiderDialog({
                 icon={Bike}
                 label="Assigned rider"
                 value={`${selectedRider?.name} · ${selectedRider?.phone}`}
+              />
+              <InfoRow
+                icon={Bike}
+                label="Vehicle"
+                value={
+                  riderVehicleLabel(
+                    selectedRider ?? { vehicleType: null, vehiclePlate: null },
+                  ) ?? "No vehicle recorded"
+                }
               />
             </div>
           ) : null}

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm"
 import { boolean, index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
-import { riderStatuses, riderTaskTypes } from "./enums"
+import { riderStatuses, riderTaskTypes, riderVehicleTypes } from "./enums"
 import { ts } from "./helpers"
 
 // =============================================================================
@@ -54,6 +54,13 @@ export const rider = pgTable(
     taskType: text("taskType", { enum: riderTaskTypes })
       .notNull()
       .default("DELIVERY"),
+    // What this rider collects parcels in. Set by a warehouse admin and shown
+    // beside the rider when assigning a parcel, so the choice is informed
+    // rather than blind. Both nullable: a rider who has not declared a vehicle
+    // yet is a real state, not an error, and "unknown" must be readable as such
+    // instead of being faked with a default.
+    vehicleType: text("vehicleType", { enum: riderVehicleTypes }),
+    vehiclePlate: text("vehiclePlate"),
     // Home warehouse this rider dispatches from. Every rider belongs to exactly
     // one warehouse. `restrict` prevents deleting a hub that still has riders.
     warehouseId: text("warehouseId")

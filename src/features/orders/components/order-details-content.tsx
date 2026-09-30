@@ -235,6 +235,16 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                     </span>
                   }
                 />
+                {/* Only when the merchant said something. A permanently empty
+                    "Contents" field on every legacy order is noise that trains
+                    readers to skip the row that actually has a value. */}
+                {order.itemType ? (
+                  <Field
+                    icon={Package}
+                    label="Contents"
+                    value={order.itemType}
+                  />
+                ) : null}
                 <Field
                   icon={Package}
                   label="Delivery type"

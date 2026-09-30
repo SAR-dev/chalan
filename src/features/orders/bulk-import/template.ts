@@ -14,6 +14,7 @@ export const orderImportHeaders = [
   "delivery_city",
   "delivery_address",
   "parcel_weight_kg",
+  "item_type",
   "product_cost",
   "delivery_type",
   "delivery_map_link",
@@ -52,6 +53,16 @@ export const headerAliases: Record<string, OrderImportHeader> = {
   weight: "parcel_weight_kg",
   weight_kg: "parcel_weight_kg",
   parcel_weight: "parcel_weight_kg",
+  // `item` and `items` map here too. Someone whose sheet says "items" is almost
+  // certainly describing contents, and the alternative is rejecting their whole
+  // file over a column they filled in correctly.
+  item: "item_type",
+  items: "item_type",
+  item_name: "item_type",
+  product: "item_type",
+  product_name: "item_type",
+  goods: "item_type",
+  contents: "item_type",
   cod: "product_cost",
   cod_amount: "product_cost",
   amount: "product_cost",
@@ -101,6 +112,11 @@ export function buildTemplateCsv(sample?: TemplateSample): string {
     delivery_city: sample?.deliveryCity?.trim() || "Dhaka",
     delivery_address: "House 1 Road 1 Dhanmondi Dhaka",
     parcel_weight_kg: "1.5",
+    // Prefilled rather than blank: an empty optional column in a template reads
+    // as "this import does not support it", and most merchants would delete the
+    // column instead of discovering what it was for. One realistic example is
+    // enough to convey both the existence and the shape of the field.
+    item_type: "Cotton saree",
     product_cost: "1200",
     delivery_type: "STANDARD",
     delivery_map_link: "",

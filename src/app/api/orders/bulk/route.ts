@@ -296,6 +296,11 @@ export const POST = withErrorHandler(async (req: Request) => {
         deliveryAddress: input.deliveryAddress,
         deliveryMapLink: mapLink ? mapLink : null,
         parcelWeightKg: input.parcelWeightKg,
+        // Carried straight from the validated input. `orderCreateSchema` has
+        // already trimmed it and turned blank into null, so a missing item_type
+        // column in the CSV lands here as null rather than an empty string that
+        // would later read back as "the merchant typed nothing".
+        itemType: input.itemType ?? null,
         deliveryType: input.deliveryType ?? "STANDARD",
         productCost,
         deliveryFee,
@@ -323,6 +328,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       deliveryAddress: order.deliveryAddress,
       deliveryMapLink: order.deliveryMapLink,
       parcelWeightKg: order.parcelWeightKg,
+      itemType: order.itemType,
       deliveryType: order.deliveryType,
       productCost: order.productCost,
       deliveryFee: order.deliveryFee,

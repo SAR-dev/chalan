@@ -37,8 +37,16 @@ export async function jsonFetcher<T>(url: string): Promise<T> {
 // the tab comes back online after connectivity is restored.
 // dedupingInterval prevents duplicate API calls when multiple components mount
 // simultaneously (e.g. tab switches or page re-renders).
+// keepPreviousData holds the last successful response while a new key (page,
+// search, filter, sort) is in flight. Without it SWR reports `data: undefined`
+// for the new key, which every table renders as an empty state or skeleton —
+// so paging through results appears to delete the rows. Note this also means
+// `isLoading` stays false across a key change; consumers that need a busy
+// signal must read `isValidating` (surfaced as `isRefreshing` by the feature
+// hooks) rather than relying on `isLoading` alone.
 export const swrOptions: SWRConfiguration = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
   dedupingInterval: 2000,
+  keepPreviousData: true,
 }

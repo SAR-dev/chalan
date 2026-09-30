@@ -88,6 +88,7 @@ export function useOrders({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<Order>>(currentUser ? url : null, jsonFetcher, {
     ...swrOptions,
@@ -491,6 +492,7 @@ export function useOrders({
     merchantPayableTotal,
     merchantPayableAmount,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createOrder,

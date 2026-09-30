@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { canPickup, useRiders } from "@/features/riders/hooks/use-riders"
+import { riderVehicleLabel } from "@/features/riders/vehicle-label"
 
 export function BulkAssignPickupRiderDialog({
   count,
@@ -94,11 +95,30 @@ export function BulkAssignPickupRiderDialog({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {pickupRiders.map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {r.name} · {r.zone}
-                </SelectItem>
-              ))}
+              {pickupRiders.map((r) => {
+                const vehicle = riderVehicleLabel(r)
+                return (
+                  <SelectItem
+                    key={r.id}
+                    value={r.id}
+                    data-testid={`bulk-pickup-rider-option-${r.id}`}
+                  >
+                    <span className="flex flex-col">
+                      <span>
+                        {r.name} · {r.zone}
+                      </span>
+                      {/* Shown, never used to filter — a rider with no vehicle
+                          recorded is still assignable. */}
+                      <span
+                        className="text-muted-foreground text-xs"
+                        data-testid={`bulk-pickup-rider-vehicle-${r.id}`}
+                      >
+                        {vehicle ?? "No vehicle recorded"}
+                      </span>
+                    </span>
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
         )}

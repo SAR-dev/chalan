@@ -12,6 +12,8 @@ import {
   orderCreateSchema,
   parseBody,
   profileUpdateSchema,
+  riderApproveSchema,
+  riderUpdateSchema,
   validateFormData,
 } from "@/lib/validation"
 
@@ -315,6 +317,152 @@ describe("orderCreateSchema — deliveryCityId", () => {
       deliveryCityId: "",
     })
     expect(result.success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// orderCreateSchema — itemType
+// ---------------------------------------------------------------------------
+
+describe("orderCreateSchema — itemType", () => {
+  const base = {
+    pickupLocationId: "pl_1",
+    recipientName: "John",
+    recipientPhone: "01712345678",
+    deliveryAddress: "Road 11, Banani",
+    deliveryCityId: "city_1",
+    parcelWeightKg: 1,
+    productCost: 500,
+  }
+
+  it("stays optional — an order with no contents is still a valid order", () => {
+    // Not making it required is the whole reason existing CSVs keep importing.
+    const result = orderCreateSchema.safeParse({ ...base })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.itemType).toBeNull()
+  })
+
+  it("normalizes blank and whitespace-only to null, not an empty string", () => {
+    // "" and null are indistinguishable in the UI but not in the database, and
+    // "did not say" is worth being able to tell apart from "typed nothing".
+    for (const blank of ["", "   "]) {
+      const result = orderCreateSchema.safeParse({ ...base, itemType: blank })
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.itemType).toBeNull()
+    }
+  })
+
+  it("trims a real value", () => {
+    const result = orderCreateSchema.safeParse({
+      ...base,
+      itemType: "  Cotton saree  ",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.itemType).toBe("Cotton saree")
+  })
+
+  it("caps the length so the field cannot become free-form notes", () => {
+    const result = orderCreateSchema.safeParse({
+      ...base,
+      itemType: "x".repeat(61),
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].message).toMatch(/60 characters/)
+    }
+  })
+
+  it("does not let the contents influence anything priced", () => {
+    // Two orders identical except for contents must produce identical parsed
+    // data apart from that field — nothing downstream reads it, so this is the
+    // guard against a future edit wiring it into the fee.
+    const a = orderCreateSchema.safeParse({ ...base, itemType: "Books" })
+    const b = orderCreateSchema.safeParse({ ...base, itemType: "Gold chain" })
+    expect(a.success && b.success).toBe(true)
+    if (!a.success || !b.success) return
+    const { itemType: _a, ...restA } = a.data
+    const { itemType: _b, ...restB } = b.data
+    expect(restA).toEqual(restB)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// riderUpdateSchema / riderApproveSchema — vehicle
+// ---------------------------------------------------------------------------
+
+describe("rider vehicle fields", () => {
+  it("normalizes a plate to upper case with no spaces", () => {
+    // The same plate typed two ways is one vehicle, and an admin comparing it
+    // against a photo should not have to guess which form is canonical.
+    const result = riderUpdateSchema.safeParse({
+      vehicleType: "BIKE",
+      vehiclePlate: "  dhaka 12-3456 ",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.vehiclePlate).toBe("DHAKA12-3456")
+  })
+
+  it("clears the plate when given a blank string", () => {
+    // A blank plate is a real state (a foot or bicycle rider has none), and it
+    // must be sendable as a clear rather than being rejected as invalid.
+    const result = riderUpdateSchema.safeParse({ vehiclePlate: "  " })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.vehiclePlate).toBeNull()
+  })
+
+  it("accepts an explicit null vehicleType as 'not declared'", () => {
+    const result = riderUpdateSchema.safeParse({ vehicleType: null })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.vehicleType).toBeNull()
+  })
+
+  it("rejects a vehicle type outside the list", () => {
+    const result = riderUpdateSchema.safeParse({ vehicleType: "HELICOPTER" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a plate over the length cap", () => {
+    const result = riderUpdateSchema.safeParse({
+      vehicleType: "BIKE",
+      vehiclePlate: "x".repeat(21),
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("still rejects an update that carries no field at all", () => {
+    // The empty-vehicle PATCH is a clear; a PATCH with neither is a mistake.
+    const result = riderUpdateSchema.safeParse({ vehiclePlate: null })
+    expect(result.success).toBe(true)
+    const nothing = riderUpdateSchema.safeParse({})
+    expect(nothing.success).toBe(false)
+  })
+
+  it("leaves the plate absent when the update does not mention it", () => {
+    // The regression this guards: a transform on the field used to materialise
+    // `vehiclePlate: null` on every parse, so renaming a rider would have wiped
+    // the vehicle recorded against them. Absent must stay absent — only an
+    // explicit null (or blank) is a clear.
+    const result = riderUpdateSchema.safeParse({ name: "New Name" })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect("vehiclePlate" in result.data).toBe(false)
+    expect("vehicleType" in result.data).toBe(false)
+  })
+
+  it("captures the vehicle at approval without requiring it", () => {
+    const without = riderApproveSchema.safeParse({})
+    expect(without.success).toBe(true)
+
+    const withVehicle = riderApproveSchema.safeParse({
+      taskType: "PICKUP",
+      vehicleType: "VAN",
+      vehiclePlate: "ba-11-1111",
+    })
+    expect(withVehicle.success).toBe(true)
+    if (withVehicle.success) {
+      expect(withVehicle.data.vehicleType).toBe("VAN")
+      expect(withVehicle.data.vehiclePlate).toBe("BA-11-1111")
+    }
   })
 })
 

@@ -60,6 +60,7 @@ export default function MerchantOrdersPage() {
     statuses: _statuses,
     setStatuses,
     isLoading,
+    isRefreshing,
     sortId,
     sortDir,
     onSortChange,
@@ -317,7 +318,7 @@ export default function MerchantOrdersPage() {
             data={orders}
             getRowKey={(o) => o.id}
             emptyMessage="No orders match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

@@ -18,6 +18,7 @@ describe("orderImportHeaders", () => {
       "delivery_city",
       "delivery_address",
       "parcel_weight_kg",
+      "item_type",
       "product_cost",
       "delivery_type",
       "delivery_map_link",
@@ -25,9 +26,21 @@ describe("orderImportHeaders", () => {
     ])
   })
 
-  it("requires exactly the first seven columns", () => {
+  it("requires the seven columns that identify a deliverable parcel", () => {
+    // `item_type` is deliberately NOT required even though it sits inside the
+    // first seven positions of the canonical order. Requiring it would reject
+    // every file imported before it existed, and the field is descriptive — an
+    // order with no stated contents is still a valid order.
     expect(requiredImportHeaders).toHaveLength(7)
-    expect([...requiredImportHeaders]).toEqual(orderImportHeaders.slice(0, 7))
+    expect([...requiredImportHeaders]).toEqual([
+      "pickup_location",
+      "recipient_name",
+      "recipient_phone",
+      "delivery_city",
+      "delivery_address",
+      "parcel_weight_kg",
+      "product_cost",
+    ])
   })
 
   it("maps every documented alias to its canonical header", () => {
@@ -49,6 +62,13 @@ describe("orderImportHeaders", () => {
       weight: "parcel_weight_kg",
       weight_kg: "parcel_weight_kg",
       parcel_weight: "parcel_weight_kg",
+      item: "item_type",
+      items: "item_type",
+      item_name: "item_type",
+      product: "item_type",
+      product_name: "item_type",
+      goods: "item_type",
+      contents: "item_type",
       cod: "product_cost",
       cod_amount: "product_cost",
       amount: "product_cost",
@@ -79,11 +99,21 @@ describe("buildTemplateCsv", () => {
       delivery_city: "Dhaka",
       delivery_address: "House 1 Road 1 Dhanmondi Dhaka",
       parcel_weight_kg: "1.5",
+      item_type: "Cotton saree",
       product_cost: "1200",
       delivery_type: "STANDARD",
       delivery_map_link: "",
       merchant_note: "fragile packaging",
     })
+  })
+
+  it("prefills the optional item_type so the column is not deleted unused", () => {
+    // An empty optional column in a template reads as "this import does not
+    // support it", and merchants delete it rather than find out what it was for.
+    const result = parseImportText(buildTemplateCsv())
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.rows[0].values.item_type).toBe("Cotton saree")
   })
 
   it("fills the sample row from the merchant's lookups", () => {

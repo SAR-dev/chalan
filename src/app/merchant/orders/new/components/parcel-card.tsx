@@ -221,6 +221,25 @@ export function ParcelCard({
                 required
               />
             </div>
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <Label htmlFor={`item-type-${p.id}`}>Item type</Label>
+              <Input
+                id={`item-type-${p.id}`}
+                data-testid="parcel-item-type"
+                value={p.itemType}
+                onChange={(e) => updateParcel(p.id, "itemType", e.target.value)}
+                placeholder="e.g. Cotton saree, phone charger, cooked food"
+                maxLength={60}
+              />
+              {/* Says plainly that it changes nothing about cost — the field sits
+                  next to the weight and the fee, and a merchant will otherwise
+                  assume the contents decide the price. */}
+              <span className="text-muted-foreground text-xs">
+                Optional. Shown to the rider collecting the parcel. It does not
+                affect the delivery fee — that comes from the route and the
+                weight.
+              </span>
+            </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor={`cost-${p.id}`}>COD amount (TK)</Label>
               <Input

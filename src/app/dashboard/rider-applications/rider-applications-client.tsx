@@ -50,6 +50,7 @@ export function RiderApplicationsPageClient({
     page: _page,
     setPage,
     isLoading,
+    isRefreshing,
     mutate,
     limit: _limit,
     setLimit,
@@ -237,7 +238,7 @@ export function RiderApplicationsPageClient({
             getRowKey={(a) => a.id}
             initialSortId="createdAt"
             emptyMessage="No applications match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

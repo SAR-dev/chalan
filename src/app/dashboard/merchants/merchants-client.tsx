@@ -69,6 +69,7 @@ export function MerchantsPageClient({
     page: _page,
     setPage,
     isLoading,
+    isRefreshing,
     limit: _limit,
     setLimit,
     query,
@@ -482,7 +483,7 @@ export function MerchantsPageClient({
             getRowKey={(m) => m.id}
             initialSortId="business"
             emptyMessage="No merchants match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

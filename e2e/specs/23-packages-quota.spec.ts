@@ -3,7 +3,7 @@ import "dotenv/config"
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS, login, toast, waitForAppReady } from "../helpers"
-import { dialog, onboarding, orders, packages } from "../selectors"
+import { dialog, orders, packages } from "../selectors"
 
 /**
  * Bundle quota accounting (S61).
@@ -122,12 +122,6 @@ async function pricedOrders(recipients: string[]): Promise<PricedRow[]> {
 
 /** Import a batch through the merchant's own CSV bulk-create surface. */
 async function importOrders(page: Page, recipients: string[]): Promise<void> {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
-
   await page.goto("/merchant/orders")
   await waitForAppReady(page)
   await page.locator(orders.bulkImportOpen).click()

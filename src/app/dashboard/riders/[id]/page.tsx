@@ -28,6 +28,8 @@ export default async function RiderDetailPage({
       status: rider.status,
       isActive: rider.isActive,
       taskType: rider.taskType,
+      vehicleType: rider.vehicleType,
+      vehiclePlate: rider.vehiclePlate,
       warehouseId: rider.warehouseId,
       approvedBy: rider.approvedBy,
       approvedAt: rider.approvedAt,

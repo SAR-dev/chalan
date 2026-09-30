@@ -30,11 +30,6 @@ export const register = {
   email: "[data-testid='register-email']",
 }
 
-// ─── Onboarding ──────────────────────────────────────────────────────────────
-export const onboarding = {
-  skip: "[data-testid='onboarding-skip']",
-}
-
 // ─── Two-factor authentication (H4) ─────────────────────────────────────────
 export const twoFactor = {
   status: "[data-testid='two-factor-status']",
@@ -149,6 +144,7 @@ export const orderForm = {
   deliveryAddress: "[data-testid='delivery-address']",
   deliveryMap: "[data-testid='delivery-map']",
   parcelWeight: "[data-testid='parcel-weight']",
+  itemType: "[data-testid='parcel-item-type']",
   productCost: "[data-testid='product-cost']",
   submitOrder: "[data-testid='submit-order']",
   addParcel: "[data-testid='add-parcel']",
@@ -171,6 +167,15 @@ export const merchants = {
 export const riders = {
   table: "[data-testid='riders-table']",
   row: (id: string) => `[data-testid='rider-row-${id}']`,
+  // Vehicle: type + registration number, set by an admin. Displayed on the list
+  // and in the assign-rider dialogs so an admin can see who can take what.
+  // `vehicleCell` repeats per row — always scope it inside `row(id)`.
+  vehicleCell: "[data-testid='rider-vehicle-cell']",
+  detailVehicle: "[data-testid='rider-detail-vehicle']",
+  editVehicleType: "[data-testid='edit-rider-vehicle-type']",
+  editVehicleOption: (type: string) =>
+    `[data-testid='edit-rider-vehicle-option-${type}']`,
+  editVehiclePlate: "[data-testid='edit-rider-vehicle-plate']",
 }
 
 // ─── Users (admin user management) ──────────────────────────────────────────
@@ -220,12 +225,35 @@ export const payouts = {
   markPaidButton: "[data-testid='mark-paid']",
 }
 
+// ─── Rider parcel column (weight + contents) ─────────────────────────────────
+// The DataTable tags each `<tr>` as `row-<tableId>-<rowKey>`, and the rider
+// queues key on the order id, so a single order's parcel cell is addressable
+// without matching on its contents.
+export const riderParcel = {
+  cell: "[data-testid='rider-parcel-cell']",
+  pickupRow: (orderId: string) => `[data-testid='row-rider-pickup-${orderId}']`,
+  deliveryRow: (orderId: string) =>
+    `[data-testid='row-rider-delivery-${orderId}']`,
+  pickupCell: (orderId: string) =>
+    `[data-testid='row-rider-pickup-${orderId}'] [data-testid='rider-parcel-cell']`,
+  deliveryCell: (orderId: string) =>
+    `[data-testid='row-rider-delivery-${orderId}'] [data-testid='rider-parcel-cell']`,
+}
+
 // ─── Zone Pricing ────────────────────────────────────────────────────────────
 export const zones = {
   table: "[data-testid='zones-table']",
   addButton: "[data-testid='add-zone']",
   pricingTable: "[data-testid='zone-pricing-table']",
   addPricingButton: "[data-testid='add-zone-pricing']",
+  // The admin zone-pricing page shows the same rates two ways. List is the
+  // default because it is the only one carrying the row actions; the matrix is
+  // a read-only coverage audit. Both triggers stay on screen in both views, so
+  // a test can always get back to the list.
+  viewList: "[data-testid='zone-pricing-view-list']",
+  viewMatrix: "[data-testid='zone-pricing-view-matrix']",
+  listView: "[data-testid='zone-pricing-list-view']",
+  matrixLoading: "[data-testid='zone-pricing-matrix-loading']",
 }
 
 // ─── Delivery Cities ─────────────────────────────────────────────────────────

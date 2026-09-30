@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -21,8 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  VEHICLE_TYPE_OPTIONS,
+  VEHICLE_TYPES_REQUIRING_PLATE,
+  vehicleTypeLabel,
+} from "@/features/riders/dialogs/task-type"
 import type { RiderApplication } from "@/features/riders/hooks/use-rider-applications"
 import { RIDER_TASK_TYPE_LABELS } from "@/lib/constants"
+import type { RiderVehicleType } from "@/lib/types"
 
 interface WarehouseOption {
   id: string
@@ -46,6 +53,8 @@ export function RiderApplicationDetailDialog({
   onRejected,
 }: RiderApplicationDetailDialogProps) {
   const [taskType, setTaskType] = useState<string>("DELIVERY")
+  const [vehicleType, setVehicleType] = useState<RiderVehicleType | "">("")
+  const [vehiclePlate, setVehiclePlate] = useState("")
   const [warehouseId, setWarehouseId] = useState<string>("")
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([])
   const [rejectReason, setRejectReason] = useState("")
@@ -64,6 +73,12 @@ export function RiderApplicationDetailDialog({
   useEffect(() => {
     if (application && mode === "approve") {
       setWarehouseId(application.warehouseId ?? "")
+      // Reset the vehicle each time the approve form is opened. Without this the
+      // previous applicant's motorbike and plate would still be sitting in the
+      // fields — a silent mis-assignment, since nothing about the form changes
+      // to make the leftover visible.
+      setVehicleType("")
+      setVehiclePlate("")
     }
   }, [application, mode])
 
@@ -76,7 +91,19 @@ export function RiderApplicationDetailDialog({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskType, warehouseId }),
+          body: JSON.stringify({
+            taskType,
+            warehouseId,
+            // Sent even when blank, as an explicit null. Omitting the key would
+            // leave whatever was on the record, and on a fresh application that
+            // is nothing — so blank and "not asked" would be indistinguishable
+            // to anyone reading the audit trail later.
+            vehicleType: vehicleType || null,
+            vehiclePlate:
+              vehicleType && VEHICLE_TYPES_REQUIRING_PLATE.has(vehicleType)
+                ? vehiclePlate.trim()
+                : null,
+          }),
         },
       )
       if (res.ok) {
@@ -249,6 +276,65 @@ export function RiderApplicationDetailDialog({
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="approveVehicleType">Vehicle</Label>
+                  <Select
+                    value={vehicleType}
+                    onValueChange={(v) =>
+                      setVehicleType((v as RiderVehicleType) ?? "")
+                    }
+                  >
+                    <SelectTrigger
+                      id="approveVehicleType"
+                      className="w-full"
+                      data-testid="approve-vehicle-type"
+                    >
+                      <SelectValue placeholder="Not recorded">
+                        {(value) =>
+                          value
+                            ? vehicleTypeLabel(value as RiderVehicleType)
+                            : "Not recorded"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VEHICLE_TYPE_OPTIONS.map((o) => (
+                        <SelectItem
+                          key={o.value}
+                          value={o.value}
+                          data-testid={`approve-vehicle-option-${o.value}`}
+                        >
+                          <span className="flex flex-col">
+                            <span>{o.label}</span>
+                            <span className="text-muted-foreground text-xs">
+                              {o.description}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">
+                    Recorded now so parcels can be assigned to this rider
+                    sensibly. Leave blank if not known yet.
+                  </p>
+                </div>
+                {vehicleType &&
+                  VEHICLE_TYPES_REQUIRING_PLATE.has(vehicleType) && (
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="approveVehiclePlate">
+                        Registration number
+                      </Label>
+                      <Input
+                        id="approveVehiclePlate"
+                        data-testid="approve-vehicle-plate"
+                        value={vehiclePlate}
+                        onChange={(e) => setVehiclePlate(e.target.value)}
+                        placeholder="DHAKA-1234"
+                        className="uppercase"
+                      />
+                    </div>
+                  )}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="overrideWarehouse">Warehouse</Label>
                   <Select

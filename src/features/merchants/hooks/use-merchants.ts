@@ -48,6 +48,7 @@ export function useMerchants({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<Merchant>>(
     currentUser ? url : null,
@@ -240,6 +241,7 @@ export function useMerchants({
     currentMerchant,
     isCurrentMerchantLoading,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     suspendMerchant,

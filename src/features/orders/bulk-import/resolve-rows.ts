@@ -49,6 +49,7 @@ const INPUT_HEADERS: Record<string, OrderImportHeader> = {
   deliveryAddress: "delivery_address",
   deliveryMapLink: "delivery_map_link",
   parcelWeightKg: "parcel_weight_kg",
+  itemType: "item_type",
   deliveryType: "delivery_type",
   productCost: "product_cost",
   merchantNote: "merchant_note",
@@ -205,6 +206,11 @@ export function resolveRow(
     deliveryAddress: values.delivery_address.trim(),
     deliveryMapLink: deliveryMapLink || null,
     parcelWeightKg,
+    // Optional and never coerced: an empty cell means the merchant did not say,
+    // which is stored as NULL. Not defaulted to something like "Parcel" — a
+    // placeholder written once would be read back later as if the merchant had
+    // actually stated it.
+    itemType: collapseWhitespace(values.item_type) || null,
     deliveryType,
     productCost,
     merchantNote: values.merchant_note.trim() || csvImportTag(),

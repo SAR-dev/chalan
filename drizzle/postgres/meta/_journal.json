@@ -15,6 +15,13 @@
       "when": 1790758731975,
       "tag": "0001_tiny_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790773822929,
+      "tag": "0002_tricky_ulik",
+      "breakpoints": true
     }
   ]
 }

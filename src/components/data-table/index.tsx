@@ -494,6 +494,15 @@ export function DataTable<T>({
     return sorted.slice(start, start + size)
   }, [sorted, currentPage, size, paginated, serverPaginated, data])
 
+  // A refresh must never blank the table. `loading` is true both for a genuine
+  // first load (nothing to show yet) and for an in-flight refetch of a key
+  // change, a post-mutation revalidate, or a manual refresh. Only the former
+  // deserves skeleton rows — once rows exist they stay on screen behind the
+  // overlay, because a table that empties and refills reads as data loss.
+  const showSkeletonRows = loading && !bulkLoading && visible.length === 0
+  const showRefreshOverlay =
+    bulkLoading || refreshing || (loading && !bulkLoading && visible.length > 0)
+
   // ---- Selection ----
   const [internalSelectedKeys, setInternalSelectedKeys] = React.useState<
     Set<string>
@@ -651,12 +660,23 @@ export function DataTable<T>({
         className="relative overflow-x-auto"
         onScroll={(e) => setIsPinnedScrolled(e.currentTarget.scrollLeft > 0)}
       >
-        {bulkLoading || refreshing ? (
-          <div className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center">
-            <Loader2 className="text-muted-foreground size-8 animate-spin" />
+        {showRefreshOverlay ? (
+          <div
+            data-testid={id ? `table-refreshing-${id}` : "table-refreshing"}
+            className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center"
+          >
+            <div className="bg-background flex flex-col items-center gap-2 rounded-lg border px-4 py-3 shadow-sm">
+              <Loader2 className="text-muted-foreground size-6 animate-spin" />
+              <span className="text-muted-foreground text-xs font-medium">
+                Refreshing…
+              </span>
+            </div>
           </div>
         ) : null}
-        <Table data-testid={id ? `table-${id}` : undefined}>
+        <Table
+          data-testid={id ? `table-${id}` : undefined}
+          aria-busy={showRefreshOverlay || undefined}
+        >
           <TableHeader>
             <TableRow>
               {selectable ? (
@@ -740,7 +760,7 @@ export function DataTable<T>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && !bulkLoading ? (
+            {showSkeletonRows ? (
               <TableSkeletonRows
                 size={size}
                 selectable={selectable}

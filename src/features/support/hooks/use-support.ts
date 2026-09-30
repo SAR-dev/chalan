@@ -52,6 +52,7 @@ export function useSupport({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<SupportTicket>>(
     currentUser ? url : null,
@@ -137,6 +138,7 @@ export function useSupport({
     sortDir: filters.sortDir,
     onSortChange: filters.onSortChange,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createTicket,

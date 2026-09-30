@@ -12,6 +12,7 @@ import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { riderParcelColumn } from "@/features/orders/components/order-table-columns"
 import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
 import { PickupConfirmDialog } from "@/features/orders/dialogs/pickup-confirm-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
@@ -32,6 +33,7 @@ export default function RiderPickupQueuePage() {
     query,
     setQuery,
     isLoading,
+    isRefreshing,
     dateFrom,
     setDateFrom,
     dateTo,
@@ -113,6 +115,9 @@ export default function RiderPickupQueuePage() {
         )
       },
     },
+    // What is being collected and how heavy it is — the rider is standing in
+    // front of a merchant's shelf when they read this.
+    riderParcelColumn(),
     {
       id: "pickupAddress",
       header: columnLabels.rider.pickupFrom,
@@ -216,7 +221,7 @@ export default function RiderPickupQueuePage() {
             data={myPickups}
             getRowKey={(o) => o.id}
             initialSortId="order"
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             emptyMessage="No pickups waiting. New pickups appear here once an Admin assigns them to you."
             serverPaginated
             total={total}

@@ -61,6 +61,7 @@ export function WarehouseSettlementPageClient({
     settleOrderCod,
     bulkSettleCod,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useOrders({ initialData, initialTotal })
   const { merchants } = useMerchants()
@@ -305,7 +306,7 @@ export function WarehouseSettlementPageClient({
             data={visible}
             getRowKey={(o) => o.id}
             initialSortId="order"
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             emptyMessage={
               tab === "UNSETTLED"
                 ? "Nothing to settle. Delivered parcels appear here until their COD is settled."

@@ -29,11 +29,9 @@ export interface PackageRequestRow {
 export function usePackageRequests() {
   const { currentUser } = useAuth()
 
-  const { data, error, isLoading, mutate } = useSWR<PackageRequestRow[]>(
-    currentUser ? KEY : null,
-    jsonFetcher,
-    swrOptions,
-  )
+  const { data, error, isLoading, isValidating, mutate } = useSWR<
+    PackageRequestRow[]
+  >(currentUser ? KEY : null, jsonFetcher, swrOptions)
 
   const review = useCallback(
     async (
@@ -68,5 +66,13 @@ export function usePackageRequests() {
     [review],
   )
 
-  return { requests: data ?? [], isLoading, error, mutate, approve, reject }
+  return {
+    requests: data ?? [],
+    isLoading,
+    isRefreshing: isValidating,
+    error,
+    mutate,
+    approve,
+    reject,
+  }
 }

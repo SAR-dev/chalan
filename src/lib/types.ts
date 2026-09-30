@@ -51,6 +51,9 @@ export type DeliveryType = (typeof order.$inferSelect)["deliveryType"]
 export type OrderStatus = (typeof order.$inferSelect)["status"]
 export type PayoutRequestStatus = (typeof payoutRequest.$inferSelect)["status"]
 export type RiderTaskType = (typeof rider.$inferSelect)["taskType"]
+export type RiderVehicleType = NonNullable<
+  (typeof rider.$inferSelect)["vehicleType"]
+>
 export type RiderStatus = (typeof rider.$inferSelect)["status"]
 export type BalanceTxType = (typeof balanceTransaction.$inferSelect)["type"]
 export type BalanceTxStatus = (typeof balanceTransaction.$inferSelect)["status"]
@@ -201,6 +204,8 @@ export interface CreateOrderInput {
   deliveryCityId: string
   deliveryMapLink?: string | null
   parcelWeightKg: number
+  /** What is in the parcel, in the merchant's words. Optional and never priced. */
+  itemType?: string | null
   deliveryType: DeliveryType
   productCost: number
   merchantNote?: string | null

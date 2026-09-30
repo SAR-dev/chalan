@@ -35,8 +35,14 @@ import { tierLabel } from "@/lib/packages"
 import { formatTk } from "@/lib/pricing"
 
 export default function PackagesPage() {
-  const { packages, updatePackage, deletePackage, deleteTier, isLoading } =
-    usePackages()
+  const {
+    packages,
+    updatePackage,
+    deletePackage,
+    deleteTier,
+    isLoading,
+    isRefreshing,
+  } = usePackages()
 
   const [editing, setEditing] = useState<PackageRow | null>(null)
   const [tierFor, setTierFor] = useState<PackageRow | null>(null)
@@ -243,7 +249,7 @@ export default function PackagesPage() {
             data={packages}
             getRowKey={(p) => p.id}
             emptyMessage="No packages yet. Create one to start selling prepaid delivery bundles."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
           />
         </CardContent>
       </Card>

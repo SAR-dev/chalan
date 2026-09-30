@@ -35,6 +35,7 @@ function emptyParcel(pickupLocationId = ""): ParcelState {
     deliveryCityId: "",
     deliveryAddress: "",
     parcelWeightKg: "1",
+    itemType: "",
     productCost: "",
     deliveryType: "STANDARD",
     deliveryMapLink: "",
@@ -223,6 +224,10 @@ export default function NewOrderPage() {
       deliveryAddress: p.deliveryAddress.trim(),
       deliveryMapLink: p.deliveryMapLink.trim() || null,
       parcelWeightKg: Number(p.parcelWeightKg) || 0,
+      // Blank becomes null, not "". The two are indistinguishable in the UI but
+      // not in the database, and "did not say" is worth being able to tell apart
+      // from "typed nothing useful" if the field is ever grouped.
+      itemType: p.itemType.trim() || null,
       deliveryType: p.deliveryType,
       productCost: Number(p.productCost) || 0,
       merchantNote: p.merchantNote.trim() || null,

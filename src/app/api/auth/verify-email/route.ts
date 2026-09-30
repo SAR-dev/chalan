@@ -82,7 +82,7 @@ export const GET = withErrorHandler(async (req: Request) => {
       .where(eq(user.email, _updated.email))
 
     // Send welcome email (fire-and-forget)
-    const dashboardUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/welcome`
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/merchant`
     sendMail({
       to: _updated.email,
       ...(await merchantWelcomeTemplate({

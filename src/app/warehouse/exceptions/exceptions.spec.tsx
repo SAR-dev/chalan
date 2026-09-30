@@ -154,7 +154,7 @@ describe("Warehouse exceptions — section 5", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("shows loading state", async () => {
+  it("keeps rows on screen while refreshing", async () => {
     mockOrdersState = createMockOrders({
       orders: [
         makeOrder({
@@ -165,7 +165,10 @@ describe("Warehouse exceptions — section 5", () => {
       isLoading: true,
     })
     await importPage()
-    expect(screen.queryByText("ORD-0001")).not.toBeInTheDocument()
+    // A refresh must not read as data loss: the row stays put and the table is
+    // marked busy rather than blanking to skeletons.
+    expect(screen.getByText("ORD-0001")).toBeInTheDocument()
+    expect(screen.getByText("Refreshing…")).toBeInTheDocument()
   })
 
   it("shows RESOLVED tab empty message", async () => {

@@ -53,6 +53,7 @@ export function useUsers({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<AdminUser>>(
     currentUser ? url : null,
@@ -156,6 +157,7 @@ export function useUsers({
     sortDir: filters.sortDir,
     onSortChange: filters.onSortChange,
     isLoading,
+    isRefreshing: isValidating,
     error,
     currentUserId: currentUser?.id ?? null,
     resetPassword,

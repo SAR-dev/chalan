@@ -27,6 +27,7 @@ export function DeliveryZonesPageClient() {
   const {
     zones,
     isLoading,
+    isRefreshing,
     updateZone,
     deleteZone,
     mutate: refresh,
@@ -132,7 +133,7 @@ export function DeliveryZonesPageClient() {
             columns={columns}
             data={zones}
             getRowKey={(o) => o.id}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             onRefresh={refresh}
             emptyMessage="No delivery zones yet. Add one to get started."
           />

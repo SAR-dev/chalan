@@ -26,8 +26,26 @@ import type { ZonePricingEstimate } from "../hooks/use-zone-pricing-public"
 interface ZoneMatrixProps {
   /** Active zones, for names. An id missing here falls back to its raw value. */
   zones: ReadonlyArray<{ id: string; name: string }>
-  rates: ReadonlyArray<ZonePricingEstimate>
+  /**
+   * The rates to lay out. Typed as the fields the matrix actually reads rather
+   * than as one concrete row type, so the merchant estimate feed and the admin
+   * `zone_pricing` rows can both render it without either being cast — the two
+   * differ in extra columns they carry, not in anything shown here.
+   */
+  rates: ReadonlyArray<ZoneMatrixRate>
 }
+
+type ZoneMatrixRate = Pick<
+  ZonePricingEstimate,
+  | "fromZoneId"
+  | "toZoneId"
+  | "baseRate"
+  | "extraRatePerKg"
+  | "freeWeightKg"
+  | "maxWeightKg"
+  | "codFeePercentage"
+  | "cancellationFee"
+>
 
 type Lane = { fromZoneId: string; toZoneId: string } | null
 

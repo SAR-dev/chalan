@@ -26,6 +26,7 @@ export function useDeliveryCities() {
     data: cities,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<DeliveryCityOption[]>(
     isAdmin ? ADMIN_KEY : null,
@@ -103,6 +104,7 @@ export function useDeliveryCities() {
   return {
     cities: activeCities,
     isLoading: isAdmin ? isLoading : isPublicLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createCity,

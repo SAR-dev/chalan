@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
 import { totpSecretFromUri } from "@/lib/two-factor"
 import { CREDS, type E2ECredential, login, waitForAppReady } from "../helpers"
-import { auth, onboarding, twoFactor } from "../selectors"
+import { auth, twoFactor } from "../selectors"
 import { totp } from "../totp"
 
 const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider|welcome)/
@@ -13,15 +13,6 @@ async function openTwoFactorTab(page: Page, path = "/dashboard/account") {
   // Let /api/users/me settle so status/policy assertions see fresh flags.
   await waitForAppReady(page)
   await expect(page.locator(twoFactor.status)).toBeVisible()
-}
-
-/** Skip onboarding if the merchant landed on /welcome */
-async function skipOnboardingIfNeeded(page: Page) {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
 }
 
 /** Reads the live TOTP secret for the signed-in user (recovery path). */
@@ -150,7 +141,6 @@ test.describe("S37. Two-factor authentication", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     // ── Opt in from the merchant account page ─────────────────────────────
     await openTwoFactorTab(page, "/merchant/account")
@@ -189,7 +179,6 @@ test.describe("S37. Two-factor authentication", () => {
     await page.locator(twoFactor.loginSubmit).click()
     await page.waitForURL(AUTHENTICATED_URL, { timeout: 15_000 })
     await waitForAppReady(page)
-    await skipOnboardingIfNeeded(page)
 
     // ── Disable again (leaves the seeded merchant clean) ──────────────────
     await openTwoFactorTab(page, "/merchant/account")

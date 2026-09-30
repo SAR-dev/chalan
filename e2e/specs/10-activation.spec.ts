@@ -11,27 +11,9 @@ import {
   merchantQuota,
   moderators,
   nav,
-  onboarding,
   orders,
   team,
 } from "../selectors"
-
-/** Ensure the merchant is past the onboarding wizard (seeded merchant1 is
- *  not onboarded; "Skip for now" persists onboardingCompletedAt). The shell
- *  redirect to /welcome is async, so wait for it deterministically. */
-async function skipOnboardingIfNeeded(page: Page) {
-  await page.goto("/merchant")
-  await waitForAppReady(page).catch(() => {})
-  const skip = page.locator(onboarding.skip)
-  try {
-    await skip.waitFor({ state: "visible", timeout: 5_000 })
-  } catch {
-    return // already onboarded — no welcome screen
-  }
-  await skip.click()
-  await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-  await waitForAppReady(page)
-}
 
 /**
  * Read the latest activation email for an address straight from Postgres —
@@ -186,7 +168,6 @@ test.describe("S41. Merchant moderator accounts", () => {
 
     // Owner invites the first moderator with Orders + New Order only.
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/settings")
     await waitForAppReady(page)
     await expect(page.locator(moderators.card)).toBeVisible()
@@ -290,7 +271,6 @@ test.describe("S41. Merchant moderator accounts", () => {
   }) => {
     const modEmail = await latestActivatedModeratorEmail()
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/settings")
     await waitForAppReady(page)
 

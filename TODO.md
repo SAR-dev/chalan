@@ -1,207 +1,154 @@
 # TODO
 
-> **Just landed** (all gates green): zone pricing is now the single source of
-> delivery pricing with no platform-wide fallback — an unpriced lane is rejected
-> by name and `/dashboard` lists the gaps. The merchant weight limit was dropped
-> in favour of the lane's own, plus a merchant Delivery Cities page and a
-> zone × zone rate matrix.
+> **Just landed** (all gates green): onboarding is gone — its fee/zone/weight
+> explainer now lives permanently on the merchant support page. Merchants can
+> state an item type on their orders (single or CSV), riders are shown what they
+> are collecting, admins record a rider's vehicle (settable at approval) which
+> shows in the assign dialogs, the admin zone-pricing page has a list/matrix
+> toggle (list default), and data tables keep their rows on screen while
+> refreshing instead of blanking to skeletons.
 >
 > | Gate | Result |
 > |---|---|
 > | `pnpm ci:check` | ✅ 0 |
-> | `pnpm test:coverage` | ✅ 1911 passed · 51.99 / 45.28 / 39.85 / 52.66 |
+> | `pnpm test:coverage` | ✅ 1955 passed · 52.96 / 46.01 / 40.79 / 53.68 |
 > | `pnpm build` | ✅ 0 |
-> | `pnpm db:migrate` | ✅ `0000_init`, `0001_tiny_kang` (squashed) |
+> | `pnpm db:migrate` | ✅ `0000_init`, `0001_tiny_kang`, `0002_tricky_ulik` |
 > | `pnpm test:integration` | ✅ 16/16 |
-> | `pnpm test:e2e` | ✅ 104 passed (S1–S65, 25 files) |
+> | `pnpm test:e2e` | ✅ 109 passed (S1–S66, 26 files) |
 
 ---
 
-## 1. Remove the onboarding flow
+## 1. Remove the onboarding flow ✅
 
 The support page now covers what onboarding told merchants, so the three-step
 wizard goes away.
 
-**What exists**
+**Done**
 
-```
-src/app/(onboarding)/welcome/page.tsx        ← entry after email verification
-src/app/(onboarding)/pickup-locations/page.tsx
-src/app/(onboarding)/pricing/page.tsx        ← the "how fees work" explainer
-src/app/(onboarding)/layout.tsx              ← gates the group
-src/app/(onboarding)/error.tsx
-```
+- [x] Deleted the five `(onboarding)` files (git rm + this round).
+- [x] `merchant-shell.tsx` — dropped the `!onboardingCompletedAt` redirect; a
+      verified merchant lands on `/merchant` directly.
+- [x] `api/auth/verify-email/route.ts` — the welcome email's `dashboardUrl` now
+      points at `/merchant`.
+- [x] Deleted `PATCH /api/merchants/me/onboarding` + `onboarding.spec.ts`.
+- [x] `api/merchants/route.ts` + `api/merchants/[id]/route.ts` no longer select
+      `onboardingCompletedAt`.
+- [x] **`merchant.onboardingCompletedAt` was dead** — dropped the column, the
+      seed values (plus a leftover `maxWeightKg` field the fresh seed choked on)
+      and migrated it in `0002_tricky_ulik`.
+- [x] E2E: `03-onboarding.spec.ts` was **renamed** `03-merchant-registration.spec.ts`
+      (S35, 4 tests) rather than deleted, so suite numbers keep no gaps;
+      `skipOnboardingIfNeeded` and all 10 call sites are gone.
+- [x] Re-checked `hasNavPermission` / `merchantVisibleNavItems` — no
+      onboarding-only hrefs remained.
 
-**Remove / rewire**
+### Support page: reference material ✅
 
-- [ ] Delete the five files above.
-- [ ] `merchant-shell.tsx:208-213` — drops the `!onboardingCompletedAt` redirect;
-      a verified merchant lands on `/merchant` directly.
-- [ ] `api/auth/verify-email/route.ts:85` — the welcome email's `dashboardUrl`
-      points at `/welcome`, the onboarding entry. Repoint it at `/merchant`.
-- [ ] Delete `PATCH /api/merchants/me/onboarding` + `onboarding.spec.ts` — it
-      exists only to mark the step complete.
-- [ ] `api/merchants/route.ts:46` selects `onboardingCompletedAt` for the admin
-      list — drop it with the column (see below).
-- [ ] **Decide:** does `merchant.onboardingCompletedAt` become dead? If so,
-      drop the column + seed references
-      (`seed-content/merchants.ts:29,72,73,180`) and migrate.
-- [ ] E2E: `03-onboarding.spec.ts` (S35, 4 tests) and the
-      `skipOnboardingIfNeeded` helper — remove the helper and every call site,
-      or repoint them at `/merchant`.
-- [ ] Re-check `hasNavPermission` / `merchantVisibleNavItems` for any
-      onboarding-only hrefs.
-
-**Move the explainer into the support page** — `(onboarding)/pricing/page.tsx`
-told merchants how fees, zones and weight limits work, and item 1 of the
-previous round put that detail on the pricing page instead. Make sure support
-carries it too.
-
-### Support page: make it good enough to stand alone
-
-- [ ] Audit `merchant/support/page.tsx` (33 lines, server) +
-      `features/support/components/support-page-client.tsx` (305 lines).
-      Today it is a **ticket thread list** — there is no reference material on
-      it at all.
-- [ ] Add a permanent reference section: how delivery fees are calculated
-      (zone → zone, base + per-KG above free weight), what the route weight
-      limit means, where the Delivery Cities list lives, and how to read the
-      rate matrix.
-- [ ] Decide the shape: FAQ accordion vs tabs (Tickets | How pricing works) vs
-      a link out to `/merchant/pricing`.
-- [ ] Keep the existing ticket flow intact — this is additive.
+- [x] `support-reference.tsx` — 8 native `<details>` disclosures covering fee
+      calculation (zone × zone, base + per-KG above allowance, directional,
+      locked at creation), the **real** rejection sentence rendered by calling
+      `pricingUnavailableMessage("no-pricing-for-lane", …)` so the wording can
+      never drift, the lane-owned weight limit, reading the matrix (em dash =
+      not configured, not free), delivery cities, COD earnings, prepaid vs COD,
+      and what to do if still stuck.
+- [x] Rendered **merchant-only** in `support-page-client.tsx`, guarded by
+      `!isAdmin && currentUser?.role === "MERCHANT"` and covered by wiring tests
+      (reverting the conditional fails one).
 
 ---
 
-## 2. Item type, rider weight, and vehicle assignment
+## 2. Item type, rider weight, and vehicle assignment ✅
 
-This one still needs design thought before any code. Split into four parts.
+Decisions taken: **item type is free text** (descriptive, never touches
+pricing); **one vehicle per rider** (type + optional plate, no capacity);
+**vehicle in the assignment dialog is a display aid**, not a filter; **2b is
+read-only visibility**, not a verification step.
 
-### 2a. Merchants submit an item type at order creation
+### 2a. Merchants submit an item type at order creation ✅
 
-- [ ] Add `order.itemType` (column + enum or free text — **open, see below**).
-- [ ] `CreateOrderInput` + `orderCreateSchema` in `src/lib/validation.ts`.
-- [ ] Order form field (`merchant/orders/new/page.tsx`, `parcel-card.tsx`).
-- [ ] CSV import: header in `bulk-import/template.tsx`, parse in
-      `csv-parse.ts`, resolve in `resolve-rows.ts`, plus the template CSV and
-      its spec fixtures.
-- [ ] Surface it everywhere an order is read: order table columns, order
-      detail, warehouse intake/dispatch, rider screens.
+- [x] `order.itemType` — nullable text, 60 chars, trimmed; blank → `NULL`.
+- [x] `CreateOrderInput` + `itemTypeField()` on `orderCreateSchema`.
+- [x] Order form field in `parcel-card.tsx`, with copy that states plainly it
+      does not affect the fee.
+- [x] CSV import: `item_type` added to `orderImportHeaders` (optional, position 7),
+      7 new forgiving aliases, prefilled in the template, mapped in
+      `resolve-rows.ts` and round-tripped by `row-to-parcel.ts`.
+- [x] Read surfaces: `ORDER_CORE_COLUMNS` (so every list/detail picks it up),
+      `itemTypeColumn()` on the shared order lists and warehouse dispatch, the
+      detail panel, and `riderParcelColumn()` on the rider queues.
 
-> **Open:** enum or free text? (If it ever drives pricing, filtering or
-> reporting, an enum is much easier to aggregate on — but it has to be a list
-> merchants will actually pick from.) Does it affect pricing, or is it purely
-> descriptive?
+### 2b. Riders see item type and weight ✅
 
-### 2b. Riders see item type and weight
+- [x] `riderParcelColumn()` on **both** `rider/pickup` and `rider/delivery` —
+      weight and contents as one cell, because they are one decision.
+- [x] Rider endpoints already returned both fields (`ORDER_CORE_COLUMNS`).
 
-- [ ] `parcelWeightKg` already exists on `order`; item type arrives with 2a.
-- [ ] Show both on `rider/pickup` and `rider/delivery` — the rider needs to
-      know what they are collecting and how heavy it is.
-- [ ] Confirm the rider list endpoints already return both fields; add them if
-      not.
+### 2c. Vehicles — net-new concept ✅
 
-> **Open:** is this just visibility, or does it become a verification step
-> ("confirm the parcel is a 3 kg electronics item")? That changes whether it
-> needs an API write or only a read.
+- [x] Schema: `rider.vehicleType` (text column, `riderVehicleTypes` enum hint
+      covering FOOT/BICYCLE/BIKE/CAR/VAN/PICKUP_TRUCK) + `rider.vehiclePlate`
+      (20 chars, normalized upper-case, space-stripped). Both nullable.
+- [x] Admin UI: `edit-rider-dialog` picker (plate only for plate-bearing
+      vehicles), a `vehicle` column on the rider list, and a Vehicle row on the
+      rider detail — each saying "Not recorded" rather than showing a gap.
+- [x] Also settable when a rider application is approved
+      (`riderApproveSchema` + the approve dialog, which resets the fields per
+      applicant so one rider's bike cannot leak onto the next).
+- [x] Migration `0002_tricky_ulik` + seed: 3 of 30 riders get a vehicle, the
+      other 27 deliberately have none.
+- [x] `riderVehicleLabel()` / `hasRiderVehicle()` in `vehicle-label.ts` — null
+      when nothing is declared, distinct from "on foot".
 
-### 2c. Vehicles — net-new concept
+> **Resolved bug:** `riderVehiclePlateSchema`'s `.transform()` used to
+> materialise `vehiclePlate: null` on *every* parse, so renaming a rider would
+> have silently erased their vehicle. The transform now passes `undefined`
+> through, and `validation.spec.ts` pins it.
 
-The `rider` table has **no vehicle field at all** today (`id, name, email,
-phone, zone, address, nid*, status, isActive, taskType, warehouseId,
-approvedBy/At, createdAt, updatedAt`).
+### 2d. The assignment dialog shows the rider's vehicle ✅
 
-- [ ] Schema: add a vehicle to `rider` — **open** (below).
-- [ ] Admin UI to set it: rider management list + rider detail
-      (`dashboard/riders/*`) and/or `features/riders/dialogs/*`.
-- [ ] Also settable when a rider application is approved.
-- [ ] Migration + seed update.
-
-> **Open:** one vehicle per rider, or a pool a rider can be assigned from? Is
-> it just a plate/type, or does it carry capacity (which would then constrain
-> what parcels they can take — see 2d)?
-
-### 2d. The assignment dialog shows the rider's vehicle
-
-- [ ] `features/orders/dialogs/assign-pickup-rider-dialog.tsx` and
-      `bulk-assign-pickup-rider-dialog.tsx` — show the vehicle beside each
-      rider.
-- [ ] Backend: `POST /api/orders/bulk/assign-pickup-rider` and the single
-      assign endpoint need to return the vehicle with the rider list.
-- [ ] The admin should be able to see the parcel's item/weight and the rider's
-      vehicle in the same view before choosing.
-
-> **Open:** is the vehicle purely an aid ("see it and pick"), or does it
-> **filter** the eligible riders — e.g. a parcel over a size limit cannot go to
-> a rider whose vehicle cannot carry it? The wording suggests an aid first;
-> filtering is a natural follow-up but changes the endpoint contract.
+- [x] Both `assign-pickup-rider-dialog.tsx` and
+      `bulk-assign-pickup-rider-dialog.tsx` show a vehicle line per rider with a
+      "No vehicle recorded" fallback, plus a Contents row carrying the parcel's
+      item type — vehicle and contents in the same view before choosing.
+- [x] Backend already returned the rider list; no endpoint contract change.
 
 ---
 
-## 3. Admin pricing: matrix and list, toggleable
+## 3. Admin pricing: matrix and list, toggleable ✅
 
-Merchants already get the matrix (`features/platform-config/components/zone-rate-matrix.tsx`,
-9 unit tests + E2E S65). The admin page is list-only.
-
-**What exists**
-
-- `src/app/dashboard/zone-pricing/zone-pricing-client.tsx` — `DataTable` with
-  Route / Base / Extra per KG / Free / COD / Max weight, **editable** via
-  `CreateZonePricingDialog` + `useZonePricing().upsertPricing`.
-- `ZoneRateMatrix` — read-only, rows = pickup zone, columns = delivery zone.
-
-**Do**
-
-- [ ] Render `ZoneRateMatrix` on the admin page alongside the existing table.
-- [ ] Add a toggle between the two views.
-- [ ] Make sure the matrix shows the same rate fields the list does, or links
-      through to editing that lane.
-
-> **Open:** should cells open `CreateZonePricingDialog` for that lane (making
-> the matrix editable), or stay read-only with editing only in the list?
-> **Open:** which view is the default, and should the choice persist? The
-> `DataTable` already persists column state in `localStorage`, so that is the
-> pattern to follow.
+- [x] `ZoneRateMatrix` renders on the admin page alongside the existing table.
+- [x] Toggle sits **above** the card, not inside the table toolbar — inside the
+      toolbar it would vanish the moment the matrix was selected, stranding the
+      admin with no way back. Covered by a test.
+- [x] **List is the default**: it is the only view carrying the row actions, and
+      an admin arriving here is most often here to add, edit or delete a rate.
+- [x] Matrix stays **read-only**; it is a coverage audit ("which lanes am I
+      missing?"), not an edit surface.
+- [x] `ZoneRateMatrix`'s `rates` prop was widened to the fields it actually
+      reads, so the merchant estimate feed and the admin `zone_pricing` rows
+      both render it with no casts.
+- [x] The matrix is gated on `isLoading` so it cannot claim there are no rates
+      while the first fetch is still running.
 
 ---
 
-## 4. Keep DataTable rows visible while refreshing
+## 4. Keep DataTable rows visible while refreshing ✅
 
-**The problem:** the table blanks to skeleton rows on every refresh, which
-looks like data loss.
-
-**Diagnosis — two separate mechanisms, only one of them behaves:**
-
-- `src/components/data-table/index.tsx:743` — `loading && !bulkLoading` renders
-  `TableSkeletonRows`, **replacing every row**. This is what the user sees.
-- `index.tsx:654` already has the right behaviour: a translucent overlay
-  (`bg-background/60` + spinner) drawn **over** the existing rows. But it is
-  gated on `bulkLoading || refreshing`, and `refreshing` is internal toolbar
-  state set only by the manual refresh button (`index.tsx:850-851`). No other
-  load path ever reaches it.
-- `src/lib/hooks/fetcher.ts` `swrOptions` has **no `keepPreviousData`**, so a
-  page/size/filter change drops `data` before the next response lands.
-
-**33 call sites** pass `loading={isLoading}` — dashboard, merchant, warehouse,
-rider and `features/*` tables alike. Hence "all instances".
-
-**Do**
-
-- [ ] In `data-table/index.tsx`, show the overlay instead of skeleton rows
-      **whenever rows already exist**; keep `TableSkeletonRows` for a genuine
-      first load with nothing to show.
-- [ ] Add `keepPreviousData: true` to `swrOptions` (or opt in per hook) so
-      `data` never collapses to `undefined` mid-revalidate.
-- [ ] Audit the 33 `loading={isLoading}` call sites for `data={data ?? []}`,
-      which silently renders an empty table while fetching.
-- [ ] Unit tests in `components/data-table.spec.tsx`: rows are still in the
-      DOM while `loading` is true with prior data, and skeletons appear when
-      there are none.
-- [ ] Confirm the empty state never flashes during a refresh.
-
-> **Open:** the current overlay dims rows + spinner. Worth deciding whether a
-> small "Refreshing…" label makes it clearer that the data is stale rather than
-> broken — but the overlay is a good starting point.
+- [x] `data-table/index.tsx` — `showSkeletonRows` only when there is nothing to
+      show (`loading && !bulkLoading && visible.length === 0`); a refresh
+      overlay (`Loader2` + "Refreshing…", `data-testid="table-refreshing-<id>"`,
+      `aria-busy` on the `<Table>`) draws over existing rows otherwise.
+- [x] `swrOptions` gained `keepPreviousData: true`, so `data` never collapses
+      to `undefined` mid-revalidate.
+- [x] `isRefreshing` (= SWR `isValidating`) added to ~19 table-backing hooks;
+      ~32 call sites use `loading={isLoading || isRefreshing}`. Feature hooks'
+      `isLoading` semantics were deliberately **not** changed — card-style
+      consumers would otherwise blank on revalidation.
+- [x] `data-table.spec.tsx` — 6 refresh tests; 10 page specs rewritten from
+      "shows loading state" to "keeps rows on screen while refreshing".
+- [x] Empty state cannot flash: with prior data present the overlay, not the
+      empty message, is what renders.
 
 ---
 
@@ -217,16 +164,20 @@ rider and `features/*` tables alike. Hence "all instances".
 - [ ] `reuseExistingServer` is `true` locally, so a stray `pnpm start` makes
       Playwright **skip `db:seed:full`**. Stop any running server before
       `pnpm test:e2e`, or tests may pass against stale data.
+- [ ] A `docs/CSV-IMPORT.md` still does not exist — `bulk-import/template.tsx`
+      refers to sections of it (§3.2, §3.4, §6, §7) that were never written.
+      `item_type` should be part of that write-up, but writing the spec is its
+      own piece of work, not a follow-up to this one.
 
 ## Verification
 
-- [ ] `pnpm ci:check`
-- [ ] `pnpm test:coverage` (floors: 49 / 42 / 37 / 50 global, stricter for
+- [x] `pnpm ci:check`
+- [x] `pnpm test:coverage` (floors: 49 / 42 / 37 / 50 global, stricter for
       `src/lib/**` and `src/app/api/**`)
-- [ ] `pnpm db:generate` + `pnpm db:migrate`
-- [ ] `pnpm build`
-- [ ] `INTEGRATION_DATABASE_URL=… pnpm test:integration`
-- [ ] `pnpm test:e2e`
+- [x] `pnpm db:generate` (no further changes) + `pnpm db:migrate`
+- [x] `pnpm build`
+- [x] `INTEGRATION_DATABASE_URL=… pnpm test:integration`
+- [x] `pnpm test:e2e`
 
 **Local note:** this machine has 14 logical cores but little free RAM, so the
 suite's default worker count can starve it — 60 s timeouts and
@@ -234,3 +185,9 @@ suite's default worker count can starve it — 60 s timeouts and
 happens, re-run with `pnpm exec vitest run --coverage --maxWorkers=4`; the
 committed `vitest.config.ts` is deliberately left alone because CI is
 unaffected.
+
+**PowerShell note:** `pnpm … *>$null; $LASTEXITCODE` is the reliable way to get
+an exit code — several tools here write progress to stderr, which PowerShell
+surfaces as `NativeCommandError` even on success. Integration tests read
+`INTEGRATION_DATABASE_URL` from `.env`'s `DATABASE_URL`; without it the whole
+suite skips rather than failing.

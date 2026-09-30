@@ -4,22 +4,13 @@ import {
   deliveryCities,
   dialog,
   merchants,
-  onboarding,
   orders,
   register,
   riderApplication,
 } from "../selectors"
 
-async function skipOnboardingIfNeeded(page: any) {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
-}
-
-// ─── S2. Merchant Onboarding ─────────────────────────────────────────────────
-test.describe("S2. Merchant Onboarding", () => {
+// ─── S2. Merchant Registration ─────────────────────────────────────────────────
+test.describe("S2. Merchant Registration", () => {
   test("user can access registration page", async ({ page }) => {
     await page.goto("/register")
     await waitForAppReady(page)
@@ -30,7 +21,6 @@ test.describe("S2. Merchant Onboarding", () => {
   test("registered merchant sees pending status", async ({ page }) => {
     // Login as a merchant that's already active (seeded)
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await waitForAppReady(page)
     // Merchant dashboard should load
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -63,7 +53,6 @@ test.describe("S5. Merchant Self-Cancellation", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/orders")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -98,7 +87,6 @@ test.describe("S11. Payout Rejection", () => {
 test.describe("S13. Zone-Based Order Pricing", () => {
   test("order form loads correctly", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/orders/new")
     await waitForAppReady(page)
     // Verify order form page loaded
@@ -148,7 +136,6 @@ test.describe("S20. Announcement Lifecycle", () => {
 
   test("merchant can view announcements inbox", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/announcements")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -159,7 +146,6 @@ test.describe("S20. Announcement Lifecycle", () => {
 test.describe("S23. Merchant Balance & Payment", () => {
   test("merchant can view finance page", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/finance")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -194,7 +180,6 @@ test.describe("S29. Warehouse COD Settlement", () => {
 test.describe("S30. Merchant Pricing", () => {
   test("merchant can view pricing page", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/pricing")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()

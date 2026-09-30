@@ -40,8 +40,6 @@ export const merchant = pgTable(
     })
       .notNull()
       .default("Other"),
-    // Onboarding — set when merchant completes the setup wizard.
-    onboardingCompletedAt: ts("onboardingCompletedAt"),
     status: text("status", { enum: merchantStatuses })
       .notNull()
       .default("PENDING"),

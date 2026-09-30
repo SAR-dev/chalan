@@ -43,7 +43,6 @@ export const GET = withErrorHandler(async (req: Request) => {
         address: merchant.address,
         status: merchant.status,
         businessType: merchant.businessType,
-        onboardingCompletedAt: merchant.onboardingCompletedAt,
         emailVerifiedAt: merchant.emailVerifiedAt,
         phoneVerifiedAt: merchant.phoneVerifiedAt,
         nidSubmittedAt: merchant.nidSubmittedAt,

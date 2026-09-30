@@ -1,10 +1,10 @@
+import type { RiderVehicleType } from "@/lib/types"
 import {
   PENDING_RIDER_CREDENTIAL,
   RIDER_CREDENTIALS,
   SEED_COUNTS,
 } from "./credentials"
 import { WAREHOUSE_IDS } from "./warehouses"
-
 // ---------------------------------------------------------------------------
 // Deterministic: Riders (30)
 // ---------------------------------------------------------------------------
@@ -21,6 +21,14 @@ export interface RiderSeedEntry {
   isActive: boolean
   taskType: "PICKUP" | "DELIVERY" | "BOTH"
   warehouseId: string
+  /**
+   * Optional. Most seeded riders deliberately have none, so a freshly seeded
+   * database shows the same "Not recorded" gap a real one would — a fleet where
+   * every rider already has a vehicle is the case the UI has to handle least and
+   * the one a reviewer is most likely to be fooled by.
+   */
+  vehicleType?: RiderVehicleType | null
+  vehiclePlate?: string | null
 }
 
 export const RIDER_IDS: Record<string, string> = Object.fromEntries(
@@ -63,6 +71,23 @@ const RIDER_TASK_TYPES: ("PICKUP" | "DELIVERY" | "BOTH")[] = [
   "BOTH",
 ]
 
+/**
+ * Vehicles for a handful of seeded riders, indexed by rider number.
+ *
+ * Sparse on purpose. Two riders get a plate-requiring vehicle, one gets a
+ * plate-less one, and the other twenty-seven get nothing — so the list, the
+ * detail page and the assign dialogs are each exercised in both their "declared"
+ * and "not declared" states without a special-case fixture.
+ */
+const RIDER_VEHICLES: Record<
+  number,
+  { vehicleType: RiderVehicleType; vehiclePlate: string | null }
+> = {
+  1: { vehicleType: "BIKE", vehiclePlate: "DHAKA-11111" },
+  2: { vehicleType: "BICYCLE", vehiclePlate: null },
+  3: { vehicleType: "VAN", vehiclePlate: "DHAKA-22222" },
+}
+
 export const SEED_RIDERS: RiderSeedEntry[] = Array.from(
   { length: SEED_COUNTS.riders },
   (_, i) => ({
@@ -78,6 +103,8 @@ export const SEED_RIDERS: RiderSeedEntry[] = Array.from(
     isActive: i % 5 !== 4,
     taskType: RIDER_TASK_TYPES[i],
     warehouseId: WAREHOUSE_IDS.dhakaCentralHub,
+    vehicleType: RIDER_VEHICLES[i + 1]?.vehicleType ?? null,
+    vehiclePlate: RIDER_VEHICLES[i + 1]?.vehiclePlate ?? null,
   }),
 )
 

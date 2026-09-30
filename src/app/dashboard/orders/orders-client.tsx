@@ -71,6 +71,7 @@ export function OrdersPageClient({
     statuses: _statuses,
     setStatuses,
     isLoading,
+    isRefreshing,
     bulkApproveOrders,
     bulkCancelOrders,
     dateFrom: _dateFrom,
@@ -388,7 +389,7 @@ export function OrdersPageClient({
             data={orders}
             getRowKey={(o) => o.id}
             emptyMessage="No orders match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             serverSortId={sortId}
             serverSortDir={sortDir}

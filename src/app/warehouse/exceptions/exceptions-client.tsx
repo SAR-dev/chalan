@@ -75,6 +75,7 @@ export function WarehouseExceptionsPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
@@ -278,7 +279,7 @@ export function WarehouseExceptionsPageClient({
             data={tab === "NEEDS_ACTION" ? needsAction : resolved}
             getRowKey={(o) => o.id}
             initialSortId="order"
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             emptyMessage={
               tab === "NEEDS_ACTION"
                 ? "No failed deliveries. Parcels appear here when a delivery rider records a failed attempt."

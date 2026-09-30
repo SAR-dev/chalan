@@ -7,6 +7,7 @@ import {
   PACKAGE_RULE_TYPES,
   PROFILE_ROLES,
   RIDER_TASK_TYPES,
+  RIDER_VEHICLE_TYPES,
 } from "@/lib/constants"
 import { isAllowedOrigin } from "@/lib/csrf"
 
@@ -228,6 +229,23 @@ export const twoFactorDisableSchema = z.object({
 const noteField = (label: string) =>
   z.string().trim().max(100, `${label} cannot exceed 100 characters`).nullish()
 
+/**
+ * What is in the parcel, as free text.
+ *
+ * Optional, and a blank submission is stored as NULL rather than "" so
+ * "did not say" stays distinguishable from "said nothing useful" when the field
+ * is later grouped or counted. The cap is a single line of a label — enough for
+ * "saree", "cooked food", "phone charger" — and stops the field being used as
+ * free-form notes that nothing will ever read.
+ */
+const itemTypeField = () =>
+  z
+    .string()
+    .trim()
+    .max(60, "Item type cannot exceed 60 characters")
+    .nullish()
+    .transform((v) => (v ? v.replace(/\s+/g, " ") : null))
+
 export const orderCreateSchema = z.object({
   pickupLocationId: requiredString("Pickup location"),
   recipientName: requiredString("Recipient name"),
@@ -239,6 +257,7 @@ export const orderCreateSchema = z.object({
     .or(z.literal(""))
     .nullish(),
   parcelWeightKg: z.number().positive("Parcel weight must be greater than 0"),
+  itemType: itemTypeField(),
   deliveryType: z.enum(ORDER_DELIVERY_TYPES).optional(),
   productCost: z.number().nonnegative("Product cost cannot be negative"),
   merchantNote: noteField("Merchant note"),
@@ -401,6 +420,37 @@ const riderTaskTypeSchema = z.enum(RIDER_TASK_TYPES, {
   error: "Select a valid task type",
 })
 
+const riderVehicleTypeSchema = z.enum(RIDER_VEHICLE_TYPES, {
+  error: "Select a valid vehicle type",
+})
+
+/**
+ * Registration number. Upper-cased and space-stripped so "dhaka 12-3456" and
+ * "DHAKA-123456" are the same plate — the same value typed two ways is one
+ * vehicle, and an admin comparing it against a photo should not have to guess.
+ * A blank value clears the plate, which is a real state (a foot or bicycle
+ * rider has no plate).
+ *
+ * The `undefined` passthrough in the transform is load-bearing, not defensive.
+ * Zod's `.nullish()` alone would leave an absent key absent, but attaching a
+ * plain `.transform()` makes the key materialise on EVERY parse — so
+ * `parse({ name: "New" })` would come back carrying `vehiclePlate: null` and a
+ * PATCH that only renames a rider would silently erase its vehicle. Returning
+ * `undefined` for an absent input is what keeps "not mentioned" distinct from
+ * "cleared", which is exactly the distinction the update route relies on.
+ */
+const riderVehiclePlateSchema = z
+  .string()
+  .trim()
+  .max(20, "Vehicle plate cannot exceed 20 characters")
+  .nullish()
+  .transform((v) => {
+    // `undefined` (key absent) stays absent; `null` (key present) is a clear and
+    // stays null; a string is normalized, and a blank one becomes null.
+    if (v === undefined || v === null) return v
+    return v.toUpperCase().replace(/\s+/g, "") || null
+  })
+
 export const riderApplySchema = z.object({
   name: requiredString("Name"),
   email: z.email("A valid email is required"),
@@ -418,6 +468,13 @@ export const riderApplySchema = z.object({
 export const riderApproveSchema = z.object({
   taskType: riderTaskTypeSchema.default("DELIVERY"),
   warehouseId: z.string().trim().optional(),
+  // Captured at approval rather than left for later. This is the one moment the
+  // admin is guaranteed to be looking at the rider's details and thinking about
+  // what they can carry — ask then or the field sits unset until someone
+  // remembers, which for most fleets is never. Both stay optional so approving
+  // is never blocked on a detail that does not apply (a bicycle has no plate).
+  vehicleType: riderVehicleTypeSchema.nullish(),
+  vehiclePlate: riderVehiclePlateSchema,
 })
 
 export const riderApplicationRejectSchema = z.object({
@@ -431,6 +488,8 @@ export const riderUpdateSchema = z
     zone: requiredString("Zone").optional(),
     warehouseId: requiredString("Warehouse").optional(),
     taskType: riderTaskTypeSchema.optional(),
+    vehicleType: riderVehicleTypeSchema.nullish(),
+    vehiclePlate: riderVehiclePlateSchema,
     isActive: z.boolean().optional(),
   })
   .refine(
@@ -440,6 +499,8 @@ export const riderUpdateSchema = z
       d.zone !== undefined ||
       d.warehouseId !== undefined ||
       d.taskType !== undefined ||
+      d.vehicleType !== undefined ||
+      d.vehiclePlate !== undefined ||
       d.isActive !== undefined,
     { error: "Provide at least one field to update" },
   )

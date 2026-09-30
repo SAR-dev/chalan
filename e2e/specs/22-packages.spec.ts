@@ -3,7 +3,7 @@ import "dotenv/config"
 import { expect, type Page, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { dialog, onboarding, packages } from "../selectors"
+import { dialog, packages } from "../selectors"
 
 /**
  * Package catalogue / purchase request flow (S58–S60).
@@ -82,14 +82,6 @@ async function resetMerchant3Packages(): Promise<void> {
   })
 }
 
-async function skipOnboardingIfNeeded(page: Page) {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
-}
-
 async function openAdminPackages(page: Page) {
   await page.goto("/dashboard/packages")
   await waitForAppReady(page)
@@ -98,14 +90,12 @@ async function openAdminPackages(page: Page) {
 }
 
 async function openMerchantPricing(page: Page) {
-  // The onboarding guard bounces incomplete merchants to /welcome, whose skip
-  // button lands on /merchant — so come back until the catalogue is really up.
+  // The catalogue is client-fetched, so come back until it is really up.
   for (let attempt = 0; attempt < 3; attempt++) {
     await page.goto("/merchant/pricing")
     await waitForAppReady(page)
     if ((await page.locator(packages.catalogueCard(STARTER)).count()) > 0)
       return
-    await skipOnboardingIfNeeded(page)
   }
   await expect(page.locator(packages.catalogueCard(STARTER))).toBeVisible()
 }

@@ -64,7 +64,7 @@ const IN_PROGRESS_STATUSES = [
 export default function MerchantOverviewPage() {
   const { currentUser } = useAuth()
   const { currentMerchant } = useMerchants()
-  const { orders, isLoading, mutate: refreshOrders } = useOrders()
+  const { orders, isLoading, isRefreshing, mutate: refreshOrders } = useOrders()
   const { analytics, isLoading: analyticsLoading } = useOrderAnalytics()
 
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
@@ -362,7 +362,7 @@ export default function MerchantOverviewPage() {
             data={filteredOrders}
             getRowKey={(o) => o.id}
             initialSortId="order"
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             onRefresh={refreshOrders}
             emptyMessage={
               <div className="flex flex-col items-center gap-3 py-12 text-center">
