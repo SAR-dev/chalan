@@ -29,6 +29,7 @@ const HEADER_BY_KEY: Partial<Record<keyof ParcelState, OrderImportHeader>> = {
   deliveryCityId: "delivery_city",
   deliveryAddress: "delivery_address",
   parcelWeightKg: "parcel_weight_kg",
+  itemType: "item_type",
   productCost: "product_cost",
   deliveryType: "delivery_type",
   deliveryMapLink: "delivery_map_link",
@@ -87,6 +88,7 @@ export function resolvedRowToParcelState(
     ),
     deliveryAddress: raw.delivery_address,
     parcelWeightKg: raw.parcel_weight_kg,
+    itemType: raw.item_type,
     productCost: raw.product_cost,
     deliveryType: (raw.delivery_type.trim().toUpperCase() ||
       "STANDARD") as DeliveryType,

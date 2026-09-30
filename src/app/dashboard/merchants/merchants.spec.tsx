@@ -122,14 +122,17 @@ describe("Dashboard merchants — section 10", () => {
     expect(moreBtn).toBeTruthy()
   })
 
-  it("shows loading state", async () => {
+  it("keeps rows on screen while refreshing", async () => {
     mockMerchantsState.merchants = [
       makeMerchant({ status: "PENDING", businessName: "Test Merchant" }),
     ]
     mockMerchantsState.total = 1
     mockMerchantsState.isLoading = true
     await importPage()
-    expect(screen.queryByText("Test Merchant")).not.toBeInTheDocument()
+    // A refresh must not read as data loss: the row stays put and the table is
+    // marked busy rather than blanking to skeletons.
+    expect(screen.getByText("Test Merchant")).toBeInTheDocument()
+    expect(screen.getByText("Refreshing…")).toBeInTheDocument()
     mockMerchantsState.isLoading = false
   })
 

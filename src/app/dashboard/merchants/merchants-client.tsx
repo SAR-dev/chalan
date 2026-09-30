@@ -12,7 +12,6 @@ import {
   Phone,
   RotateCcw,
   Store,
-  Tag,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
@@ -40,7 +39,6 @@ import { pageContent } from "@/config/content"
 import { statCardLabels } from "@/config/stat-card-labels"
 import { columnLabels } from "@/config/table-column-labels"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
-import { PricingDialog } from "@/features/merchants/dialogs/pricing-dialog"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { AssignPackageDialog } from "@/features/packages/dialogs/assign-package-dialog"
 import { formatTk } from "@/lib/pricing"
@@ -71,6 +69,7 @@ export function MerchantsPageClient({
     page: _page,
     setPage,
     isLoading,
+    isRefreshing,
     limit: _limit,
     setLimit,
     query,
@@ -127,8 +126,6 @@ export function MerchantsPageClient({
     setBulkReactivateIds([])
   }
 
-  const [pricingMerchant, setPricingMerchant] = useState<Merchant | null>(null)
-  const [pricingOpen, setPricingOpen] = useState(false)
   const [assignTarget, setAssignTarget] = useState<Merchant | null>(null)
   const [confirmMerchant, setConfirmMerchant] = useState<Merchant | null>(null)
   const [confirmAction, setConfirmAction] = useState<
@@ -158,11 +155,6 @@ export function MerchantsPageClient({
     }),
     [allMerchants, initialCounts],
   )
-
-  function openPricing(merchant: Merchant) {
-    setPricingMerchant(merchant)
-    setPricingOpen(true)
-  }
 
   function openConfirm(merchant: Merchant, action: "suspend" | "reactivate") {
     setConfirmMerchant(merchant)
@@ -278,14 +270,6 @@ export function MerchantsPageClient({
         ),
     },
     {
-      id: "maxWeightKg",
-      header: columnLabels.merchant.maxWeightKg,
-      align: "right",
-      sortable: true,
-      sortValue: (m) => m.maxWeightKg,
-      cell: (m) => <span className="tabular-nums">{m.maxWeightKg} KG</span>,
-    },
-    {
       id: "pendingBalance",
       header: columnLabels.merchant.pending,
       align: "right",
@@ -338,13 +322,6 @@ export function MerchantsPageClient({
               >
                 <Store className="size-4" />
                 View details
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={m.status !== "ACTIVE"}
-                onClick={() => openPricing(m)}
-              >
-                <Tag className="size-4" />
-                Set weight limit
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
@@ -506,7 +483,7 @@ export function MerchantsPageClient({
             getRowKey={(m) => m.id}
             initialSortId="business"
             emptyMessage="No merchants match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}
@@ -554,12 +531,6 @@ export function MerchantsPageClient({
           />
         </CardContent>
       </Card>
-
-      <PricingDialog
-        merchant={pricingMerchant}
-        open={pricingOpen}
-        onOpenChange={setPricingOpen}
-      />
 
       <AssignPackageDialog
         merchant={

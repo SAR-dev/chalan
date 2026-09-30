@@ -15,6 +15,10 @@ const forCalls: string[] = []
 vi.mock("@/lib/db", () => {
   const chain: Record<string, unknown> = {
     from: () => chain,
+    // Intermediate builder methods — they shape one statement and must not
+    // consume a queued result.
+    leftJoin: () => chain,
+    innerJoin: () => chain,
     where: () => chain,
     limit: () => chain,
     for: (strength: string) => {
@@ -37,22 +41,17 @@ beforeEach(() => {
 })
 
 describe("resolveRoutePricing", () => {
+  /** The four statements the resolver issues, in order, for a resolvable lane. */
+  const laneQueries = (zoneRow: unknown[]) => [
+    [{ city: "Dhaka" }], // warehouse
+    [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }], // origin city + zone
+    [{ zone: { id: "ZN-2", name: "Gazipur" } }], // destination city + zone
+    zoneRow,
+  ]
+
   it("returns the zone-pair row when it matches", async () => {
     selectQueue.push(
-      [
-        {
-          baseRate: 0,
-          extraRatePerKg: 0,
-          freeWeightKg: 1,
-          maxWeightKg: 3,
-          codFeePercentage: 1,
-          cancellationFee: 0,
-        },
-      ], // platform
-      [{ city: "Dhaka" }], // warehouse
-      [{ zoneId: "ZN-1" }], // origin city
-      [{ zoneId: "ZN-2" }], // destination city
-      [
+      ...laneQueries([
         {
           fromZoneId: "ZN-1",
           toZoneId: "ZN-2",
@@ -63,31 +62,91 @@ describe("resolveRoutePricing", () => {
           codFeePercentage: 2,
           cancellationFee: 25,
         },
-      ], // zone pricing
+      ]),
     )
-    const pricing = await resolveRoutePricing("wh_1", "city_2")
-    expect(pricing).toMatchObject({ baseRate: 100, cancellationFee: 25 })
+
+    const result = await resolveRoutePricing("wh_1", "city_2")
+
+    expect(result).toEqual({
+      ok: true,
+      pricing: expect.objectContaining({ baseRate: 100, cancellationFee: 25 }),
+    })
+    // Exactly four reads: nothing was consulted to find a fallback rate.
+    expect(selectQueue).toHaveLength(0)
   })
 
-  it("falls back to platform defaults when there is no zone row", async () => {
+  it("reports the missing lane by name instead of falling back", async () => {
+    selectQueue.push(...laneQueries([]))
+
+    const result = await resolveRoutePricing("wh_1", "city_3")
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "no-pricing-for-lane",
+      fromZone: { id: "ZN-1", name: "Dhaka Metro" },
+      toZone: { id: "ZN-2", name: "Gazipur" },
+    })
+  })
+
+  it("never reads a platform-wide rate, even when the lane is unpriced", async () => {
+    // The regression this pins: the resolver used to query `platform_config`
+    // first and quietly price unconfigured lanes from it. A leftover row in
+    // that table must have no effect on a missing lane.
+    selectQueue.push(...laneQueries([]), [
+      { baseRate: 60, cancellationFee: 20 },
+    ])
+
+    const result = await resolveRoutePricing("wh_1", "city_3")
+
+    expect(result.ok).toBe(false)
+    // The platform row is still sitting in the queue: never consumed.
+    expect(selectQueue).toHaveLength(1)
+  })
+
+  it("blames the origin when the warehouse's city has no zone", async () => {
+    selectQueue.push([{ city: "Dhaka" }], [])
+
+    const result = await resolveRoutePricing("wh_1", "city_2")
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "origin-zone-unknown",
+      fromZone: null,
+      toZone: null,
+    })
+  })
+
+  it("blames the destination city when none was supplied", async () => {
     selectQueue.push(
-      [
-        {
-          baseRate: 60,
-          extraRatePerKg: 15,
-          freeWeightKg: 1,
-          maxWeightKg: 10,
-          codFeePercentage: 1,
-          cancellationFee: 20,
-        },
-      ],
       [{ city: "Dhaka" }],
-      [{ zoneId: "ZN-1" }],
-      [{ zoneId: "ZN-3" }],
-      [], // no matching zone pricing
+      [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }],
     )
-    const pricing = await resolveRoutePricing("wh_1", "city_3")
-    expect(pricing).toMatchObject({ baseRate: 60, cancellationFee: 20 })
+
+    const result = await resolveRoutePricing("wh_1", null)
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "destination-city-unknown",
+      fromZone: null,
+      toZone: null,
+    })
+  })
+
+  it("blames the destination zone when the city is unzoned", async () => {
+    selectQueue.push(
+      [{ city: "Dhaka" }],
+      [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }],
+      [{ zone: null }], // delivery city exists but has no zone
+    )
+
+    const result = await resolveRoutePricing("wh_1", "city_9")
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "destination-zone-unknown",
+      fromZone: { id: "ZN-1", name: "Dhaka Metro" },
+      toZone: null,
+    })
   })
 })
 

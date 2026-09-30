@@ -9,6 +9,7 @@ import type {
   PayoutRequestStatus,
   RiderStatus,
   RiderTaskType,
+  RiderVehicleType,
   Role,
   SupportStatus,
 } from "@/lib/types"
@@ -27,6 +28,7 @@ export {
   profileRoles as PROFILE_ROLES,
   riderStatuses as RIDER_STATUSES,
   riderTaskTypes as RIDER_TASK_TYPES,
+  riderVehicleTypes as RIDER_VEHICLE_TYPES,
   supportStatuses as SUPPORT_STATUSES,
 } from "@/lib/db/schema"
 
@@ -158,6 +160,24 @@ export const RIDER_TASK_TYPE_TONES: Record<RiderTaskType, BadgeTone> = {
   PICKUP: "info",
   DELIVERY: "success",
   BOTH: "brand",
+}
+
+export const RIDER_VEHICLE_TYPE_LABELS: Record<RiderVehicleType, string> = {
+  FOOT: "On foot",
+  BICYCLE: "Bicycle",
+  BIKE: "Motorbike",
+  CAR: "Car",
+  VAN: "Van",
+  PICKUP_TRUCK: "Pickup truck",
+}
+
+export const RIDER_VEHICLE_TYPE_TONES: Record<RiderVehicleType, BadgeTone> = {
+  FOOT: "neutral",
+  BICYCLE: "info",
+  BIKE: "success",
+  CAR: "brand",
+  VAN: "violet",
+  PICKUP_TRUCK: "warehouse",
 }
 
 export const RIDER_STATUS_LABELS: Record<RiderStatus, string> = {

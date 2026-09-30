@@ -7,26 +7,15 @@ import {
   auth,
   help,
   merchants,
-  onboarding,
   orderForm,
   pricing,
   riderApplication,
 } from "../selectors"
 
-/** Skip onboarding if the merchant landed on /welcome */
-async function skipOnboardingIfNeeded(page: any) {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
-}
-
 // ─── S1. Full Order Lifecycle ────────────────────────────────────────────────
 test.describe("S1. Full Order Lifecycle", () => {
   test("merchant creates order → admin views orders", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/orders/new")
     await waitForAppReady(page)
@@ -251,7 +240,6 @@ test.describe("S9. Team Management", () => {
 test.describe("S26. Merchant Dashboard", () => {
   test("merchant can access all sections", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/finance")
     await waitForAppReady(page)

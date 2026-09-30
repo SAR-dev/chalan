@@ -1,15 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, toast, waitForAppReady } from "../helpers"
-import { onboarding, orders } from "../selectors"
-
-/** Skip onboarding if the merchant landed on /welcome */
-async function skipOnboardingIfNeeded(page: any) {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
-}
+import { orders } from "../selectors"
 
 const PICKUP = "Merchant 1 Pickup — 100 Business Street"
 const CITY = "Dhaka"
@@ -84,7 +75,6 @@ test.describe("S40. CSV bulk import", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await openOrdersPage(page)
     await openImportPage(page)
 
@@ -141,7 +131,6 @@ test.describe("S40. CSV bulk import", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await openOrdersPage(page)
     await openImportPage(page)
 
@@ -173,7 +162,6 @@ test.describe("S40. CSV bulk import", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await openOrdersPage(page)
     await openImportPage(page)
 

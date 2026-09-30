@@ -81,11 +81,8 @@ export interface PackageTierInput {
 export function usePackages() {
   const { currentUser } = useAuth()
 
-  const { data, error, isLoading, mutate } = useSWR<PackagesResponse>(
-    currentUser ? KEY : null,
-    jsonFetcher,
-    swrOptions,
-  )
+  const { data, error, isLoading, isValidating, mutate } =
+    useSWR<PackagesResponse>(currentUser ? KEY : null, jsonFetcher, swrOptions)
 
   const createPackage = useCallback(
     async (input: PackageInput): Promise<Result> => {
@@ -260,6 +257,7 @@ export function usePackages() {
     activePackage: data?.activePackage ?? null,
     latestRequest: data?.latestRequest ?? null,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createPackage,

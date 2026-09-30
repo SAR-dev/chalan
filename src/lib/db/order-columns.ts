@@ -23,6 +23,10 @@ export const ORDER_CORE_COLUMNS = {
   deliveryMapLink: order.deliveryMapLink,
   deliveryCity: deliveryCity.name,
   parcelWeightKg: order.parcelWeightKg,
+  // Beside the weight because the two are read together: a rider picks up "a
+  // 3 kg box of books", not "a box". Part of the core set so every order list
+  // and the detail view show it without each one having to remember.
+  itemType: order.itemType,
   deliveryType: order.deliveryType,
   productCost: order.productCost,
   deliveryFee: order.deliveryFee,

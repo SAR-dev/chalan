@@ -170,7 +170,7 @@ must match text, scope it to a tagged container (e.g.
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
 describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique with no gaps or duplicates (suite is
-currently S1-S61 across 23 files / 98 tests).
+currently S1-S65 across 25 files / 104 tests).
 
 ## Coding Patterns
 
@@ -411,3 +411,13 @@ Tab changes call `setStatuses(TAB_STATUSES[tab])` + `setPage(1)` in the hook.
 - **Read CONTRIBUTING.md** for full conventions (error handling, hooks, testing, DB, etc.)
 - Never commit secrets or API keys
 - Follow existing patterns — check neighboring files before adding new ones
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

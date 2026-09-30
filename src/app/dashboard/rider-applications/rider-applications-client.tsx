@@ -50,6 +50,7 @@ export function RiderApplicationsPageClient({
     page: _page,
     setPage,
     isLoading,
+    isRefreshing,
     mutate,
     limit: _limit,
     setLimit,
@@ -168,7 +169,14 @@ export function RiderApplicationsPageClient({
       headClassName: "w-12",
       cell: (a) => (
         <div className="flex items-center justify-end">
-          <Button size="sm" onClick={() => openDetail(a)}>
+          <Button
+            size="sm"
+            onClick={() => openDetail(a)}
+            // Scoped by id: the approval test opens one specific application,
+            // and a bare "View" would be ambiguous on any list with a second
+            // pending rider in it.
+            data-testid={`rider-app-view-${a.id}`}
+          >
             <Eye className="size-4" />
             View
           </Button>
@@ -237,7 +245,7 @@ export function RiderApplicationsPageClient({
             getRowKey={(a) => a.id}
             initialSortId="createdAt"
             emptyMessage="No applications match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

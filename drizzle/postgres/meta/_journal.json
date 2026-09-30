@@ -12,15 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1790679302605,
-      "tag": "0001_stiff_leader",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1790691917041,
-      "tag": "0002_plain_lilandra",
+      "when": 1790805424677,
+      "tag": "0001_slim_kid_colt",
       "breakpoints": true
     }
   ]

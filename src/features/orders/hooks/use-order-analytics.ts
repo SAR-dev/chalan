@@ -19,7 +19,7 @@ export function useOrderAnalytics(params?: {
   if (params?.from) url.searchParams.set("from", params.from)
   if (params?.to) url.searchParams.set("to", params.to)
 
-  const { data, error, isLoading } = useSWR<OrderAnalytics>(
+  const { data, error, isLoading, isValidating } = useSWR<OrderAnalytics>(
     url.toString(),
     jsonFetcher,
     swrOptions,
@@ -28,6 +28,7 @@ export function useOrderAnalytics(params?: {
   return {
     analytics: data ?? null,
     isLoading,
+    isRefreshing: isValidating,
     error,
   }
 }

@@ -3,15 +3,7 @@ import "dotenv/config"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { branding, onboarding, tracking } from "../selectors"
-
-async function skipOnboardingIfNeeded(page: any) {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
-}
+import { branding, tracking } from "../selectors"
 
 // ─── Branding Section ────────────────────────────────────────────────────────
 test.describe("S36. Merchant Branding", () => {
@@ -19,7 +11,6 @@ test.describe("S36. Merchant Branding", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
     await waitForAppReady(page)
@@ -36,7 +27,6 @@ test.describe("S36. Merchant Branding", () => {
 
   test("merchant can set brand color via hex input", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
     await waitForAppReady(page)
@@ -53,7 +43,6 @@ test.describe("S36. Merchant Branding", () => {
 
   test("merchant can toggle hide platform branding", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
     await waitForAppReady(page)
@@ -109,7 +98,6 @@ test.describe("S36. Merchant Branding", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/settings")
     await waitForAppReady(page)
@@ -140,7 +128,6 @@ test.describe("S56. Merchant branding uses the business name", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
 
     const brand = page.locator(branding.sidebarBrand)
     await expect(brand).toContainText("Merchant 1 Business")

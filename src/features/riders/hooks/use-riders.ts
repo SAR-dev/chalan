@@ -8,7 +8,7 @@ import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 import { buildTableUrl, useTableFilters } from "@/lib/hooks/use-table-filters"
 import type { PaginatedResponse } from "@/lib/pagination"
 import { MAX_LIMIT } from "@/lib/pagination"
-import type { Rider, RiderTaskType } from "@/lib/types"
+import type { Rider, RiderTaskType, RiderVehicleType } from "@/lib/types"
 import { formatError } from "@/lib/validation"
 
 const KEY = "/api/riders"
@@ -19,6 +19,11 @@ interface RiderUpdateInput {
   zone?: string
   warehouseId?: string
   taskType?: RiderTaskType
+  // Explicit null clears the vehicle, so the type has to carry null rather than
+  // just `?: string` — that would make "unset" and "clear it" indistinguishable
+  // and the PATCH would silently keep the old vehicle.
+  vehicleType?: RiderVehicleType | null
+  vehiclePlate?: string | null
   isActive?: boolean
 }
 
@@ -62,6 +67,7 @@ export function useRiders({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<Rider>>(currentUser ? url : null, jsonFetcher, {
     ...swrOptions,
@@ -169,6 +175,7 @@ export function useRiders({
     warehouseRiders,
     warehouseDeliveryRiders,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     updateRider,

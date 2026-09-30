@@ -41,6 +41,7 @@ export function useWarehouses({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<Warehouse>>(
     currentUser ? url : null,
@@ -158,6 +159,7 @@ export function useWarehouses({
     onSortChange: filters.onSortChange,
     currentWarehouse,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createWarehouse,

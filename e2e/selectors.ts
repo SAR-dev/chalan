@@ -11,6 +11,8 @@ export const auth = {
   loginError: "[data-testid='login-error']",
   registerForm: "[data-testid='register-form']",
   logout: "[data-testid='logout']",
+  mobileMenu: "[data-testid='mobile-menu']",
+  mobileLogout: "[data-testid='mobile-logout']",
   accountSecurityTab: "[data-testid='account-tab-security']",
   accountTwoFactorTab: "[data-testid='account-tab-two-factor']",
 }
@@ -28,11 +30,6 @@ export const register = {
   form: "[data-testid='register-form']",
   businessName: "[data-testid='register-business-name']",
   email: "[data-testid='register-email']",
-}
-
-// ─── Onboarding ──────────────────────────────────────────────────────────────
-export const onboarding = {
-  skip: "[data-testid='onboarding-skip']",
 }
 
 // ─── Two-factor authentication (H4) ─────────────────────────────────────────
@@ -80,22 +77,49 @@ export const pricing = {
   cancellationTable: "[data-testid='cancellation-fee-table']",
   navLink: "[data-testid='nav-pricing']",
   rateCardLink: "[data-testid='rate-card-link']",
+  // Zone × zone rate matrix. Rows are pickup zones, columns delivery zones;
+  // both directions are priced separately, so cells are addressed by lane.
+  zoneRateCard: "[data-testid='merchant-zone-rate-card']",
+  zoneMatrix: "[data-testid='zone-rate-matrix']",
+  zoneMatrixCell: (fromZoneId: string, toZoneId: string) =>
+    `[data-testid='zone-matrix-cell'][data-lane='${fromZoneId}:${toZoneId}']`,
+  zoneMatrixUnpriced: "[data-testid='zone-matrix-unpriced']",
+  zoneMatrixDetail: "[data-testid='zone-matrix-detail']",
+  zoneMatrixDetailLane: "[data-testid='zone-matrix-detail-lane']",
+  zoneMatrixEmpty: "[data-testid='zone-rate-matrix-empty']",
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboard = {
   statCard: (label: string) => `[data-testid='stat-card-${label}']`,
   overview: "[data-testid='dashboard-overview']",
+  // Zone-pricing coverage: lanes with no configured rate.
+  pricingCoverageCard: "[data-testid='pricing-coverage-card']",
+  pricingCoverageMissing: "[data-testid='pricing-coverage-missing']",
+  pricingCoverageClear: "[data-testid='pricing-coverage-clear']",
+  pricingCoverageEmpty: "[data-testid='pricing-coverage-empty']",
+  pricingCoverageOverflow: "[data-testid='pricing-coverage-overflow']",
 }
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 export const orders = {
   table: "[data-testid='table-dashboard-orders']",
   merchantTable: "[data-testid='table-merchant-orders']",
-  row: (id: string) => `[data-testid='order-row-${id}']`,
-  rowPrefix: "[data-testid^='order-row-']",
+  // The DataTable tags rows `row-<tableId>-<rowKey>`, and both order lists key
+  // on the order id. The previous `order-row-<id>` form matched nothing in
+  // `src/` — the same stale copy the riders selectors had, fixed to the
+  // pattern `packages` already used correctly.
+  row: (id: string) => `[data-testid='row-dashboard-orders-${id}']`,
+  rowPrefix: "[data-testid^='row-dashboard-orders-']",
+  merchantRow: (id: string) => `[data-testid='row-merchant-orders-${id}']`,
+  merchantRowPrefix: "[data-testid^='row-merchant-orders-']",
   createButton: "[data-testid='create-order']",
+  // The submit button of `approve-order-dialog`, wired via `submitTestId`.
   approveButton: "[data-testid='approve-order']",
+  approveItemType: "[data-testid='approve-order-item-type']",
+  // Row-level: the actions menu and its items are one per order.
+  actionsButton: (id: string) => `[data-testid='order-actions-${id}']`,
+  reviewOrder: (id: string) => `[data-testid='order-review-${id}']`,
   // The order detail page (`/merchant/orders/<code>`) owns the cancel flow.
   cancelOrderButton: "[data-testid='cancel-order']",
   cancelOrderSubmit: "[data-testid='cancel-order-submit']",
@@ -104,10 +128,13 @@ export const orders = {
   bulkCancel: "[data-testid='bulk-cancel']",
   selectAll: "[data-testid='select-all']",
   selectRow: (id: string) => `[data-testid='select-${id}']`,
-  searchInput: "[data-testid='orders-search']",
+  // The toolbar's search field. The previous `orders-search` value matched
+  // nothing in `src/`; `SearchInput` carries no testid of its own and the
+  // DataTable prefixes its toolbar field with the table id.
+  searchInput: "[data-testid='table-search-dashboard-orders']",
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
   tab: (name: string) => `[data-testid='tab-${name}']`,
-  // CSV bulk import (§5 of docs/CSV-IMPORT.md)
+  // CSV bulk import — the page and its testids.
   bulkImportOpen: "[data-testid='bulk-import-open']",
   bulkImportTemplate: "[data-testid='bulk-import-template']",
   bulkImportFile: "[data-testid='bulk-import-file']",
@@ -133,10 +160,13 @@ export const orderForm = {
   deliveryAddress: "[data-testid='delivery-address']",
   deliveryMap: "[data-testid='delivery-map']",
   parcelWeight: "[data-testid='parcel-weight']",
+  itemType: "[data-testid='parcel-item-type']",
   productCost: "[data-testid='product-cost']",
   submitOrder: "[data-testid='submit-order']",
   addParcel: "[data-testid='add-parcel']",
   removeParcel: (index: number) => `[data-testid='remove-parcel-${index}']`,
+  // Shown instead of a delivery charge when the lane has no configured rate.
+  pricingUnavailable: "[data-testid='parcel-pricing-unavailable']",
 }
 
 // ─── Merchants ───────────────────────────────────────────────────────────────
@@ -144,15 +174,45 @@ export const merchants = {
   table: "[data-testid='table-dashboard-merchants']",
   row: (id: string) => `[data-testid='row-dashboard-merchants-${id}']`,
   firstRow: "[data-testid^='row-dashboard-merchants-']",
-  approveButton: "[data-testid='approve-merchant']",
+  // No `approveButton` here. It used to be, but the merchants list has no
+  // approve action: approving a merchant happens through
+  // `/api/merchants/[id]/approve`, which no screen calls — and
+  // `merchants.spec.tsx` asserts outright that no inline "Approve" button
+  // renders for a PENDING merchant. Keeping the selector would advertise an
+  // affordance that the UI deliberately does not have.
   suspendButton: "[data-testid='suspend-merchant']",
   reactivateButton: "[data-testid='reactivate-merchant']",
 }
 
 // ─── Riders ──────────────────────────────────────────────────────────────────
 export const riders = {
-  table: "[data-testid='riders-table']",
-  row: (id: string) => `[data-testid='rider-row-${id}']`,
+  // The DataTable derives these from `id="dashboard-riders"` and
+  // `getRowKey={(r) => r.id}`: the table is `table-<id>` and each `<tr>` is
+  // `row-<id>-<rowKey>`. Both values were previously hardcoded to
+  // `riders-table` / `rider-row-<id>`, which exist nowhere in `src/` — a
+  // selector nothing can ever satisfy.
+  table: "[data-testid='table-dashboard-riders']",
+  row: (id: string) => `[data-testid='row-dashboard-riders-${id}']`,
+  search: "[data-testid='table-search-dashboard-riders']",
+  // Vehicle: type + registration number, set by an admin. Displayed on the list
+  // and in the assign-rider dialogs so an admin can see who can take what.
+  // `vehicleCell` repeats per row — always scope it inside `row(id)`.
+  vehicleCell: "[data-testid='rider-vehicle-cell']",
+  detailVehicle: "[data-testid='rider-detail-vehicle']",
+  editVehicleType: "[data-testid='edit-rider-vehicle-type']",
+  editVehicleOption: (type: string) =>
+    `[data-testid='edit-rider-vehicle-option-${type}']`,
+  editVehiclePlate: "[data-testid='edit-rider-vehicle-plate']",
+}
+
+// ─── Sign-out confirmation ───────────────────────────────────────────────────
+// These are `ConfirmDialog`'s generic ids, so they address the sign-out
+// confirmation only while it is the sole open dialog — true here, since
+// sign-out is the one confirm flow reachable without first opening another.
+export const signOut = {
+  dialog: "[data-testid='confirm-dialog']",
+  confirm: "[data-testid='confirm-button']",
+  cancel: "[data-testid='cancel-button']", // also keeps the session alive
 }
 
 // ─── Users (admin user management) ──────────────────────────────────────────
@@ -197,9 +257,44 @@ export const rider = {
 export const payouts = {
   table: "[data-testid='payouts-table']",
   requestButton: "[data-testid='request-payout']",
+  // Both point at the same ConfirmDialog, whose confirm button now carries a
+  // per-action id — see `payouts-client`. `mark-paid` never existed in `src`;
+  // the real value is `mark-paid-payout`.
   approveButton: "[data-testid='approve-payout']",
   rejectButton: "[data-testid='reject-payout']",
-  markPaidButton: "[data-testid='mark-paid']",
+  markPaidButton: "[data-testid='mark-paid-payout']",
+}
+
+// ─── Rider parcel column (weight) ────────────────────────────────────────────
+// The DataTable tags each `<tr>` as `row-<tableId>-<rowKey>`, and the rider
+// queues key on the order id, so a single order's row is addressable without
+// matching on its contents. Row-level on purpose: these tests need "this
+// parcel's row shows the weight and does not leak the contents", which the row
+// text answers without a cell-level hook that would exist only for them.
+export const riderParcel = {
+  pickupRow: (orderId: string) => `[data-testid='row-rider-pickup-${orderId}']`,
+  deliveryRow: (orderId: string) =>
+    `[data-testid='row-rider-delivery-${orderId}']`,
+}
+
+// ─── Rider applications (admin review queue) ─────────────────────────────────
+export const riderApplications = {
+  table: "[data-testid='table-dashboard-rider-applications']",
+  search: "[data-testid='table-search-dashboard-rider-applications']",
+  viewButton: (id: string) => `[data-testid='rider-app-view-${id}']`,
+  openApprove: "[data-testid='rider-app-approve']",
+  confirmApprove: "[data-testid='rider-app-confirm-approve']",
+  vehicleValue: "[data-testid='approve-vehicle-type']",
+  vehiclePlate: "[data-testid='approve-vehicle-plate']",
+  submittedNote: "[data-testid='approve-vehicle-submitted']",
+}
+
+// ─── Rider registration form (public /apply/rider) ──────────────────────────
+export const riderApplyForm = {
+  vehicleType: "[data-testid='rider-apply-vehicle-type']",
+  vehicleOption: (type: string) =>
+    `[data-testid='rider-apply-vehicle-option-${type}']`,
+  vehiclePlate: "[data-testid='rider-apply-vehicle-plate']",
 }
 
 // ─── Zone Pricing ────────────────────────────────────────────────────────────
@@ -208,12 +303,29 @@ export const zones = {
   addButton: "[data-testid='add-zone']",
   pricingTable: "[data-testid='zone-pricing-table']",
   addPricingButton: "[data-testid='add-zone-pricing']",
+  // The admin zone-pricing page shows the same rates two ways. List is the
+  // default because it is the only one carrying the row actions; the matrix is
+  // a read-only coverage audit. Both triggers stay on screen in both views, so
+  // a test can always get back to the list.
+  viewList: "[data-testid='zone-pricing-view-list']",
+  viewMatrix: "[data-testid='zone-pricing-view-matrix']",
+  listView: "[data-testid='zone-pricing-list-view']",
+  matrixLoading: "[data-testid='zone-pricing-matrix-loading']",
 }
 
 // ─── Delivery Cities ─────────────────────────────────────────────────────────
+// `table`/`addButton` are the admin management page; the `merchant*` selectors
+// are the read-only merchant view at /merchant/delivery-cities.
 export const deliveryCities = {
   table: "[data-testid='delivery-cities-table']",
   addButton: "[data-testid='add-city']",
+  merchantPage: "[data-testid='delivery-cities-page']",
+  merchantSearch: "[data-testid='delivery-city-search']",
+  merchantZone: (zoneId: string) => `[data-testid='delivery-zone-${zoneId}']`,
+  merchantZoneCount: (zoneId: string) =>
+    `[data-testid='delivery-zone-count-${zoneId}']`,
+  merchantCity: (cityId: string) => `[data-testid='delivery-city-${cityId}']`,
+  merchantEmpty: "[data-testid='delivery-cities-empty']",
 }
 
 // ─── Balance ─────────────────────────────────────────────────────────────────
@@ -233,8 +345,10 @@ export const email = {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 export const settings = {
-  pricingForm: "[data-testid='pricing-form']",
   mailConfigTable: "[data-testid='mail-config-table']",
+  cancellationPolicyCard: "[data-testid='cancellation-policy-card']",
+  refundOnCancel: "[data-testid='refund-on-cancel-switch']",
+  savePolicy: "[data-testid='save-policy']",
 }
 
 // ─── Branding ────────────────────────────────────────────────────────────────

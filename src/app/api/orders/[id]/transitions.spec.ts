@@ -42,6 +42,9 @@ vi.mock("@/lib/db", () => {
       from: () => chain,
       where: () => chain,
       innerJoin: () => chain,
+      // `resolveRoutePricing` joins delivery_city → delivery_zone to read the
+      // zone name for the "cannot be priced" message.
+      leftJoin: () => chain,
       limit: () => chain,
       // `.for("update")` (row locking inside a transaction) is a passthrough
       // here — the mock has no real lock semantics, it just needs to not
@@ -201,6 +204,46 @@ function makeRider(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/** Overridable lane rate. Defaults are a 10 KG lane starting at 100 TK. */
+interface LaneOpts {
+  baseRate?: number
+  cancellationFee?: number
+  extraRatePerKg?: number
+  maxWeightKg?: number
+}
+
+/**
+ * The four reads `resolveRoutePricing` issues for a lane that HAS a rate.
+ *
+ * Used by re-pricing (a rider corrected the weight) and by the approve guard,
+ * which re-reads the lane to check its own weight limit — with no platform
+ * fallback, a missing row means "keep the snapshot" instead.
+ */
+function pricedLane({
+  baseRate = 100,
+  cancellationFee = 0,
+  extraRatePerKg = 0,
+  maxWeightKg = 10,
+}: LaneOpts = {}) {
+  return [
+    [{ city: "Dhaka" }], // warehouse
+    [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }], // origin city → zone
+    [{ zone: { id: "ZN-2", name: "Gazipur" } }], // delivery city → zone
+    [
+      {
+        fromZoneId: "ZN-1",
+        toZoneId: "ZN-2",
+        baseRate,
+        extraRatePerKg,
+        freeWeightKg: 1,
+        maxWeightKg,
+        codFeePercentage: 1,
+        cancellationFee,
+      },
+    ],
+  ]
+}
+
 // ---------------------------------------------------------------------------
 describe("PATCH /orders/:id/approve", () => {
   it("401 when unauthenticated", async () => {
@@ -231,24 +274,40 @@ describe("PATCH /orders/:id/approve", () => {
     expect(json).toEqual({ error: "Only PENDING orders can be approved" })
   })
 
-  it("400 when parcel weight exceeds merchant max", async () => {
+  it("400 when the parcel exceeds the route's weight limit", async () => {
+    // The limit belongs to the route, and the guard re-reads it because an
+    // admin may have lowered the rate since creation.
     sessionState.value = admin
     dbState.selectQueue = [
-      [makeOrder({ parcelWeightKg: 10 })],
-      [{ maxWeightKg: 5, status: "ACTIVE" }],
+      [makeOrder({ parcelWeightKg: 10, deliveryCityId: "city_1" })],
+      [{ status: "ACTIVE" }],
+      ...pricedLane({ maxWeightKg: 5 }),
     ]
     const { status, json } = await call(approve)
     expect(status).toBe(400)
     expect(json).toEqual({
-      error: "Parcel weight exceeds the 5 KG limit and cannot be approved.",
+      error:
+        "Parcel weight exceeds the 5 KG limit for this route and cannot be approved.",
     })
+  })
+
+  it("approves a parcel within the route's limit", async () => {
+    sessionState.value = admin
+    dbState.selectQueue = [
+      [makeOrder({ parcelWeightKg: 4, deliveryCityId: "city_1" })],
+      [{ status: "ACTIVE" }],
+      ...pricedLane({ maxWeightKg: 5 }),
+    ]
+    dbState.updateResult = [makeOrder({ status: "APPROVED" })]
+    const { status } = await call(approve)
+    expect(status).toBe(200)
   })
 
   it("400 when the merchant is suspended (ROADMAP B8)", async () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 2 })],
-      [{ maxWeightKg: 5, status: "SUSPENDED" }],
+      [{ status: "SUSPENDED" }],
     ]
     const { status, json } = await call(approve)
     expect(status).toBe(400)
@@ -261,7 +320,7 @@ describe("PATCH /orders/:id/approve", () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 2 })],
-      [{ maxWeightKg: 5, status: "ACTIVE" }],
+      [{ status: "ACTIVE" }],
     ]
     dbState.updateResult = [makeOrder({ status: "APPROVED" })]
     const { status, payload } = await call(approve)
@@ -301,7 +360,7 @@ describe("PATCH /orders/:id/approve", () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 2 })],
-      [{ maxWeightKg: 5, status: "ACTIVE" }],
+      [{ status: "ACTIVE" }],
     ]
     dbState.updateResult = [makeOrder({ status: "APPROVED" })]
     vi.mocked(logAudit).mockRejectedValueOnce(new Error("audit down"))
@@ -311,10 +370,7 @@ describe("PATCH /orders/:id/approve", () => {
 
   it("allows SUPER_ADMIN too", async () => {
     sessionState.value = superAdmin
-    dbState.selectQueue = [
-      [makeOrder()],
-      [{ maxWeightKg: 5, status: "ACTIVE" }],
-    ]
+    dbState.selectQueue = [[makeOrder()], [{ status: "ACTIVE" }]]
     dbState.updateResult = [makeOrder({ status: "APPROVED" })]
     const { status } = await call(approve, { riderId: "r1" })
     expect(status).toBe(200)
@@ -530,22 +586,12 @@ describe("PATCH /orders/:id/picked-up", () => {
           deliveryFee: 60,
           codFee: 0,
           productCost: 500,
+          deliveryCityId: "city_1",
         }),
       ], // order
       [{ id: "pl_1", warehouseId: "wh_9" }], // pickup location
-      [{ maxWeightKg: 10 }], // merchant cap
-      [
-        {
-          baseRate: 100,
-          extraRatePerKg: 20,
-          freeWeightKg: 1,
-          maxWeightKg: 10,
-          codFeePercentage: 1,
-          cancellationFee: 0,
-        },
-      ], // platform defaults
-      [{ city: "Dhaka" }], // origin warehouse city
-      [{ zoneId: "ZN-1" }], // origin city zone (no deliveryCityId → fallback)
+      // resolveRoutePricing: a configured lane is required to re-price.
+      ...pricedLane({ baseRate: 100, extraRatePerKg: 20 }),
     ]
     dbState.updateResult = [
       makeOrder({
@@ -568,6 +614,99 @@ describe("PATCH /orders/:id/picked-up", () => {
     ).toMatchObject({ amount: 80, status: "SETTLED" })
   })
 
+  it("keeps the snapshotted fee when the lane's pricing row is gone", async () => {
+    // A pickup must not be blocked because an admin deleted the rate after the
+    // order shipped: the order already has its fee, and this branch only runs
+    // for a weight correction. Still caps against the merchant's own limit.
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+          parcelWeightKg: 1,
+          deliveryFee: 60,
+          codFee: 0,
+          productCost: 500,
+          deliveryCityId: "city_1",
+        }),
+      ], // order
+      [{ id: "pl_1", warehouseId: "wh_9" }], // pickup location
+      [{ city: "Dhaka" }], // warehouse
+      [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }], // origin city → zone
+      [{ zone: { id: "ZN-2", name: "Gazipur" } }], // delivery city → zone
+      [], // no zone_pricing row for this pair
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "PICKED_UP",
+        parcelWeightKg: 3,
+        deliveryFee: 60,
+        codFee: 0,
+        productCost: 500,
+      }),
+    ]
+
+    const { status, payload } = await call(pickedUp, {
+      proofRefs: ["/uploads/a.png"],
+      parcelWeightKg: 3,
+    })
+
+    expect(status).toBe(200)
+    // `payload` is the last update payload: the weight was corrected, the fee
+    // was deliberately left on the creation-time snapshot.
+    expect(payload).toMatchObject({ parcelWeightKg: 3 })
+    expect(payload).not.toHaveProperty("deliveryFee")
+    expect(payload).not.toHaveProperty("merchantEarnings")
+    // No re-priced fee means no charge adjustment to the merchant.
+    expect(
+      dbState.insertPayloads.filter((p) => p.type === "ORDER_CHARGE"),
+    ).toEqual([])
+  })
+
+  it("accepts a corrected weight on an unpriced lane, keeping the snapshot fee", async () => {
+    // There is no merchant cap left, so an unpriced lane has nothing to
+    // validate against — and rejecting would strand an in-flight parcel. The
+    // weight is corrected; the fee stays on the creation-time snapshot.
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+          deliveryFee: 60,
+          deliveryCityId: "city_1",
+        }),
+      ],
+      [{ id: "pl_1", warehouseId: "wh_9" }],
+      [{ city: "Dhaka" }],
+      [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }],
+      [{ zone: { id: "ZN-2", name: "Gazipur" } }],
+      [], // lane unpriced
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "PICKED_UP",
+        parcelWeightKg: 6,
+        deliveryFee: 60,
+        codFee: 0,
+        productCost: 500,
+      }),
+    ]
+
+    const { status, payload } = await call(pickedUp, {
+      proofRefs: ["/uploads/a.png"],
+      parcelWeightKg: 6,
+    })
+
+    expect(status).toBe(200)
+    expect(payload).toMatchObject({ parcelWeightKg: 6 })
+    expect(payload).not.toHaveProperty("deliveryFee")
+    expect(
+      dbState.insertPayloads.filter((p) => p.type === "ORDER_CHARGE"),
+    ).toEqual([])
+  })
+
   it("keeps a FLAT bundle price through a weight correction", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
@@ -576,24 +715,13 @@ describe("PATCH /orders/:id/picked-up", () => {
           pickupRiderId: "rider_1",
           status: "APPROVED",
           deliveryFee: 50,
+          deliveryCityId: "city_1",
           packageRuleType: "FLAT",
           packageRuleValue: 50,
         }),
       ],
       [{ id: "pl_1", warehouseId: "wh_1" }],
-      [{ maxWeightKg: 10 }], // merchant cap
-      [
-        {
-          baseRate: 100,
-          extraRatePerKg: 20,
-          freeWeightKg: 1,
-          maxWeightKg: 10,
-          codFeePercentage: 1,
-          cancellationFee: 0,
-        },
-      ], // platform defaults
-      [{ city: "Dhaka" }], // origin warehouse city
-      [{ zoneId: "ZN-1" }], // origin city zone
+      ...pricedLane({ baseRate: 100, extraRatePerKg: 20 }),
     ]
     dbState.updateResult = [
       makeOrder({
@@ -619,24 +747,19 @@ describe("PATCH /orders/:id/picked-up", () => {
     ).toBeUndefined()
   })
 
-  it("400 when the corrected weight exceeds the limit", async () => {
+  it("400 when the corrected weight exceeds the route's limit", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
-      [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
-      [{ id: "pl_1", warehouseId: "wh_9" }],
-      [{ maxWeightKg: 5 }], // merchant cap 5
       [
-        {
-          baseRate: 100,
-          extraRatePerKg: 20,
-          freeWeightKg: 1,
-          maxWeightKg: 10,
-          codFeePercentage: 1,
-          cancellationFee: 0,
-        },
+        makeOrder({
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+          deliveryCityId: "city_1",
+        }),
       ],
-      [{ city: "Dhaka" }],
-      [{ zoneId: "ZN-1" }],
+      [{ id: "pl_1", warehouseId: "wh_9" }],
+      // The route's own limit is the only one now — 5 KG here, so 6 is over.
+      ...pricedLane({ baseRate: 100, extraRatePerKg: 20, maxWeightKg: 5 }),
     ]
     const { status, json } = await call(pickedUp, {
       proofRefs: ["/uploads/a.png"],

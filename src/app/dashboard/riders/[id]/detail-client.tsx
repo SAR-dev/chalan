@@ -15,7 +15,11 @@ import { ImageZoom } from "@/components/image-zoom"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { taskTypeLabel } from "@/features/riders/dialogs/task-type"
+import {
+  taskTypeLabel,
+  vehicleTypeLabel,
+} from "@/features/riders/dialogs/task-type"
+import type { RiderVehicleType } from "@/lib/types"
 
 type RiderData = {
   id: string
@@ -28,6 +32,8 @@ type RiderData = {
   status: string
   isActive: boolean
   taskType: string
+  vehicleType: string | null
+  vehiclePlate: string | null
   warehouseId: string
   approvedBy: string | null
   approvedAt: string | null
@@ -121,6 +127,30 @@ export function RiderDetailClient({ rider }: { rider: RiderData }) {
                     rider.taskType as "PICKUP" | "DELIVERY" | "BOTH",
                   )}
                 </Badge>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-muted-foreground text-sm">Vehicle</span>
+                {rider.vehicleType || rider.vehiclePlate ? (
+                  <Badge
+                    variant="secondary"
+                    className="font-normal"
+                    data-testid="rider-detail-vehicle"
+                  >
+                    {rider.vehicleType
+                      ? vehicleTypeLabel(rider.vehicleType as RiderVehicleType)
+                      : "Unclassified"}
+                    {rider.vehiclePlate ? ` · ${rider.vehiclePlate}` : null}
+                  </Badge>
+                ) : (
+                  // Said plainly rather than left blank: an admin deciding
+                  // whether this rider can take a van is looking for the gap.
+                  <span
+                    className="text-muted-foreground text-sm"
+                    data-testid="rider-detail-vehicle"
+                  >
+                    Not recorded
+                  </span>
+                )}
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground text-sm">

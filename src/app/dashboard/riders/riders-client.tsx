@@ -58,6 +58,7 @@ export function RidersPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useRiders({ initialData, initialTotal })
   const router = useRouter()
@@ -221,7 +222,7 @@ export function RidersPageClient({
             columns={allColumns}
             data={riders}
             total={total}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             query={query}
             onQueryChange={(q) => {
               setQuery(q)

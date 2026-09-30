@@ -20,7 +20,7 @@ export default function CodSettlementPage() {
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined)
   const [dateTo, setDateTo] = useState<string | undefined>(undefined)
 
-  const { analytics, isLoading } = useOrderAnalytics({
+  const { analytics, isLoading, isRefreshing } = useOrderAnalytics({
     from: dateFrom,
     to: dateTo,
   })
@@ -85,7 +85,7 @@ export default function CodSettlementPage() {
               value: d.revenue,
             }))}
             height={250}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
           />
         </CardContent>
       </Card>

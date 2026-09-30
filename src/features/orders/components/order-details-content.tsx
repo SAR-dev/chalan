@@ -14,7 +14,10 @@ import {
 import Link from "next/link"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge"
+import { exceedsLaneWeightLimit } from "@/features/orders/lane-weight"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { CURRENCY_SUFFIX, ORDER_DELIVERY_TYPE_LABELS } from "@/lib/constants"
@@ -80,9 +83,19 @@ export function OrderDetailsContent({ order }: { order: Order }) {
   const pickupRider = riders.find((r) => r.id === order.pickupRiderId)
   const deliveryRider = riders.find((r) => r.id === order.deliveryRiderId)
   const warehouse = warehouses.find((w) => w.id === order.warehouseId)
-  const exceedsWeight = merchant
-    ? order.parcelWeightKg > merchant.maxWeightKg
-    : false
+  // The weight limit belongs to the route, so "over limit" is a property of the
+  // lane this order is on — not of the merchant. Resolved through the same
+  // lookup `resolveRoutePricing` uses server-side.
+  const { cities: deliveryCities } = useDeliveryCities()
+  const { pricing: zonePricing } = useZonePricingPublic()
+  const exceedsWeight = exceedsLaneWeightLimit(
+    {
+      warehouseId: order.warehouseId,
+      deliveryCityId: order.deliveryCityId,
+      parcelWeightKg: order.parcelWeightKg,
+    },
+    { warehouses, deliveryCities, zonePricing },
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -222,6 +235,16 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                     </span>
                   }
                 />
+                {/* Only when the merchant said something. A permanently empty
+                    "Contents" field on every legacy order is noise that trains
+                    readers to skip the row that actually has a value. */}
+                {order.itemType ? (
+                  <Field
+                    icon={Package}
+                    label="Contents"
+                    value={order.itemType}
+                  />
+                ) : null}
                 <Field
                   icon={Package}
                   label="Delivery type"

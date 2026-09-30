@@ -84,6 +84,7 @@ export function WarehouseOrdersPageClient({
     statuses: _statuses,
     setStatuses,
     isLoading,
+    isRefreshing,
     bulkCancelOrders,
     mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
@@ -258,7 +259,7 @@ export function WarehouseOrdersPageClient({
             data={orders}
             getRowKey={(o) => o.id}
             emptyMessage="No orders to show for this view."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

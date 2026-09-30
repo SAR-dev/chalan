@@ -39,6 +39,7 @@ export function AuditLogsClient({
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useAuditLogs({ initialData, initialTotal })
 
@@ -120,7 +121,7 @@ export function AuditLogsClient({
             columns={columns}
             data={auditLogs}
             total={total}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             query={query}
             onQueryChange={(q) => {
               setQuery(q)

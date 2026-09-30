@@ -68,16 +68,23 @@ describe("DeliveryFeeCalculator", () => {
     expect(screen.getAllByText("60 TK").length).toBeGreaterThan(0)
   })
 
-  it("falls back to default rates when the route has no zone row", async () => {
+  it("reports an unpriced route instead of estimating from a sample rate", async () => {
     vi.stubGlobal("fetch", mockFetch([dhaka, faridpur], []))
     render(<DeliveryFeeCalculator defaultPricing={defaultPricing} />)
 
+    // The matrix loaded and this lane has no row — say so, with no number.
+    // Quoting TK 60 would promise a rate order creation would reject.
     await waitFor(() => {
-      expect(
-        screen.getByText(/No zone pricing configured for Dhaka → Faridpur/),
-      ).toBeInTheDocument()
+      expect(screen.getByTestId("calc-unpriced")).toBeInTheDocument()
     })
-    expect(screen.getAllByText("60 TK").length).toBeGreaterThan(0)
+    expect(screen.getByTestId("calc-route-unpriced")).toHaveTextContent(
+      /No pricing configured for Dhaka → Faridpur/,
+    )
+    expect(screen.queryAllByText("60 TK")).toHaveLength(0)
+    expect(screen.queryByTestId("calc-delivery-fee")).not.toBeInTheDocument()
+    expect(screen.getByTestId("calc-unpriced")).toHaveTextContent(
+      "No price for Dhaka → Faridpur",
+    )
   })
 
   it("discounts the delivery fee by an active bundle rule", async () => {

@@ -47,7 +47,7 @@ beforeEach(() => {
 
 async function importPage() {
   const { IntakePageClient } = await import("./intake-client")
-  renderPage(<IntakePageClient initialData={[]} initialTotal={0} />)
+  return renderPage(<IntakePageClient initialData={[]} initialTotal={0} />)
 }
 
 describe("Warehouse intake — section 4", () => {
@@ -126,13 +126,27 @@ describe("Warehouse intake — section 4", () => {
     expect(screen.getByText(/nothing received/i)).toBeInTheDocument()
   })
 
-  it("shows loading state", async () => {
+  it("keeps rows on screen while refreshing", async () => {
     mockOrdersState = createMockOrders({
       orders: [makeOrder({ status: "PICKED_UP" })],
       isLoading: true,
     })
     await importPage()
-    expect(screen.queryByText("ORD-0001")).not.toBeInTheDocument()
+    // A refresh must not read as data loss: the row stays put and the table is
+    // marked busy rather than blanking to skeletons.
+    expect(screen.getByText("ORD-0001")).toBeInTheDocument()
+    expect(screen.getByText("Refreshing…")).toBeInTheDocument()
+  })
+
+  it("falls back to skeleton rows on a first load with no data", async () => {
+    mockOrdersState = createMockOrders({ orders: [], isLoading: true })
+    const { container } = await importPage()
+    // Nothing to keep, so skeletons stand in — and "no parcels" must not claim
+    // the queue is genuinely empty while the first load is still running.
+    expect(
+      container.querySelectorAll('[data-slot="skeleton"]').length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryByText(/no parcels incoming/i)).not.toBeInTheDocument()
   })
 
   it("opens Receive dialog and submits successfully", async () => {

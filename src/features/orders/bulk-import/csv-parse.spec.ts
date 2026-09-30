@@ -18,7 +18,7 @@ function file(name: string, text: string) {
 describe("parseImportText", () => {
   it("parses a happy-path file with physical line numbers", () => {
     const result = parseImportText(
-      `${HEADER}\nShop A,John,01712345678,Dhaka,Addr,1.5,1200\nShop B,Jane,01712345679,Chittagong,Addr 2,2,500`,
+      `${HEADER}\nShop A,John,01712345678,Dhaka,Addr,1.5,Cotton saree,1200,STANDARD,,note\nShop B,Jane,01712345679,Chittagong,Addr 2,2,Charger,500,STANDARD,,`,
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -31,11 +31,31 @@ describe("parseImportText", () => {
       delivery_city: "Dhaka",
       delivery_address: "Addr",
       parcel_weight_kg: "1.5",
+      item_type: "Cotton saree",
       product_cost: "1200",
-      delivery_type: "",
+      delivery_type: "STANDARD",
       delivery_map_link: "",
-      merchant_note: "",
+      merchant_note: "note",
     })
+  })
+
+  it("leaves item_type empty when a file predates the column", () => {
+    // Every file imported before item_type existed has one cell fewer than the
+    // current header. The optional columns must come out as "" rather than
+    // shifting the following values left — a misparse here would put a product
+    // cost where the contents belong and silently mis-price nothing while
+    // corrupting the merchant's data.
+    const legacyHeader = orderImportHeaders
+      .filter((h) => h !== "item_type")
+      .join(",")
+    const result = parseImportText(
+      `${legacyHeader}\nShop A,John,01712345678,Dhaka,Addr,1.5,1200`,
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const values = result.rows[0].values
+    expect(values.item_type).toBe("")
+    expect(values.product_cost).toBe("1200")
   })
 
   it("keeps quoted commas and newlines inside one row", () => {
@@ -83,6 +103,25 @@ describe("parseImportText", () => {
     expect(result.rows[0].values.delivery_city).toBe("Dhaka")
     expect(result.rows[0].values.parcel_weight_kg).toBe("1.5")
     expect(result.rows[0].values.product_cost).toBe("1200")
+  })
+
+  it("reads item_type under its canonical and aliased headers", () => {
+    // Canonical header.
+    const canonical = parseImportText(
+      "pickup_location,recipient_name,recipient_phone,delivery_city,delivery_address,parcel_weight_kg,item_type,product_cost\nShop A,John,01712345678,Dhaka,Addr,1.5,Cotton saree,1200",
+    )
+    expect(canonical.ok).toBe(true)
+    if (!canonical.ok) return
+    expect(canonical.rows[0].values.item_type).toBe("Cotton saree")
+
+    // Alias: a merchant whose sheet already says "Product" should not be told
+    // their correctly-filled column is unrecognized.
+    const aliased = parseImportText(
+      "Pickup,Name,Phone,City,Address,Weight,Product,COD\nShop A,John,01712345678,Dhaka,Addr,1.5,Charger,1200",
+    )
+    expect(aliased.ok).toBe(true)
+    if (!aliased.ok) return
+    expect(aliased.rows[0].values.item_type).toBe("Charger")
   })
 
   it("auto-detects TSV from pasted spreadsheet rows", () => {

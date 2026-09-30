@@ -51,6 +51,7 @@ export function WarehousesPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useWarehouses({ initialData, initialTotal })
   const [editing, setEditing] = useState<Warehouse | null>(null)
@@ -142,7 +143,7 @@ export function WarehousesPageClient({
             getRowKey={(w) => w.id}
             initialSortId="name"
             emptyMessage="No warehouses found."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

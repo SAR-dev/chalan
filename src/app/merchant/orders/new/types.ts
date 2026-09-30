@@ -9,6 +9,7 @@ export interface ParcelState {
   deliveryCityId: string
   deliveryAddress: string
   parcelWeightKg: string
+  itemType: string
   productCost: string
   deliveryType: DeliveryType
   deliveryMapLink: string
@@ -23,6 +24,18 @@ export interface ParcelRow {
   deliveryCharge: number
   codFee: number
   exceedsMax: boolean
+  /**
+   * The route's own weight limit — `zone_pricing.maxWeightKg`, and nothing
+   * else. `0` when the lane is unpriced (the pricing error is what shows then).
+   */
+  maxWeightKg: number
   errors: string[]
-  isZonePricing: boolean
+  /**
+   * No `zone_pricing` row covers this lane. Delivery charges are per-lane with
+   * no platform fallback, so such a parcel cannot be created — the form blocks
+   * the submit and `pricingError` says which lane an admin must configure.
+   */
+  pricingUnavailable: boolean
+  /** Actionable explanation; non-null exactly when `pricingUnavailable`. */
+  pricingError: string | null
 }

@@ -15,6 +15,7 @@ vi.mock("@/lib/db", () => {
       from: () => chain,
       where: () => chain,
       limit: () => chain,
+      orderBy: () => chain,
       then: (onFulfilled: (v: unknown) => unknown) =>
         Promise.resolve(selectQueue.shift() ?? []).then(onFulfilled),
     }
@@ -31,7 +32,26 @@ async function importPage() {
 
 describe("Landing page", () => {
   it("renders marketing content", async () => {
-    selectQueue.push([{ defaultBaseRate: 60 }])
+    // The "from" rate now comes from the cheapest configured lane, not from a
+    // platform default — the row shape is a `zone_pricing` lane.
+    selectQueue.push([
+      {
+        baseRate: 60,
+        extraRatePerKg: 10,
+        freeWeightKg: 1,
+        maxWeightKg: 10,
+        codFeePercentage: 1,
+        cancellationFee: 20,
+      },
+    ])
+    await importPage()
+    expect(screen.getByText(/ship anything/i)).toBeInTheDocument()
+  })
+
+  it("still renders when no lane is configured", async () => {
+    // The sample rate is a build-time fallback for the marketing page only —
+    // it must never reach an order.
+    selectQueue.push([])
     await importPage()
     expect(screen.getByText(/ship anything/i)).toBeInTheDocument()
   })

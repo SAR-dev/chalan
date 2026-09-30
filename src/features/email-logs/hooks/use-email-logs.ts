@@ -34,6 +34,7 @@ export function useEmailLogs() {
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<EmailLogListItem>>(
     currentUser ? url : null,
@@ -93,6 +94,7 @@ export function useEmailLogs() {
     statusFilter,
     setStatusFilter,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     markAsSent,

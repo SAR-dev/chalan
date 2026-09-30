@@ -44,6 +44,7 @@ export function useRiderApplications({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<RiderApplication>>(
     currentUser && currentUser.role === "SUPER_ADMIN" ? url : null,
@@ -142,6 +143,7 @@ export function useRiderApplications({
     sortDir: filters.sortDir,
     onSortChange: filters.onSortChange,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     approveApplication,

@@ -9,7 +9,6 @@ import { POST as submitPayment } from "./[id]/balance/payment/route"
 import { GET as getMerchantBalance } from "./[id]/balance/route"
 import { PATCH as submitNid } from "./[id]/nid/route"
 import { PATCH as reviewNid } from "./[id]/nid/verify/route"
-import { PATCH as setMerchantPricing } from "./[id]/pricing/route"
 import { PATCH as reactivateMerchant } from "./[id]/reactivate/route"
 import { GET as getMerchant, PATCH as updateMerchant } from "./[id]/route"
 import { PATCH as suspendMerchant } from "./[id]/suspend/route"
@@ -622,50 +621,6 @@ describe("PATCH /api/merchants/:id/reactivate", () => {
         action: "MERCHANT_REACTIVATED",
         metadata: {
           diff: { status: { from: "SUSPENDED", to: "ACTIVE" } },
-        },
-      }),
-    )
-  })
-})
-
-describe("PATCH /api/merchants/:id/pricing", () => {
-  const validBody = {
-    maxWeightKg: 5,
-  }
-
-  it("401 when unauthenticated", async () => {
-    const res = await setMerchantPricing(
-      req("PATCH", undefined, validBody),
-      ctx(),
-    )
-    expect(res.status).toBe(401)
-  })
-
-  it("403 for non-admin", async () => {
-    sessionState.value = merchantSession
-    const res = await setMerchantPricing(
-      req("PATCH", undefined, validBody),
-      ctx(),
-    )
-    expect(res.status).toBe(403)
-  })
-
-  it("updates the weight limit", async () => {
-    sessionState.value = superAdmin
-    selectQueue.push([{ maxWeightKg: 3 }])
-    updateResult.push({ id: "m_1", businessName: "Biz", maxWeightKg: 5 })
-    const res = await setMerchantPricing(
-      req("PATCH", undefined, validBody),
-      ctx(),
-    )
-    const json = await res.json()
-    expect(res.status).toBe(200)
-    expect(json).toBeDefined()
-    expect(logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "MERCHANT_PRICING_UPDATED",
-        metadata: {
-          diff: { maxWeightKg: { from: 3, to: 5 } },
         },
       }),
     )

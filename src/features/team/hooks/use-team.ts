@@ -49,6 +49,7 @@ export function useTeam({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<TeamMember>>(
     currentUser ? url : null,
@@ -158,6 +159,7 @@ export function useTeam({
     sortDir: filters.sortDir,
     onSortChange: filters.onSortChange,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createAccount,

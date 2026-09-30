@@ -22,6 +22,24 @@ export const riderStatuses = [
   "SUSPENDED",
 ] as const
 
+// The vehicle a rider collects parcels in. A closed list rather than free text
+// because an admin scanning the rider list needs to compare vehicles at a
+// glance, and "motorbike" / "Motorbike" / "bike" splitting into three riders'
+// records is exactly the problem a list prevents.
+//
+// Deliberately carries no capacity. A vehicle here is a display aid so an admin
+// can pick sensibly when assigning a parcel; it is not a constraint, and adding
+// capacity later would imply a filtering rule that does not exist today.
+// Drizzle-only `enum` hint — the column stays plain `text`.
+export const riderVehicleTypes = [
+  "FOOT",
+  "BICYCLE",
+  "BIKE",
+  "CAR",
+  "VAN",
+  "PICKUP_TRUCK",
+] as const
+
 export const merchantStatuses = ["PENDING", "ACTIVE", "SUSPENDED"] as const
 
 export const payoutRequestStatuses = [

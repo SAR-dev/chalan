@@ -18,7 +18,6 @@ const deliveryCities = [{ id: "DC-1", name: "Dhaka" }]
 const lookups: ResolveLookups = {
   pickupLocations: [{ id: "PKL-1", name: "Shop A" }],
   deliveryCities: [{ id: "DC-1", name: "Dhaka" }],
-  maxWeightKg: 10,
 }
 
 function rawRow(partial: Partial<Record<OrderImportHeader, string>>, line = 2) {
@@ -42,6 +41,7 @@ function validRaw(
       delivery_city: "Dhaka",
       delivery_address: "House 1 Road 1",
       parcel_weight_kg: "1.5",
+      item_type: "Cotton saree",
       product_cost: "1200",
       delivery_type: "STANDARD",
       delivery_map_link: "https://maps.google.com/abc",
@@ -67,6 +67,7 @@ describe("resolvedRowToParcelState", () => {
       deliveryCityId: "DC-1",
       deliveryAddress: "House 1 Road 1",
       parcelWeightKg: "1.5",
+      itemType: "Cotton saree",
       productCost: "1200",
       deliveryType: "STANDARD",
       deliveryMapLink: "https://maps.google.com/abc",
@@ -214,6 +215,7 @@ describe("parcelStateToRawPatch", () => {
       ["deliveryCityId", parcel.deliveryCityId],
       ["deliveryAddress", parcel.deliveryAddress],
       ["parcelWeightKg", parcel.parcelWeightKg],
+      ["itemType", parcel.itemType],
       ["productCost", parcel.productCost],
       ["deliveryType", parcel.deliveryType],
       ["deliveryMapLink", parcel.deliveryMapLink],

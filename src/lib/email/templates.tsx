@@ -7,8 +7,10 @@
 // arrives as a React child and is escaped by React itself, so no template has
 // to hand-escape a name, address, order code or note.
 //
-// One plain header, one accent color, no per-status theming: all thirteen
-// emails are the same layout with different copy.
+// One plain header, one ink, no per-status theming, and no accent colour at
+// all: every email is the same layout with different copy, set in greyscale so
+// it reads the same in every client and never depends on colour being
+// supported or the recipient's mail theme.
 
 import {
   Body,
@@ -24,7 +26,6 @@ import {
   Text,
 } from "react-email"
 import { siteConfig } from "@/config/site"
-import { isValidHexColor } from "@/lib/brand-color"
 
 /** Everything a rendered email needs. Callers build one of these per mail. */
 export interface EmailSpec {
@@ -36,26 +37,28 @@ export interface EmailSpec {
   rows?: [string, string][]
   cta?: { href: string; label: string }
   footnote?: string
-  brandColor?: string
   hidePlatformBranding?: boolean
 }
 
-/** Platform accent — merchants without a brand color keep this exact color. */
-const DEFAULT_ACCENT = "#2563eb"
-
 const FONT = "Arial, sans-serif"
+/**
+ * Body and headline ink, and the CTA fill. One near-black rather than a pure
+ * `#000`, which reads as a hole against white on low-quality screens.
+ */
 const INK = "#1f2937"
+/** Secondary ink: fact labels, the platform name, the closing note. */
 const MUTED = "#6b7280"
-const FAINT = "#9ca3af"
+/** The single rule colour — the only thing on the page that is not text. */
 const RULE = "#e5e7eb"
+/**
+ * Natural width of the content column.
+ *
+ * Paired with `width: 100%` on the container so a phone simply narrows the
+ * column instead of overflowing — a fixed width here is the classic
+ * email-client bug where the template renders off-screen with no way to
+ * scroll it back.
+ */
 const WIDTH = "480px"
-
-/** A merchant-supplied color is only trusted once it parses as hex. */
-function resolveAccent(brandColor?: string): string {
-  return brandColor && isValidHexColor(brandColor)
-    ? brandColor.trim()
-    : DEFAULT_ACCENT
-}
 
 /** The "label: value" fact list every order/merchant email shows. */
 function Facts({ rows }: { rows: [string, string][] }) {
@@ -80,7 +83,6 @@ function Facts({ rows }: { rows: [string, string][] }) {
 }
 
 function EmailLayout({ spec }: { spec: EmailSpec }) {
-  const accent = resolveAccent(spec.brandColor)
   const showBranding = !spec.hidePlatformBranding
 
   return (
@@ -123,7 +125,10 @@ function EmailLayout({ spec }: { spec: EmailSpec }) {
                 fontSize: "20px",
                 lineHeight: "28px",
                 fontWeight: 700,
-                color: accent,
+                // Same ink as the body — the size and weight carry the
+                // hierarchy, so the headline still reads first without
+                // needing a colour to mark it out.
+                color: INK,
                 margin: "4px 0 0",
               }}
             >
@@ -173,7 +178,10 @@ function EmailLayout({ spec }: { spec: EmailSpec }) {
                 <Button
                   href={spec.cta.href}
                   style={{
-                    backgroundColor: accent,
+                    // Black fill, white label — the strongest contrast the
+                    // palette can offer, so the one action in the email needs
+                    // no colour to be the obvious thing to click.
+                    backgroundColor: INK,
                     borderRadius: "6px",
                     boxSizing: "border-box",
                     color: "#ffffff",
@@ -200,7 +208,12 @@ function EmailLayout({ spec }: { spec: EmailSpec }) {
                   style={{
                     fontSize: "12px",
                     lineHeight: "18px",
-                    color: FAINT,
+                    // `MUTED`, not a lighter grey: at 12px a third, fainter
+                    // step measured ~2.5:1 against white, which is below the
+                    // 4.5:1 a reader needs. Collapsing it also leaves the
+                    // palette at one ink and one secondary — genuinely two
+                    // tones, not three shades of the same idea.
+                    color: MUTED,
                     margin: 0,
                   }}
                 >

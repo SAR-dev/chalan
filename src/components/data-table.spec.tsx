@@ -403,6 +403,114 @@ describe("DataTable", () => {
     )
   })
 
+  // ---- Refresh behaviour ----
+  //
+  // A refresh must not look like data loss. Previously `loading` swapped every
+  // row for a skeleton, so a key change (page/search/filter) or a post-mutation
+  // revalidate made the table appear to empty out. Rows now survive a refresh
+  // and the table is marked busy instead; skeletons are only for a genuine
+  // first load, when there is nothing on screen to keep.
+
+  it("keeps existing rows on screen while a refresh is in flight", () => {
+    const { rerender, container } = render(
+      <DataTable id="dash" columns={columns} data={data} getRowKey={getKey} />,
+    )
+    expect(screen.getByText("Alice")).toBeInTheDocument()
+
+    rerender(
+      <DataTable
+        id="dash"
+        columns={columns}
+        data={data}
+        getRowKey={getKey}
+        loading
+      />,
+    )
+
+    // Every row is still there...
+    expect(screen.getByText("Alice")).toBeInTheDocument()
+    expect(screen.getByText("Bob")).toBeInTheDocument()
+    expect(screen.getByText("Charlie")).toBeInTheDocument()
+    // ...and none of them was swapped for a skeleton.
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(0)
+  })
+
+  it("marks the table busy and shows the refresh overlay while loading", () => {
+    render(
+      <DataTable
+        id="busy"
+        columns={columns}
+        data={data}
+        getRowKey={getKey}
+        loading
+      />,
+    )
+    expect(screen.getByTestId("table-busy")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    )
+    expect(screen.getByTestId("table-refreshing-busy")).toBeInTheDocument()
+  })
+
+  it("shows no overlay and no aria-busy when the table is idle", () => {
+    render(
+      <DataTable id="idle" columns={columns} data={data} getRowKey={getKey} />,
+    )
+    expect(
+      screen.queryByTestId("table-refreshing-idle"),
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId("table-idle")).not.toHaveAttribute("aria-busy")
+  })
+
+  it("falls back to skeleton rows on a first load, not the empty message", () => {
+    const { container } = render(
+      <DataTable
+        id="first"
+        columns={columns}
+        data={[]}
+        getRowKey={getKey}
+        loading
+        emptyMessage="No items found."
+      />,
+    )
+    expect(
+      container.querySelectorAll('[data-slot="skeleton"]').length,
+    ).toBeGreaterThan(0)
+    // "No records" is a lie while the first load is still running.
+    expect(screen.queryByText("No items found.")).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId("table-refreshing-first"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("shows the empty message once a settled load really has no rows", () => {
+    render(
+      <DataTable
+        id="settled"
+        columns={columns}
+        data={[]}
+        getRowKey={getKey}
+        emptyMessage="No items found."
+      />,
+    )
+    expect(screen.getByText("No items found.")).toBeInTheDocument()
+  })
+
+  it("keeps rows and shows the overlay during a bulk action", () => {
+    render(
+      <DataTable
+        id="bulk"
+        columns={columns}
+        data={data}
+        getRowKey={getKey}
+        bulkActions={[{ label: "Delete", onClick: vi.fn() }]}
+        bulkLoading
+      />,
+    )
+    expect(screen.getByText("Alice")).toBeInTheDocument()
+    expect(screen.getByTestId("table-refreshing-bulk")).toBeInTheDocument()
+  })
+
   // ---- Derived CSV export ----
 
   it("shows the CSV button and exports derived rows", async () => {

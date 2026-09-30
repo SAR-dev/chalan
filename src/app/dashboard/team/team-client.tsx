@@ -84,6 +84,7 @@ export function TeamPageClient({
     updateAccountWarehouse,
     resendActivation,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useTeam({ initialData, initialTotal })
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -263,7 +264,7 @@ export function TeamPageClient({
             getRowKey={(u) => u.id}
             initialSortId="role"
             emptyMessage="No team members yet."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

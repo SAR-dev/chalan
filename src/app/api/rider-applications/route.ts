@@ -54,6 +54,8 @@ export const POST = withErrorHandler(async (req: Request) => {
     nidSelfieImage,
     warehouseId,
     password,
+    vehicleType,
+    vehiclePlate,
   } = parsed.data
 
   // The selected warehouse must exist and be active.
@@ -109,6 +111,12 @@ export const POST = withErrorHandler(async (req: Request) => {
           nidSelfieImage: nidSelfieImage ?? null,
           nidSubmittedAt: hasNidImages ? new Date().toISOString() : null,
           warehouseId,
+          // Saved with the application, not collected later: the columns live
+          // on `rider` because applications *are* rider rows with status
+          // PENDING, so no separate table or migration is involved. Null means
+          // the applicant declared nothing, which is a real answer.
+          vehicleType: vehicleType ?? null,
+          vehiclePlate: vehiclePlate ?? null,
           status: "PENDING",
           isActive: false,
         })
@@ -202,6 +210,13 @@ export const GET = withErrorHandler(async (req: Request) => {
       nidSubmittedAt: rider.nidSubmittedAt,
       status: rider.status,
       taskType: rider.taskType,
+      // Without these two the type still says they exist: `RiderApplication
+      // extends Rider` and `Rider` is derived from the table, so
+      // `application.vehicleType` compiles while the endpoint never returns it.
+      // The approval dialog would then prefill from `undefined` and look like
+      // every applicant forgot to state a vehicle.
+      vehicleType: rider.vehicleType,
+      vehiclePlate: rider.vehiclePlate,
       warehouseId: rider.warehouseId,
       approvedBy: rider.approvedBy,
       approvedAt: rider.approvedAt,

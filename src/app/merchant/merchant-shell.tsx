@@ -204,13 +204,6 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
     } else if (isMerchantLoading || !currentMerchant) {
       // Wait for merchant data to load before deciding redirect
       return
-    } else if (
-      !currentMerchant.onboardingCompletedAt &&
-      !window.location.pathname.startsWith("/welcome") &&
-      !window.location.pathname.startsWith("/pickup-locations") &&
-      !window.location.pathname.startsWith("/pricing")
-    ) {
-      router.replace("/welcome")
     }
   }, [isReady, currentUser, currentMerchant, isMerchantLoading, router])
 

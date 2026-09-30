@@ -37,6 +37,7 @@ export default function WarehouseAdminWarehousesPageClient() {
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useWarehouses()
   const rows = useMemo<WarehouseRow[]>(
@@ -100,7 +101,7 @@ export default function WarehouseAdminWarehousesPageClient() {
             getRowKey={(w) => w.id}
             initialSortId="name"
             emptyMessage="No warehouses found."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

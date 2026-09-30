@@ -25,7 +25,7 @@ export const PATCH = withErrorHandler(
 
     const parsed = await parseBody(req, riderApproveSchema)
     if (parsed.error) return parsed.error
-    const { taskType, warehouseId } = parsed.data
+    const { taskType, warehouseId, vehicleType, vehiclePlate } = parsed.data
 
     const { id } = await params
 
@@ -51,6 +51,12 @@ export const PATCH = withErrorHandler(
           isActive: true,
           taskType,
           ...(warehouseId ? { warehouseId } : {}),
+          // The vehicle is recorded at approval, and an explicit `null` from the
+          // form is written as a real "not declared" rather than skipped — the
+          // approve form is the only moment the admin is asked, so a value that
+          // is not sent means they were never shown the question.
+          ...(vehicleType !== undefined ? { vehicleType } : {}),
+          ...(vehiclePlate !== undefined ? { vehiclePlate } : {}),
           approvedBy: me.name,
           approvedAt: now,
         })

@@ -46,6 +46,7 @@ export function WarehouseRidersPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useRiders({ initialData, initialTotal })
   const columns = useRiderColumns()
@@ -176,7 +177,7 @@ export function WarehouseRidersPageClient({
             columns={columns}
             data={riders}
             total={total}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             query={query}
             onQueryChange={(q) => {
               setQuery(q)

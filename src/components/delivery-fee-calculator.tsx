@@ -46,8 +46,13 @@ interface ZonePricingRow {
 /**
  * Public fee estimator. Uses the live zone-pricing matrix fetched from the
  * public APIs (/api/delivery-cities + /api/zone-pricing) so visitors see the
- * real route-based rates. Falls back to `defaultPricing` (platform defaults)
- * before the API responds or when no zone row covers the chosen route.
+ * real route-based rates.
+ *
+ * `defaultPricing` is a SAMPLE rate: there is no platform-wide rate any more,
+ * so it only covers the pre-hydration state and a failed fetch. Once the matrix
+ * has loaded, a route with no `zone_pricing` row is reported as unpriced rather
+ * than estimated — quoting a number would promise a rate order creation would
+ * reject.
  *
  * `packageRule` is the merchant's active bundle tier, when signed in with one:
  * it discounts the delivery fee through the same `applyPackageRule` helper the
@@ -117,38 +122,43 @@ export function DeliveryFeeCalculator({
         )
       : undefined
 
-  const effective = useMemo(
-    () =>
-      zoneRow
-        ? {
-            baseRate: zoneRow.baseRate,
-            extraRatePerKg: zoneRow.extraRatePerKg,
-            freeWeightKg: zoneRow.freeWeightKg,
-            maxWeightKg: zoneRow.maxWeightKg,
-            codFeePercentage: zoneRow.codFeePercentage,
-            cancellationFee: zoneRow.cancellationFee,
-          }
-        : defaultPricing,
-    [zoneRow, defaultPricing],
-  )
+  // The rate this estimate is built from.
+  //
+  // Before the matrix has loaded there is nothing to check the chosen lane
+  // against, so a sample rate keeps the estimator usable rather than blank.
+  // Once loaded, a lane with no row has NO price — quoting a number would
+  // promise a rate the order form would reject.
+  const effective: DefaultPricing | null =
+    zoneRow ?? (loading || failed ? defaultPricing : null)
+
+  // Null-safe stand-in so the JSX can branch on `effective` without every
+  // derived memo having to handle `null` itself. Never rendered.
+  const rate: DefaultPricing = effective ?? {
+    baseRate: 0,
+    extraRatePerKg: 0,
+    freeWeightKg: 0,
+    maxWeightKg: 0,
+    codFeePercentage: 0,
+    cancellationFee: 0,
+  }
 
   const breakdown = useMemo(
     () =>
       calcDeliveryCharge(
         {
-          baseRate: effective.baseRate,
-          extraRatePerKg: effective.extraRatePerKg,
-          freeWeightKg: effective.freeWeightKg,
-          maxWeightKg: effective.maxWeightKg,
+          baseRate: rate.baseRate,
+          extraRatePerKg: rate.extraRatePerKg,
+          freeWeightKg: rate.freeWeightKg,
+          maxWeightKg: rate.maxWeightKg,
         },
         weightNum,
       ),
-    [effective, weightNum],
+    [rate, weightNum],
   )
 
   const codFee = useMemo(
-    () => calcCodFee(codNum, effective.codFeePercentage),
-    [codNum, effective.codFeePercentage],
+    () => calcCodFee(codNum, rate.codFeePercentage),
+    [codNum, rate.codFeePercentage],
   )
 
   // The bundle discount applies to the delivery fee only (COD and cancellation
@@ -169,7 +179,7 @@ export function DeliveryFeeCalculator({
   ) : failed ? (
     <span className="text-muted-foreground inline-flex items-center gap-1.5">
       <Info className="size-3" />
-      Live rates unavailable — showing defaults
+      Live rates unavailable — sample estimate only
     </span>
   ) : zoneRow ? (
     <span className="bg-chart-2/10 text-chart-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
@@ -177,9 +187,9 @@ export function DeliveryFeeCalculator({
       Zone-based rates
     </span>
   ) : (
-    <span className="text-muted-foreground inline-flex items-center gap-1.5">
+    <span className="text-destructive/80 inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-0.5 text-[11px] font-medium">
       <Info className="size-3" />
-      No zone rates for this route — showing defaults
+      Not priced for this route
     </span>
   )
 
@@ -246,10 +256,13 @@ export function DeliveryFeeCalculator({
             </div>
           </div>
           {!loading && !failed && fromCity && toCity && !zoneRow ? (
-            <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <p
+              className="text-destructive flex items-center gap-1.5 text-xs"
+              data-testid="calc-route-unpriced"
+            >
               <Route className="size-3.5" />
-              No zone pricing configured for {fromCity.name} → {toCity.name}.
-              Showing the default estimate.
+              No pricing configured for {fromCity.name} → {toCity.name}. There
+              is no rate for this route yet.
             </p>
           ) : null}
 
@@ -265,8 +278,9 @@ export function DeliveryFeeCalculator({
               placeholder="1"
             />
             <p className="text-muted-foreground text-xs">
-              Free up to {effective.freeWeightKg} KG. Max{" "}
-              {effective.maxWeightKg} KG.
+              {effective
+                ? `Free up to ${rate.freeWeightKg} KG. Max ${rate.maxWeightKg} KG.`
+                : "Weighted against this route's rate once one is configured."}
             </p>
           </div>
 
@@ -282,8 +296,8 @@ export function DeliveryFeeCalculator({
               placeholder="500"
             />
             <p className="text-muted-foreground text-xs">
-              Cash collected from recipient. COD fee:{" "}
-              {effective.codFeePercentage}%.
+              Cash collected from recipient.
+              {effective ? ` COD fee: ${rate.codFeePercentage}%.` : ""}
             </p>
           </div>
 
@@ -301,91 +315,110 @@ export function DeliveryFeeCalculator({
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="rounded-lg border p-4">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-              Delivery fee
+        {effective === null ? (
+          // The matrix has loaded and this lane has no row: there is no price
+          // to show, because order creation would reject it too.
+          <div
+            className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center"
+            data-testid="calc-unpriced"
+          >
+            <Route className="text-destructive mx-auto mb-2 size-5" />
+            <p className="text-sm font-medium">
+              No price for {fromName} → {toName}
             </p>
-            <p
-              className="text-2xl font-bold tabular-nums"
-              data-testid="calc-delivery-fee"
-            >
-              {formatTk(deliveryFee)}
+            <p className="text-muted-foreground mt-1 text-xs">
+              This route has no configured rate, so an order cannot be placed on
+              it either. Pick another route, or ask an admin to add this one to
+              the zone rate card.
             </p>
-            {bundleDiscount > 0 && (
-              <p
-                className="text-chart-2 mt-1 text-xs font-medium"
-                data-testid="calc-bundle-discount"
-              >
-                Bundle discount −{formatTk(bundleDiscount)} (was{" "}
-                {formatTk(breakdown.total)})
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-lg border p-4">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                Delivery fee
               </p>
-            )}
-            <div className="text-muted-foreground mt-2 space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span>Base rate</span>
-                <span className="tabular-nums">
-                  {formatTk(breakdown.baseRate)}
-                </span>
-              </div>
-              {breakdown.billableExtraKg > 0 && (
+              <p
+                className="text-2xl font-bold tabular-nums"
+                data-testid="calc-delivery-fee"
+              >
+                {formatTk(deliveryFee)}
+              </p>
+              {bundleDiscount > 0 && (
+                <p
+                  className="text-chart-2 mt-1 text-xs font-medium"
+                  data-testid="calc-bundle-discount"
+                >
+                  Bundle discount −{formatTk(bundleDiscount)} (was{" "}
+                  {formatTk(breakdown.total)})
+                </p>
+              )}
+              <div className="text-muted-foreground mt-2 space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span>
-                    Extra weight ({breakdown.billableExtraKg} KG ×{" "}
-                    {formatTk(effective.extraRatePerKg)})
-                  </span>
+                  <span>Base rate</span>
                   <span className="tabular-nums">
-                    {formatTk(breakdown.extraWeightCharge)}
+                    {formatTk(breakdown.baseRate)}
                   </span>
                 </div>
+                {breakdown.billableExtraKg > 0 && (
+                  <div className="flex justify-between">
+                    <span>
+                      Extra weight ({breakdown.billableExtraKg} KG ×{" "}
+                      {formatTk(effective.extraRatePerKg)})
+                    </span>
+                    <span className="tabular-nums">
+                      {formatTk(breakdown.extraWeightCharge)}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {breakdown.exceedsMax && (
+                <p className="text-destructive mt-2 text-xs font-medium">
+                  Exceeds maximum {effective.maxWeightKg} KG weight limit.
+                </p>
               )}
             </div>
-            {breakdown.exceedsMax && (
-              <p className="text-destructive mt-2 text-xs font-medium">
-                Exceeds maximum {effective.maxWeightKg} KG weight limit.
+
+            <div className="rounded-lg border p-4">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                COD fee ({effective.codFeePercentage}%)
               </p>
-            )}
-          </div>
-
-          <div className="rounded-lg border p-4">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-              COD fee ({effective.codFeePercentage}%)
-            </p>
-            <p className="text-lg font-semibold tabular-nums">
-              {formatTk(codFee)}
-            </p>
-          </div>
-
-          <div className="rounded-lg border p-4">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-              Cancellation fee
-            </p>
-            <p className="text-lg font-semibold tabular-nums">
-              {formatTk(effective.cancellationFee)}
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Charged only if the parcel is returned; the delivery and COD fees
-              are refunded.
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs font-medium uppercase tracking-wide">
-                Merchant receives
+              <p className="text-lg font-semibold tabular-nums">
+                {formatTk(codFee)}
               </p>
-              <Info className="text-muted-foreground size-3" />
             </div>
-            <p className="text-primary mt-1 text-2xl font-bold tabular-nums">
-              {formatTk(merchantEarnings)}
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              COD amount − delivery fee − COD fee
-            </p>
+
+            <div className="rounded-lg border p-4">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                Cancellation fee
+              </p>
+              <p className="text-lg font-semibold tabular-nums">
+                {formatTk(effective.cancellationFee)}
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Charged only if the parcel is returned; the delivery and COD
+                fees are refunded.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-medium uppercase tracking-wide">
+                  Merchant receives
+                </p>
+                <Info className="text-muted-foreground size-3" />
+              </div>
+              <p className="text-primary mt-1 text-2xl font-bold tabular-nums">
+                {formatTk(merchantEarnings)}
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                COD amount − delivery fee − COD fee
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   )

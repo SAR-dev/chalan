@@ -1,30 +1,13 @@
 import "dotenv/config"
 
 import { createHash, createHmac } from "node:crypto"
-import { expect, type Page, test } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import { Client } from "pg"
-import { login, toast, waitForAppReady } from "../helpers"
-import { email, onboarding } from "../selectors"
+import { login, toast } from "../helpers"
+import { email } from "../selectors"
 
 const PASSWORD = "testpass123"
 const SITE_ORIGIN = "http://localhost:3000"
-
-/** Skip onboarding for a freshly registered merchant. The shell redirects
- *  incomplete merchants to /welcome asynchronously, so navigate to /merchant
- *  and wait for that decision instead of checking the URL immediately. */
-async function skipOnboardingIfNeeded(page: Page) {
-  await page.goto("/merchant")
-  await waitForAppReady(page).catch(() => {})
-  const skip = page.locator(onboarding.skip)
-  try {
-    await skip.waitFor({ state: "visible", timeout: 5_000 })
-  } catch {
-    return // already onboarded
-  }
-  await skip.click()
-  await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-  await waitForAppReady(page)
-}
 
 /**
  * Point a merchant's stored verification token at a known raw value.
@@ -138,7 +121,6 @@ test.describe("S39. Change email", () => {
 
     // Sign in (unverified merchants are bounced back to /login).
     await login(page, { email: oldEmail, password: PASSWORD })
-    await skipOnboardingIfNeeded(page)
 
     await page.goto("/merchant/account")
     await expect(page.locator(email.current)).toHaveValue(oldEmail)

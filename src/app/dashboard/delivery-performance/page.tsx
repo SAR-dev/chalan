@@ -19,7 +19,7 @@ export default function DeliveryPerformancePage() {
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined)
   const [dateTo, setDateTo] = useState<string | undefined>(undefined)
 
-  const { analytics, isLoading } = useOrderAnalytics({
+  const { analytics, isLoading, isRefreshing } = useOrderAnalytics({
     from: dateFrom,
     to: dateTo,
   })
@@ -84,7 +84,7 @@ export default function DeliveryPerformancePage() {
                 value: d.count,
               }))}
               height={250}
-              loading={isLoading}
+              loading={isLoading || isRefreshing}
             />
           </CardContent>
         </Card>
@@ -102,7 +102,7 @@ export default function DeliveryPerformancePage() {
                 { name: "Returned", value: dp?.totalReturned ?? 0 },
               ].filter((d) => d.value > 0)}
               height={250}
-              loading={isLoading}
+              loading={isLoading || isRefreshing}
             />
           </CardContent>
         </Card>
@@ -120,7 +120,7 @@ export default function DeliveryPerformancePage() {
               value: d.revenue,
             }))}
             height={250}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
           />
         </CardContent>
       </Card>

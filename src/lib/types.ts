@@ -51,6 +51,9 @@ export type DeliveryType = (typeof order.$inferSelect)["deliveryType"]
 export type OrderStatus = (typeof order.$inferSelect)["status"]
 export type PayoutRequestStatus = (typeof payoutRequest.$inferSelect)["status"]
 export type RiderTaskType = (typeof rider.$inferSelect)["taskType"]
+export type RiderVehicleType = NonNullable<
+  (typeof rider.$inferSelect)["vehicleType"]
+>
 export type RiderStatus = (typeof rider.$inferSelect)["status"]
 export type BalanceTxType = (typeof balanceTransaction.$inferSelect)["type"]
 export type BalanceTxStatus = (typeof balanceTransaction.$inferSelect)["status"]
@@ -155,17 +158,42 @@ export interface MerchantRegistrationInput {
   password: string
 }
 
-export interface MerchantWeightLimitInput {
-  maxWeightKg: number
+/**
+ * Platform settings, as returned by `GET /api/platform-config`.
+ *
+ * Rates are per-lane `zone_pricing` rows, so the only platform-level policy
+ * here is the cancellation refund. `min`/`maxCodFeePercentage` are the
+ * validation bounds an admin sets for a lane's COD percentage.
+ */
+export interface PlatformConfig {
+  id: string
+  minCodFeePercentage: number
+  maxCodFeePercentage: number
+  refundOnCancel: boolean
+  updatedAt: string
 }
 
+/** The PATCH body for `PUT`/`PATCH /api/platform-config`. */
 export interface PlatformConfigInput {
-  defaultBaseRate?: number
-  defaultExtraRatePerKg?: number
-  defaultFreeWeightKg?: number
-  defaultMaxWeightKg?: number
-  defaultCancellationFee?: number
   refundOnCancel?: boolean
+}
+
+/** A lane that has no `zone_pricing` row and therefore cannot be ordered on. */
+export interface MissingZonePair {
+  fromZoneId: string
+  fromZoneName: string
+  toZoneId: string
+  toZoneName: string
+}
+
+/** Response of `GET /api/admin/pricing-coverage`. */
+export interface PricingCoverage {
+  missing: MissingZonePair[]
+  /** Origin zones × destination zones — the pairs that could need a rate. */
+  reachablePairCount: number
+  configuredPairCount: number
+  originZoneCount: number
+  destinationZoneCount: number
 }
 
 export interface CreateOrderInput {
@@ -176,6 +204,8 @@ export interface CreateOrderInput {
   deliveryCityId: string
   deliveryMapLink?: string | null
   parcelWeightKg: number
+  /** What is in the parcel, in the merchant's words. Optional and never priced. */
+  itemType?: string | null
   deliveryType: DeliveryType
   productCost: number
   merchantNote?: string | null

@@ -16,15 +16,9 @@ export async function seedPlatformConfig() {
 
   await db.insert(platformConfig).values({
     id: "default",
-    defaultBaseRate: 60,
-    defaultExtraRatePerKg: 15,
-    defaultFreeWeightKg: 1,
-    defaultMaxWeightKg: 10,
-    defaultCodFeePercentage: 1,
     minCodFeePercentage: 0.5,
     maxCodFeePercentage: 5,
-    defaultCancellationFee: 20,
   })
 
-  log("Seeded platform config defaults")
+  log("Seeded platform config")
 }

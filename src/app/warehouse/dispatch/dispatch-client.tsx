@@ -78,6 +78,7 @@ export function WarehouseDispatchPageClient({
     setQuery,
     setStatuses,
     isLoading,
+    isRefreshing,
     mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
@@ -328,7 +329,7 @@ export function WarehouseDispatchPageClient({
             columns={columns}
             data={data}
             getRowKey={(o) => o.id}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             emptyMessage={
               tab === "PICKUP"
                 ? "No approved orders ready for pickup."

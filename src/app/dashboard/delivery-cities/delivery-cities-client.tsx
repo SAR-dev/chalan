@@ -29,6 +29,7 @@ export function DeliveryCitiesPageClient() {
   const {
     cities,
     isLoading,
+    isRefreshing,
     toggleCity,
     deleteCity,
     mutate: refresh,
@@ -163,7 +164,7 @@ export function DeliveryCitiesPageClient() {
             columns={columns}
             data={cities}
             getRowKey={(o) => o.id}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             onRefresh={refresh}
             emptyMessage="No delivery cities yet. Add one to get started."
           />

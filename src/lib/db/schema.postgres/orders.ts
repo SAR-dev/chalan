@@ -104,6 +104,14 @@ export const order = pgTable(
     // the recipient location.
     deliveryMapLink: text("deliveryMapLink"),
     parcelWeightKg: doublePrecision("parcelWeightKg").notNull(),
+    // What is in the parcel, in the merchant's own words ("saree", "phone
+    // charger", "cooked food"). Free text on purpose: the list of things people
+    // actually sell is unbounded, and a fixed enum would either be too short to
+    // be useful or so long that nobody picks carefully. It is descriptive and
+    // never touches pricing — a parcel's cost comes from its lane and weight,
+    // so nothing here can change what an order is charged.
+    // Nullable because orders created before this column existed have none.
+    itemType: text("itemType"),
     deliveryType: text("deliveryType", { enum: orderDeliveryTypes })
       .notNull()
       .default("STANDARD"),

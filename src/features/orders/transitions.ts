@@ -106,10 +106,7 @@ export const ORDER_TRANSITIONS = {
         return { error: "Only PENDING orders can be approved", status: 400 }
       }
       const [merchantRow] = await db
-        .select({
-          maxWeightKg: merchant.maxWeightKg,
-          status: merchant.status,
-        })
+        .select({ status: merchant.status })
         .from(merchant)
         .where(eq(merchant.id, o.merchantId))
         .limit(1)
@@ -122,9 +119,19 @@ export const ORDER_TRANSITIONS = {
           status: 400,
         }
       }
-      if (merchantRow && o.parcelWeightKg > merchantRow.maxWeightKg) {
+      // The lane's own `zone_pricing.maxWeightKg` is the only weight limit.
+      // Re-checked here because an admin may have lowered the rate between
+      // creation and approval — and approving would dispatch a parcel the route
+      // no longer accepts. If the lane cannot be resolved the order is still
+      // blocked by creation, so this degrades to not re-checking rather than
+      // stranding an already-charged order.
+      const resolved = await resolveRoutePricing(
+        o.warehouseId,
+        o.deliveryCityId,
+      )
+      if (resolved.ok && o.parcelWeightKg > resolved.pricing.maxWeightKg) {
         return {
-          error: `Parcel weight exceeds the ${merchantRow.maxWeightKg} KG limit and cannot be approved.`,
+          error: `Parcel weight exceeds the ${resolved.pricing.maxWeightKg} KG limit for this route and cannot be approved.`,
           status: 400,
         }
       }
@@ -251,50 +258,56 @@ export const ORDER_TRANSITIONS = {
         warehouseId,
       }
       // The rider may correct the parcel weight at pickup. Re-price the delivery
-      // and reject a weight over the merchant/route limit.
+      // and reject a weight over the lane's limit.
+      //
+      // The lane's `zone_pricing.maxWeightKg` is the only weight limit. There is
+      // no per-merchant cap to fall back on, so on an unpriced lane there is
+      // nothing to validate against — the correction is accepted and the fee
+      // stays on the creation-time snapshot. Blocking the pickup would strand an
+      // in-flight parcel, which is the worse failure than a weight we cannot
+      // re-check (the order is already charged). The lane gap itself is surfaced
+      // on the dashboard coverage list and blocks *new* orders at creation.
+      // See `lib/order-pricing.ts`.
       if (body.parcelWeightKg !== undefined) {
-        const [merchantRow] = await db
-          .select({ maxWeightKg: merchant.maxWeightKg })
-          .from(merchant)
-          .where(eq(merchant.id, o.merchantId))
-          .limit(1)
-        const pricing = await resolveRoutePricing(
+        const resolved = await resolveRoutePricing(
           o.warehouseId,
           o.deliveryCityId,
         )
-        const cap = Math.min(
-          merchantRow?.maxWeightKg ?? Number.POSITIVE_INFINITY,
-          pricing.maxWeightKg,
-        )
-        if (body.parcelWeightKg > cap) {
+
+        if (resolved.ok && body.parcelWeightKg > resolved.pricing.maxWeightKg) {
           throw new TransitionError(
-            `Parcel weight exceeds the ${cap} KG limit.`,
+            `Parcel weight exceeds the ${resolved.pricing.maxWeightKg} KG limit.`,
           )
         }
-        // The bundle rule is frozen onto the order at creation, so re-apply the
-        // snapshotted rule to the re-priced zone fee. A FLAT rule is
-        // weight-independent, so a weight correction under a flat bundle yields
-        // no delivery-fee delta — exactly as at creation.
-        const { total: zoneDeliveryFee } = calcDeliveryCharge(
-          pricing,
-          body.parcelWeightKg,
-        )
-        const deliveryFee = applyPackageRule(
-          zoneDeliveryFee,
-          o.packageRuleType
-            ? {
-                ruleType: o.packageRuleType,
-                ruleValue: o.packageRuleValue ?? 0,
-              }
-            : null,
-        )
+
         update.parcelWeightKg = body.parcelWeightKg
-        update.deliveryFee = deliveryFee
-        update.merchantEarnings = calcMerchantEarnings(
-          o.productCost,
-          deliveryFee,
-          o.codFee,
-        )
+        if (resolved.ok) {
+          // The bundle rule is frozen onto the order at creation, so re-apply
+          // the snapshotted rule to the re-priced zone fee. A FLAT rule is
+          // weight-independent, so a weight correction under a flat bundle
+          // yields no delivery-fee delta — exactly as at creation.
+          const { total: zoneDeliveryFee } = calcDeliveryCharge(
+            resolved.pricing,
+            body.parcelWeightKg,
+          )
+          const deliveryFee = applyPackageRule(
+            zoneDeliveryFee,
+            o.packageRuleType
+              ? {
+                  ruleType: o.packageRuleType,
+                  ruleValue: o.packageRuleValue ?? 0,
+                }
+              : null,
+          )
+          update.deliveryFee = deliveryFee
+          update.merchantEarnings = calcMerchantEarnings(
+            o.productCost,
+            deliveryFee,
+            o.codFee,
+          )
+        }
+        // Unpriced lane: `deliveryFee` and `merchantEarnings` stay on the
+        // creation-time snapshot.
       }
       return update
     },

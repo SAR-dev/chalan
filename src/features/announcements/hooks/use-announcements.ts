@@ -41,6 +41,7 @@ export function useAnnouncements() {
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<Announcement>>(
     currentUser ? url : null,
@@ -142,6 +143,7 @@ export function useAnnouncements() {
     isActive,
     setIsActive,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     createAnnouncement,

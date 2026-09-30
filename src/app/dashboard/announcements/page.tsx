@@ -54,6 +54,7 @@ export default function AnnouncementsPage() {
     deleteAnnouncement,
     deleteAnnouncements,
     isLoading,
+    isRefreshing,
     isActive: _isActive,
     setIsActive,
     mutate: refresh,
@@ -285,7 +286,7 @@ export default function AnnouncementsPage() {
             getRowKey={(a) => a.id}
             initialSortId="createdAt"
             emptyMessage="No announcements yet."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

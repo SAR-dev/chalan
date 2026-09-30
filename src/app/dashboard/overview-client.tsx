@@ -24,6 +24,7 @@ import {
 import { pageContent } from "@/config/content"
 import { statCardLabels } from "@/config/stat-card-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
+import { PricingCoverageCard } from "@/features/platform-config/components/pricing-coverage-card"
 import { cn } from "@/lib/utils"
 
 interface OverviewProps {
@@ -185,6 +186,8 @@ export function OverviewPageClient({
             })}
           </CardContent>
         </Card>
+
+        <PricingCoverageCard />
       </div>
     </>
   )

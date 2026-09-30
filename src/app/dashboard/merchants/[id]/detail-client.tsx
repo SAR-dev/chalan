@@ -422,12 +422,15 @@ export function MerchantDetailClient({
             <CardContent className="divide-border divide-y py-0">
               <div className="flex items-center justify-between py-2">
                 <span className="text-muted-foreground text-sm">
-                  Max parcel weight
+                  Account-level limit
                 </span>
-                <span className="text-sm font-medium tabular-nums">
-                  {merchant.maxWeightKg} KG
-                </span>
+                <span className="text-sm font-medium">None</span>
               </div>
+              <p className="text-muted-foreground py-2 text-xs">
+                Parcels are checked against the limit of their own route, which
+                the platform sets on each zone-to-zone rate under Zone Pricing —
+                so the allowance can differ between destinations.
+              </p>
             </CardContent>
           </Card>
         </div>

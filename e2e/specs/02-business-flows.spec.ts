@@ -4,22 +4,14 @@ import {
   deliveryCities,
   dialog,
   merchants,
-  onboarding,
   orders,
   register,
   riderApplication,
+  riders,
 } from "../selectors"
 
-async function skipOnboardingIfNeeded(page: any) {
-  if (page.url().includes("/welcome")) {
-    await page.locator(onboarding.skip).click()
-    await page.waitForURL(/\/merchant/, { timeout: 15_000 })
-    await waitForAppReady(page)
-  }
-}
-
-// ─── S2. Merchant Onboarding ─────────────────────────────────────────────────
-test.describe("S2. Merchant Onboarding", () => {
+// ─── S2. Merchant Registration ─────────────────────────────────────────────────
+test.describe("S2. Merchant Registration", () => {
   test("user can access registration page", async ({ page }) => {
     await page.goto("/register")
     await waitForAppReady(page)
@@ -30,7 +22,6 @@ test.describe("S2. Merchant Onboarding", () => {
   test("registered merchant sees pending status", async ({ page }) => {
     // Login as a merchant that's already active (seeded)
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await waitForAppReady(page)
     // Merchant dashboard should load
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -63,7 +54,6 @@ test.describe("S5. Merchant Self-Cancellation", () => {
     page,
   }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/orders")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -98,7 +88,6 @@ test.describe("S11. Payout Rejection", () => {
 test.describe("S13. Zone-Based Order Pricing", () => {
   test("order form loads correctly", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/orders/new")
     await waitForAppReady(page)
     // Verify order form page loaded
@@ -148,7 +137,6 @@ test.describe("S20. Announcement Lifecycle", () => {
 
   test("merchant can view announcements inbox", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/announcements")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -159,7 +147,6 @@ test.describe("S20. Announcement Lifecycle", () => {
 test.describe("S23. Merchant Balance & Payment", () => {
   test("merchant can view finance page", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/finance")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -194,7 +181,6 @@ test.describe("S29. Warehouse COD Settlement", () => {
 test.describe("S30. Merchant Pricing", () => {
   test("merchant can view pricing page", async ({ page }) => {
     await login(page, CREDS.merchant)
-    await skipOnboardingIfNeeded(page)
     await page.goto("/merchant/pricing")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
@@ -225,7 +211,35 @@ test.describe("S32. Admin Rider Management", () => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/riders")
     await waitForAppReady(page)
-    await expect(page.getByRole("heading").first()).toBeVisible()
+    await expect(page.locator(riders.table)).toBeVisible()
+
+    // The list is server-sorted by `createdAt` desc, so an individual rider is
+    // not guaranteed to be on the first page. Search narrows to the seeded
+    // rider, which puts its row at a known address.
+    await page.locator(riders.search).fill("Rider 1")
+    const row = page.locator(riders.row("RID-100001E"))
+    await expect(row).toBeVisible()
+
+    // The vehicle column the admin reads before assigning a parcel. RID-100001E
+    // is seeded with a motorbike + plate, so this asserts the column renders a
+    // real value rather than only that a row exists.
+    await expect(row.locator(riders.vehicleCell)).toContainText("Motorbike")
+    await expect(row.locator(riders.vehicleCell)).toContainText("DHAKA-11111")
+  })
+
+  test("riders with no vehicle are labelled, not left blank", async ({
+    page,
+  }) => {
+    await login(page, CREDS.superAdmin)
+    await page.goto("/dashboard/riders")
+    await waitForAppReady(page)
+    await page.locator(riders.search).fill("Rider 5")
+
+    // Only riders 1-3 are seeded with a vehicle. A blank cell would be
+    // indistinguishable from one that failed to load, so the gap is labelled.
+    const row = page.locator(riders.row("RID-100005E"))
+    await expect(row).toBeVisible()
+    await expect(row.locator(riders.vehicleCell)).toContainText("Not recorded")
   })
 
   test("admin can view rider applications", async ({ page }) => {

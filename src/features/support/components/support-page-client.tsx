@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
+import { SupportReference } from "@/features/support/components/support-reference"
 import { SupportStatusBadge } from "@/features/support/components/support-status-badge"
 import { CreateTicketDialog } from "@/features/support/dialogs/create-ticket-dialog"
 import { ReplyTicketDialog } from "@/features/support/dialogs/reply-ticket-dialog"
@@ -80,6 +81,7 @@ export function SupportPageClient({
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     closeTicket,
     mutate: refresh,
   } = useSupport({ initialData, initialTotal })
@@ -254,6 +256,12 @@ export function SupportPageClient({
         {!isAdmin ? <CreateTicketDialog /> : null}
       </PageHeader>
 
+      {/* Merchants get the standing reference the onboarding wizard used to
+          deliver; admins/warehouse/riders are working a ticket queue. */}
+      {!isAdmin && currentUser?.role === "MERCHANT" ? (
+        <SupportReference />
+      ) : null}
+
       <Card>
         <CardContent className="p-0">
           <div data-testid="support-tickets">
@@ -282,7 +290,7 @@ export function SupportPageClient({
                   ? "No support tickets yet."
                   : "No tickets match this filter."
               }
-              loading={isLoading}
+              loading={isLoading || isRefreshing}
               serverPaginated
               total={total}
               query={query}

@@ -3,9 +3,11 @@
 import { LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useState } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { SignOutConfirmDialog } from "@/features/account/dialogs/sign-out-confirm-dialog"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { BRAND_NAME } from "@/lib/constants"
 import { isNavItemActive, type SidebarConfig } from "@/lib/nav-config"
@@ -37,8 +39,9 @@ export function RoleSidebar({
   hidePlatformBranding?: boolean
 }) {
   const pathname = usePathname()
-  const { currentUser, logout } = useAuth()
+  const { currentUser } = useAuth()
   const BrandIcon = config.brandIcon
+  const [signOutOpen, setSignOutOpen] = useState(false)
 
   const sidebarStyle = brandColor
     ? ({ "--sidebar-primary": brandColor } as React.CSSProperties)
@@ -132,7 +135,10 @@ export function RoleSidebar({
         <Button
           variant="ghost"
           size="sm"
-          onClick={logout}
+          // Opens the confirmation rather than signing out directly — an
+          // accidental click in the sidebar footer used to end the session
+          // with no way back but retyping credentials.
+          onClick={() => setSignOutOpen(true)}
           data-testid="logout"
           className="mt-0.5 w-full justify-start gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
         >
@@ -140,6 +146,7 @@ export function RoleSidebar({
           Sign out
         </Button>
       </div>
+      <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </aside>
   )
 }

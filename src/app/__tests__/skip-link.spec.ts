@@ -12,7 +12,7 @@ function tsxFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry)
     if (statSync(full).isDirectory()) {
-      // Route groups like (onboarding) still contain real pages/layouts.
+      // Route groups still contain real pages/layouts.
       return tsxFiles(full)
     }
     return full.endsWith(".tsx") ? [full] : []

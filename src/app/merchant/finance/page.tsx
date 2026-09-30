@@ -56,6 +56,7 @@ export default function MerchantFinancePage() {
     merchantPayableTotal,
     merchantPayableAmount,
     isLoading: isLoadingOrders,
+    isRefreshing: isRefreshingOrders,
     mutate: refreshOrders,
   } = useOrders({
     payablePage,
@@ -66,6 +67,7 @@ export default function MerchantFinancePage() {
   const {
     merchantPayoutRequests,
     isLoading: isLoadingPayouts,
+    isRefreshing: isRefreshingPayouts,
     mutate: refreshPayouts,
   } = usePayouts()
   const requestColumns = usePayoutRequestColumns()
@@ -78,6 +80,7 @@ export default function MerchantFinancePage() {
     total: paymentsTotal,
     hasPendingPayment,
     isLoading: isLoadingPayments,
+    isValidating: isRefreshingPayments,
     mutate: refreshPayments,
     setPage: setPaymentsPage,
     setLimit: setPaymentsLimit,
@@ -402,7 +405,7 @@ export default function MerchantFinancePage() {
                   data={filteredPayableOrders}
                   getRowKey={(o) => o.id}
                   initialSortId="tracking"
-                  loading={isLoadingOrders}
+                  loading={isLoadingOrders || isRefreshingOrders}
                   onRefresh={refreshOrders}
                   serverPaginated
                   total={merchantPayableTotal}
@@ -446,7 +449,7 @@ export default function MerchantFinancePage() {
                   getRowKey={(p) => p.id}
                   initialSortId="requested"
                   initialSortDir="desc"
-                  loading={isLoadingPayouts}
+                  loading={isLoadingPayouts || isRefreshingPayouts}
                   onRefresh={refreshPayouts}
                 />
               )}
@@ -534,7 +537,7 @@ export default function MerchantFinancePage() {
                 emptyMessage="No top-ups yet."
                 initialSortId="date"
                 initialSortDir="desc"
-                loading={isLoadingPayments}
+                loading={isLoadingPayments || isRefreshingPayments}
                 onRefresh={refreshPayments}
                 serverPaginated
                 total={paymentsTotal}

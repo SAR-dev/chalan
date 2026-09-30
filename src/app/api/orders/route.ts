@@ -55,6 +55,7 @@ import {
   calcCodFee,
   calcDeliveryCharge,
   calcMerchantEarnings,
+  pricingUnavailableMessage,
 } from "@/lib/pricing"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { generateTrackingToken } from "@/lib/tracking-token"
@@ -229,6 +230,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     deliveryAddress,
     deliveryMapLink,
     parcelWeightKg,
+    itemType,
     deliveryType,
     productCost: rawProductCost,
     merchantNote,
@@ -290,7 +292,6 @@ export const POST = withErrorHandler(async (req: Request) => {
       status: merchant.status,
       emailVerifiedAt: merchant.emailVerifiedAt,
       nidVerifiedAt: merchant.nidVerifiedAt,
-      maxWeightKg: merchant.maxWeightKg,
     })
     .from(merchant)
     .where(eq(merchant.id, merchantId))
@@ -310,25 +311,32 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!verification.allowed) {
     return forbidden(verification.reason)
   }
-  if (parcelWeightKg > merchantRow.maxWeightKg) {
+
+  // ── Pricing: zone pricing is the single source for delivery, COD and
+  //    cancellation fees. There is no platform fallback — an unconfigured lane
+  //    is a configuration gap and is rejected with the reason, so the admin can
+  //    fix the right thing. Shared with pickup re-pricing so the two cannot
+  //    drift on what counts as a configured lane.
+  const destCityId = parsed.data.deliveryCityId
+  const resolved = await resolveRoutePricing(hub.id, destCityId ?? null)
+  if (!resolved.ok) {
     return badRequest(
-      `Parcel weight exceeds the ${merchantRow.maxWeightKg} KG limit.`,
+      pricingUnavailableMessage(
+        resolved.reason,
+        resolved.fromZone,
+        resolved.toZone,
+      ),
     )
   }
-
-  // ── Pricing: the zone-pair row wins; platform defaults are the fallback.
-  //    Per-merchant rate fields were removed — zone pricing is the single
-  //    source for delivery, COD and cancellation fees. Shared with the
-  //    pickup-time re-pricing so the two can never drift.
-  const destCityId = parsed.data.deliveryCityId
-  const pricing = await resolveRoutePricing(hub.id, destCityId ?? null)
+  const pricing = resolved.pricing
 
   const { total: zoneDeliveryFee, exceedsMax } = calcDeliveryCharge(
     pricing,
     parcelWeightKg,
   )
-  // The rate is undefined above its own max weight — enforce it as well as the
-  // per-merchant cap checked above.
+  // The rate is undefined above its own max weight — that is the ONLY weight
+  // limit: a parcel may be heavier on one lane than another, and there is no
+  // per-merchant cap to disagree with it.
   if (exceedsMax) {
     return badRequest(
       `Parcel weight exceeds the ${pricing.maxWeightKg} KG limit for this route.`,
@@ -363,6 +371,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         deliveryAddress,
         deliveryMapLink: normalizedMapLink,
         parcelWeightKg,
+        itemType,
         deliveryType: deliveryType ?? "STANDARD",
         productCost,
         deliveryFee,
@@ -389,6 +398,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         deliveryAddress: order.deliveryAddress,
         deliveryMapLink: order.deliveryMapLink,
         parcelWeightKg: order.parcelWeightKg,
+        itemType: order.itemType,
         deliveryType: order.deliveryType,
         productCost: order.productCost,
         deliveryFee: order.deliveryFee,

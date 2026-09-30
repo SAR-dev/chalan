@@ -60,6 +60,7 @@ export default function MerchantOrdersPage() {
     statuses: _statuses,
     setStatuses,
     isLoading,
+    isRefreshing,
     sortId,
     sortDir,
     onSortChange,
@@ -149,6 +150,25 @@ export default function MerchantOrdersPage() {
           </CellContent>
         )
       },
+    },
+    {
+      // What the merchant said is in the parcel. Not sortable: it is free text
+      // they typed, so an ORDER BY would be alphabetical noise ("Cotton saree"
+      // next to "charger") rather than a grouping anyone scans for.
+      id: "itemType",
+      header: columnLabels.order.itemType,
+      headClassName: "hidden lg:table-cell",
+      cellClassName: "hidden lg:table-cell",
+      cell: (o) =>
+        o.itemType ? (
+          <CellContent>{o.itemType}</CellContent>
+        ) : (
+          // Reads as an empty value rather than a blank cell, which is
+          // indistinguishable from one that failed to load.
+          <CellContent className="text-muted-foreground">
+            Not stated
+          </CellContent>
+        ),
     },
     {
       id: "status",
@@ -317,7 +337,7 @@ export default function MerchantOrdersPage() {
             data={orders}
             getRowKey={(o) => o.id}
             emptyMessage="No orders match the current filters."
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}

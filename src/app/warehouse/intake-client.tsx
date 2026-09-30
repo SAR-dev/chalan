@@ -58,6 +58,7 @@ export function IntakePageClient({
     statuses: _statuses,
     setStatuses,
     isLoading,
+    isRefreshing,
     bulkReceiveOrders,
     mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
@@ -227,7 +228,7 @@ export function IntakePageClient({
             columns={columns}
             data={tab === "INCOMING" ? incoming : received}
             getRowKey={(o) => o.id}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             emptyMessage={
               tab === "INCOMING"
                 ? "No parcels incoming. Parcels appear here once a rider marks them picked up."

@@ -1,5 +1,5 @@
 /**
- * CSV/TSV parsing for bulk order import (§3.4). Pure module: decoding takes
+ * CSV/TSV parsing for bulk order import. Pure module: decoding takes
  * bytes or text, so file handling stays in the dialog. Papa runs with
  * `delimiter: ""` (auto-detect) and `header: true`; physical line numbers
  * (`__line`, header = line 1) are attributed from Papa's row cursors so error

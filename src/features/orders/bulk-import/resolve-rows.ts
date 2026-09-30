@@ -1,9 +1,13 @@
 /**
- * Row resolution and validation for bulk order import (§6). Pure module: the
- * import page injects the lookup maps (pickup locations, active cities) and
- * the merchant's `maxWeightKg`. Each row is normalized per §3.2, mapped to
- * IDs, auto-tagged per §7, then validated with `orderCreateSchema`; errors
- * come back as `Row N: ...` instructions via the `formatError` pattern.
+ * Row resolution and validation for bulk order import. Pure module: the
+ * import page injects the lookup maps (pickup locations, active cities). Each
+ * row is normalized, mapped to IDs, auto-tagged with the import marker, then
+ * validated with `orderCreateSchema`; errors come back as `Row N: ...`
+ * instructions via the `formatError` pattern.
+ *
+ * Note what is NOT here: any weight limit. The limit belongs to the lane
+ * (`zone_pricing.maxWeightKg`) and depends on both endpoints of the row, so it
+ * is resolved by `quoteParcel` and reported from the preview.
  */
 
 import type { CreateOrderInput, DeliveryType } from "@/lib/types"
@@ -19,7 +23,6 @@ export interface ResolveLookup {
 export interface ResolveLookups {
   pickupLocations: ResolveLookup[]
   deliveryCities: ResolveLookup[]
-  maxWeightKg: number
 }
 
 export interface ResolvedRow {
@@ -46,6 +49,7 @@ const INPUT_HEADERS: Record<string, OrderImportHeader> = {
   deliveryAddress: "delivery_address",
   deliveryMapLink: "delivery_map_link",
   parcelWeightKg: "parcel_weight_kg",
+  itemType: "item_type",
   deliveryType: "delivery_type",
   productCost: "product_cost",
   merchantNote: "merchant_note",
@@ -165,13 +169,11 @@ export function resolveRow(
     if (Number.isNaN(parcelWeightKg)) {
       pushBoth("parcel_weight_kg", "Parcel weight must be a number like 1.5.")
       covered.add("parcelWeightKg")
-    } else if (parcelWeightKg > lookups.maxWeightKg) {
-      pushBoth(
-        "parcel_weight_kg",
-        `Parcel weight exceeds the ${lookups.maxWeightKg} KG limit.`,
-      )
-      covered.add("parcelWeightKg")
     }
+    // No weight-limit check here. The limit belongs to the lane
+    // (`zone_pricing.maxWeightKg`), which depends on the pickup city AND the
+    // destination city — neither known while parsing a CSV cell — so it is
+    // resolved by `quoteParcel` and reported from the preview instead.
   }
 
   let productCost = Number.NaN
@@ -204,6 +206,11 @@ export function resolveRow(
     deliveryAddress: values.delivery_address.trim(),
     deliveryMapLink: deliveryMapLink || null,
     parcelWeightKg,
+    // Optional and never coerced: an empty cell means the merchant did not say,
+    // which is stored as NULL. Not defaulted to something like "Parcel" — a
+    // placeholder written once would be read back later as if the merchant had
+    // actually stated it.
+    itemType: collapseWhitespace(values.item_type) || null,
     deliveryType,
     productCost,
     merchantNote: values.merchant_note.trim() || csvImportTag(),
@@ -230,7 +237,7 @@ export function resolveRow(
   return { line, raw: values, input, errors, fieldErrors }
 }
 
-/** Normalizes, resolves and validates every parsed row against §6. */
+/** Normalizes, resolves and validates every parsed row in one pass. */
 export function resolveRows(
   rows: RawOrderRow[],
   lookups: ResolveLookups,

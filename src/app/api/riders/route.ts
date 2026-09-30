@@ -31,6 +31,8 @@ export const GET = withErrorHandler(async (req: Request) => {
         phone: rider.phone,
         zone: rider.zone,
         taskType: rider.taskType,
+        vehicleType: rider.vehicleType,
+        vehiclePlate: rider.vehiclePlate,
         warehouseId: rider.warehouseId,
         isActive: rider.isActive,
       })
@@ -102,6 +104,8 @@ export const GET = withErrorHandler(async (req: Request) => {
         phone: rider.phone,
         zone: rider.zone,
         taskType: rider.taskType,
+        vehicleType: rider.vehicleType,
+        vehiclePlate: rider.vehiclePlate,
         warehouseId: rider.warehouseId,
         isActive: rider.isActive,
       })
@@ -114,6 +118,11 @@ export const GET = withErrorHandler(async (req: Request) => {
       phone: rider.phone,
       zone: rider.zone,
       taskType: rider.taskType,
+      // The vehicle column sorts on the type, not the label. Postgres cannot sort
+      // on a projection this map does not hold, and remapping label order to a
+      // CASE expression would silently break the next time a vehicle type is
+      // added to the enum.
+      vehicle: rider.vehicleType,
       isActive: rider.isActive,
     }
     const sort = parseSort(req, sortColumnMap)
@@ -156,6 +165,8 @@ export const GET = withErrorHandler(async (req: Request) => {
       phone: rider.phone,
       zone: rider.zone,
       taskType: rider.taskType,
+      vehicleType: rider.vehicleType,
+      vehiclePlate: rider.vehiclePlate,
       warehouseId: rider.warehouseId,
       isActive: rider.isActive,
     })
@@ -168,6 +179,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     phone: rider.phone,
     zone: rider.zone,
     taskType: rider.taskType,
+    vehicle: rider.vehicleType,
     isActive: rider.isActive,
   }
   const sort = parseSort(req, sortColumnMap)

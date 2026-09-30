@@ -23,11 +23,12 @@ import {
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
-import { usePlatformPricingPublic } from "@/features/platform-config/hooks/use-platform-pricing-public"
+import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { downloadCsv } from "@/lib/csv"
 import { formatError } from "@/lib/validation"
 import type { ParcelState } from "../new/types"
+import { buildImportParcelRows } from "./build-parcel-rows"
 import { ImportInputCard } from "./components/import-input-card"
 import { ImportPreviewCard } from "./components/import-preview-card"
 import { parcelStateToRawPatch } from "./row-to-parcel"
@@ -52,7 +53,8 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
   const { pickupLocations } = usePickupLocations()
   const { cities } = useDeliveryCities()
   const { pricing: zonePricing } = useZonePricingPublic()
-  const { platformDefaults } = usePlatformPricingPublic()
+  // Only used to name the zone pair in the "cannot be priced" message.
+  const { zones } = useDeliveryZones()
   const { createOrders } = useOrders()
 
   const [parseError, setParseError] = useState<string | null>(null)
@@ -66,17 +68,15 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
   const myLocations = currentMerchant
     ? pickupLocations.filter((p) => p.merchantId === currentMerchant.id)
     : []
-  const maxWeightKg = currentMerchant?.maxWeightKg
   const lookups: ResolveLookups | null = useMemo(() => {
-    if (!currentMerchant || !maxWeightKg) return null
+    if (!currentMerchant) return null
     return {
       pickupLocations: pickupLocations
         .filter((p) => p.merchantId === currentMerchant.id)
         .map((p) => ({ id: p.id, name: p.label })),
       deliveryCities: cities.map((c) => ({ id: c.id, name: c.name })),
-      maxWeightKg,
     }
-  }, [currentMerchant, pickupLocations, cities, maxWeightKg])
+  }, [currentMerchant, pickupLocations, cities])
 
   // A file can resolve before the lookups finish loading (e.g. the cities
   // fetch on first visit), which would strand rows with stale "unknown city"
@@ -98,11 +98,62 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
   const isPreview =
     phase === "preview" || phase === "submitting" || phase === "error"
 
-  const rowHasError = (row: ResolvedRow) =>
-    row.errors.length > 0 || (serverErrors[row.line]?.length ?? 0) > 0
-  const validCount = rows.filter((row) => row.errors.length === 0).length
-  const errorCount = rows.filter(rowHasError).length
-  const visibleRows = errorsOnly ? rows.filter(rowHasError) : rows
+  // Quoted once and shared with the preview card, so "can this batch be
+  // submitted?" and "what does each row look like?" are the same computation.
+  const parcelRows = useMemo(
+    () =>
+      currentMerchant
+        ? buildImportParcelRows(rows, {
+            myLocations,
+            deliveryCities: cities,
+            zonePricing,
+            zones,
+            serverErrors,
+          })
+        : [],
+    [
+      rows,
+      currentMerchant,
+      myLocations,
+      cities,
+      zonePricing,
+      zones,
+      serverErrors,
+    ],
+  )
+
+  /**
+   * Every blocking message for a row: CSV validation, errors from a previous
+   * submit, "no rate configured for this lane", and the route's own weight
+   * limit (which is lane-dependent rather than a CSV rule, so it is only known
+   * once both endpoints resolve). Single-sourced so the counts, the errors-only
+   * filter, the jump link and the error CSV all agree on a row's problem.
+   */
+  const messagesFor = (row: ResolvedRow): string[] => {
+    const messages = [...row.errors, ...(serverErrors[row.line] ?? [])]
+    const quoted = parcelRows.find((p) => p.line === row.line)?.row
+    if (quoted?.pricingError) messages.push(quoted.pricingError)
+    if (quoted?.exceedsMax) {
+      messages.push(`Parcel weight exceeds the ${quoted.maxWeightKg} KG limit.`)
+    }
+    return messages
+  }
+
+  const errorLines = useMemo(
+    () =>
+      new Set(
+        rows
+          .filter((row) => messagesFor(row).length > 0)
+          .map((row) => row.line),
+      ),
+    [rows, serverErrors, parcelRows],
+  )
+
+  const validCount = rows.length - errorLines.size
+  const errorCount = errorLines.size
+  const visibleParcelRows = errorsOnly
+    ? parcelRows.filter((p) => errorLines.has(p.line))
+    : parcelRows
   const hasServerErrors = Object.keys(serverErrors).length > 0
   const confirmDisabled =
     phase === "submitting" || errorCount > 0 || validCount === 0
@@ -204,7 +255,7 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
   }
 
   function handleJumpToError() {
-    const target = rows.find(rowHasError)
+    const target = rows.find((row) => messagesFor(row).length > 0)
     if (!target) return
     document
       .querySelector(`[data-testid="bulk-import-row-${target.line}"]`)
@@ -222,10 +273,12 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
   }
 
   function handleErrorCsvDownload() {
-    const errorRows = rows.filter(rowHasError).map((row) => ({
-      values: row.raw,
-      error: [...row.errors, ...(serverErrors[row.line] ?? [])].join(" "),
-    }))
+    const errorRows = rows
+      .filter((row) => messagesFor(row).length > 0)
+      .map((row) => ({
+        values: row.raw,
+        error: messagesFor(row).join(" "),
+      }))
     downloadCsv("order-import-errors", buildErrorCsv(errorRows))
   }
 
@@ -314,8 +367,7 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
       ) : isPreview && lookups ? (
         <ImportPreviewCard
           phase={phase}
-          rows={visibleRows}
-          serverErrors={serverErrors}
+          parcelRows={visibleParcelRows}
           validCount={validCount}
           errorCount={errorCount}
           errorsOnly={errorsOnly}
@@ -324,9 +376,6 @@ export function ImportClient({ phase, setPhase }: ImportClientProps) {
           confirmDisabled={confirmDisabled}
           myLocations={myLocations}
           deliveryCities={cities}
-          zonePricing={zonePricing}
-          platformDefaults={platformDefaults}
-          maxWeightKg={lookups.maxWeightKg}
           onParcelChange={handleParcelChange}
           onRemoveRow={handleRemoveRow}
           onErrorsOnlyChange={setErrorsOnly}

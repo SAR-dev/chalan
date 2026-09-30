@@ -64,6 +64,7 @@ export default function EmailLogsPage() {
     sortDir,
     onSortChange,
     isLoading,
+    isRefreshing,
     markAsSent,
     markAsSentBulk,
     statusFilter: _statusFilter,
@@ -263,7 +264,7 @@ export default function EmailLogsPage() {
             columns={columns}
             data={emailLogs}
             total={total}
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             query={query}
             onQueryChange={(q) => {
               setQuery(q)

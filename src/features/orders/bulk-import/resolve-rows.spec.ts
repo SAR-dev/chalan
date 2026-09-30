@@ -132,7 +132,7 @@ describe("numeric parsing", () => {
   })
 })
 
-describe("note auto-tag (§7)", () => {
+describe("note auto-tag", () => {
   it("tags an empty note with today's CSV import marker", () => {
     const [resolved] = resolveRows([validRow({ merchant_note: "" })], lookups)
     expect(resolved.errors).toEqual([])
@@ -185,14 +185,15 @@ describe("row validation", () => {
     ])
   })
 
-  it("flags overweight rows against the merchant maxWeightKg", () => {
+  it("does not validate weight against a merchant limit", () => {
+    // The limit belongs to the route and depends on both endpoints of the row,
+    // neither of which is known while parsing a CSV cell — so it is resolved by
+    // `quoteParcel` and reported from the preview instead.
     const [resolved] = resolveRows(
       [validRow({ parcel_weight_kg: "50" }, 9)],
       lookups,
     )
-    expect(resolved.errors).toEqual([
-      "Row 9: Parcel weight exceeds the 10 KG limit.",
-    ])
+    expect(resolved.errors).toEqual([])
   })
 
   it("accepts a fully valid row", () => {
@@ -241,15 +242,23 @@ describe("field-level error attribution (inline cell errors)", () => {
     ])
   })
 
-  it("attributes overweight rows to parcel_weight_kg and stays empty when valid", () => {
-    const [overweight] = resolveRows(
+  it("attributes an unparseable weight to parcel_weight_kg", () => {
+    const [bad] = resolveRows(
+      [validRow({ parcel_weight_kg: "heavy" }, 9)],
+      lookups,
+    )
+    expect(bad.fieldErrors.parcel_weight_kg).toBe(
+      "Parcel weight must be a number like 1.5.",
+    )
+    expect(Object.keys(bad.fieldErrors)).toEqual(["parcel_weight_kg"])
+
+    // A merely heavy row has no field error: the route's limit is not a CSV
+    // rule, so it does not surface here.
+    const [heavy] = resolveRows(
       [validRow({ parcel_weight_kg: "50" }, 9)],
       lookups,
     )
-    expect(overweight.fieldErrors.parcel_weight_kg).toBe(
-      "Parcel weight exceeds the 10 KG limit.",
-    )
-    expect(Object.keys(overweight.fieldErrors)).toEqual(["parcel_weight_kg"])
+    expect(heavy.fieldErrors).toEqual({})
 
     const [clean] = resolveRows([validRow()], lookups)
     expect(clean.fieldErrors).toEqual({})

@@ -85,6 +85,23 @@ const PRODUCT_COSTS = [
 
 const PARCEL_WEIGHTS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0]
 
+// Contents, cycled. Deliberately NOT applied to every order: the order table,
+// the detail panel and the rider queues each render a distinct placeholder when
+// nothing was stated, and a seed where every row is filled is exactly the case
+// that leaves those branches unexercised. `i % 3 === 0` leaves roughly a third
+// of orders without contents.
+const ITEM_TYPES = [
+  "Cotton saree",
+  "Phone charger",
+  "Cooked food",
+  "Running shoes",
+  "Gift box",
+  "Documents",
+  "Glassware",
+  "Cosmetics",
+  "Books",
+]
+
 // ---------------------------------------------------------------------------
 // Deterministic: 100 Orders
 // ---------------------------------------------------------------------------
@@ -98,6 +115,8 @@ export interface OrderSeedEntry {
   recipientPhone: string
   deliveryAddress: string
   parcelWeightKg: number
+  /** What is in the parcel. Null for roughly a third of seeded orders. */
+  itemType?: string | null
   deliveryType: "STANDARD" | "FRAGILE"
   productCost: number
   deliveryFee: number
@@ -201,6 +220,7 @@ function buildSeedOrders(): OrderSeedEntry[] {
       recipientPhone: `+8801712${String(10000 + i).slice(0, 5)}`,
       deliveryAddress: `${100 + i} Seed Road, ${city}`,
       parcelWeightKg: weight,
+      itemType: i % 3 === 0 ? null : ITEM_TYPES[i % ITEM_TYPES.length],
       deliveryType,
       productCost,
       deliveryFee,

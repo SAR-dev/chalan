@@ -10,7 +10,7 @@ import {
   text,
 } from "drizzle-orm/pg-core"
 import { emailLogStatuses, emailOutboxStatuses, profileRoles } from "./enums"
-import { money, ts } from "./helpers"
+import { ts } from "./helpers"
 
 // =============================================================================
 // Failed mail log — REMOVED
@@ -198,30 +198,21 @@ export const auditLog = pgTable(
 
 // =============================================================================
 // Platform configuration
+//
+// Delivery/COD/cancellation fees are NOT here — they live per lane in
+// `zone_pricing` (one row per ordered zone pair). A lane with no row is an
+// unconfigured lane, and order creation rejects it rather than inheriting a
+// platform-wide rate; the dashboard coverage list surfaces the gaps.
 // =============================================================================
 
 export const platformConfig = pgTable("platform_config", {
   id: text("id").primaryKey().default("default"),
-  defaultCodFeePercentage: doublePrecision("defaultCodFeePercentage")
-    .notNull()
-    .default(1),
   minCodFeePercentage: doublePrecision("minCodFeePercentage")
     .notNull()
     .default(0.5),
   maxCodFeePercentage: doublePrecision("maxCodFeePercentage")
     .notNull()
     .default(5),
-  defaultBaseRate: money("defaultBaseRate").notNull().default(0),
-  defaultExtraRatePerKg: money("defaultExtraRatePerKg").notNull().default(0),
-  defaultFreeWeightKg: doublePrecision("defaultFreeWeightKg")
-    .notNull()
-    .default(1),
-  defaultMaxWeightKg: doublePrecision("defaultMaxWeightKg")
-    .notNull()
-    .default(3),
-  // Fallback cancellation fee used when no zone-pair row is configured; the
-  // order snapshots the resolved value at creation (see `order.cancellationFee`).
-  defaultCancellationFee: money("defaultCancellationFee").notNull().default(0),
   // Whether a cancelled order is refunded its creation charge (ROADMAP B15).
   // true = refund (default); false = the merchant keeps the fee.
   refundOnCancel: boolean("refundOnCancel").notNull().default(true),

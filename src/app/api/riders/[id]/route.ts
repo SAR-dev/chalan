@@ -22,6 +22,8 @@ export const GET = withErrorHandler(
         phone: rider.phone,
         zone: rider.zone,
         taskType: rider.taskType,
+        vehicleType: rider.vehicleType,
+        vehiclePlate: rider.vehiclePlate,
         warehouseId: rider.warehouseId,
         isActive: rider.isActive,
       })
@@ -78,7 +80,16 @@ export const PATCH = withErrorHandler(
 
     const parsed = await parseBody(req, riderUpdateSchema)
     if (parsed.error) return parsed.error
-    const { name, phone, zone, warehouseId, taskType, isActive } = parsed.data
+    const {
+      name,
+      phone,
+      zone,
+      warehouseId,
+      taskType,
+      vehicleType,
+      vehiclePlate,
+      isActive,
+    } = parsed.data
 
     // Warehouse Admins are scoped to riders at their own hub and cannot move a
     // rider away from it.
@@ -100,6 +111,10 @@ export const PATCH = withErrorHandler(
         // Only Admins may reassign the home warehouse.
         ...(isAdmin && warehouseId !== undefined ? { warehouseId } : {}),
         ...(taskType !== undefined ? { taskType } : {}),
+        // `undefined` leaves the vehicle alone; an explicit `null` clears it,
+        // which is how an admin says "this rider has no vehicle declared".
+        ...(vehicleType !== undefined ? { vehicleType } : {}),
+        ...(vehiclePlate !== undefined ? { vehiclePlate } : {}),
         ...(isActive !== undefined ? { isActive } : {}),
       })
       .where(eq(rider.id, id))
@@ -111,7 +126,16 @@ export const PATCH = withErrorHandler(
       entityType: "rider",
       entityId: updated.id,
       description: `Updated rider ${updated.name}`,
-      metadata: { name, phone, zone, warehouseId, taskType, isActive },
+      metadata: {
+        name,
+        phone,
+        zone,
+        warehouseId,
+        taskType,
+        vehicleType,
+        vehiclePlate,
+        isActive,
+      },
     })
 
     return NextResponse.json(updated)

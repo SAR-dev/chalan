@@ -35,8 +35,8 @@ export type E2ECredential = {
   home?: string
 }
 
-/** Any authenticated landing page (onboarding-incomplete merchants hit /welcome). */
-const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider|welcome)/
+/** Any authenticated landing page, by role shell. */
+const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider)/
 
 /**
  * Sign in through the login form and wait until the app has settled.

@@ -3,9 +3,10 @@ import { type EmailSpec, renderEmailHtml } from "@/lib/email/templates"
 
 /**
  * These pin the properties react-email gives us that hand-written HTML did
- * not, plus the two ways it could silently regress (a missing font stack, an
- * accent leaking out of a style attribute). The copy itself is covered by
- * mail-templates.spec.ts, which drives the public template functions.
+ * not, plus the ways it could silently regress: a missing font stack, or a
+ * colour creeping back into a design that is meant to stay greyscale. The copy
+ * itself is covered by mail-templates.spec.ts, which drives the public
+ * template functions.
  */
 
 const base: EmailSpec = {
@@ -41,25 +42,45 @@ describe("renderEmailHtml", () => {
     expect(html).toContain(base.cta?.label as string)
   })
 
-  it("applies the accent to the status and the button", async () => {
-    const html = await renderEmailHtml({ ...base, brandColor: "#10b981" })
-    // Exactly twice: the heading colour and the button background. Matching the
-    // bare hex rather than `color:` — the latter is a substring of
-    // `background-color:`, so it would double-count the button.
-    expect(html.match(/#10b981/g) ?? []).toHaveLength(2)
+  it("fills the CTA with the same ink as the text", async () => {
+    const html = await renderEmailHtml(base)
+    // The button is the only filled element, so a black background occurs
+    // exactly once. Counting the bare hex would not work: ink is now also the
+    // colour of every body line, the fact values and the headline.
+    expect(html.match(/background-color:#1f2937/g) ?? []).toHaveLength(1)
     expect(html).toContain("font-size:20px")
   })
 
-  it("never lets a rejected brand color reach the markup", async () => {
-    // `isValidHexColor` is the only thing standing between a merchant-supplied
-    // string and a style attribute, so an invalid one must not appear at all —
-    // not even as a fragment.
+  it("uses no colour outside the monochrome palette", async () => {
+    // The black-and-white requirement, asserted as an allowlist rather than by
+    // checking two specific spots: a new coloured element added anywhere in
+    // the tree would otherwise pass every other test here.
     const html = await renderEmailHtml({
       ...base,
-      brandColor: "red;} body{display:none",
+      hidePlatformBranding: false,
     })
-    expect(html).not.toContain("red;")
-    expect(html).toContain("#2563eb")
+    // The lookbehind matters: React emits numeric character references such as
+    // `&#8202;` (a hair space), whose `#8202` is not a colour at all.
+    const hexes = [...new Set(html.match(/(?<!&)#[0-9a-f]{3,8}/gi) ?? [])].map(
+      (h) => h.toLowerCase(),
+    )
+    const allowed = new Set([
+      "#1f2937", // ink
+      "#6b7280", // muted
+      "#e5e7eb", // rule
+      "#eaeaea", // react-email's own <Hr> default border
+      "#ffffff", // body background, CTA label
+      "#fff",
+      "#000000",
+      "#000",
+    ])
+    const stray = hexes.filter((h) => !allowed.has(h))
+    expect(
+      stray,
+      `unexpected colours in the email: ${stray.join(", ")}`,
+    ).toEqual([])
+    // Belt and braces: the old platform accent must be gone entirely.
+    expect(html).not.toContain("#2563eb")
   })
 
   it("escapes a hostile greeting name", async () => {

@@ -26,10 +26,8 @@ export interface MerchantSeedEntry {
     | "Fashion"
     | "Electronics"
     | "Other"
-  onboardingCompletedAt?: string | null
   emailVerifiedAt: string | null
   phoneVerifiedAt: string | null
-  maxWeightKg: number
   brandColor?: string | null
   hidePlatformBranding?: boolean
   approvedBy: string | null
@@ -68,10 +66,6 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-01T00:00:00.000Z",
     phoneVerifiedAt: "2026-07-01T00:00:00.000Z",
-    // merchant1 is the primary e2e account — onboarded so merchant flows land
-    // on the dashboard instead of racing the /welcome guard.
-    onboardingCompletedAt: "2026-07-01T00:00:00.000Z",
-    maxWeightKg: 10,
     brandColor: "#2563eb",
     hidePlatformBranding: false,
     approvedBy: ADMIN_USER_NAMES.tanvir,
@@ -94,7 +88,6 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-02T00:00:00.000Z",
     phoneVerifiedAt: "2026-07-02T00:00:00.000Z",
-    maxWeightKg: 10,
     approvedBy: ADMIN_USER_NAMES.tanvir,
     approvedAt: "2026-07-03T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -115,7 +108,6 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-03T00:00:00.000Z",
     phoneVerifiedAt: "2026-07-03T00:00:00.000Z",
-    maxWeightKg: 10,
     approvedBy: ADMIN_USER_NAMES.tanvir,
     approvedAt: "2026-07-04T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -136,7 +128,6 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-04T00:00:00.000Z",
     phoneVerifiedAt: null,
-    maxWeightKg: 10,
     approvedBy: "System",
     approvedAt: "2026-07-04T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -157,7 +148,6 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "SUSPENDED",
     emailVerifiedAt: "2026-07-04T00:00:00.000Z",
     phoneVerifiedAt: null,
-    maxWeightKg: 10,
     approvedBy: ADMIN_USER_NAMES.tanvir,
     approvedAt: "2026-07-05T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -177,10 +167,8 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     address: "123 Demo Street, Dhaka 1212",
     status: "ACTIVE",
     businessType: "E-commerce",
-    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
     emailVerifiedAt: "2026-01-01T00:00:00.000Z",
     phoneVerifiedAt: "2026-01-01T00:00:00.000Z",
-    maxWeightKg: 10,
     brandColor: "#f97316",
     hidePlatformBranding: false,
     approvedBy: "System",

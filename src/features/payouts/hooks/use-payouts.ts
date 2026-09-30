@@ -48,6 +48,7 @@ export function usePayouts({
     data: response,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWR<PaginatedResponse<PayoutRequest>>(
     currentUser ? url : null,
@@ -263,6 +264,7 @@ export function usePayouts({
     onSortChange: filters.onSortChange,
     merchantPayoutRequests,
     isLoading,
+    isRefreshing: isValidating,
     error,
     mutate,
     requestPayout,
