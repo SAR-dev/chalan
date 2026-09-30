@@ -16,15 +16,20 @@ import {
   hasActiveMailConfig,
   MAIL_NOT_CONFIGURED_MESSAGE,
 } from "@/lib/mail-config"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 /** Super Admin re-sends (re-issues) a PENDING team member's activation
  *  email — overwrites the previous token so the old link dies. */
 export const POST = withErrorHandler(
-  async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const me = await requireSession()
     if (!me) return unauthorized()
     if (me.role !== "SUPER_ADMIN") return forbidden()
+
+    // Sends mail — throttle so a loop cannot spam an invitee's mailbox.
+    const limited = await rateLimitByIp(req, "resend-activation", 5, 60)
+    if (limited) return limited
 
     const { id } = await params
     const [target] = await dbRead

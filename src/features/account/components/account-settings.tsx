@@ -49,6 +49,35 @@ interface Session {
   userId: string
 }
 
+/**
+ * Maps the Better Auth session rows onto the shape this component renders.
+ *
+ * Written out field by field (rather than a blanket cast) so a rename or a type
+ * change in Better Auth becomes a compile error here instead of a silent
+ * `undefined` at runtime.
+ */
+function toSession(row: {
+  id: string
+  token: string
+  userId: string
+  expiresAt: Date | string
+  createdAt: Date | string
+  updatedAt: Date | string
+  ipAddress?: string | null
+  userAgent?: string | null
+}): Session {
+  return {
+    id: row.id,
+    token: row.token,
+    userId: row.userId,
+    expiresAt: new Date(row.expiresAt).toISOString(),
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+    ipAddress: row.ipAddress ?? null,
+    userAgent: row.userAgent ?? null,
+  }
+}
+
 // Client-side form gate only — Better Auth's /change-email zod schema does
 // the real validation server-side.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -147,7 +176,7 @@ export function AccountSettings() {
     try {
       const { data, error } = await authClient.listSessions()
       if (!error && data) {
-        setSessions(data as unknown as Session[])
+        setSessions(data.map(toSession))
       }
     } finally {
       setLoadingSessions(false)

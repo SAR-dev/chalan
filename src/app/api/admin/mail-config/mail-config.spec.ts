@@ -308,7 +308,7 @@ describe("POST /api/admin/mail-config/test", () => {
     )
   })
 
-  it("surfaces the SMTP auth error verbatim as a 400", async () => {
+  it("returns a generic 400 instead of echoing the SMTP error", async () => {
     sessionState.value = admin
     mockSendTestMail.mockRejectedValue(
       new Error("Invalid login: 535 5.7.8 Username and Password not accepted"),
@@ -316,7 +316,11 @@ describe("POST /api/admin/mail-config/test", () => {
     const res = await testMail(req("POST", undefined, validTestBody))
     const json = await res.json()
     expect(res.status).toBe(400)
-    expect(json.error).toContain("535 5.7.8 Username and Password not accepted")
+    // Connection failures can leak internal hostnames/addresses, so the detail
+    // is logged rather than returned.
+    expect(json.error).toBe(
+      "Could not send the test email. Check the server logs.",
+    )
   })
 })
 

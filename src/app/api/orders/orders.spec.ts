@@ -31,6 +31,8 @@ const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
 const insertPayloads: Record<string, unknown>[] = []
 const whereCalls: unknown[] = []
+/** Row-lock strengths requested by any query, in order. */
+const forCalls: string[] = []
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -47,7 +49,10 @@ vi.mock("@/lib/db", () => {
       offset: () => chain,
       orderBy: () => chain,
       $dynamic: () => chain,
-      for: () => chain,
+      for: (strength: string) => {
+        forCalls.push(strength)
+        return chain
+      },
       then: (onFulfilled: (v: unknown) => unknown) =>
         Promise.resolve(selectQueue.shift() ?? []).then(onFulfilled),
     }
@@ -104,6 +109,7 @@ beforeEach(() => {
   insertResult.length = 0
   insertPayloads.length = 0
   whereCalls.length = 0
+  forCalls.length = 0
   sessionState.value = null
   rateLimited = false
 })
@@ -218,7 +224,7 @@ describe("POST /api/orders", () => {
   it("creates order with warehouse routing", async () => {
     sessionState.value = merchant
     selectQueue.push(
-      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
       [{ id: "wh_hub", isActive: true }], // warehouse hub
       [
         {
@@ -242,6 +248,116 @@ describe("POST /api/orders", () => {
     expect(json).toMatchObject({ id: "o_new" })
   })
 
+  it("applies the active bundle rule, snapshots it, and consumes quota", async () => {
+    sessionState.value = merchant
+    selectQueue.push(
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "wh_hub", isActive: true }], // warehouse hub
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+        },
+      ], // merchant
+      // resolveRoutePricing: platform defaults, then two empty lookups.
+      [
+        {
+          baseRate: 80,
+          extraRatePerKg: 0,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ],
+      [], // warehouse city
+      [], // delivery city
+      // lockAndResolveMerchantPackageRule: bundle, package, tiers
+      [{ merchantPackageId: "mp_1", packageId: "pk_1", ordersUsed: 120 }],
+      [{ isActive: true }],
+      [
+        {
+          id: "t1",
+          orderCount: 100,
+          sortOrder: 0,
+          ruleType: "PERCENT_OFF",
+          ruleValue: 25,
+        },
+      ],
+    )
+    insertResult.push({ id: "o_pkg", status: "PENDING" })
+
+    const res = await createOrder(req("POST", undefined, validOrderBody))
+    expect(res.status).toBe(201)
+
+    const orderInsert = insertPayloads.find(
+      (p) => (p as { recipientName?: string }).recipientName === "Bob",
+    ) as Record<string, unknown> | undefined
+
+    // 25% off the 80 Tk zone fee.
+    expect(orderInsert?.deliveryFee).toBe(60)
+    expect(orderInsert?.packageId).toBe("pk_1")
+    expect(orderInsert?.packageTierId).toBe("t1")
+    expect(orderInsert?.merchantPackageId).toBe("mp_1")
+    expect(orderInsert?.packageRuleType).toBe("PERCENT_OFF")
+    expect(orderInsert?.packageRuleValue).toBe(25)
+
+    // The bundle row is locked for the rest of the transaction, so a
+    // concurrent create cannot read the same `ordersUsed` and price the
+    // shallower tier (proved end-to-end in src/lib/db/integration.spec.ts).
+    expect(forCalls).toContain("update")
+
+    // Quota incremented by one.
+    expect(updatePayloads.some((p) => "ordersUsed" in p)).toBe(true)
+  })
+
+  it("leaves package columns null when the merchant has no active bundle", async () => {
+    sessionState.value = merchant
+    selectQueue.push(
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "wh_hub", isActive: true }], // warehouse hub
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+        },
+      ], // merchant
+      [
+        {
+          baseRate: 80,
+          extraRatePerKg: 0,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ],
+      [], // warehouse city
+      [], // delivery city
+      [], // no active bundle
+    )
+    insertResult.push({ id: "o_plain", status: "PENDING" })
+
+    const res = await createOrder(req("POST", undefined, validOrderBody))
+    expect(res.status).toBe(201)
+
+    const orderInsert = insertPayloads.find(
+      (p) => (p as { recipientName?: string }).recipientName === "Bob",
+    ) as Record<string, unknown> | undefined
+    expect(orderInsert?.deliveryFee).toBe(80)
+    expect(orderInsert?.packageId).toBeNull()
+    expect(orderInsert?.merchantPackageId).toBeNull()
+    expect(updatePayloads.some((p) => "ordersUsed" in p)).toBe(false)
+  })
+
   it("returns the original order for a repeated Idempotency-Key (ROADMAP B13)", async () => {
     sessionState.value = merchant
     selectQueue.push([{ id: "o_orig", status: "PENDING" }])
@@ -262,7 +378,7 @@ describe("POST /api/orders", () => {
   it("snapshots the zone-pair cancellation fee on the order", async () => {
     sessionState.value = merchant
     selectQueue.push(
-      [{ id: "pl_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
       [{ id: "wh_hub", isActive: true }], // warehouse hub
       [
         {
@@ -411,11 +527,106 @@ describe("POST /api/orders/bulk", () => {
           codFeePercentage: 1,
         },
       ],
-      [{ id: "pl_1", warehouseId: "wh_1" }],
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_1" }],
     )
     insertResult.push([{ id: "o_bulk" }])
     const res = await bulkCreate(req("POST", undefined, bulkBody))
     expect(res.status).toBe(201)
+  })
+
+  it("locks the bundle once and prices each row at its own cumulative tier", async () => {
+    // A batch that straddles a tier boundary must not price every parcel at
+    // the bundle's current tier: the count advances as the batch is consumed.
+    sessionState.value = merchant
+    const row = (id: string) => ({
+      pickupLocationId: "pl_1",
+      recipientName: id,
+      recipientPhone: "01712345678",
+      deliveryAddress: "123 Main St",
+      deliveryCity: "City",
+      deliveryCityId: "city_1",
+      parcelWeightKg: 1,
+      productCost: 500,
+    })
+    selectQueue.push(
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          emailVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+        },
+      ], // merchant
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_1" }], // pickup hub
+      [{ id: "wh_1", city: "Dhaka" }], // warehouse
+      [{ id: "city_1", zoneId: "ZN-2" }], // delivery city
+      [{ name: "Dhaka", zoneId: "ZN-1" }], // origin city
+      [
+        {
+          fromZoneId: "ZN-1",
+          toZoneId: "ZN-2",
+          baseRate: 100,
+          extraRatePerKg: 20,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ], // zone pricing (100 Tk for a 1 kg parcel)
+      [], // platform config (unused — the zone pair matched)
+      [{ merchantPackageId: "mp_1", packageId: "pk_1", ordersUsed: 99 }], // bundle
+      [{ isActive: true }], // package
+      [
+        {
+          id: "t_shallow",
+          orderCount: 10,
+          sortOrder: 0,
+          ruleType: "PERCENT_OFF",
+          ruleValue: 10,
+        },
+        {
+          id: "t_deep",
+          orderCount: 100,
+          sortOrder: 1,
+          ruleType: "FLAT",
+          ruleValue: 5,
+        },
+      ], // tiers
+    )
+    insertResult.push([
+      { id: "o_1", deliveryFee: 90, codFee: 5 },
+      { id: "o_2", deliveryFee: 5, codFee: 5 },
+    ])
+
+    const res = await bulkCreate(
+      req("POST", undefined, { orders: [row("Bob"), row("Ann")] }),
+    )
+    expect(res.status).toBe(201)
+
+    const inserted = insertPayloads.find(
+      (p) => Array.isArray(p) && "recipientName" in p[0],
+    ) as unknown as Record<string, unknown>[]
+    expect(inserted).toHaveLength(2)
+    // Order 99 → 10% off the 100 Tk zone fee; order 100 unlocks the flat tier.
+    expect(inserted[0]).toMatchObject({
+      recipientName: "Bob",
+      deliveryFee: 90,
+      packageTierId: "t_shallow",
+      packageRuleType: "PERCENT_OFF",
+    })
+    expect(inserted[1]).toMatchObject({
+      recipientName: "Ann",
+      deliveryFee: 5,
+      packageTierId: "t_deep",
+      packageRuleType: "FLAT",
+    })
+    // One lock for the whole batch — never one per row.
+    expect(forCalls).toEqual(["update"])
+    // … and the batch consumes exactly its own length from the quota.
+    expect(updatePayloads).toContainEqual(
+      expect.objectContaining({ ordersUsed: expect.anything() }),
+    )
   })
 })
 

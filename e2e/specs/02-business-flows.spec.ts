@@ -5,6 +5,7 @@ import {
   dialog,
   merchants,
   onboarding,
+  orders,
   register,
   riderApplication,
 } from "../selectors"
@@ -66,11 +67,10 @@ test.describe("S5. Merchant Self-Cancellation", () => {
     await page.goto("/merchant/orders")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
-    // Cancel buttons should exist for PENDING orders (if any)
-    const cancelBtns = page.getByRole("button", { name: /cancel/i })
-    // May or may not be visible depending on order status
-    const count = await cancelBtns.count()
-    expect(count).toBeGreaterThanOrEqual(0)
+    // The merchant's own orders table renders (with its toolbar). This replaces
+    // an assertion that could never fail (`count >= 0`).
+    await expect(page.locator(orders.merchantTable)).toBeVisible()
+    await expect(page.locator(orders.merchantOrdersSearch)).toBeVisible()
   })
 })
 

@@ -71,50 +71,83 @@ export const GET = withErrorHandler(async (req: Request) => {
   // otherwise Recharts receives strings and its path/axis math yields NaN,
   // rendering blank charts.
   const dayExpr = businessDate(order.createdAt)
-  const ordersByDay = await dbRead
-    .select({
-      date: dayExpr.as("date"),
-      count: sql<number>`count(*)::int`.as("count"),
-      revenue: sumMoney(order.merchantEarnings).as("revenue"),
-    })
-    .from(order)
-    .where(where)
-    .groupBy(dayExpr)
-    .orderBy(dayExpr)
 
-  // 2. Orders by status
-  const ordersByStatus = await dbRead
-    .select({
-      status: order.status,
-      count: sql<number>`count(*)::int`.as("count"),
-    })
-    .from(order)
-    .where(where)
-    .groupBy(order.status)
+  // All four aggregates share the same `where` and none depends on another, so
+  // run them together instead of paying four sequential round trips.
+  const [ordersByDay, ordersByStatus, deliveryRows, codRows] =
+    await Promise.all([
+      dbRead
+        .select({
+          date: dayExpr.as("date"),
+          count: sql<number>`count(*)::int`.as("count"),
+          revenue: sumMoney(order.merchantEarnings).as("revenue"),
+        })
+        .from(order)
+        .where(where)
+        .groupBy(dayExpr)
+        .orderBy(dayExpr),
 
-  // 3. Delivery performance
-  const [deliveryStats] = await dbRead
-    .select({
-      totalDelivered:
-        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')::int`.as(
-          "totalDelivered",
-        ),
-      totalFailed:
-        sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')::int`.as(
-          "totalFailed",
-        ),
-      totalReturned:
-        sql<number>`count(*) filter (where ${order.status} = 'RETURNED')::int`.as(
-          "totalReturned",
-        ),
-      avgDeliveryTimeHours:
-        sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)::float`.as(
-          "avgDeliveryTimeHours",
-        ),
-    })
-    .from(order)
-    .where(where)
-    .limit(1)
+      // 2. Orders by status
+      dbRead
+        .select({
+          status: order.status,
+          count: sql<number>`count(*)::int`.as("count"),
+        })
+        .from(order)
+        .where(where)
+        .groupBy(order.status),
+
+      // 3. Delivery performance
+      dbRead
+        .select({
+          totalDelivered:
+            sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')::int`.as(
+              "totalDelivered",
+            ),
+          totalFailed:
+            sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')::int`.as(
+              "totalFailed",
+            ),
+          totalReturned:
+            sql<number>`count(*) filter (where ${order.status} = 'RETURNED')::int`.as(
+              "totalReturned",
+            ),
+          avgDeliveryTimeHours:
+            sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)::float`.as(
+              "avgDeliveryTimeHours",
+            ),
+        })
+        .from(order)
+        .where(where)
+        .limit(1),
+
+      // 4. COD summary
+      dbRead
+        .select({
+          totalCollected: sumMoneyFiltered(
+            order.productCost,
+            sql`${order.status} = 'DELIVERED'`,
+          ).as("totalCollected"),
+          totalSettled: sumMoneyFiltered(
+            order.productCost,
+            sql`${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null`,
+          ).as("totalSettled"),
+          settledCount:
+            sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)::int`.as(
+              "settledCount",
+            ),
+          pendingCount:
+            sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)::int`.as(
+              "pendingCount",
+            ),
+        })
+        .from(order)
+        .where(where)
+        .limit(1),
+    ])
+
+  const deliveryStats = deliveryRows[0]
+  const codSummary = codRows[0]
 
   const totalOutcome =
     (deliveryStats?.totalDelivered ?? 0) +
@@ -124,30 +157,6 @@ export const GET = withErrorHandler(async (req: Request) => {
     totalOutcome > 0
       ? ((deliveryStats?.totalDelivered ?? 0) / totalOutcome) * 100
       : 0
-
-  // 4. COD summary
-  const [codSummary] = await dbRead
-    .select({
-      totalCollected: sumMoneyFiltered(
-        order.productCost,
-        sql`${order.status} = 'DELIVERED'`,
-      ).as("totalCollected"),
-      totalSettled: sumMoneyFiltered(
-        order.productCost,
-        sql`${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null`,
-      ).as("totalSettled"),
-      settledCount:
-        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)::int`.as(
-          "settledCount",
-        ),
-      pendingCount:
-        sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)::int`.as(
-          "pendingCount",
-        ),
-    })
-    .from(order)
-    .where(where)
-    .limit(1)
 
   const pendingSettlement =
     (codSummary?.totalCollected ?? 0) - (codSummary?.totalSettled ?? 0)

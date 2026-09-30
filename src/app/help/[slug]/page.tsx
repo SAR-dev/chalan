@@ -7,7 +7,8 @@ import { notFound } from "next/navigation"
 import { Markdown } from "@/components/markdown"
 import { PublicFooter } from "@/components/public-footer"
 import { PublicHeader } from "@/components/public-header"
-import { appContent, siteConfig } from "@/config/site"
+import { siteConfig } from "@/config/site"
+import { replaceContentKeywords } from "@/lib/content-keywords"
 import { helpGuideFor } from "../guides"
 
 interface Props {
@@ -24,13 +25,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: guide.title,
     description: `${siteConfig.name} help — ${guide.description}`,
   }
-}
-
-function replaceContentKeywords(content: string): string {
-  return content
-    .replace(/\{\{APP_NAME\}\}/g, appContent.APP_NAME)
-    .replace(/\{\{APP_URL\}\}/g, appContent.APP_URL)
-    .replace(/\{\{APP_EMAIL\}\}/g, appContent.APP_EMAIL)
 }
 
 export default async function HelpGuidePage({ params }: Props) {

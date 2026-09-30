@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
-import { db } from "@/lib/db"
+import { db, dbRead } from "@/lib/db"
 import { zonePricing } from "@/lib/db/schema"
 import { parseBody, zonePricingCreateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -19,7 +19,7 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const where = fromZoneId ? eq(zonePricing.fromZoneId, fromZoneId) : undefined
 
-  const rows = await db
+  const rows = await dbRead
     .select()
     .from(zonePricing)
     .where(where)

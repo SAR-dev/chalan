@@ -1,19 +1,14 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { logger } from "@/lib/logger"
 import { merchantVerifyEmailTemplate } from "@/lib/mail-templates"
 import { sendMail } from "@/lib/mailer"
 import { rateLimitByIp } from "@/lib/rate-limit"
-import { parseBody } from "@/lib/validation"
+import { parseBody, resendVerificationSchema } from "@/lib/validation"
 import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
 import { withErrorHandler } from "@/lib/with-error-handler"
-
-const resendVerificationSchema = z.object({
-  email: z.email("A valid email is required"),
-})
 
 // Public endpoint — no session required. Allows unverified merchants to
 // request a new activation email from the login page.

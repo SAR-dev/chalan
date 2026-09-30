@@ -2,7 +2,7 @@ import { asc } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
-import { db } from "@/lib/db"
+import { db, dbRead } from "@/lib/db"
 import { deliveryZone } from "@/lib/db/schema"
 import { deliveryZoneCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -14,7 +14,7 @@ export const GET = withErrorHandler(async () => {
     return forbidden()
   }
 
-  const zones = await db
+  const zones = await dbRead
     .select()
     .from(deliveryZone)
     .orderBy(asc(deliveryZone.name))

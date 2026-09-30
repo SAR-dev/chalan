@@ -30,7 +30,7 @@ const ACCOUNTS: SeededSignIn[] = [
   { label: "Merchant", email: "merchant1@email.com", password: "12qwaszx" },
 ]
 
-describe("LoginForm demo-account picker (NEXT_DEVELOPMENT_MODE)", () => {
+describe("LoginForm demo-account picker (demo mode)", () => {
   beforeEach(() => {
     push.mockClear()
     replace.mockClear()

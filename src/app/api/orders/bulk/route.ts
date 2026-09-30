@@ -9,18 +9,22 @@ import {
 } from "@/lib/api-response"
 import { orderChargeAmount, toPaisa } from "@/lib/balance-ledger"
 import { db, dbRead } from "@/lib/db"
-import { pickupWarehouseIds } from "@/lib/db/order-lookup"
+import { pickupLocationHubs } from "@/lib/db/order-lookup"
 import {
   balanceTransaction,
   deliveryCity,
   merchant,
   merchantBalance,
+  merchantPackage,
   order,
   platformConfig,
   warehouse,
   zonePricing,
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
+import { hasNavPermission } from "@/lib/nav-config"
+import { lockAndResolveMerchantPackageRule } from "@/lib/order-pricing"
+import { applyPackageRule, pickTierForCount } from "@/lib/packages"
 import {
   calcCodFee,
   calcDeliveryCharge,
@@ -36,6 +40,10 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!me) return unauthorized()
   if (me.role !== "MERCHANT" || !me.merchantId) {
     return forbidden("Only merchants can create orders")
+  }
+  // Bulk creation is the same New Order surface — moderators need the grant.
+  if (!hasNavPermission(me, "/merchant/orders/new")) {
+    return forbidden("You don't have access to create orders.")
   }
 
   const limited = await rateLimitByIp(req, "orders-bulk", 10, 60)
@@ -88,16 +96,21 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   const merchantId = me.merchantId
 
-  // Resolve warehouse for each unique pickup location via city → warehouse.
+  // Resolve warehouse + owner for each unique pickup location via city →
+  // warehouse. Every location must belong to the caller — never book against
+  // another merchant's shop address.
   const pickupLocationIds = [...new Set(inputs.map((i) => i.pickupLocationId))]
-  const pickupWarehouses = await pickupWarehouseIds(pickupLocationIds)
+  const hubs = await pickupLocationHubs(pickupLocationIds)
   const warehouseByPickup: Record<string, string> = {}
   for (const p of pickupLocationIds) {
-    const warehouseId = pickupWarehouses.get(p) ?? null
-    if (!warehouseId) {
+    const hub = hubs.get(p)
+    if (!hub || hub.merchantId !== merchantId) {
+      return notFound("Pickup location not found")
+    }
+    if (!hub.warehouseId) {
       return badRequest(`Pickup location ${p} has no warehouse assigned.`)
     }
-    warehouseByPickup[p] = warehouseId
+    warehouseByPickup[p] = hub.warehouseId
   }
 
   // ── Pre-fetch zone pricing for all unique city pairs ──
@@ -220,15 +233,24 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
 
   const created = await db.transaction(async (tx) => {
-    const values = inputs.map((input) => {
+    // Lock the merchant's active bundle once. Each order resolves its own tier
+    // against the cumulative count, so a batch that crosses a tier boundary is
+    // priced correctly order-by-order.
+    const bundle = await lockAndResolveMerchantPackageRule(tx, merchantId)
+
+    const values = inputs.map((input, index) => {
       const pricing = pricingFor(input)
 
       // Money is stored to paisa (ROADMAP P0.4) — never carry sub-paisa noise.
       const productCost = toPaisa(input.productCost)
-      const { total: deliveryFee } = calcDeliveryCharge(
+      const { total: zoneDeliveryFee } = calcDeliveryCharge(
         pricing,
         input.parcelWeightKg,
       )
+      const tier = bundle
+        ? pickTierForCount(bundle.tiers, bundle.ordersUsed + index)
+        : null
+      const deliveryFee = applyPackageRule(zoneDeliveryFee, tier)
       const codFee = calcCodFee(productCost, pricing.codFeePercentage ?? 1)
       const merchantEarnings = calcMerchantEarnings(
         productCost,
@@ -253,6 +275,11 @@ export const POST = withErrorHandler(async (req: Request) => {
         codFee,
         cancellationFee: toPaisa(pricing.cancellationFee ?? 0),
         merchantEarnings,
+        packageId: bundle?.packageId ?? null,
+        packageTierId: tier?.id ?? null,
+        merchantPackageId: bundle?.merchantPackageId ?? null,
+        packageRuleType: tier?.ruleType ?? null,
+        packageRuleValue: tier?.ruleValue ?? null,
         status: "PENDING" as const,
         deliveryAttempts: 0,
         merchantNote: input.merchantNote?.trim() || null,
@@ -309,6 +336,17 @@ export const POST = withErrorHandler(async (req: Request) => {
           updatedAt: new Date().toISOString(),
         },
       })
+
+    // Consume the batch's orders from the bundle quota.
+    if (bundle && insertedOrders.length > 0) {
+      await tx
+        .update(merchantPackage)
+        .set({
+          ordersUsed: sql`${merchantPackage.ordersUsed} + ${insertedOrders.length}`,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(merchantPackage.id, bundle.merchantPackageId))
+    }
 
     return insertedOrders
   })

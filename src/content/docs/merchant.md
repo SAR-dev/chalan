@@ -28,7 +28,7 @@ Step-by-step tasks for running your deliveries on {{APP_NAME}}. Open the merchan
 6. Press **Add parcel** if you want to book several parcels in the same submission — charges update live as you type.
 7. Confirm. Each parcel is created as a **Pending** order and appears in your Orders list.
 
-> **CSV / bulk import** is not available yet — the multi-parcel form is the current way to book several shipments at once.
+> **Booking several parcels at once?** Use the **Import CSV** option on the New Order page (`/merchant/orders/import`) to upload a spreadsheet of parcels. The preview flags invalid rows so you can fix them before importing.
 
 ## 4. Follow the order lifecycle
 

@@ -8,8 +8,10 @@ import type {
   merchant,
   merchantBalance,
   order,
+  packagePurchaseRequest,
   payoutRequest,
   pickupLocation,
+  pricingPackageTier,
   profile,
   rider,
   supportTicket,
@@ -52,6 +54,10 @@ export type RiderTaskType = (typeof rider.$inferSelect)["taskType"]
 export type RiderStatus = (typeof rider.$inferSelect)["status"]
 export type BalanceTxType = (typeof balanceTransaction.$inferSelect)["type"]
 export type BalanceTxStatus = (typeof balanceTransaction.$inferSelect)["status"]
+export type PackageRuleType =
+  (typeof pricingPackageTier.$inferSelect)["ruleType"]
+export type PackagePurchaseStatus =
+  (typeof packagePurchaseRequest.$inferSelect)["status"]
 export type SupportStatus = (typeof supportTicket.$inferSelect)["status"]
 
 // --- User: Better Auth's `user` row joined 1:1 with our `profile` row ------

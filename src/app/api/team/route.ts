@@ -10,6 +10,7 @@ import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { auth } from "@/lib/auth"
+import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { db, dbRead } from "@/lib/db"
 import { profile, profileRoles, user, warehouse } from "@/lib/db/schema"
 import { enumValue } from "@/lib/db-helpers"
@@ -29,7 +30,9 @@ export const GET = withErrorHandler(async (req: Request) => {
     return NextResponse.json(paginateResponse([], 0), { status: 200 })
   }
 
-  const { limit, offset } = parsePagination(req)
+  const { limit, offset } = parsePagination(req, {
+    defaultLimit: DEFAULT_TABLE_ROWS_PER_PAGE,
+  })
   let where = inArray(profile.role, ["SUPER_ADMIN", "WAREHOUSE_ADMIN"])
   const search = new URL(req.url).searchParams.get("q")?.trim()
   if (search) {
@@ -81,6 +84,9 @@ export const GET = withErrorHandler(async (req: Request) => {
       sort.direction === "asc"
         ? q.orderBy(asc(sort.column))
         : q.orderBy(desc(sort.column))
+  } else {
+    // Stable default so OFFSET paging cannot repeat or skip rows.
+    q = q.orderBy(desc(user.createdAt), desc(user.id))
   }
 
   if (limit !== undefined) q = q.limit(limit)

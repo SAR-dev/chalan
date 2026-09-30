@@ -4,6 +4,7 @@ import {
   MAX_BULK_ORDERS,
   MAX_TABLE_ROWS_PER_PAGE,
   ORDER_DELIVERY_TYPES,
+  PACKAGE_RULE_TYPES,
   PROFILE_ROLES,
   RIDER_TASK_TYPES,
 } from "@/lib/constants"
@@ -91,14 +92,17 @@ export async function parseBody<T extends z.ZodType>(
 }
 
 export function formatError(
-  data: {
-    error?: string
-    issues?: Array<{ path: (string | number)[]; message: string }>
-  },
+  data:
+    | {
+        error?: string
+        issues?: Array<{ path: (string | number)[]; message: string }>
+      }
+    | null
+    | undefined,
   fallback = "Request failed.",
 ): string {
-  if (!data.issues || data.issues.length === 0) {
-    return data.error ?? fallback
+  if (!data || !data.issues || data.issues.length === 0) {
+    return data?.error ?? fallback
   }
   const msgs = data.issues.map((i) => {
     const field = i.path
@@ -353,6 +357,52 @@ export const balancePaymentSchema = z.object({
 export const balancePaymentRejectSchema = z.object({
   reason: requiredString("A rejection reason"),
 })
+
+export const packageRequestSchema = z.object({
+  note: z.string().trim().optional(),
+})
+
+export const packageRequestReviewSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approve") }),
+  z.object({
+    action: z.literal("reject"),
+    reason: requiredString("A rejection reason"),
+  }),
+])
+
+export const packageUpsertSchema = z.object({
+  name: requiredString("Package name"),
+  description: z.string().trim().optional(),
+  price: z
+    .number({ error: "Price must be a number" })
+    .min(0, "Price cannot be negative"),
+  isActive: z.boolean().optional(),
+})
+
+export const packageTierUpsertSchema = z.object({
+  orderCount: z
+    .number({ error: "Order count must be a number" })
+    .int("Order count must be a whole number")
+    .min(1, "Order count must be at least 1"),
+  ruleType: z.enum(PACKAGE_RULE_TYPES, {
+    error: "Select a valid rule type",
+  }),
+  ruleValue: z
+    .number({ error: "Rule value must be a number" })
+    .min(0, "Rule value cannot be negative"),
+  sortOrder: z.number().int().optional(),
+})
+
+/** PERCENT_OFF values are capped at 100; FLAT values are unbounded. */
+export function validateTierRule(
+  ruleType: (typeof PACKAGE_RULE_TYPES)[number],
+  ruleValue: number,
+): string | null {
+  if (ruleType === "PERCENT_OFF" && ruleValue > 100) {
+    return "A percentage discount cannot exceed 100."
+  }
+  return null
+}
 
 export const balanceAdjustSchema = z.object({
   amount: z
@@ -665,4 +715,51 @@ export const userBanSchema = z.object({
     .min(1, "Duration must be at least 1 day")
     .max(365, "Duration cannot exceed 365 days")
     .optional(),
+})
+
+// ---------------------------------------------------------------------------
+// Mail configuration
+// ---------------------------------------------------------------------------
+
+export const createMailConfigSchema = z.object({
+  label: z.string().min(1, "Label is required"),
+  host: z.string().min(1, "Host is required"),
+  port: z.string().min(1, "Port is required"),
+  secure: z.boolean(),
+  user: z.string().min(1, "User is required"),
+  pass: z.string().min(1, "Password is required"),
+  fromEmail: z.string().email("Invalid email"),
+  fromName: z.string().min(1, "From name is required"),
+})
+
+/** Diagnostic send from the Add Config dialog, before the config is saved. */
+export const testMailSchema = z.object({
+  host: z.string().min(1, "Host is required"),
+  port: z.string().min(1, "Port is required"),
+  secure: z.boolean(),
+  user: z.string().min(1, "User is required"),
+  pass: z.string().min(1, "Password is required"),
+  fromEmail: z.string().email("Invalid email"),
+  fromName: z.string().min(1, "From name is required"),
+  // Defaults to fromEmail; lets a caller route the test to any address.
+  to: z.string().email("Invalid email").optional(),
+})
+
+/** Public "resend my activation email" request. */
+export const resendVerificationSchema = z.object({
+  email: z.email("A valid email is required"),
+})
+
+/**
+ * Bulk assign a rider to a set of orders. Shared by the dispatch and
+ * assign-pickup-rider endpoints — the bodies are identical.
+ */
+export const bulkAssignRiderSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(100),
+  riderId: z.string().min(1, "Rider is required"),
+})
+
+/** Admin direct-assign of a package to a merchant (ops override / comp). */
+export const packageAssignSchema = z.object({
+  packageId: z.string().min(1, "Package is required"),
 })

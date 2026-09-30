@@ -19,17 +19,17 @@ describe("Help center page", () => {
 
   it("links to every guide", async () => {
     await importPage()
-    expect(
-      screen.getByRole("link", { name: /merchant guide/i }),
-    ).toHaveAttribute("href", "/help/merchant")
-    expect(screen.getByRole("link", { name: /rider guide/i })).toHaveAttribute(
-      "href",
-      "/help/rider",
-    )
-    expect(screen.getByRole("link", { name: /admin guide/i })).toHaveAttribute(
-      "href",
-      "/help/admin",
-    )
+    const guides: [string, string][] = [
+      ["merchant", "Merchant guide"],
+      ["rider", "Rider guide"],
+      ["warehouse-admin", "Warehouse admin guide"],
+      ["admin", "Admin guide"],
+    ]
+    for (const [slug, title] of guides) {
+      const link = screen.getByTestId(`help-guide-${slug}`)
+      expect(link).toHaveAttribute("href", `/help/${slug}`)
+      expect(link).toHaveTextContent(title)
+    }
     expect(screen.getByTestId("help-faq-link")).toHaveAttribute("href", "/faq")
   })
 })

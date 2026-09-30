@@ -20,6 +20,7 @@ import { NextResponse } from "next/server"
 import { isAuthorizedCron } from "@/lib/cron-auth"
 import { db } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
+import { logger } from "@/lib/logger"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const POST = withErrorHandler(async (req: Request) => {
@@ -44,6 +45,6 @@ export const POST = withErrorHandler(async (req: Request) => {
     ranAt: new Date().toISOString(),
   }
 
-  console.log("[cron/cleanup-audit-logs]", result)
+  logger.info("cleanup-audit-logs finished", result)
   return NextResponse.json(result)
 })

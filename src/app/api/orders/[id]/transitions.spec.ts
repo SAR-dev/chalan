@@ -568,6 +568,57 @@ describe("PATCH /orders/:id/picked-up", () => {
     ).toMatchObject({ amount: 80, status: "SETTLED" })
   })
 
+  it("keeps a FLAT bundle price through a weight correction", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+          deliveryFee: 50,
+          packageRuleType: "FLAT",
+          packageRuleValue: 50,
+        }),
+      ],
+      [{ id: "pl_1", warehouseId: "wh_1" }],
+      [{ maxWeightKg: 10 }], // merchant cap
+      [
+        {
+          baseRate: 100,
+          extraRatePerKg: 20,
+          freeWeightKg: 1,
+          maxWeightKg: 10,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ], // platform defaults
+      [{ city: "Dhaka" }], // origin warehouse city
+      [{ zoneId: "ZN-1" }], // origin city zone
+    ]
+    dbState.updateResult = [
+      makeOrder({
+        status: "PICKED_UP",
+        parcelWeightKg: 3,
+        deliveryFee: 50,
+        codFee: 0,
+        productCost: 500,
+        packageRuleType: "FLAT",
+        packageRuleValue: 50,
+      }),
+    ]
+    const { status, payload } = await call(pickedUp, {
+      proofRefs: ["/uploads/a.png"],
+      parcelWeightKg: 3,
+    })
+    expect(status).toBe(200)
+    // The zone fee would be 140; the snapshotted FLAT rule caps it at 50, so
+    // the weight correction produces no delivery-fee delta.
+    expect(payload).toMatchObject({ parcelWeightKg: 3, deliveryFee: 50 })
+    expect(
+      dbState.insertPayloads.find((p) => p.type === "ORDER_CHARGE"),
+    ).toBeUndefined()
+  })
+
   it("400 when the corrected weight exceeds the limit", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
@@ -1000,6 +1051,39 @@ describe("PATCH /orders/:id/return", () => {
       balance: -45,
     })
   })
+
+  it("returns the bundle quota when the returned order had one", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          status: "FAILED_ATTEMPT",
+          warehouseId: "wh_1",
+          merchantPackageId: "mp_1",
+        }),
+      ],
+    ]
+    dbState.updateResult = [
+      makeOrder({ status: "RETURNED", merchantPackageId: "mp_1" }),
+    ]
+    const { status } = await call(returnRoute, { reason: "unreachable" })
+    expect(status).toBe(200)
+
+    // A parcel that never really shipped gives its quota back — the same
+    // GREATEST(ordersUsed - 1, 0) update the cancel path performs.
+    expect(dbState.updatePayloads.some((p) => "ordersUsed" in p)).toBe(true)
+  })
+
+  it("leaves bundle quota alone when the returned order had no package", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "FAILED_ATTEMPT", warehouseId: "wh_1" })],
+    ]
+    dbState.updateResult = [makeOrder({ status: "RETURNED" })]
+    const { status } = await call(returnRoute, { reason: "unreachable" })
+    expect(status).toBe(200)
+    expect(dbState.updatePayloads.some((p) => "ordersUsed" in p)).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -1169,6 +1253,38 @@ describe("PATCH /orders/:id/cancel", () => {
     expect(
       dbState.insertPayloads.find((p) => p.type === "ORDER_CANCELLATION"),
     ).toBeUndefined()
+  })
+
+  it("returns the bundle quota when the cancelled order had one", async () => {
+    sessionState.value = merchantSession("merch_1")
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          status: "PENDING",
+          merchantId: "merch_1",
+          merchantPackageId: "mp_1",
+        }),
+      ],
+    ]
+    dbState.updateResult = [
+      makeOrder({ status: "CANCELLED", merchantPackageId: "mp_1" }),
+    ]
+    const { status } = await call(cancel)
+    expect(status).toBe(200)
+
+    // The quota refund is a GREATEST(ordersUsed - 1, 0) update on the bundle.
+    expect(dbState.updatePayloads.some((p) => "ordersUsed" in p)).toBe(true)
+  })
+
+  it("leaves bundle quota alone when the cancelled order had no package", async () => {
+    sessionState.value = merchantSession("merch_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "PENDING", merchantId: "merch_1" })],
+    ]
+    dbState.updateResult = [makeOrder({ status: "CANCELLED" })]
+    const { status } = await call(cancel)
+    expect(status).toBe(200)
+    expect(dbState.updatePayloads.some((p) => "ordersUsed" in p)).toBe(false)
   })
 
   it("charges the cancellation fee when cancelled after pickup (ROADMAP B4)", async () => {

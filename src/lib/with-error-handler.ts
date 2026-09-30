@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
+import { isAllowedOrigin } from "@/lib/csrf"
 import { logger } from "@/lib/logger"
 import { getRequestId, REQUEST_ID_HEADER } from "@/lib/request-id"
+
+/** Methods that never mutate state and are exempt from the origin check. */
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 
 function pathOf(req?: Request): string | undefined {
   if (!req) return undefined
@@ -19,6 +23,11 @@ function pathOf(req?: Request): string | undefined {
  *
  * Every response (success or failure) also carries the `x-request-id` header so
  * a client can quote the id when reporting a problem.
+ *
+ * State-changing requests are also origin-checked here. `parseBody` already
+ * checks the origin, but a mutation with **no body** (approve, suspend,
+ * activate, every DELETE) never reaches it and previously relied on the
+ * SameSite cookie alone. Doing it centrally means no route can forget.
  */
 export function withErrorHandler<
   Args extends unknown[],
@@ -28,6 +37,19 @@ export function withErrorHandler<
     const req = args[0] as Request | undefined
     const requestId = getRequestId(req)
     try {
+      if (
+        req?.method &&
+        !SAFE_METHODS.has(req.method) &&
+        !isAllowedOrigin(req)
+      ) {
+        const res = NextResponse.json(
+          { error: "Invalid request origin" },
+          { status: 403 },
+        )
+        res.headers.set(REQUEST_ID_HEADER, requestId)
+        return res
+      }
+
       const res = await handler(...args)
       try {
         res.headers.set(REQUEST_ID_HEADER, requestId)

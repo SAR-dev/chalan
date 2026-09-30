@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { applyPackageRule, type PackageRule } from "@/lib/packages"
 import { calcCodFee, calcDeliveryCharge, formatTk } from "@/lib/pricing"
 
 interface DefaultPricing {
@@ -47,11 +48,17 @@ interface ZonePricingRow {
  * public APIs (/api/delivery-cities + /api/zone-pricing) so visitors see the
  * real route-based rates. Falls back to `defaultPricing` (platform defaults)
  * before the API responds or when no zone row covers the chosen route.
+ *
+ * `packageRule` is the merchant's active bundle tier, when signed in with one:
+ * it discounts the delivery fee through the same `applyPackageRule` helper the
+ * server charges with, so the estimate matches the real charge.
  */
 export function DeliveryFeeCalculator({
   defaultPricing,
+  packageRule = null,
 }: {
   defaultPricing: DefaultPricing
+  packageRule?: PackageRule | null
 }) {
   const [weight, setWeight] = useState("1")
   const [codAmount, setCodAmount] = useState("500")
@@ -144,7 +151,15 @@ export function DeliveryFeeCalculator({
     [codNum, effective.codFeePercentage],
   )
 
-  const merchantEarnings = Math.max(0, codNum - breakdown.total - codFee)
+  // The bundle discount applies to the delivery fee only (COD and cancellation
+  // fees are unchanged), matching what order creation charges.
+  const deliveryFee = useMemo(
+    () => applyPackageRule(breakdown.total, packageRule),
+    [breakdown.total, packageRule],
+  )
+  const bundleDiscount = breakdown.total - deliveryFee
+
+  const merchantEarnings = Math.max(0, codNum - deliveryFee - codFee)
 
   const sourceBadge = loading ? (
     <span className="text-muted-foreground inline-flex items-center gap-1.5">
@@ -291,9 +306,21 @@ export function DeliveryFeeCalculator({
             <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
               Delivery fee
             </p>
-            <p className="text-2xl font-bold tabular-nums">
-              {formatTk(breakdown.total)}
+            <p
+              className="text-2xl font-bold tabular-nums"
+              data-testid="calc-delivery-fee"
+            >
+              {formatTk(deliveryFee)}
             </p>
+            {bundleDiscount > 0 && (
+              <p
+                className="text-chart-2 mt-1 text-xs font-medium"
+                data-testid="calc-bundle-discount"
+              >
+                Bundle discount −{formatTk(bundleDiscount)} (was{" "}
+                {formatTk(breakdown.total)})
+              </p>
+            )}
             <div className="text-muted-foreground mt-2 space-y-1 text-xs">
               <div className="flex justify-between">
                 <span>Base rate</span>

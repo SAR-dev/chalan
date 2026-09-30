@@ -11,6 +11,9 @@ vi.mock("./local", () => ({
       { key: "avatars/u1/a.png", size: 1, lastModified: new Date(0) },
     ]),
   deleteLocalFile: vi.fn().mockResolvedValue(undefined),
+  readLocalFile: vi
+    .fn()
+    .mockResolvedValue({ buffer: Buffer.from("local"), contentType: null }),
 }))
 
 vi.mock("./r2", () => ({
@@ -24,6 +27,9 @@ vi.mock("./r2", () => ({
       { key: "avatars/u1/a.png", size: 1, lastModified: new Date(0) },
     ]),
   deleteR2File: vi.fn().mockResolvedValue(undefined),
+  readR2File: vi
+    .fn()
+    .mockResolvedValue({ buffer: Buffer.from("r2"), contentType: "image/png" }),
 }))
 
 import { deleteFile, listFiles, saveFile } from "./index"

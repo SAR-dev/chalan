@@ -106,3 +106,14 @@ export async function waitForAppReady(
   await page.waitForLoadState("load").catch(() => {})
   await page.waitForLoadState("networkidle", { timeout }).catch(() => {})
 }
+
+/**
+ * A sonner toast, matched by its text.
+ *
+ * Toasts are portaled and carry no stable per-message testid, so this is the
+ * documented fallback: match text, but scope it to the toast container rather
+ * than the whole page.
+ */
+export function toast(page: Page, text: string | RegExp) {
+  return page.locator("[data-sonner-toast]").filter({ hasText: text })
+}

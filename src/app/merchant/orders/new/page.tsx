@@ -11,10 +11,12 @@ import { pageContent } from "@/config/content"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { quoteParcel } from "@/features/orders/quote-parcel"
+import { usePackages } from "@/features/packages/hooks/use-packages"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
 import { usePlatformPricingPublic } from "@/features/platform-config/hooks/use-platform-pricing-public"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
+import { pickTierForCount } from "@/lib/packages"
 import type { CreateOrderInput } from "@/lib/types"
 import {
   InactiveAccountCard,
@@ -47,6 +49,17 @@ export default function NewOrderPage() {
   const { pricing: zonePricing } = useZonePricingPublic()
   const { platformDefaults } = usePlatformPricingPublic()
   const { createOrders } = useOrders()
+  const { packages, activePackage } = usePackages()
+
+  // The active bundle's current tier rule, so the per-parcel preview shows the
+  // same delivery fee the server will charge. `pickTierForCount` is the same
+  // selector order creation uses.
+  const packageRule = useMemo(() => {
+    if (!activePackage) return null
+    const pkg = packages.find((p) => p.id === activePackage.packageId)
+    if (!pkg) return null
+    return pickTierForCount(pkg.tiers, activePackage.ordersUsed)
+  }, [packages, activePackage])
 
   const myLocations = useMemo(
     () =>
@@ -119,6 +132,7 @@ export default function NewOrderPage() {
         zonePricing,
         platformDefaults,
         maxWeightKg: currentMerchant?.maxWeightKg ?? 3,
+        packageRule,
       })
 
       const errors: string[] = []
@@ -199,13 +213,17 @@ export default function NewOrderPage() {
 
     setSubmitting(true)
     setApiErrors({})
-    const result = await createOrders(payload)
-    if (result.ok && result.orders) {
-      toast.success(
-        `${result.orders.length} order${result.orders.length > 1 ? "s" : ""} created.`,
-      )
-      router.push("/merchant/orders")
-    } else {
+    // try/finally: a thrown fetch (offline, gateway error) must not leave the
+    // submit button disabled forever.
+    try {
+      const result = await createOrders(payload)
+      if (result.ok && result.orders) {
+        toast.success(
+          `${result.orders.length} order${result.orders.length > 1 ? "s" : ""} created.`,
+        )
+        router.push("/merchant/orders")
+        return
+      }
       if (result.issues) {
         const mapped: Record<number, string[]> = {}
         for (const issue of result.issues) {
@@ -219,6 +237,9 @@ export default function NewOrderPage() {
       } else {
         toast.error(result.error ?? "Unable to create orders.")
       }
+    } catch {
+      toast.error("Could not reach the server. Please try again.")
+    } finally {
       setSubmitting(false)
     }
   }

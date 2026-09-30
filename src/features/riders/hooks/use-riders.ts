@@ -7,6 +7,7 @@ import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 import { buildTableUrl, useTableFilters } from "@/lib/hooks/use-table-filters"
 import type { PaginatedResponse } from "@/lib/pagination"
+import { MAX_LIMIT } from "@/lib/pagination"
 import type { Rider, RiderTaskType } from "@/lib/types"
 import { formatError } from "@/lib/validation"
 
@@ -90,8 +91,12 @@ export function useRiders({
 
   // Fetch warehouse-scoped riders when a warehouse is active.
   const warehouseId = currentWarehouse?.id
+  // A warehouse's roster feeds the dispatch picker, so it must not be paged by
+  // the server default — ask for the full (capped) set explicitly.
   const warehouseRidersKey =
-    currentUser && warehouseId ? `${KEY}?warehouseId=${warehouseId}` : null
+    currentUser && warehouseId
+      ? `${KEY}?warehouseId=${warehouseId}&limit=${MAX_LIMIT}`
+      : null
   const { data: warehouseResponse } = useSWR<PaginatedResponse<Rider>>(
     warehouseRidersKey,
     jsonFetcher,

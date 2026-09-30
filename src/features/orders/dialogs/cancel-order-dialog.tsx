@@ -61,6 +61,7 @@ export function CancelOrderDialog({
       submitVariant="destructive"
       submitLabel="Cancel order"
       submitIcon={<Ban className="size-4" />}
+      submitTestId="cancel-order-submit"
     >
       <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
         <InfoRow icon={User} label="Recipient" value={order.recipientName} />
@@ -90,6 +91,7 @@ export function CancelOrderDialog({
         </Label>
         <Textarea
           id="cancel-reason"
+          data-testid="cancel-reason-input"
           placeholder="e.g. Customer requested cancellation, duplicate order…"
           value={reason}
           onChange={(e) => setReason(e.target.value)}

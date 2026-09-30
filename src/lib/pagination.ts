@@ -23,7 +23,10 @@ export interface PaginatedResponse<T> {
   offset?: number
 }
 
-export function parsePagination(req: Request): {
+export function parsePagination(
+  req: Request,
+  options: { defaultLimit?: number } = {},
+): {
   limit?: number
   offset?: number
 } {
@@ -35,11 +38,21 @@ export function parsePagination(req: Request): {
   const offset =
     offsetRaw !== null ? Number.parseInt(offsetRaw, 10) : Number.NaN
 
+  // `defaultLimit` is for endpoints that back a paginated table: it guarantees
+  // the query is bounded, so a caller that simply omits `?limit` cannot ask for
+  // the whole table. Endpoints that intentionally return a complete set (picker
+  // data such as delivery cities, or a warehouse's rider roster) omit it and
+  // keep the previous "no limit" behaviour.
+  const fallback = options.defaultLimit
+  const resolvedLimit =
+    Number.isFinite(limit) && limit > 0
+      ? Math.min(limit, MAX_LIMIT)
+      : fallback !== undefined
+        ? Math.min(Math.max(fallback, 1), MAX_LIMIT)
+        : undefined
+
   return {
-    limit:
-      Number.isFinite(limit) && limit > 0
-        ? Math.min(limit, MAX_LIMIT)
-        : undefined,
+    limit: resolvedLimit,
     offset:
       Number.isFinite(offset) && offset >= 0
         ? Math.min(offset, MAX_OFFSET)

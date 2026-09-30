@@ -30,6 +30,13 @@ export const HELP_GUIDES: HelpGuide[] = [
     file: "rider.md",
   },
   {
+    slug: "warehouse-admin",
+    title: "Warehouse admin guide",
+    description:
+      "Run one hub: receive and dispatch parcels, resolve failed attempts and returns, settle COD, and confirm rider cash.",
+    file: "warehouse-admin.md",
+  },
+  {
     slug: "admin",
     title: "Admin guide",
     description:

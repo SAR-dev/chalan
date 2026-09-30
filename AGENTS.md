@@ -39,7 +39,7 @@ src/features/<domain>/
   dialogs/       ← feature dialogs (<action>-dialog.tsx or folder/index.tsx)
 ```
 
-**12 domains:** account, announcements, audit-logs, email-logs, merchants, orders, payouts, pickup-locations, platform-config, riders, team, warehouses
+**15 domains:** account, announcements, audit-logs, email-logs, merchants, orders, packages, payouts, pickup-locations, platform-config, riders, support, team, users, warehouses
 
 Not every domain has all three subdirs. Minimal domains (audit-logs, platform-config) may only have `hooks/`.
 
@@ -170,7 +170,7 @@ must match text, scope it to a tagged container (e.g.
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
 describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique with no gaps or duplicates (suite is
-currently S1-S54 across 21 files / 87 tests).
+currently S1-S61 across 23 files / 98 tests).
 
 ## Coding Patterns
 

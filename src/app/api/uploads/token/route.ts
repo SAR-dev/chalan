@@ -8,7 +8,11 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // a short-lived signed token that authorizes exactly that upload — the
 // rate limit is what bounds anonymous use (ROADMAP P0.2).
 export const POST = withErrorHandler(async (req: Request) => {
-  const limited = await rateLimitByIp(req, "upload-token", 10, 60)
+  // failClosed: with no resolvable client IP this endpoint would otherwise be
+  // completely unthrottled, and it mints upload capability for anyone.
+  const limited = await rateLimitByIp(req, "upload-token", 10, 60, {
+    failClosed: true,
+  })
   if (limited) return limited
 
   const { token, expiresAt } = createUploadToken("nids")

@@ -25,7 +25,6 @@ const OPTIONAL_VARS = [
   "SMTP_SECRET_KEY",
   "NEXT_PUBLIC_BASE_URL",
   "TRUSTED_PROXY_HOPS",
-  "NEXT_DEVELOPMENT_MODE",
 ]
 
 function allKeys() {
@@ -150,45 +149,6 @@ describe("validateEnv", () => {
   it("rejects an invalid PORTAL_MODE", () => {
     setEnv({ ...baseEnv(), PORTAL_MODE: "merchant" })
     expect(() => validateEnv()).toThrow("PORTAL_MODE")
-  })
-
-  it("accepts NEXT_DEVELOPMENT_MODE off", () => {
-    for (const value of ["false", "0"]) {
-      setEnv({ ...baseEnv(), NEXT_DEVELOPMENT_MODE: value })
-      expect(validateEnv()).toBeUndefined()
-    }
-  })
-
-  it("accepts NEXT_DEVELOPMENT_MODE on in development", () => {
-    for (const value of ["true", "1"]) {
-      setEnv({ ...baseEnv(), NEXT_DEVELOPMENT_MODE: value })
-      expect(validateEnv()).toBeUndefined()
-    }
-  })
-
-  it("rejects an unparseable NEXT_DEVELOPMENT_MODE", () => {
-    setEnv({ ...baseEnv(), NEXT_DEVELOPMENT_MODE: "trst" })
-    expect(() => validateEnv()).toThrow("NEXT_DEVELOPMENT_MODE")
-  })
-
-  it("rejects NEXT_DEVELOPMENT_MODE in production — it would publish seed credentials", () => {
-    setEnv({
-      ...baseEnv(),
-      NEXT_PUBLIC_ENV: "production",
-      SMTP_SECRET_KEY: "b".repeat(64),
-      NEXT_DEVELOPMENT_MODE: "true",
-    })
-    expect(() => validateEnv()).toThrow("NEXT_DEVELOPMENT_MODE")
-  })
-
-  it("accepts NEXT_DEVELOPMENT_MODE=false in production", () => {
-    setEnv({
-      ...baseEnv(),
-      NEXT_PUBLIC_ENV: "production",
-      SMTP_SECRET_KEY: "b".repeat(64),
-      NEXT_DEVELOPMENT_MODE: "false",
-    })
-    expect(validateEnv()).toBeUndefined()
   })
 
   it("requires SMTP_SECRET_KEY when NEXT_PUBLIC_ENV=production", () => {

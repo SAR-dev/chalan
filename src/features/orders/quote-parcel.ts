@@ -8,6 +8,7 @@
 
 import type { PlatformPricingDefaults } from "@/features/platform-config/hooks/use-platform-pricing-public"
 import type { ZonePricingEstimate } from "@/features/platform-config/hooks/use-zone-pricing-public"
+import { applyPackageRule, type PackageRule } from "@/lib/packages"
 import {
   calcCodFee,
   calcDeliveryCharge,
@@ -26,13 +27,24 @@ export interface ParcelQuoteArgs {
   platformDefaults: PlatformPricingDefaults | null
   /** The merchant's max parcel weight (admin-set). */
   maxWeightKg: number
+  /**
+   * The active bundle's current tier rule, if the merchant has one. Applied to
+   * the delivery fee so this preview matches what order creation will charge
+   * (`applyPackageRule` is the same helper the server uses).
+   */
+  packageRule?: PackageRule | null
 }
 
 export interface ParcelQuote {
   weight: number
   productCost: number
   breakdown: DeliveryChargeBreakdown | null
+  /** Delivery fee actually charged, after any bundle discount. */
   deliveryCharge: number
+  /** The undiscounted zone/default fee, for a "was X" display. */
+  deliveryChargeBeforePackage: number
+  /** True when the bundle rule actually reduced the fee. */
+  packageDiscountApplied: boolean
   codFee: number
   cancellationFee: number
   /** Effective cap: min(merchant limit, rate max weight). */
@@ -73,11 +85,18 @@ export function quoteParcel(args: ParcelQuoteArgs): ParcelQuote {
     pricing?.maxWeightKg ?? args.maxWeightKg,
   )
 
+  const rawDeliveryCharge = breakdown?.total ?? 0
+  // The same helper the server applies at creation time, so the preview and the
+  // stored charge cannot drift.
+  const deliveryCharge = applyPackageRule(rawDeliveryCharge, args.packageRule)
+
   return {
     weight,
     productCost,
     breakdown,
-    deliveryCharge: breakdown?.total ?? 0,
+    deliveryCharge,
+    deliveryChargeBeforePackage: rawDeliveryCharge,
+    packageDiscountApplied: deliveryCharge !== rawDeliveryCharge,
     codFee,
     cancellationFee,
     maxWeightKg,

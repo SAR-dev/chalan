@@ -8,9 +8,23 @@ import {
   PackagePlus,
   Wallet,
 } from "lucide-react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { AreaChart, PieChart } from "@/components/charts"
+
+// recharts is heavy and is only needed once the analytics payload has arrived,
+// so the chart components (and recharts with them) are loaded on demand rather
+// than shipped in the merchant dashboard's initial bundle. Importing the files
+// directly also avoids the barrel pulling in the unused BarChart.
+const AreaChart = dynamic(
+  () => import("@/components/charts/area-chart").then((m) => m.AreaChart),
+  { ssr: false },
+)
+const PieChart = dynamic(
+  () => import("@/components/charts/pie-chart").then((m) => m.PieChart),
+  { ssr: false },
+)
+
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
