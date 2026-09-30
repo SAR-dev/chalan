@@ -64,8 +64,8 @@ export function LoginForm({
   const [twoFactorError, setTwoFactorError] = useState<string | null>(null)
   const [verifyingTwoFactor, setVerifyingTwoFactor] = useState(false)
 
-  // Only present when NEXT_DEVELOPMENT_MODE is on (the server page decides), so
-  // the picker never renders on a deployment that didn't ask for it.
+  // Only present on a development deployment (the server page decides), so the
+  // picker never renders on a deployment that didn't ask for it.
   const devAccounts = seededSignIns?.length ? seededSignIns : undefined
 
   // Where to land after a successful sign-in: ?next= (set by automatic-logout

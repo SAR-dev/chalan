@@ -3,9 +3,9 @@ import { Suspense } from "react"
 import { seededDevSignIns } from "@/lib/dev-mode"
 import { LoginForm } from "./login-form"
 
-// Server component so NEXT_DEVELOPMENT_MODE stays off the client bundle: the
-// flag is resolved here and only the resulting list (empty in production) is
-// handed to the form. See src/lib/dev-mode.ts.
+// Server component so the demo account list is resolved here and only the
+// resulting entries (empty on a production deployment) are handed to the form.
+// See src/lib/dev-mode.ts.
 export default function LoginPage() {
   return (
     <Suspense

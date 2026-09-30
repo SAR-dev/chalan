@@ -1,6 +1,6 @@
 // Basic seed — the "fresh demo" dataset used by the daily midnight reset when
-// NEXT_DEVELOPMENT_MODE is on (see src/lib/demo-reset.ts) and by
-// `pnpm db:seed:basic`.
+// demo mode is on (NEXT_PUBLIC_ENV=development, see src/lib/demo-reset.ts) and
+// by `pnpm db:seed:basic`.
 //
 // Cleans the database and populates the basic entities a demo needs: base
 // platform config, warehouses, delivery zones/cities and zone pricing, and the

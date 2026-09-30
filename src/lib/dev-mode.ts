@@ -4,17 +4,16 @@ import {
   type SeedUserCredential,
 } from "@/lib/db/seed/seed-content/credentials"
 
-// NEXT_DEVELOPMENT_MODE is the seeded-demo switch for local development: with
-// it on, the sign-in page offers the well-known dev accounts as a dropdown so
-// you don't have to remember `12qwaszx`, a demo banner renders, and the
-// database is reset to the basic seed every day at midnight. It publishes
-// credentials in the browser, so it is hard-disabled in production (see
-// validateEnv) and inert unless set.
+// Demo mode is the seeded-demo switch, keyed on NEXT_PUBLIC_ENV: a deployment
+// that declares itself `development` also gets the sign-in page offering the
+// well-known dev accounts as a dropdown (so you don't have to remember
+// `12qwaszx`), a demo banner, and a database reset to the basic seed every day
+// at midnight.
 //
-// Server-only by design: the login page reads this in a server component and
-// passes the result down as a prop, which keeps NEXT_DEVELOPMENT_MODE out of
-// the client bundle (unlike NEXT_PUBLIC_* vars, which are inlined at build
-// time).
+// It publishes credentials in the browser, which is why it hangs off the
+// deployment's own environment declaration rather than a flag of its own — the
+// same var that gates Vercel Analytics and localhost trustedOrigins. A
+// production deployment says `production` and therefore never renders it.
 
 export interface SeededSignIn {
   label: string
@@ -22,27 +21,10 @@ export interface SeededSignIn {
   password: string
 }
 
-function isTruthyFlag(value: string | undefined): boolean {
-  const raw = (value ?? "").trim().toLowerCase()
-  return raw === "true" || raw === "1"
-}
-
-/** Raw NEXT_DEVELOPMENT_MODE parsing, with no environment-scope guard on it. */
-export function devModeFlagSet(): boolean {
-  return isTruthyFlag(process.env.NEXT_DEVELOPMENT_MODE)
-}
-
 /** True when the seeded-demo helper (sign-in picker, banner, daily reset)
  *  should be active. */
 export function isDevModeEnabled(): boolean {
-  // Belt and braces with validateEnv: never leak seed credentials to a
-  // production deployment, even if the env check is bypassed.
-  if (process.env.NEXT_PUBLIC_ENV === "production") return false
-  // NODE_ENV is set by the runtime itself, so it also catches a deployment
-  // that shipped without NEXT_PUBLIC_ENV (the mistake that turns on the
-  // credential picker and the nightly database reset).
-  if (process.env.NODE_ENV === "production") return false
-  return devModeFlagSet()
+  return process.env.NEXT_PUBLIC_ENV === "development"
 }
 
 function toSeededSignIn(label: string, user: SeedUserCredential): SeededSignIn {
@@ -51,8 +33,8 @@ function toSeededSignIn(label: string, user: SeedUserCredential): SeededSignIn {
 
 /**
  * One account per role — enough to sign in as any of them without listing the
- * full seed set. Empty when NEXT_DEVELOPMENT_MODE is off, so callers can treat
- * a non-empty result as "render the picker".
+ * full seed set. Empty unless this is a development deployment, so callers can
+ * treat a non-empty result as "render the picker".
  */
 export function seededDevSignIns(): SeededSignIn[] {
   if (!isDevModeEnabled()) return []

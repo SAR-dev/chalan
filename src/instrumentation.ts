@@ -10,7 +10,7 @@ export async function register() {
     const { validateEnv } = await import("@/lib/env")
     validateEnv()
 
-    // Seeded-demo mode (NEXT_DEVELOPMENT_MODE): re-seed the database with the
+    // Demo mode (NEXT_PUBLIC_ENV=development): re-seed the database with the
     // basic dataset at 12:00 AM local time every day. Only ever under `next
     // dev` — `next start`/builds run with NODE_ENV=production and the seed
     // refuses to run there anyway.

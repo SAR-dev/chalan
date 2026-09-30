@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { SEED_PASSWORD } from "@/lib/db/seed/seed-content/credentials"
 import { isDevModeEnabled, seededDevSignIns } from "@/lib/dev-mode"
 
-const MANAGED = ["NEXT_DEVELOPMENT_MODE", "NEXT_PUBLIC_ENV"] as const
+const MANAGED = ["NEXT_PUBLIC_ENV"] as const
 
-describe("dev mode (NEXT_DEVELOPMENT_MODE)", () => {
+describe("dev mode (NEXT_PUBLIC_ENV)", () => {
   beforeEach(() => {
     for (const key of MANAGED) delete process.env[key]
   })
@@ -13,26 +13,25 @@ describe("dev mode (NEXT_DEVELOPMENT_MODE)", () => {
     for (const key of MANAGED) delete process.env[key]
   })
 
-  it("is off when NEXT_DEVELOPMENT_MODE is unset or falsy", () => {
-    for (const value of [undefined, "", "false", "0", "no", "off"]) {
-      if (value === undefined) delete process.env.NEXT_DEVELOPMENT_MODE
-      else process.env.NEXT_DEVELOPMENT_MODE = value
+  it("is off for a production deployment", () => {
+    process.env.NEXT_PUBLIC_ENV = "production"
+    expect(isDevModeEnabled()).toBe(false)
+    expect(seededDevSignIns()).toEqual([])
+  })
+
+  it("stays off when the var is unset or not the development scope", () => {
+    // Unset falls back to `development` in validateEnv, but an undeclared
+    // environment must never publish credentials on its own.
+    for (const value of [undefined, "", "production", "Development", "dev"]) {
+      if (value === undefined) delete process.env.NEXT_PUBLIC_ENV
+      else process.env.NEXT_PUBLIC_ENV = value
       expect(isDevModeEnabled()).toBe(false)
     }
   })
 
-  it("is on for the truthy spellings we accept", () => {
-    for (const value of ["true", "TRUE", " true ", "1"]) {
-      process.env.NEXT_DEVELOPMENT_MODE = value
-      expect(isDevModeEnabled()).toBe(true)
-    }
-  })
-
-  it("stays off in production even when the flag is set", () => {
-    process.env.NEXT_DEVELOPMENT_MODE = "true"
-    process.env.NEXT_PUBLIC_ENV = "production"
-    expect(isDevModeEnabled()).toBe(false)
-    expect(seededDevSignIns()).toEqual([])
+  it("is on for a development deployment", () => {
+    process.env.NEXT_PUBLIC_ENV = "development"
+    expect(isDevModeEnabled()).toBe(true)
   })
 
   it("offers nothing while disabled", () => {
@@ -40,7 +39,7 @@ describe("dev mode (NEXT_DEVELOPMENT_MODE)", () => {
   })
 
   it("offers one account per role when enabled", () => {
-    process.env.NEXT_DEVELOPMENT_MODE = "true"
+    process.env.NEXT_PUBLIC_ENV = "development"
     const accounts = seededDevSignIns()
 
     expect(accounts.map((a) => a.label)).toEqual([

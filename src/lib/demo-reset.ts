@@ -1,4 +1,4 @@
-// Schedules the demo database reset for NEXT_DEVELOPMENT_MODE.
+// Schedules the demo database reset for NEXT_PUBLIC_ENV=development.
 //
 // When dev mode is on, the database is wiped and re-seeded with the basic seed
 // (src/lib/db/seed/basic.ts) at 12:00 AM local time every day. The server's
