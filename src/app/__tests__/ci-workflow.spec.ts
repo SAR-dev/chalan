@@ -21,13 +21,32 @@ const workflow = raw
   .map((line) => line.replace(/^\s*#\s?/, ""))
   .join("\n")
 
+/**
+ * The workflow with comment *lines* removed, original indentation kept.
+ *
+ * `workflow` above deliberately keeps commented-out jobs by stripping the `#`,
+ * which is right for checking shape but wrong for anything that greps for
+ * literal config: prose in a comment ("no `cache: pnpm` here") would satisfy a
+ * text search and make the check pass for the wrong reason. Anything reading
+ * real config keys must use this instead.
+ */
+const code = raw
+  .split("\n")
+  .filter((line) => !/^\s*#/.test(line))
+  .join("\n")
+
+/** Every job key in the *uncommented* workflow. */
+function jobNames(): string[] {
+  return [...code.matchAll(/^ {2}([a-zA-Z0-9_-]+):/gm)].map((m) => m[1])
+}
+
 /** The `name:` job block, from its key to the next top-level job key. */
-function jobBlock(name: string): string {
-  const start = workflow.search(new RegExp(`^\\s{2}${name}:`, "m"))
+function jobBlock(name: string, src: string = workflow): string {
+  const start = src.search(new RegExp(`^\\s{2}${name}:`, "m"))
   if (start === -1) return ""
-  const rest = workflow.slice(start + 1)
+  const rest = src.slice(start + 1)
   const next = rest.search(/^\s{2}[a-zA-Z0-9_-]+:/m)
-  return next === -1 ? workflow.slice(start) : rest.slice(0, next)
+  return next === -1 ? src.slice(start) : rest.slice(0, next)
 }
 
 describe("CI workflow", () => {
@@ -82,6 +101,29 @@ describe("CI workflow", () => {
     // review diffs the lockfile — neither needs node_modules.
     expect(jobBlock("security")).not.toContain("run: pnpm install")
     expect(jobBlock("security")).toContain("pnpm audit")
+  })
+
+  it("only declares the pnpm cache in jobs that install", () => {
+    // `actions/setup-node`'s `cache: pnpm` registers a post-job save step. A job
+    // that never runs `pnpm install` never populates the pnpm store, so that post
+    // step fails the job *after* all of its real work has already passed, with
+    // "Path Validation Error: Path(s) specified in the action for caching do(es)
+    // not exist". Dropping an install without dropping its cache is the trap;
+    // drop both together, as the security job does.
+    const names = jobNames()
+    expect(names.length).toBeGreaterThan(0)
+
+    // Read from `code`, not `workflow`: the prose in the comments above would
+    // otherwise satisfy both searches and hide the regression.
+    for (const name of names) {
+      const job = jobBlock(name, code)
+      const caches = /^\s{10}cache: pnpm$/m.test(job)
+      if (!caches) continue
+      expect(
+        /^\s*- run: pnpm install/m.test(job),
+        `${name} declares \`cache: pnpm\` but never runs \`pnpm install\``,
+      ).toBe(true)
+    }
   })
 
   it("runs the real-DB integration suite against its own service container", () => {
