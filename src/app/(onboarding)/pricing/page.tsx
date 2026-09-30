@@ -12,10 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 
 export default function OnboardingPricingPage() {
-  const { currentMerchant } = useMerchants()
   const { mutate } = useSWRConfig()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,17 +58,12 @@ export default function OnboardingPricingPage() {
         </div>
 
         <div className="rounded-lg border p-4">
-          <h3 className="mb-2 text-sm font-medium">Your weight limit</h3>
-          <dl className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Max parcel weight:</dt>
-              <dd className="font-medium">
-                {currentMerchant?.maxWeightKg ?? 3} kg
-              </dd>
-            </div>
-          </dl>
-          <p className="text-muted-foreground mt-2 text-xs">
-            Delivery and COD fees are set per route by the platform.
+          <h3 className="mb-2 text-sm font-medium">Weight limit</h3>
+          <p className="text-muted-foreground text-sm">
+            The maximum parcel weight is set per route by the platform,
+            alongside that route&apos;s rates — so it can differ between
+            destinations. The limit for your chosen pickup and delivery city is
+            shown while you create an order.
           </p>
         </div>
 

@@ -242,6 +242,12 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
     { href: "/merchant/finance", label: "Finance", icon: Wallet },
     { href: "/merchant/pricing", label: "Pricing", icon: Tag, exact: true },
     {
+      href: "/merchant/delivery-cities",
+      label: "Delivery Cities",
+      icon: MapPin,
+      exact: true,
+    },
+    {
       href: "/merchant/settings",
       label: "Business Settings",
       icon: UserCog,
@@ -289,9 +295,11 @@ export const MERCHANT_MODERATOR_ALWAYS_HREFS: readonly string[] = [
 ]
 
 /** Hrefs that are never grantable to moderators (owner-only surfaces —
- *  the moderator-management UI lives under Business Settings). */
+ *  the moderator-management UI lives under Business Settings, and Delivery
+ *  Cities is reference info a moderator has no order-taking need for). */
 export const MERCHANT_OWNER_ONLY_HREFS: readonly string[] = [
   "/merchant/settings",
+  "/merchant/delivery-cities",
 ]
 
 /** The nav subjects our permission helpers reason about (the `me` shape from

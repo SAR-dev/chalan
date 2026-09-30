@@ -202,31 +202,17 @@ export const warehouseUpdateSchema = z
     { error: "Provide at least one field to update" },
   )
 
-// Per-merchant parcel weight limit (ROADMAP: zone pricing owns the fees, the
-// merchant only carries a weight cap).
-export const merchantWeightLimitSchema = z.object({
-  maxWeightKg: z.number().positive("Max weight must be greater than 0"),
-})
+// NOTE: there is deliberately no per-merchant weight limit schema. The maximum
+// parcel weight belongs to the lane (`zone_pricing.maxWeightKg`), so one zone
+// pair means one limit. See the note on the `merchant` table.
 
-export const platformConfigSchema = z
-  .object({
-    defaultBaseRate: z.number().nonnegative().optional(),
-    defaultExtraRatePerKg: z.number().nonnegative().optional(),
-    defaultFreeWeightKg: z.number().nonnegative().optional(),
-    defaultMaxWeightKg: z.number().positive().optional(),
-    defaultCancellationFee: z.number().nonnegative().optional(),
-    refundOnCancel: z.boolean().optional(),
-  })
-  .refine(
-    (d) =>
-      d.defaultFreeWeightKg === undefined ||
-      d.defaultMaxWeightKg === undefined ||
-      d.defaultFreeWeightKg <= d.defaultMaxWeightKg,
-    {
-      error: "defaultFreeWeightKg cannot exceed defaultMaxWeightKg",
-      path: ["defaultFreeWeightKg"],
-    },
-  )
+/**
+ * Platform settings. Deliberately small: delivery/COD/cancellation rates are
+ * per-lane `zone_pricing` rows, so there is no platform-wide price to set here.
+ */
+export const platformConfigSchema = z.object({
+  refundOnCancel: z.boolean().optional(),
+})
 
 // Disabling 2FA (ROADMAP H4) requires a *current* second factor — a live TOTP
 // code or one of the remaining recovery codes — even though the caller is

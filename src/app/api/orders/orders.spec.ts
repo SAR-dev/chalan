@@ -27,6 +27,58 @@ vi.mock("@/lib/rate-limit", () => ({
 
 const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
+
+/**
+ * The four reads `resolveRoutePricing` issues for a lane that HAS a rate.
+ *
+ * Delivery pricing is per lane with no platform fallback, so any test that
+ * expects an order to be created must queue these — an exhausted queue means
+ * "lane unconfigured" and the route answers 400, which is the new intended
+ * behaviour rather than a mock artefact.
+ */
+function pricedLane(baseRate = 80, cancellationFee = 0) {
+  return [
+    [{ city: "Dhaka" }], // warehouse
+    [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }], // origin city → zone
+    [{ zone: { id: "ZN-2", name: "Gazipur" } }], // delivery city → zone
+    [
+      {
+        fromZoneId: "ZN-1",
+        toZoneId: "ZN-2",
+        baseRate,
+        extraRatePerKg: 0,
+        freeWeightKg: 1,
+        maxWeightKg: 10,
+        codFeePercentage: 1,
+        cancellationFee,
+      },
+    ],
+  ]
+}
+
+/**
+ * The same, for `POST /api/orders/bulk`, which batches its lookups instead of
+ * calling the resolver. `wh_1` sits in Dhaka (ZN-1) and `city_1` is in ZN-2.
+ */
+function pricedLaneBulk(baseRate = 80) {
+  return [
+    [{ id: "wh_1", city: "Dhaka" }], // warehouses
+    [{ id: "city_1", zoneId: "ZN-2", zoneName: "Gazipur" }], // destCities
+    [{ name: "Dhaka", zoneId: "ZN-1", zoneName: "Dhaka Metro" }], // origCities
+    [
+      {
+        fromZoneId: "ZN-1",
+        toZoneId: "ZN-2",
+        baseRate,
+        extraRatePerKg: 0,
+        freeWeightKg: 1,
+        maxWeightKg: 10,
+        codFeePercentage: 1,
+        cancellationFee: 0,
+      },
+    ],
+  ]
+}
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
 const insertPayloads: Record<string, unknown>[] = []
@@ -231,21 +283,54 @@ describe("POST /api/orders", () => {
           id: "m_1",
           status: "ACTIVE",
           maxWeightKg: 10,
-          baseRate: 50,
-          extraRatePerKg: 10,
-          freeWeightKg: 1,
           emailVerifiedAt: new Date(),
           phoneVerifiedAt: new Date(),
           nidVerifiedAt: new Date(),
-          codFeePercentage: 1,
         },
       ], // merchant
+      ...pricedLane(50),
     )
     insertResult.push({ id: "o_new", status: "PENDING" })
     const res = await createOrder(req("POST", undefined, validOrderBody))
     const json = await res.json()
     expect(res.status).toBe(201)
     expect(json).toMatchObject({ id: "o_new" })
+  })
+
+  it("400 when the lane has no configured rate", async () => {
+    // The whole point: no platform-wide rate to fall back to, so an
+    // unconfigured lane is rejected by name instead of silently priced at 0.
+    sessionState.value = merchant
+    selectQueue.push(
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_hub" }], // pickup location
+      [{ id: "wh_hub", isActive: true }], // warehouse hub
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+        },
+      ], // merchant
+      [{ city: "Dhaka" }], // warehouse
+      [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }], // origin city → zone
+      [{ zone: { id: "ZN-2", name: "Gazipur" } }], // delivery city → zone
+      [], // no zone_pricing row for this pair
+    )
+
+    const res = await createOrder(req("POST", undefined, validOrderBody))
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    // Names the exact pair an admin must configure.
+    expect(json.error).toMatch(
+      /No delivery pricing is configured for Dhaka Metro → Gazipur/,
+    )
+    expect(json.error).toMatch(/Configure the zone pair/)
+    // Nothing was written.
+    expect(insertPayloads.some((p) => "recipientName" in p)).toBe(false)
   })
 
   it("applies the active bundle rule, snapshots it, and consumes quota", async () => {
@@ -263,19 +348,8 @@ describe("POST /api/orders", () => {
           nidVerifiedAt: new Date(),
         },
       ], // merchant
-      // resolveRoutePricing: platform defaults, then two empty lookups.
-      [
-        {
-          baseRate: 80,
-          extraRatePerKg: 0,
-          freeWeightKg: 1,
-          maxWeightKg: 10,
-          codFeePercentage: 1,
-          cancellationFee: 0,
-        },
-      ],
-      [], // warehouse city
-      [], // delivery city
+      // resolveRoutePricing: a lane that has a configured rate.
+      ...pricedLane(80),
       // lockAndResolveMerchantPackageRule: bundle, package, tiers
       [{ merchantPackageId: "mp_1", packageId: "pk_1", ordersUsed: 120 }],
       [{ isActive: true }],
@@ -330,18 +404,7 @@ describe("POST /api/orders", () => {
           nidVerifiedAt: new Date(),
         },
       ], // merchant
-      [
-        {
-          baseRate: 80,
-          extraRatePerKg: 0,
-          freeWeightKg: 1,
-          maxWeightKg: 10,
-          codFeePercentage: 1,
-          cancellationFee: 0,
-        },
-      ],
-      [], // warehouse city
-      [], // delivery city
+      ...pricedLane(80),
       [], // no active bundle
     )
     insertResult.push({ id: "o_plain", status: "PENDING" })
@@ -390,22 +453,8 @@ describe("POST /api/orders", () => {
           nidVerifiedAt: new Date(),
         },
       ], // merchant
-      [], // platform config (empty → defaults)
-      [{ city: "Dhaka" }], // origin warehouse city
-      [{ zoneId: "ZN-1" }], // origin city zone
-      [{ zoneId: "ZN-2" }], // destination city zone
-      [
-        {
-          fromZoneId: "ZN-1",
-          toZoneId: "ZN-2",
-          baseRate: 100,
-          extraRatePerKg: 20,
-          freeWeightKg: 1,
-          maxWeightKg: 10,
-          codFeePercentage: 1,
-          cancellationFee: 25,
-        },
-      ], // zone pricing
+      // resolveRoutePricing: a lane with an explicit cancellation fee.
+      ...pricedLane(100, 25),
     )
     insertResult.push({ id: "o_new", status: "PENDING" })
 
@@ -518,20 +567,49 @@ describe("POST /api/orders/bulk", () => {
           id: "m_1",
           status: "ACTIVE",
           maxWeightKg: 10,
-          baseRate: 50,
-          extraRatePerKg: 10,
-          freeWeightKg: 1,
           emailVerifiedAt: new Date(),
           phoneVerifiedAt: new Date(),
           nidVerifiedAt: new Date(),
-          codFeePercentage: 1,
         },
       ],
       [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_1" }],
+      ...pricedLaneBulk(),
     )
     insertResult.push([{ id: "o_bulk" }])
     const res = await bulkCreate(req("POST", undefined, bulkBody))
     expect(res.status).toBe(201)
+  })
+
+  it("400 the whole batch when a lane has no configured rate", async () => {
+    // Rejected before the transaction starts, so a batch can never half-create
+    // rows priced against a rate that does not exist.
+    sessionState.value = merchant
+    selectQueue.push(
+      [
+        {
+          id: "m_1",
+          status: "ACTIVE",
+          maxWeightKg: 10,
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+          nidVerifiedAt: new Date(),
+        },
+      ],
+      [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_1" }],
+      [{ id: "wh_1", city: "Dhaka" }], // warehouses
+      [{ id: "city_1", zoneId: "ZN-2", zoneName: "Gazipur" }], // destCities
+      [{ name: "Dhaka", zoneId: "ZN-1", zoneName: "Dhaka Metro" }], // origCities
+      [], // no zone_pricing row for ZN-1 → ZN-2
+    )
+
+    const res = await bulkCreate(req("POST", undefined, bulkBody))
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.error).toMatch(/have no delivery pricing configured/)
+    expect(json.error).toMatch(/Dhaka Metro → Gazipur/)
+    expect(json.rows).toEqual([0])
+    expect(insertResult).toEqual([]) // nothing was written
   })
 
   it("locks the bundle once and prices each row at its own cumulative tier", async () => {
@@ -559,9 +637,9 @@ describe("POST /api/orders/bulk", () => {
         },
       ], // merchant
       [{ id: "pl_1", merchantId: "m_1", warehouseId: "wh_1" }], // pickup hub
-      [{ id: "wh_1", city: "Dhaka" }], // warehouse
-      [{ id: "city_1", zoneId: "ZN-2" }], // delivery city
-      [{ name: "Dhaka", zoneId: "ZN-1" }], // origin city
+      [{ id: "wh_1", city: "Dhaka" }], // warehouses
+      [{ id: "city_1", zoneId: "ZN-2", zoneName: "Gazipur" }], // destCities
+      [{ name: "Dhaka", zoneId: "ZN-1", zoneName: "Dhaka Metro" }], // origCities
       [
         {
           fromZoneId: "ZN-1",
@@ -574,7 +652,6 @@ describe("POST /api/orders/bulk", () => {
           cancellationFee: 0,
         },
       ], // zone pricing (100 Tk for a 1 kg parcel)
-      [], // platform config (unused — the zone pair matched)
       [{ merchantPackageId: "mp_1", packageId: "pk_1", ordersUsed: 99 }], // bundle
       [{ isActive: true }], // package
       [

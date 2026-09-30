@@ -2,7 +2,7 @@ import { useCallback } from "react"
 import useSWR from "swr"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
-import type { PlatformConfigInput } from "@/lib/types"
+import type { PlatformConfig, PlatformConfigInput } from "@/lib/types"
 
 const KEY = "/api/platform-config"
 
@@ -14,7 +14,7 @@ export function usePlatformConfig() {
     error,
     isLoading,
     mutate,
-  } = useSWR<Record<string, unknown>>(
+  } = useSWR<PlatformConfig>(
     currentUser?.role === "SUPER_ADMIN" ? KEY : null,
     jsonFetcher,
     swrOptions,

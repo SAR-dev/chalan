@@ -30,7 +30,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { pageContent } from "@/config/content"
@@ -67,11 +66,9 @@ const emptyForm = {
 export default function DashboardSettingsPage() {
   const { config, isLoading, updatePlatformConfig } = usePlatformConfig()
 
-  const [baseRate, setBaseRate] = useState("0")
-  const [extraRatePerKg, setExtraRatePerKg] = useState("0")
-  const [freeWeightKg, setFreeWeightKg] = useState("1")
-  const [maxWeightKg, setMaxWeightKg] = useState("3")
-  const [cancellationFee, setCancellationFee] = useState("0")
+  // Delivery, COD and cancellation *rates* are per-lane `zone_pricing` rows and
+  // are edited on the zone rate card, not here. The only platform-wide policy
+  // left is whether a cancelled order keeps its fees.
   const [refundOnCancel, setRefundOnCancel] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -88,11 +85,6 @@ export default function DashboardSettingsPage() {
 
   useEffect(() => {
     if (!config) return
-    setBaseRate(String(config.defaultBaseRate ?? 0))
-    setExtraRatePerKg(String(config.defaultExtraRatePerKg ?? 0))
-    setFreeWeightKg(String(config.defaultFreeWeightKg ?? 1))
-    setMaxWeightKg(String(config.defaultMaxWeightKg ?? 3))
-    setCancellationFee(String(config.defaultCancellationFee ?? 0))
     setRefundOnCancel(config.refundOnCancel !== false)
   }, [config])
 
@@ -113,27 +105,11 @@ export default function DashboardSettingsPage() {
   if (isLoading) return null
 
   async function handleSave() {
-    const parsed = {
-      defaultBaseRate: Number(baseRate) || 0,
-      defaultExtraRatePerKg: Number(extraRatePerKg) || 0,
-      defaultFreeWeightKg: Number(freeWeightKg) || 0,
-      defaultMaxWeightKg: Number(maxWeightKg) || 3,
-      defaultCancellationFee: Number(cancellationFee) || 0,
-      refundOnCancel,
-    }
-    if (parsed.defaultMaxWeightKg <= 0) {
-      toast.error("Max weight must be greater than 0.")
-      return
-    }
-    if (parsed.defaultFreeWeightKg > parsed.defaultMaxWeightKg) {
-      toast.error("Free weight cannot exceed max weight.")
-      return
-    }
     setSaving(true)
-    const result = await updatePlatformConfig(parsed)
+    const result = await updatePlatformConfig({ refundOnCancel })
     setSaving(false)
     if (result.ok) {
-      toast.success("Platform defaults updated.")
+      toast.success("Cancellation policy updated.")
     } else {
       toast.error(result.error ?? "Failed to update.")
     }
@@ -317,72 +293,15 @@ export default function DashboardSettingsPage() {
         description={pageContent.dashboard.settings.description}
       />
 
-      <Card>
+      <Card data-testid="cancellation-policy-card">
         <CardHeader>
-          <CardTitle>Default merchant pricing</CardTitle>
+          <CardTitle>Order cancellation policy</CardTitle>
           <CardDescription>
-            Applied to new merchants when they register. Existing merchants are
-            not affected.
+            Delivery, COD and cancellation <em>rates</em> are set per delivery
+            route on the zone rate card, not here.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="base-rate">Base rate (TK)</Label>
-              <Input
-                id="base-rate"
-                type="number"
-                min="0"
-                step="1"
-                value={baseRate}
-                onChange={(e) => setBaseRate(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="extra-rate">Extra per KG (TK)</Label>
-              <Input
-                id="extra-rate"
-                type="number"
-                min="0"
-                step="1"
-                value={extraRatePerKg}
-                onChange={(e) => setExtraRatePerKg(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="free-weight">Free weight (KG)</Label>
-              <Input
-                id="free-weight"
-                type="number"
-                min="0"
-                step="0.1"
-                value={freeWeightKg}
-                onChange={(e) => setFreeWeightKg(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="max-weight">Max weight (KG)</Label>
-              <Input
-                id="max-weight"
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={maxWeightKg}
-                onChange={(e) => setMaxWeightKg(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="cancellation-fee">Cancellation fee (TK)</Label>
-              <Input
-                id="cancellation-fee"
-                type="number"
-                min="0"
-                step="1"
-                value={cancellationFee}
-                onChange={(e) => setCancellationFee(e.target.value)}
-              />
-            </div>
-          </div>
           <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
             <div>
               <Label htmlFor="refund-on-cancel">
@@ -394,20 +313,25 @@ export default function DashboardSettingsPage() {
             </div>
             <Switch
               id="refund-on-cancel"
+              data-testid="refund-on-cancel-switch"
               checked={refundOnCancel}
               onCheckedChange={(v) => setRefundOnCancel(v)}
             />
           </div>
         </CardContent>
         <CardFooter className="justify-end">
-          <Button onClick={handleSave} disabled={saving}>
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            data-testid="save-policy"
+          >
             {saving ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 Saving
               </>
             ) : (
-              "Save defaults"
+              "Save policy"
             )}
           </Button>
         </CardFooter>

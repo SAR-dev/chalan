@@ -6,7 +6,7 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 import { buildTableUrl, useTableFilters } from "@/lib/hooks/use-table-filters"
 import type { PaginatedResponse } from "@/lib/pagination"
-import type { Merchant, MerchantWeightLimitInput } from "@/lib/types"
+import type { Merchant } from "@/lib/types"
 import { formatError } from "@/lib/validation"
 
 const KEY = "/api/merchants"
@@ -190,26 +190,6 @@ export function useMerchants({
     [revalidateAll],
   )
 
-  const setMerchantWeightLimit = useCallback(
-    async (id: string, limit: MerchantWeightLimitInput) => {
-      const res = await fetch(`/api/merchants/${id}/pricing`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(limit),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        return {
-          ok: false,
-          error: formatError(data, "Failed to update weight limit."),
-        }
-      }
-      revalidateAll()
-      return { ok: true }
-    },
-    [revalidateAll],
-  )
-
   const updateMerchantProfile = useCallback(
     async (
       id: string,
@@ -266,7 +246,6 @@ export function useMerchants({
     suspendMerchants,
     reactivateMerchant,
     reactivateMerchants,
-    setMerchantWeightLimit,
     updateMerchantProfile,
   }
 }

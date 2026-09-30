@@ -18,7 +18,6 @@ const deliveryCities = [{ id: "DC-1", name: "Dhaka" }]
 const lookups: ResolveLookups = {
   pickupLocations: [{ id: "PKL-1", name: "Shop A" }],
   deliveryCities: [{ id: "DC-1", name: "Dhaka" }],
-  maxWeightKg: 10,
 }
 
 function rawRow(partial: Partial<Record<OrderImportHeader, string>>, line = 2) {

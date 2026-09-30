@@ -2,8 +2,8 @@ import { and, eq } from "drizzle-orm"
 import { db, dbRead } from "@/lib/db"
 import {
   deliveryCity,
+  deliveryZone,
   merchantPackage,
-  platformConfig,
   pricingPackage,
   pricingPackageTier,
   warehouse,
@@ -14,6 +14,7 @@ import {
   type PackageTierRule,
   pickTierForCount,
 } from "@/lib/packages"
+import type { PricingUnavailableReason, ZoneRef } from "@/lib/pricing"
 
 export interface ResolvedPricing {
   baseRate: number
@@ -24,37 +25,38 @@ export interface ResolvedPricing {
   cancellationFee: number
 }
 
-const FALLBACK: ResolvedPricing = {
-  baseRate: 0,
-  extraRatePerKg: 0,
-  freeWeightKg: 1,
-  maxWeightKg: 3,
-  codFeePercentage: 1,
-  cancellationFee: 0,
-}
+/** Re-exported so callers can name the failure vocabulary. */
+export type { PricingUnavailableReason, ZoneRef } from "@/lib/pricing"
+
+export type ResolveRoutePricingResult =
+  | { ok: true; pricing: ResolvedPricing }
+  | {
+      ok: false
+      reason: PricingUnavailableReason
+      /** Set when both zones are known — names the pair that needs a rate. */
+      fromZone: ZoneRef | null
+      toZone: ZoneRef | null
+    }
 
 /**
- * Resolves the pricing for a route: the zone-pair row (origin = the pickup
- * warehouse's city zone, destination = the delivery city's zone), falling back
- * to the platform defaults. Shared by order creation and pickup re-pricing.
+ * Resolves the pricing for a route from the `zone_pricing` matrix (origin = the
+ * pickup warehouse's city zone, destination = the delivery city's zone).
+ *
+ * There is deliberately no platform-level fallback: zone pricing is the single
+ * source for delivery, COD and cancellation fees, so an unconfigured lane is a
+ * configuration gap that must surface rather than quietly inherit a rate. Callers
+ * decide what to do — order creation rejects, while pickup re-pricing keeps the
+ * fee the order already snapshotted (see `features/orders/transitions.ts`).
+ *
+ * Used by order creation and by pickup re-pricing. `api/orders/bulk` does not
+ * call this: it pre-fetches the whole matrix and looks the lane up in memory,
+ * so it re-implements the same "is this lane configured?" test and must keep
+ * classifying a lane identically.
  */
 export async function resolveRoutePricing(
   originWarehouseId: string,
   deliveryCityId: string | null,
-): Promise<ResolvedPricing> {
-  const [config] = await dbRead
-    .select({
-      baseRate: platformConfig.defaultBaseRate,
-      extraRatePerKg: platformConfig.defaultExtraRatePerKg,
-      freeWeightKg: platformConfig.defaultFreeWeightKg,
-      maxWeightKg: platformConfig.defaultMaxWeightKg,
-      codFeePercentage: platformConfig.defaultCodFeePercentage,
-      cancellationFee: platformConfig.defaultCancellationFee,
-    })
-    .from(platformConfig)
-    .limit(1)
-  const fallback: ResolvedPricing = config ?? FALLBACK
-
+): Promise<ResolveRoutePricingResult> {
   const [w] = await dbRead
     .select({ city: warehouse.city })
     .from(warehouse)
@@ -63,34 +65,77 @@ export async function resolveRoutePricing(
 
   const [origCity] = w?.city
     ? await dbRead
-        .select({ zoneId: deliveryCity.zoneId })
+        .select({ zone: deliveryZone })
         .from(deliveryCity)
+        .leftJoin(deliveryZone, eq(deliveryCity.zoneId, deliveryZone.id))
         .where(eq(deliveryCity.name, w.city))
         .limit(1)
     : []
 
-  const [destCity] = deliveryCityId
-    ? await dbRead
-        .select({ zoneId: deliveryCity.zoneId })
-        .from(deliveryCity)
-        .where(eq(deliveryCity.id, deliveryCityId))
-        .limit(1)
-    : []
-
-  if (origCity?.zoneId && destCity?.zoneId) {
-    const [zp] = await dbRead
-      .select()
-      .from(zonePricing)
-      .where(
-        and(
-          eq(zonePricing.fromZoneId, origCity.zoneId),
-          eq(zonePricing.toZoneId, destCity.zoneId),
-        ),
-      )
-      .limit(1)
-    if (zp) return zp
+  if (!origCity?.zone) {
+    return {
+      ok: false,
+      reason: "origin-zone-unknown",
+      fromZone: null,
+      toZone: null,
+    }
   }
-  return fallback
+
+  if (!deliveryCityId) {
+    return {
+      ok: false,
+      reason: "destination-city-unknown",
+      fromZone: null,
+      toZone: null,
+    }
+  }
+
+  const [destCity] = await dbRead
+    .select({ zone: deliveryZone })
+    .from(deliveryCity)
+    .leftJoin(deliveryZone, eq(deliveryCity.zoneId, deliveryZone.id))
+    .where(eq(deliveryCity.id, deliveryCityId))
+    .limit(1)
+
+  if (!destCity) {
+    return {
+      ok: false,
+      reason: "destination-city-unknown",
+      fromZone: null,
+      toZone: null,
+    }
+  }
+
+  if (!destCity.zone) {
+    return {
+      ok: false,
+      reason: "destination-zone-unknown",
+      fromZone: origCity.zone,
+      toZone: null,
+    }
+  }
+
+  const [zp] = await dbRead
+    .select()
+    .from(zonePricing)
+    .where(
+      and(
+        eq(zonePricing.fromZoneId, origCity.zone.id),
+        eq(zonePricing.toZoneId, destCity.zone.id),
+      ),
+    )
+    .limit(1)
+
+  if (!zp) {
+    return {
+      ok: false,
+      reason: "no-pricing-for-lane",
+      fromZone: origCity.zone,
+      toZone: destCity.zone,
+    }
+  }
+
+  return { ok: true, pricing: zp }
 }
 
 // =============================================================================

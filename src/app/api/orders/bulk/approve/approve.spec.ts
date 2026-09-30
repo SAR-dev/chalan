@@ -147,17 +147,40 @@ describe("PATCH /api/orders/bulk/approve", () => {
     expect(json.error).toBe("Only PENDING orders can be approved")
   })
 
-  it("400 when parcel weight exceeds merchant limit", async () => {
+  it("400 when the parcel exceeds the route's weight limit", async () => {
+    // The guard re-reads the lane because an admin may have lowered the rate
+    // since creation — the route, not the merchant, owns the limit.
     sessionState.value = admin
     selectQueue.push(
-      [makeOrder({ parcelWeightKg: 10 })],
-      [{ maxWeightKg: 5, status: "ACTIVE" }],
+      [
+        makeOrder({
+          parcelWeightKg: 10,
+          warehouseId: "wh_1",
+          deliveryCityId: "city_1",
+        }),
+      ],
+      [{ status: "ACTIVE" }],
+      [{ city: "Dhaka" }], // warehouse
+      [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }], // origin city → zone
+      [{ zone: { id: "ZN-2", name: "Gazipur" } }], // delivery city → zone
+      [
+        {
+          fromZoneId: "ZN-1",
+          toZoneId: "ZN-2",
+          baseRate: 100,
+          extraRatePerKg: 0,
+          freeWeightKg: 1,
+          maxWeightKg: 5,
+          codFeePercentage: 1,
+          cancellationFee: 0,
+        },
+      ],
     )
     const res = await approve(req({ ids: ["o1"] }))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe(
-      "Parcel weight exceeds the 5 KG limit and cannot be approved.",
+      "Parcel weight exceeds the 5 KG limit for this route and cannot be approved.",
     )
   })
 
@@ -165,7 +188,7 @@ describe("PATCH /api/orders/bulk/approve", () => {
     sessionState.value = admin
     selectQueue.push(
       [makeOrder({ status: "PENDING", parcelWeightKg: 2 })],
-      [{ maxWeightKg: 5, status: "ACTIVE" }],
+      [{ status: "ACTIVE" }],
     )
     updateResult.push(makeOrder({ status: "APPROVED" }))
     const res = await approve(req({ ids: ["o1"] }))

@@ -10,7 +10,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { DeliveryFeeCalculator } from "@/components/delivery-fee-calculator"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -29,9 +29,12 @@ import {
   type PackageRow,
   usePackages,
 } from "@/features/packages/hooks/use-packages"
+import { ZoneRateMatrix } from "@/features/platform-config/components/zone-rate-matrix"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
-import { usePlatformPricingPublic } from "@/features/platform-config/hooks/use-platform-pricing-public"
-import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
+import {
+  useZonePricingPublic,
+  type ZonePricingEstimate,
+} from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { formatTk } from "@/lib/pricing"
 
 function TierList({ pkg }: { pkg: PackageRow }) {
@@ -63,15 +66,25 @@ function TierList({ pkg }: { pkg: PackageRow }) {
 export default function MerchantPricingPage() {
   const { currentMerchant } = useMerchants()
   const { packages, activePackage, latestRequest, isLoading } = usePackages()
-  const { platformDefaults } = usePlatformPricingPublic()
   const { zones } = useDeliveryZones()
   const { pricing: zoneRates } = useZonePricingPublic()
 
-  const zoneName = (id: string) => zones.find((z) => z.id === id)?.name ?? id
   const [requesting, setRequesting] = useState<PackageRow | null>(null)
 
+  // The estimator takes a single rate, and there is no platform-wide one any
+  // more — delivery pricing is per lane in `zone_pricing`. Seed it with the
+  // cheapest configured lane, which is the same "from" rate the public landing
+  // page shows, so the two never disagree.
+  const cheapestLane = useMemo(
+    () =>
+      zoneRates.reduce<ZonePricingEstimate | null>(
+        (min, rate) => (min && min.baseRate <= rate.baseRate ? min : rate),
+        null,
+      ),
+    [zoneRates],
+  )
+
   if (!currentMerchant) return null
-  const m = currentMerchant
 
   const activePkg = activePackage
     ? packages.find((p) => p.id === activePackage.packageId)
@@ -280,98 +293,59 @@ export default function MerchantPricingPage() {
       )}
 
       {/* Fee estimator, pre-loaded with the merchant's active bundle tier so the
-          preview matches what order creation actually charges. */}
-      {platformDefaults ? (
+          preview matches what order creation actually charges. Seeded from the
+          cheapest configured lane — there is no platform-wide rate. */}
+      {cheapestLane ? (
         <div className="mt-8" data-testid="merchant-fee-calculator">
           <DeliveryFeeCalculator
-            defaultPricing={platformDefaults}
+            defaultPricing={cheapestLane}
             packageRule={prevTier ?? null}
           />
         </div>
       ) : null}
 
-      {zoneRates.length > 0 ? (
-        <Card className="mt-8" data-testid="merchant-zone-rate-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPinned className="size-4" />
-              Zone rate card
-            </CardTitle>
-            <CardDescription>
-              Delivery rates by origin and destination zone. A route with no row
-              here falls back to the platform defaults.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium">Route</th>
-                    <th className="px-4 py-2 text-right font-medium">
-                      Base rate
-                    </th>
-                    <th className="px-4 py-2 text-right font-medium">
-                      Extra / KG
-                    </th>
-                    <th className="px-4 py-2 text-right font-medium">Free</th>
-                    <th className="px-4 py-2 text-right font-medium">COD</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {zoneRates.map((r) => (
-                    <tr
-                      key={r.id}
-                      className="border-border border-t"
-                      data-testid={`zone-rate-${r.id}`}
-                    >
-                      <td className="px-4 py-2">
-                        {zoneName(r.fromZoneId)} → {zoneName(r.toZoneId)}
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {formatTk(r.baseRate)}
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {formatTk(r.extraRatePerKg)}
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {r.freeWeightKg} KG
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {r.codFeePercentage}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      {/* Zone rates read better as a matrix than a list: a merchant wants
+          "what does it cost from X", not a scan of a flat table. */}
+      <Card className="mt-8" data-testid="merchant-zone-rate-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPinned className="size-4" />
+            Route rates
+          </CardTitle>
+          <CardDescription>
+            Pickup zone (rows) against delivery zone (columns) — the two
+            directions are priced separately. Each cell shows that route&apos;s
+            base rate; select one for the full rates. A dash means no rate is
+            configured, so parcels cannot be booked on that route.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ZoneRateMatrix zones={zones} rates={zoneRates} />
+        </CardContent>
+      </Card>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Scale className="size-4" />
-              Your weight limit
+              Weight limit
             </CardTitle>
-            <CardDescription>
-              Set by the platform for your account.
-            </CardDescription>
+            <CardDescription>Set per route, not per account.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between py-2">
               <span className="text-muted-foreground text-sm">
-                Max parcel weight
+                Where the limit lives
               </span>
-              <span className="text-sm font-medium tabular-nums">
-                {m.maxWeightKg} KG
+              <span className="text-sm font-medium">
+                On each zone-to-zone rate
               </span>
             </div>
             <p className="text-muted-foreground mt-2 text-xs">
-              Parcels above this weight cannot be booked. Contact an admin to
-              request a change.
+              Every route carries its own maximum parcel weight with its rates,
+              so the limit can differ between destinations. It is shown on the
+              route matrix above and while you create an order.
             </p>
           </CardContent>
         </Card>

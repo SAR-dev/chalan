@@ -9,7 +9,6 @@ import {
   merchant,
   merchantBalance,
   merchantStatuses,
-  platformConfig,
   profile,
   user,
 } from "@/lib/db/schema"
@@ -47,7 +46,6 @@ export const GET = withErrorHandler(async (req: Request) => {
         onboardingCompletedAt: merchant.onboardingCompletedAt,
         emailVerifiedAt: merchant.emailVerifiedAt,
         phoneVerifiedAt: merchant.phoneVerifiedAt,
-        maxWeightKg: merchant.maxWeightKg,
         nidSubmittedAt: merchant.nidSubmittedAt,
         nidVerifiedAt: merchant.nidVerifiedAt,
         nidRejectedAt: merchant.nidRejectedAt,
@@ -156,7 +154,6 @@ export const GET = withErrorHandler(async (req: Request) => {
       status: merchant.status,
       emailVerifiedAt: merchant.emailVerifiedAt,
       phoneVerifiedAt: merchant.phoneVerifiedAt,
-      maxWeightKg: merchant.maxWeightKg,
       approvedBy: merchant.approvedBy,
       approvedAt: merchant.approvedAt,
       createdAt: merchant.createdAt,
@@ -183,7 +180,6 @@ export const GET = withErrorHandler(async (req: Request) => {
     business: merchant.businessName,
     owner: merchant.ownerName,
     status: merchant.status,
-    maxWeightKg: merchant.maxWeightKg,
     balance: merchantBalance.balance,
     createdAt: merchant.createdAt,
   }
@@ -245,18 +241,6 @@ export const POST = withErrorHandler(async (req: Request) => {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   const verificationUrl = verifyTokenUrl(verificationToken, siteUrl)
 
-  const config = await dbRead
-    .select({
-      defaultBaseRate: platformConfig.defaultBaseRate,
-      defaultExtraRatePerKg: platformConfig.defaultExtraRatePerKg,
-      defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
-      defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
-    })
-    .from(platformConfig)
-    .where(eq(platformConfig.id, "default"))
-    .limit(1)
-    .then((r) => r[0])
-
   // The merchant row and the owner's profile are one unit (ROADMAP P1.4).
   // Better Auth owns its own connection, so the user is created first and the
   // two app tables are written in a transaction; a failure deletes the user
@@ -284,7 +268,10 @@ export const POST = withErrorHandler(async (req: Request) => {
           address,
           businessType,
           status: "PENDING",
-          maxWeightKg: config?.defaultMaxWeightKg ?? 3,
+          // Deliberately the column default, not a platform default: the weight
+          // cap is a per-merchant limit, not a rate. Delivery/COD/cancellation
+          // fees come from `zone_pricing` per lane, so there is no platform
+          // pricing row to copy here any more.
           emailVerificationToken: verificationTokenHash,
           emailVerificationExpiresAt: verificationExpiresAt,
         })

@@ -9,7 +9,10 @@ import {
 } from "@/components/data-table"
 import { columnLabels } from "@/config/table-column-labels"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { exceedsLaneWeightLimit } from "@/features/orders/lane-weight"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { formatTk } from "@/lib/pricing"
@@ -520,6 +523,12 @@ export function useOrderColumns(): DataTableColumn<Order>[] {
   const { riders } = useRiders()
   const { pickupLocations } = usePickupLocations()
   const { warehouses } = useWarehouses()
+  const { cities: deliveryCities } = useDeliveryCities()
+  const { pricing: zonePricing } = useZonePricingPublic()
+
+  // The weight limit is a property of the route, so resolving it needs the
+  // same three inputs `resolveRoutePricing` uses server-side.
+  const laneLookup = { warehouses, deliveryCities, zonePricing }
 
   const merchantNameFn = (id: string) =>
     merchants.find((m) => m.id === id)?.businessName ?? "Unknown"
@@ -560,8 +569,14 @@ export function useOrderColumns(): DataTableColumn<Order>[] {
     sortable: true,
     sortValue: (o) => o.parcelWeightKg,
     cell: (o) => {
-      const merchant = merchants.find((m) => m.id === o.merchantId)
-      const exceeds = merchant ? o.parcelWeightKg > merchant.maxWeightKg : false
+      const exceeds = exceedsLaneWeightLimit(
+        {
+          warehouseId: o.warehouseId,
+          deliveryCityId: o.deliveryCityId,
+          parcelWeightKg: o.parcelWeightKg,
+        },
+        laneLookup,
+      )
       return (
         <CellContent
           className={

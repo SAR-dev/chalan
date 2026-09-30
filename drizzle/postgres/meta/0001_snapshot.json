@@ -1,5 +1,5 @@
 {
-  "id": "258a7234-d1ee-47c2-a1e1-4cf1ae1d7b31",
+  "id": "be9bc824-6f31-4cfe-85c5-9c25a9fadfb2",
   "prevId": "63ac0b4a-c601-4b43-928e-2c106106bda4",
   "version": "7",
   "dialect": "postgresql",
@@ -876,21 +876,6 @@
         }
       },
       "indexes": {
-        "balance_tx_merchant_id_idx": {
-          "name": "balance_tx_merchant_id_idx",
-          "columns": [
-            {
-              "expression": "merchantId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "balance_tx_status_idx": {
           "name": "balance_tx_status_idx",
           "columns": [
@@ -1496,13 +1481,6 @@
           "notNull": true,
           "default": "'PENDING'"
         },
-        "maxWeightKg": {
-          "name": "maxWeightKg",
-          "type": "double precision",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 3
-        },
         "maxModerators": {
           "name": "maxModerators",
           "type": "integer",
@@ -1647,11 +1625,17 @@
         }
       },
       "indexes": {
-        "merchant_status_idx": {
-          "name": "merchant_status_idx",
+        "merchant_status_created_at_idx": {
+          "name": "merchant_status_created_at_idx",
           "columns": [
             {
               "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2314,11 +2298,17 @@
         }
       },
       "indexes": {
-        "order_merchant_id_idx": {
-          "name": "order_merchant_id_idx",
+        "order_merchant_created_at_idx": {
+          "name": "order_merchant_created_at_idx",
           "columns": [
             {
               "expression": "merchantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2329,11 +2319,59 @@
           "method": "btree",
           "with": {}
         },
-        "order_warehouse_id_idx": {
-          "name": "order_warehouse_id_idx",
+        "order_warehouse_created_at_idx": {
+          "name": "order_warehouse_created_at_idx",
           "columns": [
             {
               "expression": "warehouseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "order_delivery_rider_created_at_idx": {
+          "name": "order_delivery_rider_created_at_idx",
+          "columns": [
+            {
+              "expression": "deliveryRiderId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "order_pickup_rider_created_at_idx": {
+          "name": "order_pickup_rider_created_at_idx",
+          "columns": [
+            {
+              "expression": "pickupRiderId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2359,56 +2397,11 @@
           "method": "btree",
           "with": {}
         },
-        "order_pickup_rider_id_idx": {
-          "name": "order_pickup_rider_id_idx",
-          "columns": [
-            {
-              "expression": "pickupRiderId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "order_delivery_rider_id_idx": {
-          "name": "order_delivery_rider_id_idx",
-          "columns": [
-            {
-              "expression": "deliveryRiderId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "order_pickup_location_id_idx": {
           "name": "order_pickup_location_id_idx",
           "columns": [
             {
               "expression": "pickupLocationId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "order_status_idx": {
-          "name": "order_status_idx",
-          "columns": [
-            {
-              "expression": "status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2965,21 +2958,6 @@
         }
       },
       "indexes": {
-        "payout_request_merchant_id_idx": {
-          "name": "payout_request_merchant_id_idx",
-          "columns": [
-            {
-              "expression": "merchantId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "payout_request_status_idx": {
           "name": "payout_request_status_idx",
           "columns": [
@@ -2998,6 +2976,27 @@
         "payout_request_requested_at_idx": {
           "name": "payout_request_requested_at_idx",
           "columns": [
+            {
+              "expression": "requestedAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payout_request_merchant_requested_at_idx": {
+          "name": "payout_request_merchant_requested_at_idx",
+          "columns": [
+            {
+              "expression": "merchantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "requestedAt",
               "isExpression": false,
@@ -4267,13 +4266,6 @@
           "notNull": true,
           "default": "'default'"
         },
-        "defaultCodFeePercentage": {
-          "name": "defaultCodFeePercentage",
-          "type": "double precision",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
         "minCodFeePercentage": {
           "name": "minCodFeePercentage",
           "type": "double precision",
@@ -4287,41 +4279,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": 5
-        },
-        "defaultBaseRate": {
-          "name": "defaultBaseRate",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "defaultExtraRatePerKg": {
-          "name": "defaultExtraRatePerKg",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "defaultFreeWeightKg": {
-          "name": "defaultFreeWeightKg",
-          "type": "double precision",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "defaultMaxWeightKg": {
-          "name": "defaultMaxWeightKg",
-          "type": "double precision",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 3
-        },
-        "defaultCancellationFee": {
-          "name": "defaultCancellationFee",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "refundOnCancel": {
           "name": "refundOnCancel",

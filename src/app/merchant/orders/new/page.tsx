@@ -14,9 +14,10 @@ import { quoteParcel } from "@/features/orders/quote-parcel"
 import { usePackages } from "@/features/packages/hooks/use-packages"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
-import { usePlatformPricingPublic } from "@/features/platform-config/hooks/use-platform-pricing-public"
+import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { pickTierForCount } from "@/lib/packages"
+import { pricingUnavailableMessage } from "@/lib/pricing"
 import type { CreateOrderInput } from "@/lib/types"
 import {
   InactiveAccountCard,
@@ -47,7 +48,8 @@ export default function NewOrderPage() {
   const { pickupLocations } = usePickupLocations()
   const { cities: deliveryCities } = useDeliveryCities()
   const { pricing: zonePricing } = useZonePricingPublic()
-  const { platformDefaults } = usePlatformPricingPublic()
+  // Only used to name the zone pair in the "cannot be priced" message.
+  const { zones } = useDeliveryZones()
   const { createOrders } = useOrders()
   const { packages, activePackage } = usePackages()
 
@@ -121,7 +123,10 @@ export default function NewOrderPage() {
         codFee,
         exceedsMax,
         maxWeightKg,
-        isZonePricing,
+        pricingUnavailable,
+        pricingUnavailableReason,
+        fromZone,
+        toZone,
       } = quoteParcel({
         pickupLocationId: p.pickupLocationId,
         deliveryCityId: p.deliveryCityId,
@@ -130,8 +135,7 @@ export default function NewOrderPage() {
         pickupLocations,
         deliveryCities,
         zonePricing,
-        platformDefaults,
-        maxWeightKg: currentMerchant?.maxWeightKg ?? 3,
+        zones,
         packageRule,
       })
 
@@ -159,8 +163,16 @@ export default function NewOrderPage() {
         deliveryCharge,
         codFee,
         exceedsMax,
+        maxWeightKg,
         errors,
-        isZonePricing,
+        pricingUnavailable,
+        pricingError: pricingUnavailableReason
+          ? pricingUnavailableMessage(
+              pricingUnavailableReason,
+              fromZone,
+              toZone,
+            )
+          : null,
       }
     })
   }, [
@@ -171,10 +183,13 @@ export default function NewOrderPage() {
     pickupLocations,
     deliveryCities,
     zonePricing,
-    platformDefaults,
+    zones,
   ])
 
   const anyExceeds = rows.some((r) => r.exceedsMax)
+  // A lane with no configured rate cannot be priced at all — the server rejects
+  // it, so block here rather than round-tripping for a 400.
+  const anyUnpriced = rows.some((r) => r.pricingUnavailable)
 
   if (!currentMerchant) return null
 
@@ -184,7 +199,10 @@ export default function NewOrderPage() {
     e.preventDefault()
     setSubmitAttempted(true)
 
-    const hasErrors = parcels.some((p) => {
+    const hasErrors = parcels.some((p, i) => {
+      // Unpriced lane, or over the route's own weight limit — either way the
+      // server would reject it, so don't bother submitting.
+      if (rows[i]?.pricingUnavailable || rows[i]?.exceedsMax) return true
       const weight = Number(p.parcelWeightKg) || 0
       return (
         !p.pickupLocationId ||
@@ -192,8 +210,7 @@ export default function NewOrderPage() {
         !p.recipientPhone.trim() ||
         !p.deliveryCityId.trim() ||
         !p.deliveryAddress.trim() ||
-        weight <= 0 ||
-        (currentMerchant && weight > currentMerchant.maxWeightKg)
+        weight <= 0
       )
     })
     if (hasErrors) return
@@ -286,7 +303,6 @@ export default function NewOrderPage() {
                 row={row}
                 index={index}
                 parcelCount={parcels.length}
-                maxWeightKg={currentMerchant.maxWeightKg}
                 deliveryCities={deliveryCities}
                 myLocations={myLocations}
                 updateParcel={updateParcel}
@@ -303,7 +319,7 @@ export default function NewOrderPage() {
                 type="submit"
                 data-testid="submit-order"
                 className="gap-2"
-                disabled={submitting || anyExceeds}
+                disabled={submitting || anyExceeds || anyUnpriced}
               >
                 {submitting ? (
                   <Loader2 className="size-4 animate-spin" />

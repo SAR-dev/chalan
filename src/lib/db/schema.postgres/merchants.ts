@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
-  doublePrecision,
   index,
   integer,
   pgTable,
@@ -46,10 +45,9 @@ export const merchant = pgTable(
     status: text("status", { enum: merchantStatuses })
       .notNull()
       .default("PENDING"),
-    // Max parcel weight this merchant may ship — set by an Admin. Delivery,
-    // COD and cancellation fees come from zone pricing (platform defaults as
-    // the fallback), not from per-merchant rates.
-    maxWeightKg: doublePrecision("maxWeightKg").notNull().default(3),
+    // NOTE: deliberately no per-merchant weight limit. The maximum parcel weight
+    // belongs to the lane — `zone_pricing.maxWeightKg` — so one zone pair means
+    // one limit and a merchant cannot disagree with it. See `order-pricing.ts`.
     // Moderator quota (ROADMAP 5.2): how many ACTIVE+PENDING staff logins the
     // owner may hold. SUPER_ADMIN-managed (0 = moderators disabled).
     maxModerators: integer("maxModerators").notNull().default(3),

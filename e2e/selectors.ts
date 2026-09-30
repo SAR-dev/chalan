@@ -80,12 +80,28 @@ export const pricing = {
   cancellationTable: "[data-testid='cancellation-fee-table']",
   navLink: "[data-testid='nav-pricing']",
   rateCardLink: "[data-testid='rate-card-link']",
+  // Zone × zone rate matrix. Rows are pickup zones, columns delivery zones;
+  // both directions are priced separately, so cells are addressed by lane.
+  zoneRateCard: "[data-testid='merchant-zone-rate-card']",
+  zoneMatrix: "[data-testid='zone-rate-matrix']",
+  zoneMatrixCell: (fromZoneId: string, toZoneId: string) =>
+    `[data-testid='zone-matrix-cell'][data-lane='${fromZoneId}:${toZoneId}']`,
+  zoneMatrixUnpriced: "[data-testid='zone-matrix-unpriced']",
+  zoneMatrixDetail: "[data-testid='zone-matrix-detail']",
+  zoneMatrixDetailLane: "[data-testid='zone-matrix-detail-lane']",
+  zoneMatrixEmpty: "[data-testid='zone-rate-matrix-empty']",
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboard = {
   statCard: (label: string) => `[data-testid='stat-card-${label}']`,
   overview: "[data-testid='dashboard-overview']",
+  // Zone-pricing coverage: lanes with no configured rate.
+  pricingCoverageCard: "[data-testid='pricing-coverage-card']",
+  pricingCoverageMissing: "[data-testid='pricing-coverage-missing']",
+  pricingCoverageClear: "[data-testid='pricing-coverage-clear']",
+  pricingCoverageEmpty: "[data-testid='pricing-coverage-empty']",
+  pricingCoverageOverflow: "[data-testid='pricing-coverage-overflow']",
 }
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
@@ -137,6 +153,8 @@ export const orderForm = {
   submitOrder: "[data-testid='submit-order']",
   addParcel: "[data-testid='add-parcel']",
   removeParcel: (index: number) => `[data-testid='remove-parcel-${index}']`,
+  // Shown instead of a delivery charge when the lane has no configured rate.
+  pricingUnavailable: "[data-testid='parcel-pricing-unavailable']",
 }
 
 // ─── Merchants ───────────────────────────────────────────────────────────────
@@ -211,9 +229,18 @@ export const zones = {
 }
 
 // ─── Delivery Cities ─────────────────────────────────────────────────────────
+// `table`/`addButton` are the admin management page; the `merchant*` selectors
+// are the read-only merchant view at /merchant/delivery-cities.
 export const deliveryCities = {
   table: "[data-testid='delivery-cities-table']",
   addButton: "[data-testid='add-city']",
+  merchantPage: "[data-testid='delivery-cities-page']",
+  merchantSearch: "[data-testid='delivery-city-search']",
+  merchantZone: (zoneId: string) => `[data-testid='delivery-zone-${zoneId}']`,
+  merchantZoneCount: (zoneId: string) =>
+    `[data-testid='delivery-zone-count-${zoneId}']`,
+  merchantCity: (cityId: string) => `[data-testid='delivery-city-${cityId}']`,
+  merchantEmpty: "[data-testid='delivery-cities-empty']",
 }
 
 // ─── Balance ─────────────────────────────────────────────────────────────────
@@ -233,8 +260,10 @@ export const email = {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 export const settings = {
-  pricingForm: "[data-testid='pricing-form']",
   mailConfigTable: "[data-testid='mail-config-table']",
+  cancellationPolicyCard: "[data-testid='cancellation-policy-card']",
+  refundOnCancel: "[data-testid='refund-on-cancel-switch']",
+  savePolicy: "[data-testid='save-policy']",
 }
 
 // ─── Branding ────────────────────────────────────────────────────────────────

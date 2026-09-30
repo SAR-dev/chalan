@@ -11,22 +11,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import type { ResolvedRow } from "@/features/orders/bulk-import/resolve-rows"
-import { quoteParcel } from "@/features/orders/quote-parcel"
 import type { DeliveryCityOption } from "@/features/platform-config/hooks/use-delivery-cities"
-import type { PlatformPricingDefaults } from "@/features/platform-config/hooks/use-platform-pricing-public"
-import type { ZonePricingEstimate } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import type { PickupLocation } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ParcelCard } from "../../new/components/parcel-card"
-import type { ParcelRow, ParcelState } from "../../new/types"
-import { resolvedRowToParcelState } from "../row-to-parcel"
+import type { ParcelState } from "../../new/types"
+import type { ImportParcelRow } from "../build-parcel-rows"
 import type { ImportPhase } from "../types"
 
 interface ImportPreviewCardProps {
   phase: ImportPhase
-  rows: ResolvedRow[]
-  serverErrors: Record<number, string[]>
+  /**
+   * Pre-quoted rows, built by `buildImportParcelRows` in the parent so the
+   * submittable/error gating and this display cannot disagree.
+   */
+  parcelRows: ImportParcelRow[]
+  /** Rows with no errors *and* a configured lane rate. */
   validCount: number
   errorCount: number
   errorsOnly: boolean
@@ -35,9 +35,6 @@ interface ImportPreviewCardProps {
   confirmDisabled: boolean
   myLocations: PickupLocation[]
   deliveryCities: DeliveryCityOption[]
-  zonePricing: ZonePricingEstimate[]
-  platformDefaults: PlatformPricingDefaults | null
-  maxWeightKg: number
   onParcelChange: (line: number, key: keyof ParcelState, value: string) => void
   onRemoveRow: (line: number) => void
   onErrorsOnlyChange: (value: boolean) => void
@@ -61,8 +58,7 @@ function filterButtonClass(active: boolean): string {
 
 export function ImportPreviewCard({
   phase,
-  rows,
-  serverErrors,
+  parcelRows,
   validCount,
   errorCount,
   errorsOnly,
@@ -71,9 +67,6 @@ export function ImportPreviewCard({
   confirmDisabled,
   myLocations,
   deliveryCities,
-  zonePricing,
-  platformDefaults,
-  maxWeightKg,
   onParcelChange,
   onRemoveRow,
   onErrorsOnlyChange,
@@ -166,50 +159,26 @@ export function ImportPreviewCard({
         </div>
 
         <div data-testid="bulk-import-preview" className="flex flex-col gap-4">
-          {rows.length === 0 ? (
+          {parcelRows.length === 0 ? (
             <p className="text-muted-foreground rounded-lg border px-4 py-10 text-center text-sm">
               {emptyMessage ?? "No rows to preview."}
             </p>
           ) : (
-            rows.map((row, index) => {
-              const parcel = resolvedRowToParcelState(
-                row,
-                myLocations,
-                deliveryCities,
-              )
-              const quote = quoteParcel({
-                pickupLocationId: parcel.pickupLocationId,
-                deliveryCityId: parcel.deliveryCityId,
-                parcelWeightKg: parcel.parcelWeightKg,
-                productCost: parcel.productCost,
-                pickupLocations: myLocations,
-                deliveryCities,
-                zonePricing,
-                platformDefaults,
-                maxWeightKg,
-              })
-              const parcelRow: ParcelRow = {
-                parcel,
-                ...quote,
-                errors: [...row.errors, ...(serverErrors[row.line] ?? [])],
-              }
-              return (
-                <div key={row.line} data-testid={`bulk-import-row-${row.line}`}>
-                  <ParcelCard
-                    row={parcelRow}
-                    index={index}
-                    parcelCount={rows.length}
-                    maxWeightKg={maxWeightKg}
-                    deliveryCities={deliveryCities}
-                    myLocations={myLocations}
-                    updateParcel={(_id, key, value) =>
-                      onParcelChange(row.line, key, value)
-                    }
-                    removeParcel={() => onRemoveRow(row.line)}
-                  />
-                </div>
-              )
-            })
+            parcelRows.map(({ line, row }, index) => (
+              <div key={line} data-testid={`bulk-import-row-${line}`}>
+                <ParcelCard
+                  row={row}
+                  index={index}
+                  parcelCount={parcelRows.length}
+                  deliveryCities={deliveryCities}
+                  myLocations={myLocations}
+                  updateParcel={(_id, key, value) =>
+                    onParcelChange(line, key, value)
+                  }
+                  removeParcel={() => onRemoveRow(line)}
+                />
+              </div>
+            ))
           )}
         </div>
       </CardContent>

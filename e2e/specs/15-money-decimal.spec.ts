@@ -30,25 +30,25 @@ const MONEY_COLUMNS: [string, string][] = [
   ["merchant_balance", "pendingBalance"],
   ["zone_pricing", "baseRate"],
   ["zone_pricing", "extraRatePerKg"],
+  // The cancellation fee is per lane, snapshotted onto the order. It used to
+  // also live as `platform_config.defaultCancellationFee` — a platform-wide
+  // fallback that no longer exists, so the zone row is now the only source.
+  ["zone_pricing", "cancellationFee"],
   ["order", "productCost"],
   ["order", "deliveryFee"],
   ["order", "codFee"],
+  ["order", "cancellationFee"],
   ["order", "merchantEarnings"],
   ["order", "amountCollected"],
   ["payout_request", "amount"],
-  ["platform_config", "defaultBaseRate"],
-  ["platform_config", "defaultExtraRatePerKg"],
 ]
 
 const NON_MONEY_COLUMNS: [string, string][] = [
   ["order", "parcelWeightKg"],
-  ["merchant", "maxWeightKg"],
+  // NOTE: no `merchant.maxWeightKg` — the weight limit belongs to the lane.
   ["zone_pricing", "freeWeightKg"],
   ["zone_pricing", "maxWeightKg"],
   ["zone_pricing", "codFeePercentage"],
-  ["platform_config", "defaultCodFeePercentage"],
-  ["platform_config", "defaultFreeWeightKg"],
-  ["platform_config", "defaultMaxWeightKg"],
 ]
 
 test.describe("S48. Money is stored as exact decimal", () => {

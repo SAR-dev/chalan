@@ -5,9 +5,12 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Separator } from "@/components/ui/separator"
-import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { laneMaxWeightKg } from "@/features/orders/lane-weight"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
+import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 
@@ -36,18 +39,26 @@ export function ApproveOrderDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const { approveOrder } = useOrders()
-  const { merchants } = useMerchants()
   const { pickupLocations } = usePickupLocations()
+  const { warehouses } = useWarehouses()
+  const { cities: deliveryCities } = useDeliveryCities()
+  const { pricing: zonePricing } = useZonePricingPublic()
   const [submitting, setSubmitting] = useState(false)
 
   if (!order) return null
 
   const o = order
-  const merchant = merchants.find((m) => m.id === o.merchantId)
   const pickup = pickupLocations.find((p) => p.id === o.pickupLocationId)
-  const exceedsWeight = merchant
-    ? o.parcelWeightKg > merchant.maxWeightKg
-    : false
+  // The weight limit belongs to the route the order is on, not to the merchant.
+  const laneLimit = laneMaxWeightKg(
+    {
+      warehouseId: o.warehouseId,
+      deliveryCityId: o.deliveryCityId,
+      parcelWeightKg: o.parcelWeightKg,
+    },
+    { warehouses, deliveryCities, zonePricing },
+  )
+  const exceedsWeight = laneLimit !== null && o.parcelWeightKg > laneLimit
 
   async function handleApprove(e: React.FormEvent) {
     e.preventDefault()
@@ -107,7 +118,7 @@ export function ApproveOrderDialog({
         <DetailRow
           label="Parcel weight"
           value={`${order.parcelWeightKg} KG${
-            merchant ? ` / ${merchant.maxWeightKg} KG max` : ""
+            laneLimit !== null ? ` / ${laneLimit} KG max` : ""
           }`}
         />
         <DetailRow label="Delivery type" value={order.deliveryType} />

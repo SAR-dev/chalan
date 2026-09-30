@@ -102,7 +102,7 @@ export async function seedZonePricing() {
 
   // Cancellation fee charged (instead of the delivery fee) when an order on
   // the pair is returned to the merchant. Uniform in the seed; admins tune it
-  // per city-pair from the platform settings page.
+  // per city-pair alongside the lane's other rates.
   const CANCELLATION_FEE = 20
 
   await db.insert(zonePricing).values(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
+import { merchant } from "@/lib/db/schema"
 import {
   deliveryCityCreateSchema,
   deliveryCityUpdateSchema,
@@ -7,7 +8,6 @@ import {
   idsSchema,
   isValidBdPhone,
   merchantBrandingSchema,
-  merchantWeightLimitSchema,
   normalizePhone,
   orderCreateSchema,
   parseBody,
@@ -69,19 +69,12 @@ describe("idsSchema", () => {
   })
 })
 
-describe("merchantWeightLimitSchema", () => {
-  it("accepts a positive weight", () => {
-    const result = merchantWeightLimitSchema.safeParse({ maxWeightKg: 30 })
-    expect(result.success).toBe(true)
-  })
-
-  it("rejects zero or negative weight", () => {
-    expect(
-      merchantWeightLimitSchema.safeParse({ maxWeightKg: 0 }).success,
-    ).toBe(false)
-    expect(
-      merchantWeightLimitSchema.safeParse({ maxWeightKg: -1 }).success,
-    ).toBe(false)
+// The maximum parcel weight belongs to the lane (`zone_pricing.maxWeightKg`).
+// A per-merchant cap was removed because two independent limits could disagree
+// and reject a valid parcel — this pins the column against coming back.
+describe("merchant has no per-merchant weight limit", () => {
+  it("carries no maxWeightKg column", () => {
+    expect("maxWeightKg" in merchant).toBe(false)
   })
 })
 

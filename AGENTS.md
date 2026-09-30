@@ -170,7 +170,7 @@ must match text, scope it to a tagged container (e.g.
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
 describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique with no gaps or duplicates (suite is
-currently S1-S61 across 23 files / 98 tests).
+currently S1-S65 across 25 files / 104 tests).
 
 ## Coding Patterns
 

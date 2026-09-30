@@ -235,4 +235,34 @@ describe("merchant moderator nav grants (ROADMAP 5.2)", () => {
     expect(hasNavPermission(smuggled, "/merchant/settings")).toBe(false)
     expect(hasNavPermission(smuggled, "/merchant/orders")).toBe(true)
   })
+
+  // Delivery Cities is reference information rather than an order-taking
+  // surface, so it is deliberately not one of the moderator grants — and it
+  // reads public endpoints, meaning the nav rules are its ONLY gate. Worth
+  // pinning exactly: a stale grant must not be enough.
+  const deliveryCitiesHref = "/merchant/delivery-cities"
+
+  it("sits directly after Pricing for the owner", () => {
+    const hrefs = merchantVisibleNavItems(owner).map((i) => i.href)
+    expect(hrefs).toContain(deliveryCitiesHref)
+    expect(hrefs.indexOf(deliveryCitiesHref)).toBe(
+      hrefs.indexOf("/merchant/pricing") + 1,
+    )
+  })
+
+  it("is owner-only: not grantable, and a stale grant is not enough", () => {
+    const smuggled = {
+      role: "MERCHANT",
+      isModerator: true,
+      moderatorPermissions: [deliveryCitiesHref, "/merchant/orders"],
+    }
+    expect(merchantGrantableNavItems().map((i) => i.href)).not.toContain(
+      deliveryCitiesHref,
+    )
+    expect(hasNavPermission(owner, deliveryCitiesHref)).toBe(true)
+    expect(hasNavPermission(smuggled, deliveryCitiesHref)).toBe(false)
+    expect(merchantVisibleNavItems(smuggled).map((i) => i.href)).not.toContain(
+      deliveryCitiesHref,
+    )
+  })
 })

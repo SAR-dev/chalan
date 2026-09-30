@@ -559,13 +559,14 @@ export default function MerchantSettingsPage() {
                 Weight limit
               </CardTitle>
               <CardDescription>
-                Set by the platform. Contact an admin to make changes.
+                Set per route by the platform, alongside that route&apos;s
+                rates.
               </CardDescription>
             </CardHeader>
             <CardContent className="divide-border divide-y py-0">
               <PricingRow
-                label="Max parcel weight"
-                value={`${currentMerchant.maxWeightKg} KG`}
+                label="Maximum parcel weight"
+                value="Applies per route"
               />
             </CardContent>
           </Card>

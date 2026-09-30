@@ -41,7 +41,6 @@ export const GET = withErrorHandler(
         onboardingCompletedAt: merchant.onboardingCompletedAt,
         emailVerifiedAt: merchant.emailVerifiedAt,
         phoneVerifiedAt: merchant.phoneVerifiedAt,
-        maxWeightKg: merchant.maxWeightKg,
         maxModerators: merchant.maxModerators,
         nidSubmittedAt: merchant.nidSubmittedAt,
         nidVerifiedAt: merchant.nidVerifiedAt,

@@ -9,12 +9,63 @@ export interface DeliveryChargeBreakdown {
   exceedsMax: boolean
 }
 
-/** The rate fields a delivery charge needs (zone-pair row or platform default). */
+/** The rate fields a delivery charge needs (a `zone_pricing` row). */
 export interface DeliveryRate {
   baseRate: number
   extraRatePerKg: number
   freeWeightKg: number
   maxWeightKg: number
+}
+
+/** A zone, identified well enough to name in an error or a coverage list. */
+export interface ZoneRef {
+  id: string
+  name: string
+}
+
+/**
+ * Why a route could not be priced.
+ *
+ * These are distinct admin problems with distinct fixes, so they are reported
+ * separately rather than collapsed into one "pricing not configured" — a lane
+ * with no row needs a rate, while an unmapped city needs a zone assignment
+ * first. Lives here (not in `order-pricing.ts`) so client quote code can use the
+ * same vocabulary as the server without importing the db layer.
+ */
+export type PricingUnavailableReason =
+  /** Both zones resolved, but no `zone_pricing` row exists for the pair. */
+  | "no-pricing-for-lane"
+  /** The pickup city's zone is unknown (no matching city, or no zone on it). */
+  | "origin-zone-unknown"
+  /** No delivery city was chosen, or it matches no `delivery_city`. */
+  | "destination-city-unknown"
+  /** The delivery city exists but has no zone assigned. */
+  | "destination-zone-unknown"
+
+/**
+ * A one-line, actionable explanation for a lane that cannot be priced.
+ *
+ * Used by order creation and by the client quote code (live quote, import
+ * preview, pricing calculator), so a merchant sees the same sentence they would
+ * get back if they submitted anyway — rather than a silent TK 0 quote. The bulk
+ * import route returns the same pair name but prefixes it with a row count,
+ * because one rejection there covers the whole batch.
+ */
+export function pricingUnavailableMessage(
+  reason: PricingUnavailableReason,
+  fromZone: ZoneRef | null,
+  toZone: ZoneRef | null,
+): string {
+  switch (reason) {
+    case "no-pricing-for-lane":
+      return `No delivery pricing is configured for ${fromZone?.name ?? "the pickup zone"} → ${toZone?.name ?? "the delivery zone"}. Configure the zone pair before creating orders on this lane.`
+    case "origin-zone-unknown":
+      return "The pickup city's zone is not set, so the origin zone cannot be determined. Assign the pickup city's zone first."
+    case "destination-city-unknown":
+      return "The delivery city is unknown, so its destination zone cannot be determined. Pick a configured delivery city."
+    case "destination-zone-unknown":
+      return `The delivery city has no zone assigned, so ${fromZone?.name ?? "the origin"} → ${toZone?.name ?? "the destination"} cannot be priced. Assign the delivery city's zone first.`
+  }
 }
 
 /**

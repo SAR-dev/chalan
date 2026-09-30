@@ -1,3 +1,4 @@
+import { asc } from "drizzle-orm"
 import {
   ArrowRight,
   Banknote,
@@ -34,9 +35,12 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { SiteIcon, siteConfig } from "@/config/site"
 import { dbRead } from "@/lib/db"
-import { platformConfig } from "@/lib/db/schema"
+import { zonePricing } from "@/lib/db/schema"
 
-const DEFAULT_PRICING = {
+// Shown only when the DB is unreachable (e.g. during build), so the marketing
+// page still renders. Never used to price a real order — see the lane lookup
+// below. Mirrors the seeded Dhaka-metro lane.
+const SAMPLE_PRICING = {
   baseRate: 60,
   extraRatePerKg: 10,
   freeWeightKg: 1,
@@ -45,39 +49,33 @@ const DEFAULT_PRICING = {
   cancellationFee: 20,
 }
 
-// Cache platform config for 5 minutes — this page is heavily fetched
-// and the config rarely changes (set by admin in Settings).
-// Falls back to defaults when DB is unavailable (e.g. during build).
+// Cache the "from" rate for 5 minutes — this page is heavily fetched and
+// pricing rarely changes (set by an admin per lane).
+//
+// There is no platform-wide rate any more: delivery pricing lives per lane in
+// `zone_pricing`, and an unconfigured lane is an error rather than a fallback.
+// The public calculator takes a single rate, so this is the *cheapest*
+// configured lane — which is what a "from TK X" headline should actually mean.
 const getCachedPlatformConfig = unstable_cache(
   async () => {
     try {
-      const config = await dbRead
+      const cheapestLane = await dbRead
         .select({
-          defaultBaseRate: platformConfig.defaultBaseRate,
-          defaultExtraRatePerKg: platformConfig.defaultExtraRatePerKg,
-          defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
-          defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
-          defaultCodFeePercentage: platformConfig.defaultCodFeePercentage,
-          defaultCancellationFee: platformConfig.defaultCancellationFee,
+          baseRate: zonePricing.baseRate,
+          extraRatePerKg: zonePricing.extraRatePerKg,
+          freeWeightKg: zonePricing.freeWeightKg,
+          maxWeightKg: zonePricing.maxWeightKg,
+          codFeePercentage: zonePricing.codFeePercentage,
+          cancellationFee: zonePricing.cancellationFee,
         })
-        .from(platformConfig)
+        .from(zonePricing)
+        .orderBy(asc(zonePricing.baseRate))
         .limit(1)
         .then((r) => r[0])
 
-      return {
-        baseRate: config?.defaultBaseRate ?? DEFAULT_PRICING.baseRate,
-        extraRatePerKg:
-          config?.defaultExtraRatePerKg ?? DEFAULT_PRICING.extraRatePerKg,
-        freeWeightKg:
-          config?.defaultFreeWeightKg ?? DEFAULT_PRICING.freeWeightKg,
-        maxWeightKg: config?.defaultMaxWeightKg ?? DEFAULT_PRICING.maxWeightKg,
-        codFeePercentage:
-          config?.defaultCodFeePercentage ?? DEFAULT_PRICING.codFeePercentage,
-        cancellationFee:
-          config?.defaultCancellationFee ?? DEFAULT_PRICING.cancellationFee,
-      }
+      return cheapestLane ?? SAMPLE_PRICING
     } catch {
-      return DEFAULT_PRICING
+      return SAMPLE_PRICING
     }
   },
   ["landing-platform-config"],

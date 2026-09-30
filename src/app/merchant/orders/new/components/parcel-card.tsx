@@ -28,7 +28,6 @@ interface ParcelCardProps {
   row: ParcelRow
   index: number
   parcelCount: number
-  maxWeightKg: number
   deliveryCities: DeliveryCityOption[]
   myLocations: Array<{ id: string; label: string }>
   updateParcel: <K extends keyof ParcelState>(
@@ -43,7 +42,6 @@ export function ParcelCard({
   row,
   index,
   parcelCount,
-  maxWeightKg,
   deliveryCities,
   myLocations,
   updateParcel,
@@ -56,9 +54,16 @@ export function ParcelCard({
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <CardTitle className="text-base">Parcel {index + 1}</CardTitle>
           <CardDescription className="text-right">
-            {row.exceedsMax ? (
+            {row.pricingUnavailable ? (
+              <span
+                className="text-destructive"
+                data-testid="parcel-pricing-unavailable"
+              >
+                {row.pricingError}
+              </span>
+            ) : row.exceedsMax ? (
               <span className="text-destructive">
-                exceeds {maxWeightKg} KG limit
+                exceeds {row.maxWeightKg} KG limit
               </span>
             ) : (
               <span className="text-chart-1">

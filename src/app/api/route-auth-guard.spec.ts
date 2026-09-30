@@ -57,9 +57,6 @@ const PUBLIC_ALLOWLIST = new Set<string>([
   "delivery-cities/route.ts",
   "delivery-zones/route.ts",
   "zone-pricing/route.ts",
-  // Platform-default rates, the fallback for the order form's live quote when a
-  // city pair has no zone-pricing row. No PII, anonymous-safe.
-  "platform-pricing/route.ts",
 ])
 
 function collectRouteFiles(dir: string): string[] {

@@ -16,14 +16,8 @@ export const GET = withErrorHandler(async () => {
   const config = await dbRead
     .select({
       id: platformConfig.id,
-      defaultCodFeePercentage: platformConfig.defaultCodFeePercentage,
       minCodFeePercentage: platformConfig.minCodFeePercentage,
       maxCodFeePercentage: platformConfig.maxCodFeePercentage,
-      defaultBaseRate: platformConfig.defaultBaseRate,
-      defaultExtraRatePerKg: platformConfig.defaultExtraRatePerKg,
-      defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
-      defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
-      defaultCancellationFee: platformConfig.defaultCancellationFee,
       refundOnCancel: platformConfig.refundOnCancel,
       updatedAt: platformConfig.updatedAt,
     })
@@ -58,14 +52,8 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   let config = await db
     .select({
       id: platformConfig.id,
-      defaultCodFeePercentage: platformConfig.defaultCodFeePercentage,
       minCodFeePercentage: platformConfig.minCodFeePercentage,
       maxCodFeePercentage: platformConfig.maxCodFeePercentage,
-      defaultBaseRate: platformConfig.defaultBaseRate,
-      defaultExtraRatePerKg: platformConfig.defaultExtraRatePerKg,
-      defaultFreeWeightKg: platformConfig.defaultFreeWeightKg,
-      defaultMaxWeightKg: platformConfig.defaultMaxWeightKg,
-      defaultCancellationFee: platformConfig.defaultCancellationFee,
       refundOnCancel: platformConfig.refundOnCancel,
       updatedAt: platformConfig.updatedAt,
     })
@@ -93,7 +81,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     action: "PLATFORM_CONFIG_UPDATED",
     entityType: "platform_config",
     entityId: config.id,
-    description: "Updated platform config defaults",
+    description: "Updated platform config",
     metadata: fields,
   })
 
