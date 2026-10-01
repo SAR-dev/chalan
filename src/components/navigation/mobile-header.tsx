@@ -115,22 +115,34 @@ export function MobileHeader({
 
           {/* Nav — closes the drawer on navigation */}
           <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
-            {navItems.map((item) => {
+            {navItems.map((item, i) => {
               const active = isNavItemActive(item, pathname)
               const Icon = item.icon
+              // Mirrors RoleSidebar: a header appears when the group changes,
+              // so the mobile drawer reads the same as the desktop sidebar
+              // rather than flattening every section into one long list.
+              const prevGroup = i > 0 ? navItems[i - 1]?.group : undefined
+              const showGroupHeader = item.group && item.group !== prevGroup
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    navLinkClass,
-                    active ? navLinkActive : navLinkIdle,
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
+                <div key={item.href}>
+                  {showGroupHeader ? (
+                    <p className="text-sidebar-foreground/40 mt-3 mb-1 px-3 text-[10px] font-semibold tracking-widest uppercase">
+                      {item.group}
+                    </p>
+                  ) : null}
+                  <Link
+                    href={item.href}
+                    data-testid={`nav-${item.href}`}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      navLinkClass,
+                      active ? navLinkActive : navLinkIdle,
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </div>
               )
             })}
           </nav>

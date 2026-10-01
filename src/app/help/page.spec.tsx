@@ -30,6 +30,16 @@ describe("Help center page", () => {
       expect(link).toHaveAttribute("href", `/help/${slug}`)
       expect(link).toHaveTextContent(title)
     }
-    expect(screen.getByTestId("help-faq-link")).toHaveAttribute("href", "/faq")
+  })
+
+  // The FAQ page was removed; the guides are the only answer surface now. A
+  // leftover link to /faq is a dead end (the route 404s), so pin its absence.
+  it("offers no link to a FAQ page", async () => {
+    await importPage()
+    const hrefs = screen
+      .queryAllByRole("link")
+      .map((a) => a.getAttribute("href"))
+    expect(hrefs).not.toContain("/faq")
+    expect(hrefs).toContain("/track")
   })
 })

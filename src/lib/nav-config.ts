@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Banknote,
   BarChart3,
   Bell,
   Bike,
@@ -66,6 +67,13 @@ export interface SidebarConfig {
 export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
   brandIcon: SiteIcon,
   roleLabel: "Super Admin",
+  // Grouped, work-first: the queues you work come before the directories you
+  // consult, money after coverage, logs and settings last. The landing page
+  // (`Overview`) stays ungrouped so it reads as the top-level entry point.
+  //
+  // Groups must stay contiguous — `RoleSidebar` renders a header whenever
+  // `item.group` differs from the previous item's, so an interleaved group
+  // would repeat its header.
   items: [
     {
       href: "/dashboard",
@@ -73,83 +81,110 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       icon: LayoutDashboard,
       exact: true,
     },
-    {
-      href: "/dashboard/orders",
-      label: "Orders",
-      icon: Package,
-      group: "Management",
-    },
-    {
-      href: "/dashboard/merchants",
-      label: "Merchants",
-      icon: Store,
-      group: "Management",
-    },
+    // The three approval queues, in the order the admin guide works them.
     {
       href: "/dashboard/nid-reviews",
       label: "Merchant Reviews",
       icon: FileText,
-      group: "Management",
+      group: "Approvals",
     },
     {
-      href: "/dashboard/riders",
-      label: "Riders",
-      icon: Bike,
-      group: "Management",
+      href: "/dashboard/orders",
+      label: "Orders",
+      icon: Package,
+      group: "Approvals",
     },
     {
       href: "/dashboard/rider-applications",
       label: "Rider Applications",
       icon: UserPlus,
-      group: "Management",
+      group: "Approvals",
+    },
+    // Who sells, who delivers, where from, and who administers the platform.
+    {
+      href: "/dashboard/merchants",
+      label: "Merchants",
+      icon: Store,
+      group: "Directory",
+    },
+    {
+      href: "/dashboard/riders",
+      label: "Riders",
+      icon: Bike,
+      group: "Directory",
     },
     {
       href: "/dashboard/warehouses",
       label: "Warehouses",
       icon: WarehouseIcon,
-      group: "Operations",
+      group: "Directory",
     },
     {
-      href: "/dashboard/payouts",
-      label: "Payouts",
-      icon: Wallet,
-      group: "Operations",
+      href: "/dashboard/team",
+      label: "Admins",
+      icon: ShieldCheck,
+      group: "Directory",
+    },
+    {
+      href: "/dashboard/users",
+      label: "Users",
+      icon: Users,
+      group: "Directory",
+    },
+    // The pricing matrix an order prices itself from: zones -> cities -> rates.
+    {
+      href: "/dashboard/delivery-zones",
+      label: "Delivery Zones",
+      icon: MapPin,
+      group: "Coverage & pricing",
     },
     {
       href: "/dashboard/delivery-cities",
       label: "Delivery Cities",
       icon: MapPin,
-      group: "Operations",
-    },
-    {
-      href: "/dashboard/delivery-zones",
-      label: "Delivery Zones",
-      icon: MapPin,
-      group: "Operations",
+      group: "Coverage & pricing",
     },
     {
       href: "/dashboard/zone-pricing",
       label: "Zone Pricing",
-      icon: Wallet,
-      group: "Operations",
+      icon: Tag,
+      group: "Coverage & pricing",
     },
     {
       href: "/dashboard/packages",
       label: "Packages",
       icon: Package,
-      group: "Operations",
+      group: "Coverage & pricing",
     },
     {
-      href: "/dashboard/delivery-performance",
-      label: "Delivery Performance",
-      icon: BarChart3,
-      group: "Analytics",
+      href: "/dashboard/payouts",
+      label: "Payouts",
+      icon: Wallet,
+      group: "Money",
     },
     {
       href: "/dashboard/cod-settlement",
       label: "COD Settlement",
       icon: Receipt,
-      group: "Analytics",
+      group: "Money",
+    },
+    {
+      href: "/dashboard/delivery-performance",
+      label: "Delivery Performance",
+      icon: BarChart3,
+      group: "Reports",
+    },
+    {
+      href: "/dashboard/audit-logs",
+      label: "Audit Logs",
+      icon: ScrollText,
+      group: "Reports",
+    },
+    {
+      href: "/dashboard/email-logs",
+      label: "Email Logs",
+      icon: Mail,
+      group: "Reports",
     },
     {
       href: "/dashboard/announcements",
@@ -164,26 +199,12 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       group: "System",
     },
     {
-      href: "/dashboard/audit-logs",
-      label: "Audit Logs",
-      icon: ScrollText,
-      group: "System",
-    },
-    {
-      href: "/dashboard/email-logs",
-      label: "Email Logs",
-      icon: Mail,
-      group: "System",
-    },
-    {
       href: "/dashboard/support",
       label: "Support",
       icon: LifeBuoy,
       group: "System",
     },
     { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
-    { href: "/dashboard/users", label: "Users", icon: Users, group: "System" },
-    { href: "/dashboard/team", label: "Admins", icon: Users, group: "System" },
     {
       href: "/dashboard/settings",
       label: "Settings",
@@ -196,6 +217,7 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       label: "Account",
       icon: UserCog,
       exact: true,
+      group: "System",
     },
   ],
 }
@@ -220,6 +242,8 @@ export function homeForRole(role: Role): string {
 export const MERCHANT_SIDEBAR: SidebarConfig = {
   brandIcon: SiteIcon,
   roleLabel: "Merchant",
+  // Work-first: the order-taking actions, then money, then setup/reference,
+  // then the system surfaces. Landing page ungrouped, same as the other roles.
   items: [
     {
       href: "/merchant",
@@ -228,56 +252,75 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
       exact: true,
     },
     {
-      href: "/merchant/orders",
-      label: "Orders",
-      icon: Package,
-      exact: true,
-    },
-    {
       href: "/merchant/orders/new",
       label: "New Order",
       icon: PackagePlus,
       activePaths: ["/merchant/orders/import"],
+      group: "Orders",
     },
-    { href: "/merchant/finance", label: "Finance", icon: Wallet },
-    { href: "/merchant/pricing", label: "Pricing", icon: Tag, exact: true },
     {
-      href: "/merchant/delivery-cities",
-      label: "Delivery Cities",
-      icon: MapPin,
+      href: "/merchant/orders",
+      label: "Orders",
+      icon: Package,
       exact: true,
+      group: "Orders",
+    },
+    {
+      href: "/merchant/finance",
+      label: "Finance",
+      icon: Wallet,
+      group: "Money",
+    },
+    {
+      href: "/merchant/pricing",
+      label: "Pricing",
+      icon: Tag,
+      exact: true,
+      group: "Money",
     },
     {
       href: "/merchant/settings",
       label: "Business Settings",
       icon: UserCog,
       exact: true,
+      group: "Business",
     },
     {
       href: "/merchant/verify-nid",
       label: "Verification",
       icon: ShieldCheck,
       exact: true,
+      group: "Business",
     },
     {
-      href: "/merchant/account",
-      label: "Account",
-      icon: UserCog,
+      href: "/merchant/delivery-cities",
+      label: "Delivery Cities",
+      icon: MapPin,
       exact: true,
+      group: "Business",
     },
     {
       href: "/merchant/announcements",
       label: "Inbox",
       icon: Megaphone,
       exact: true,
+      group: "System",
     },
     {
       href: "/merchant/support",
       label: "Support",
       icon: LifeBuoy,
       exact: true,
+      group: "System",
     },
-    { href: "/help", label: "Help", icon: CircleHelp },
+    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
+    {
+      href: "/merchant/account",
+      label: "Account",
+      icon: UserCog,
+      exact: true,
+      group: "System",
+    },
   ],
 }
 
@@ -354,6 +397,8 @@ export function hasNavPermission(
 export const WAREHOUSE_SIDEBAR: SidebarConfig = {
   brandIcon: SiteIcon,
   roleLabel: "Warehouse",
+  // Work-first: the intake queue is the landing page, then the rest of the hub
+  // floor, then money, then system. Landing page ungrouped, like Overview.
   items: [
     {
       href: "/warehouse",
@@ -366,49 +411,64 @@ export const WAREHOUSE_SIDEBAR: SidebarConfig = {
       label: "Dispatch desk",
       icon: Truck,
       exact: true,
+      group: "Floor",
     },
     {
       href: "/warehouse/orders",
       label: "Order progress",
       icon: Package,
       exact: true,
+      group: "Floor",
     },
     {
       href: "/warehouse/riders",
       label: "Riders",
       icon: Bike,
       exact: true,
+      group: "Floor",
     },
     {
       href: "/warehouse/exceptions",
       label: "Exceptions",
       icon: AlertTriangle,
       exact: true,
+      group: "Floor",
     },
     {
       href: "/warehouse/cod-settlement",
       label: "COD Settlement",
-      icon: Wallet,
+      icon: Receipt,
       exact: true,
+      group: "Money",
+    },
+    {
+      href: "/warehouse/rider-cash",
+      label: "Rider Cash",
+      icon: Banknote,
+      exact: true,
+      group: "Money",
     },
     {
       href: "/warehouse/announcements",
       label: "Inbox",
       icon: Megaphone,
       exact: true,
+      group: "System",
     },
     {
       href: "/warehouse/support",
       label: "Support",
       icon: LifeBuoy,
       exact: true,
+      group: "System",
     },
-    { href: "/help", label: "Help", icon: CircleHelp },
+    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
     {
       href: "/warehouse/account",
       label: "Account",
       icon: UserCog,
       exact: true,
+      group: "System",
     },
   ],
 }
@@ -416,6 +476,9 @@ export const WAREHOUSE_SIDEBAR: SidebarConfig = {
 export const RIDER_SIDEBAR: SidebarConfig = {
   brandIcon: SiteIcon,
   roleLabel: "Rider",
+  // Work-first: the queue is the landing page, then the two queues, then money,
+  // then system. `Earnings` was documented in the rider guide but had no sidebar
+  // entry — it was reachable only by typing the URL.
   items: [
     { href: "/rider", label: "To-do", icon: ListChecks, exact: true },
     {
@@ -423,31 +486,43 @@ export const RIDER_SIDEBAR: SidebarConfig = {
       label: "Pickups",
       icon: PackageCheck,
       exact: true,
+      group: "Queues",
     },
     {
       href: "/rider/delivery",
       label: "Deliveries",
       icon: Truck,
       exact: true,
+      group: "Queues",
+    },
+    {
+      href: "/rider/earnings",
+      label: "Earnings",
+      icon: Wallet,
+      exact: true,
+      group: "Money",
     },
     {
       href: "/rider/announcements",
       label: "Inbox",
       icon: Megaphone,
       exact: true,
+      group: "System",
     },
     {
       href: "/rider/support",
       label: "Support",
       icon: LifeBuoy,
       exact: true,
+      group: "System",
     },
-    { href: "/help", label: "Help", icon: CircleHelp },
+    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
     {
       href: "/rider/account",
       label: "Account",
       icon: UserCog,
       exact: true,
+      group: "System",
     },
   ],
 }

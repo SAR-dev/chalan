@@ -123,7 +123,6 @@ describe("portalPageAllowed", () => {
       "/login",
       "/register",
       "/track/abc",
-      "/faq",
       "/help",
       "/apply",
     ]) {
@@ -154,7 +153,7 @@ describe("portalPageAllowed", () => {
     expect(portalPageAllowed("/rider", "public")).toBe(true)
     expect(portalPageAllowed("/login", "public")).toBe(true)
     expect(portalPageAllowed("/register", "public")).toBe(true)
-    expect(portalPageAllowed("/faq", "public")).toBe(true)
+    expect(portalPageAllowed("/help", "public")).toBe(true)
     expect(portalPageAllowed("/apply", "public")).toBe(true)
   })
 

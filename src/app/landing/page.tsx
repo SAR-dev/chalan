@@ -152,8 +152,8 @@ const features = [
   {
     icon: <LifeBuoy className="size-5" />,
     iconClass: "bg-chart-2/10 text-chart-2",
-    title: "Help Center & FAQ",
-    desc: "Step-by-step guides for merchants, riders, warehouse admins, and super admins, plus a full role-filtered FAQ — reachable from every page.",
+    title: "Help Center",
+    desc: "Step-by-step guides for merchants, riders, warehouse admins, and super admins — reachable from every page.",
   },
   {
     icon: <ShieldCheck className="size-5" />,
@@ -264,14 +264,6 @@ export default async function LandingPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                render={<Link href="/faq" />}
-                nativeButton={false}
-              >
-                FAQ
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
                 data-testid="nav-pricing"
                 render={<Link href="/rates" />}
                 nativeButton={false}
@@ -324,7 +316,7 @@ export default async function LandingPage() {
               <span className="bg-chart-2 relative flex size-2 rounded-full">
                 <span className="bg-chart-2 absolute inset-0 animate-ping rounded-full opacity-60" />
               </span>
-              New: Help center, FAQ &amp; in-app ticket support
+              New: Help center &amp; in-app ticket support
               <ArrowRight className="text-muted-foreground group-hover:text-primary size-3 transition-colors" />
             </Link>
 
@@ -649,23 +641,10 @@ export default async function LandingPage() {
                   </li>
                   <li className="flex gap-2">
                     <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
-                    58-question FAQ covering orders, COD, pricing, packages, and
-                    returns
-                  </li>
-                  <li className="flex gap-2">
-                    <Check className="text-primary mt-0.5 size-3.5 shrink-0" />
                     Public tracking page — share a link, no account needed
                   </li>
                 </ul>
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    render={<Link href="/faq" />}
-                    nativeButton={false}
-                  >
-                    Browse the FAQ
-                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -701,16 +680,6 @@ export default async function LandingPage() {
                     Optional IP allowlisting for admin portals
                   </li>
                 </ul>
-                <div className="mt-5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    render={<Link href="/faq" />}
-                    nativeButton={false}
-                  >
-                    Security questions in the FAQ
-                  </Button>
-                </div>
               </div>
             </div>
           </div>
@@ -815,12 +784,8 @@ export default async function LandingPage() {
               </div>
               <p className="text-muted-foreground mt-6 text-xs">
                 Questions first?{" "}
-                <Link href="/faq" className="text-primary hover:underline">
-                  Read the FAQ
-                </Link>{" "}
-                or{" "}
                 <Link href="/help" className="text-primary hover:underline">
-                  browse the guides
+                  Browse the guides
                 </Link>
                 .
               </p>

@@ -42,12 +42,14 @@ How to run your hub on {{APP_NAME}}. Sign in at **{{APP_URL}}/login** and open t
 3. Settle a parcel to mark its COD as accounted for. Settlement is what makes the order **payable to the merchant** — they then see it in **Available for payout** on their Finance page.
 4. Settle promptly; merchants cannot request a payout for cash you have not settled.
 
-## 7. Handle rider cash
+## 7. Read the rider cash panel
 
-1. Open **Rider cash** (`/warehouse/rider-cash`).
-2. It shows, per rider, the cash they are **holding**, have **submitted**, and that you have **confirmed**.
-3. Confirm a submission when the cash reaches you. Confirmed cash is what reaches merchant payouts.
-4. If a rider's totals look wrong, raise it with them before confirming — a confirmed entry is what the platform reconciles against.
+1. Open **Rider Cash** (`/warehouse/rider-cash`). It covers every rider attached to your hub, and it is a read-only view.
+2. The three cards give the hub-wide totals: **Total Cash on Hand**, **Total Collected**, and **Total Submitted**.
+3. The table gives one row per rider with the same three figures and a **Status** badge — **High** when a rider is carrying more cash than the panel's threshold, **Normal** otherwise.
+4. **Collected** is every COD delivery the rider has made. **Submitted** is the part already settled. **Cash on Hand** is the difference: what the rider is still carrying.
+5. There is no confirm action on this page. Cash leaves a rider's hand on **COD Settlement** (`/warehouse/cod-settlement`) — settling there is what marks the cash submitted and makes the order payable to the merchant.
+6. If a rider's totals look wrong, compare them against that rider's **Earnings** list and raise it with them first. Settle only once the figures agree.
 
 ## 8. Manage your riders
 

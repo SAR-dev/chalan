@@ -207,12 +207,6 @@ export default async function TrackPage({ searchParams }: Props) {
           </p>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs">
             <Link
-              href="/faq"
-              className="text-primary font-medium hover:underline"
-            >
-              Read the FAQ
-            </Link>
-            <Link
               href="/help"
               className="text-primary font-medium hover:underline"
             >

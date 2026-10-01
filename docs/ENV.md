@@ -226,7 +226,7 @@ Notes:
 - Enforcement: disabled portals' pages `404` at the edge (`src/proxy.ts`), and
   their roles get `401` from `requireSession()` on API calls (the sign-in flow
   additionally signs such sessions out with a clear message). Shared surfaces
-  (`/login`, `/register`, `/track`, `/faq`, `/help`, `/apply`, public APIs)
+  (`/login`, `/register`, `/track`, `/help`, `/apply`, public APIs)
   stay reachable in every mode.
 
 ---

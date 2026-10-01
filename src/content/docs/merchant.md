@@ -17,6 +17,7 @@ Step-by-step tasks for running your deliveries on {{APP_NAME}}. Open the merchan
 2. Under **Business details**, keep your contact information current — it appears on pickups, labels, and emails.
 3. Under **Pickup locations**, add each address riders should collect from. Every location is linked to a delivery city, which determines the warehouse (hub) that handles your parcels.
 4. Save. New orders can then use these locations from the **pickup** dropdown.
+5. **Delivery Cities** (`/merchant/delivery-cities`) lists every city the platform delivers to, grouped by its delivery zone. The platform sets it — check it before promising a destination.
 
 ## 3. Create an order
 
@@ -60,8 +61,9 @@ Step-by-step tasks for running your deliveries on {{APP_NAME}}. Open the merchan
 4. Submit. Your request is created as **Pending**; the platform approves it (**Approved**) or rejects it with a reason, then marks it **Paid**.
 5. Track every request and its status in the **Payout requests** table on the same page.
 
-## 8. Manage branding and announcements
+## 8. Manage branding, announcements, and support
 
 1. On **Business Settings** (`/merchant/settings`), use the **Branding** card to upload your logo and pick a brand colour — it is applied to your sidebar and outgoing emails.
 2. Open **Inbox** (`/merchant/announcements`) for platform announcements; unread items also appear as a dismissible banner at the top of the app.
-3. Open **Account** (`/merchant/account`) to update your name and change your password (current password + at least 8 characters).
+3. Open **Support** (`/merchant/support`) to raise a ticket about an order, a charge, or your account, and to follow the replies on it.
+4. Open **Account** (`/merchant/account`) to update your name and change your password (current password + at least 8 characters).

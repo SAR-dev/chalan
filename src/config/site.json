@@ -4,5 +4,23 @@
   "description": "Chalan is a B2B courier platform for Bangladeshi merchants. Book deliveries, track parcels in real time, and manage your entire logistics operation from one place.",
   "siteUrl": "https://chalan.sarn.top",
   "author": "Chalan",
-  "ogImage": "/og-image.png"
+  "ogImage": "/og-image.png",
+  "legal": {
+    "legalVersion": "1.0",
+    "entityName": "Chalan Express Ltd",
+    "registeredAddress": "House 620/2A, 2B, Road 9, Avenue 2, Mirpur DOHS, Dhaka, Bangladesh",
+    "contactEmail": "support@chalan.sarn.top",
+    "governingLaw": "the laws of Bangladesh",
+    "jurisdiction": "the courts of Dhaka, Bangladesh",
+    "regulator": "Bangladesh Bank",
+    "privacyAuthority": "the relevant data protection authority",
+    "paymentPartners": "bKash and Nagad",
+    "idDocuments": "National ID (NID), Trade License, and TIN",
+    "customsLaw": "the Customs Act of Bangladesh",
+    "currency": "BDT",
+    "maxCodValue": "1,00,000",
+    "liabilityCap": "5,000",
+    "rtmFeeIntraCity": "50%",
+    "rtmFeeInterCity": "100%"
+  }
 }

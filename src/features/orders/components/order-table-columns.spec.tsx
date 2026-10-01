@@ -58,7 +58,7 @@ describe("item type is absent from the shared order lists", () => {
 describe("riderParcelColumn", () => {
   it("shows the weight the rider has to carry", () => {
     const col = riderParcelColumn()
-    render(<>{col.cell?.(makeOrder({ parcelWeightKg: 3 }))}</>)
+    render(col.cell?.(makeOrder({ parcelWeightKg: 3 })))
     expect(screen.getByText("3 KG")).toBeInTheDocument()
   })
 
@@ -68,9 +68,7 @@ describe("riderParcelColumn", () => {
     // but the contents must not reach them.
     const col = riderParcelColumn()
     render(
-      <>
-        {col.cell?.(makeOrder({ parcelWeightKg: 2, itemType: "Cotton saree" }))}
-      </>,
+      col.cell?.(makeOrder({ parcelWeightKg: 2, itemType: "Cotton saree" })),
     )
     expect(screen.getByText("2 KG")).toBeInTheDocument()
     expect(screen.queryByText("Cotton saree")).not.toBeInTheDocument()

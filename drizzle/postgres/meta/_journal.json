@@ -15,6 +15,13 @@
       "when": 1790805424677,
       "tag": "0001_slim_kid_colt",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790808901701,
+      "tag": "0002_flashy_martin_li",
+      "breakpoints": true
     }
   ]
 }

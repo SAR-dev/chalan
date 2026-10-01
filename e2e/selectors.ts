@@ -242,6 +242,25 @@ export const warehouse = {
   bulkSettle: "[data-testid='bulk-settle']",
 }
 
+// ─── Rider cash holdings (warehouse) ─────────────────────────────────────────
+// The page is reached by URL, not by nav: `/warehouse/rider-cash` has no inbound
+// link, so the spec navigates to it directly. The three totals and the table
+// states are tagged individually because the assertions need to tell "still
+// loading" apart from "loaded but empty" — which is the whole regression here.
+export const riderCash = {
+  page: "[data-testid='rider-cash-page']",
+  navLink: "[data-testid='nav-/warehouse/rider-cash']",
+  totalOnHand: "[data-testid='rider-cash-total-on-hand']",
+  totalCollected: "[data-testid='rider-cash-total-collected']",
+  totalSubmitted: "[data-testid='rider-cash-total-submitted']",
+  loading: "[data-testid='rider-cash-loading']",
+  refreshing: "[data-testid='rider-cash-refreshing']",
+  empty: "[data-testid='rider-cash-empty']",
+  error: "[data-testid='rider-cash-error']",
+  row: (riderId: string) => `[data-testid='rider-cash-row-${riderId}']`,
+  table: "[data-testid='rider-cash-table']",
+}
+
 // ─── Rider Pages ─────────────────────────────────────────────────────────────
 export const rider = {
   dashboard: "[data-testid='rider-dashboard']",
@@ -451,18 +470,9 @@ export const shared = {
   printButton: "[data-testid='print-button']",
 }
 
-// ─── Help center & FAQ ───────────────────────────────────────────────────────
+// ─── Help center ─────────────────────────────────────────────────────────────
 export const help = {
   guideLink: (slug: string) => `[data-testid='help-guide-${slug}']`,
-  faqLink: "[data-testid='help-faq-link']",
-}
-
-// ─── FAQ role tabs ───────────────────────────────────────────────────────────
-export const faq = {
-  tabs: "[data-testid='faq-tabs']",
-  tab: (role: string) => `[data-testid='faq-tab-${role}']`,
-  visibleSections: (role: string) => `[data-testid='faq-sections-${role}']`,
-  section: (id: string) => `[data-testid='faq-section-${id}']`,
 }
 
 // ─── Support tickets ─────────────────────────────────────────────────────────

@@ -176,6 +176,11 @@ export default function ApplyRiderPage() {
             VEHICLE_TYPES_REQUIRING_PLATE.has(form.vehicleType)
               ? form.vehiclePlate.trim()
               : null,
+          // The handler above already refuses to submit until the box is
+          // ticked, so reaching this line means acceptance was given. The server
+          // stamps its own timestamp and version from config — this only attests
+          // that the box was ticked.
+          termsAccepted: true,
         }),
       })
       const data = await res.json().catch(() => null)

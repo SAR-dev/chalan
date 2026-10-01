@@ -116,6 +116,7 @@ describe("WAREHOUSE_SIDEBAR", () => {
     expect(labels).toContain("Riders")
     expect(labels).toContain("Exceptions")
     expect(labels).toContain("COD Settlement")
+    expect(labels).toContain("Rider Cash")
     expect(labels).toContain("Inbox")
     expect(labels).toContain("Account")
   })
@@ -133,6 +134,9 @@ describe("RIDER_SIDEBAR", () => {
     expect(labels).toContain("To-do")
     expect(labels).toContain("Pickups")
     expect(labels).toContain("Deliveries")
+    // Documented in the rider guide but had no sidebar entry; reachable only by
+    // typing the URL until it was added here.
+    expect(labels).toContain("Earnings")
     expect(labels).toContain("Inbox")
     expect(labels).toContain("Account")
   })
@@ -142,6 +146,60 @@ describe("RIDER_SIDEBAR", () => {
       expect(item.href).toMatch(/^\/(rider|help)/)
     }
   })
+})
+
+// `RoleSidebar` (and the mobile drawer, which mirrors it) renders a group header
+// whenever an item's `group` differs from the *previous* item's. An item whose
+// group reappears further down therefore repeats its header mid-list, so
+// contiguity is load-bearing rather than cosmetic. The first item is also
+// deliberately ungrouped: it is the role's landing page.
+describe("sidebar grouping", () => {
+  const sidebars = [
+    ["SUPER_ADMIN", SUPER_ADMIN_SIDEBAR],
+    ["MERCHANT", MERCHANT_SIDEBAR],
+    ["WAREHOUSE", WAREHOUSE_SIDEBAR],
+    ["RIDER", RIDER_SIDEBAR],
+  ] as const
+
+  it.each(sidebars)("%s: every sidebar is grouped", (_name, config) => {
+    expect(config.items[0].group).toBeUndefined()
+    expect(config.items.length).toBeGreaterThan(1)
+    // Everything past the landing page sits under a header.
+    for (const item of config.items.slice(1)) {
+      expect(item.group, `${item.label} is missing a group`).toBeTruthy()
+    }
+  })
+
+  it.each(sidebars)("%s: no group is split by another", (_name, config) => {
+    const seen = new Set<string>()
+    let current: string | undefined
+
+    for (const item of config.items) {
+      if (item.group !== current) {
+        // Re-entering a group we already left means its header would render
+        // twice, so the new group must not be one we have closed.
+        expect(
+          seen.has(item.group ?? ""),
+          `${item.group} is not contiguous`,
+        ).toBe(false)
+        if (current) seen.add(current)
+        current = item.group
+      }
+    }
+  })
+
+  it.each(sidebars)(
+    "%s: shared sections use the same group name",
+    (_name, config) => {
+      const groups = new Set(
+        config.items.map((i) => i.group).filter((g): g is string => Boolean(g)),
+      )
+      // Money and System appear in every sidebar — part of a shared vocabulary
+      // across roles rather than a per-role invention.
+      expect(groups.has("Money")).toBe(true)
+      expect(groups.has("System")).toBe(true)
+    },
+  )
 })
 
 describe("isNavItemActive", () => {
@@ -236,17 +294,23 @@ describe("merchant moderator nav grants (ROADMAP 5.2)", () => {
     expect(hasNavPermission(smuggled, "/merchant/orders")).toBe(true)
   })
 
-  // Delivery Cities is reference information rather than an order-taking
-  // surface, so it is deliberately not one of the moderator grants — and it
-  // reads public endpoints, meaning the nav rules are its ONLY gate. Worth
-  // pinning exactly: a stale grant must not be enough.
+  // Deliberately not one of the moderator grants: it is reference information
+  // rather than an order-taking surface, and it reads public endpoints, meaning
+  // the nav rules are its ONLY gate. The meaningful claim is that it is
+  // owner-only and grouped with the rest of the merchant's business setup.
   const deliveryCitiesHref = "/merchant/delivery-cities"
 
-  it("sits directly after Pricing for the owner", () => {
-    const hrefs = merchantVisibleNavItems(owner).map((i) => i.href)
+  it("stays in the Business group, after the money sections", () => {
+    const items = merchantVisibleNavItems(owner)
+    const hrefs = items.map((i) => i.href)
+    const deliveryCities = items.find((i) => i.href === deliveryCitiesHref)!
+
     expect(hrefs).toContain(deliveryCitiesHref)
-    expect(hrefs.indexOf(deliveryCitiesHref)).toBe(
-      hrefs.indexOf("/merchant/pricing") + 1,
+    expect(deliveryCities.group).toBe("Business")
+    // Later in the nav than Pricing, but no longer pinned directly beside it —
+    // it moved with the other setup surfaces when the sidebars were grouped.
+    expect(hrefs.indexOf(deliveryCitiesHref)).toBeGreaterThan(
+      hrefs.indexOf("/merchant/pricing"),
     )
   })
 
