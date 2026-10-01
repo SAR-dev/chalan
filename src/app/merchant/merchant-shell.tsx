@@ -222,8 +222,14 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
 
   if (!isReady || !currentUser || currentUser.role !== "MERCHANT") {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
+      // Auth-init placeholder: without a live region a screen reader lands on
+      // a blank region with no indication anything is happening (ROADMAP R2.7).
+      <div
+        role="status"
+        className="bg-background flex min-h-screen items-center justify-center"
+      >
         <Loader2 className="text-muted-foreground size-6 animate-spin" />
+        <span className="sr-only">Loading…</span>
       </div>
     )
   }

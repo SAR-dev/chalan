@@ -61,7 +61,10 @@
   --secondary: oklch(0.96 0.006 247);
   --secondary-foreground: oklch(0.3 0.03 256);
   --muted: oklch(0.96 0.006 247);
-  --muted-foreground: oklch(0.55 0.02 256);
+  /* 0.55 put this at ~4.32:1 on `--muted`, below the 4.5:1 AA floor, and that
+     surface backs table meta rows and empty-state helper copy. 0.50 clears it
+     with margin on `--background` and `--card` too (ROADMAP R2.9). */
+  --muted-foreground: oklch(0.5 0.02 256);
   --accent: oklch(0.93 0.04 195);
   --accent-foreground: oklch(0.3 0.06 220);
   --destructive: oklch(0.577 0.245 27.325);
@@ -169,5 +172,26 @@
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
+  }
+}
+
+/* Roadmap R2.6 — WCAG 2.3.3.
+ *
+ * Nothing in the tree honoured this before: `animate-ping` loops forever on
+ * the landing page and both announcement inboxes, and every skeleton uses
+ * `animate-pulse`. One block covers all of it, including anything added later,
+ * because it operates on the animation rather than the utility class.
+ *
+ * `animation-iteration-count: 1` (rather than `none`) still lets a one-shot
+ * entrance animation run once — the goal is to stop *looping*, not to freeze
+ * the UI mid-state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

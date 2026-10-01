@@ -138,6 +138,7 @@ export default function RiderPickupQueuePage() {
             href={mapLink}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Open pickup location in maps for order ${o.id}`}
             className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent"
           >
             <MapPin className="size-4" />

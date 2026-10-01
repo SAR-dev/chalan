@@ -3,6 +3,7 @@
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -30,6 +31,9 @@ export function OrderDetailsDrawer({
       >
         <SheetHeader className="border-border border-b pr-12">
           <SheetTitle>Order details</SheetTitle>
+          <SheetDescription>
+            Status, parcel contents and delivery history for this order.
+          </SheetDescription>
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">

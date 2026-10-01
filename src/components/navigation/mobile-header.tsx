@@ -114,7 +114,10 @@ export function MobileHeader({
           </SheetDescription>
 
           {/* Nav — closes the drawer on navigation */}
-          <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
+          <nav
+            aria-label="Main"
+            className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2"
+          >
             {navItems.map((item, i) => {
               const active = isNavItemActive(item, pathname)
               const Icon = item.icon
@@ -134,6 +137,9 @@ export function MobileHeader({
                     href={item.href}
                     data-testid={`nav-${item.href}`}
                     onClick={() => setOpen(false)}
+                    // Same signal as the desktop sidebar — the drawer is the
+                    // only nav visible on a phone (ROADMAP R2.1).
+                    aria-current={active ? "page" : undefined}
                     className={cn(
                       navLinkClass,
                       active ? navLinkActive : navLinkIdle,

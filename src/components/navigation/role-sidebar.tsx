@@ -77,7 +77,10 @@ export function RoleSidebar({
       </Link>
 
       {/* Nav — no rules, no boxes, just rhythm and spacing */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
+      <nav
+        aria-label="Main"
+        className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2"
+      >
         {config.items.map((item, i) => {
           const active = isNavItemActive(item, pathname)
           const Icon = item.icon
@@ -93,6 +96,10 @@ export function RoleSidebar({
               <Link
                 href={item.href}
                 data-testid={`nav-${item.href}`}
+                // The active item is signalled by a tonal fill alone; a
+                // screen reader gets no sense of place without this
+                // (ROADMAP R2.1).
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   navLinkClass,
                   active ? navLinkActive : navLinkIdle,

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -164,6 +165,10 @@ function QuickFiltersModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Quick Filters</DialogTitle>
+          <DialogDescription>
+            Narrow the list by date or category. Filters combine with the
+            table&apos;s search rather than replacing it.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4 py-2">
           {sections.map((section) => (

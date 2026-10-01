@@ -142,6 +142,7 @@ export default function RiderDeliveryQueuePage() {
             href={mapLink}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Open delivery location in maps for order ${o.id}`}
             className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent"
           >
             <MapPin className="size-4" />

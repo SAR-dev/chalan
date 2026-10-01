@@ -680,6 +680,11 @@ export function DataTable<T>({
         {showRefreshOverlay ? (
           <div
             data-testid={id ? `table-refreshing-${id}` : "table-refreshing"}
+            // `role="status"` so the visible "Refreshing…" is announced: the
+            // overlay changes the rows under a screen-reader user with no
+            // other signal (the table's own `aria-busy` below marks the state
+            // but does not speak it) (ROADMAP R2.7).
+            role="status"
             className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center"
           >
             <div className="bg-background flex flex-col items-center gap-2 rounded-lg border px-4 py-3 shadow-sm">
@@ -809,6 +814,24 @@ export function DataTable<T>({
                     key={key}
                     data-testid={id ? `row-${id}-${key}` : undefined}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    // A `cursor-pointer` row driven only by onClick is
+                    // mouse-only (WCAG 2.1.1) — it looks interactive and does
+                    // nothing for a keyboard user. Give it a focus stop and the
+                    // two standard activation keys, centrally, so no page has
+                    // to remember (ROADMAP R2.3).
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onKeyDown={
+                      onRowClick
+                        ? (event) => {
+                            if (event.key !== "Enter" && event.key !== " ") {
+                              return
+                            }
+                            // Space scrolls the page otherwise.
+                            event.preventDefault()
+                            onRowClick(row)
+                          }
+                        : undefined
+                    }
                     className={cn(
                       "group/row",
                       onRowClick ? "cursor-pointer" : undefined,

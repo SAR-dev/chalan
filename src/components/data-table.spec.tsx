@@ -250,10 +250,11 @@ describe("DataTable", () => {
         bulkActions={[{ label: "Delete", onClick: vi.fn() }]}
       />,
     )
-    // select-all checkbox is inside an aria-hidden th, so getAllByRole
-    // only finds the 3 row checkboxes
+    // Select-all is in the accessibility tree now: R2.2 removed the
+    // `aria-hidden="true"` that was hiding this entire cell from `getAllByRole`
+    // — which is what made bulk select invisible to a screen reader.
     const checkboxes = screen.getAllByRole("checkbox")
-    expect(checkboxes).toHaveLength(3)
+    expect(checkboxes).toHaveLength(4)
     expect(screen.getByLabelText("Select all rows")).toBeInTheDocument()
   })
 
@@ -313,8 +314,10 @@ describe("DataTable", () => {
       />,
     )
     const checkboxes = () => screen.getAllByRole("checkbox")
-    await user.click(checkboxes()[0]) // Charlie (id 1)
-    await user.click(checkboxes()[2]) // Bob (id 3)
+    // Index 0 is select-all (R2.2 put it back in the accessibility tree):
+    // selecting everything, then unchecking Alice, leaves Charlie + Bob.
+    await user.click(checkboxes()[0])
+    await user.click(checkboxes()[2])
     await user.click(screen.getByRole("button", { name: "Process" }))
     // Confirmation dialog appears
     expect(
@@ -338,7 +341,9 @@ describe("DataTable", () => {
         bulkActions={[{ label: "Delete", onClick: vi.fn() }]}
       />,
     )
-    // select-all is inside an aria-hidden th; find it by label
+    // Find it by label rather than by index — it is at index 0 now that R2.2
+    // removed the aria-hidden (this loop asserts every checkbox, which is the
+    // behaviour under test).
     const selectAll = screen.getByLabelText("Select all rows")
     await user.click(selectAll)
     const rowCheckboxes = screen.getAllByRole("checkbox")
@@ -381,12 +386,14 @@ describe("DataTable", () => {
         onSelectionChange={onSelectionChange}
       />,
     )
-    // Alice (id "2") should be pre-selected; select-all is aria-hidden
-    // so checkboxes are [Charlie, Alice, Bob]
+    // Select-all is in the tree as well (ROADMAP R2.2), so the list is
+    // [select-all, Charlie, Alice, Bob] — Alice, pre-selected via
+    // `selectedKeys`, sits at index 2.
     const checkboxes = screen.getAllByRole("checkbox")
-    expect(checkboxes[1]).toBeChecked()
-    // Toggle a different row
-    await user.click(checkboxes[0])
+    expect(checkboxes).toHaveLength(4)
+    expect(checkboxes[2]).toBeChecked()
+    // Toggle a different row: Charlie is the first row, now at index 1.
+    await user.click(checkboxes[1])
     expect(onSelectionChange).toHaveBeenCalled()
     const newKeys = onSelectionChange.mock.calls[0][0]
     expect(newKeys).toBeInstanceOf(Set)
