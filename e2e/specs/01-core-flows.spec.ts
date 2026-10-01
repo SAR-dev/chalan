@@ -205,11 +205,15 @@ test.describe("S22. Delivery Fee Calculator", () => {
   })
 })
 
-// ─── S23. FAQ & Help Center ──────────────────────────────────────────────────
-test.describe("S25. FAQ & Help Center", () => {
-  test("faq page renders", async ({ page }) => {
-    await page.goto("/faq")
-    await expect(page.getByRole("heading", { name: /faq/i })).toBeVisible()
+// ─── S25. Help Center ────────────────────────────────────────────────────────
+// The FAQ page was removed: the role guides under /help are the only answer
+// surface now, and every inbound link to /faq was taken out. S25 keeps its id —
+// suite ids are a unique serial, not a name — and swaps the old render test for
+// a guard so the route cannot come back without someone noticing.
+test.describe("S25. Help Center", () => {
+  test("the retired FAQ route returns 404", async ({ page }) => {
+    const res = await page.goto("/faq")
+    expect(res?.status()).toBe(404)
   })
 
   test("help center opens a guide", async ({ page }) => {

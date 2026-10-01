@@ -31,15 +31,19 @@ Operating tasks for Super Admins running {{APP_NAME}} from the admin console at 
 1. **Warehouses** (`/dashboard/warehouses`) — create, rename, activate, and deactivate hubs. Every pickup location resolves to a warehouse through its delivery city.
 2. **Riders** (`/dashboard/riders`) — the full rider roster: add riders, edit details, and change status.
 3. **Rider Applications** (`/dashboard/rider-applications`) — review applications from **{{APP_URL}}/apply/rider**. Approve by choosing a **task type** (pickup, delivery, or both) and a **home warehouse**; approval activates the login and sends an approval email. Reject with a reason otherwise.
-4. **Admins** (`/dashboard/team`) — create and manage Super Admin and Warehouse Admin accounts.
+4. **Admins** (`/dashboard/team`) — create and manage Super Admin and Warehouse Admin accounts, and set which hub a Warehouse Admin belongs to.
+5. **Users** (`/dashboard/users`) — every registered account regardless of role. Filter by the role tabs, then use the row menu to **Reset password** or **ban** an account.
 
 ## 5. Configure zones and pricing
 
 1. **Delivery Zones** (`/dashboard/delivery-zones`) — create and maintain zones such as "Dhaka Metro" or "Divisional Cities".
 2. **Delivery Cities** (`/dashboard/delivery-cities`) — assign each city a zone and the warehouse that serves it. This drives both routing and pricing.
 3. **Zone Pricing** (`/dashboard/zone-pricing`) — fill the origin × destination pricing matrix: for each zone pair set the base rate, extra per-kg rate, free weight, max weight, and COD fee percentage.
-4. Orders price themselves from that matrix; if a pair is missing, the merchant's own flat rates are used as a fallback.
-5. **Settings** (`/dashboard/settings`) holds **default merchant pricing** for new merchants and the **mail configuration** (SMTP) used for all outgoing email.
+4. **Packages** (`/dashboard/packages`) — prepaid delivery bundles merchants can buy. Define each package, the discount tiers it unlocks, then approve or reject a merchant's purchase request.
+5. Orders price themselves from that matrix; if a pair is missing, the merchant's own flat rates are used as a fallback.
+6. **Settings** (`/dashboard/settings`) holds **default merchant pricing** for new merchants and the **mail configuration** (SMTP) used for all outgoing email.
+
+The first four sit in the sidebar's **Coverage & pricing** section; **Settings** sits further down under **System**.
 
 ## 6. Approve and pay payouts
 
@@ -59,9 +63,11 @@ Operating tasks for Super Admins running {{APP_NAME}} from the admin console at 
 ## 8. Communications and system logs
 
 1. **Announcements** (`/dashboard/announcements`) — publish targeted announcements; they appear as a banner and in each role's **Inbox**.
-2. **Audit Logs** (`/dashboard/audit-logs`) — who did what, across orders, merchants, payouts, and team changes.
-3. **Email Logs** (`/dashboard/email-logs`) — outgoing message history and delivery state.
-4. **Account** (`/dashboard/account`) — update your name and change your password (current password + at least 8 characters).
+2. **Inbox** (`/dashboard/announcements-inbox`) — the published announcements addressed to your own role, newest first.
+3. **Support** (`/dashboard/support`) — every ticket raised by merchants, riders, and warehouse admins, in one queue.
+4. **Audit Logs** (`/dashboard/audit-logs`) — who did what, across orders, merchants, payouts, and team changes.
+5. **Email Logs** (`/dashboard/email-logs`) — outgoing message history and delivery state.
+6. **Account** (`/dashboard/account`) — update your name and change your password (current password + at least 8 characters).
 
 ## 9. Working with warehouse admins
 

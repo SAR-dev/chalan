@@ -8,7 +8,7 @@ import {
 } from "./content-keywords"
 
 const CONTENT_DIR = join(process.cwd(), "src", "content")
-const CONTENT_FILES = ["terms.md", "privacy.md", "faq.md"]
+const CONTENT_FILES = ["terms.md", "privacy.md"]
 
 function read(file: string): string {
   return readFileSync(join(CONTENT_DIR, file), "utf-8")

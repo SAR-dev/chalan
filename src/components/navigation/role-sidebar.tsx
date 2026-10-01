@@ -92,6 +92,7 @@ export function RoleSidebar({
               )}
               <Link
                 href={item.href}
+                data-testid={`nav-${item.href}`}
                 className={cn(
                   navLinkClass,
                   active ? navLinkActive : navLinkIdle,

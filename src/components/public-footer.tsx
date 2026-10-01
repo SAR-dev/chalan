@@ -12,9 +12,6 @@ export function PublicFooter() {
           </span>
         </div>
         <div className="text-muted-foreground flex flex-wrap justify-center gap-5">
-          <Link href="/faq" className="hover:text-foreground transition-colors">
-            FAQ
-          </Link>
           <Link
             href="/rates"
             className="hover:text-foreground transition-colors"

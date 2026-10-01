@@ -17,7 +17,7 @@ import { HELP_GUIDES } from "./guides"
 
 export const metadata: Metadata = {
   title: "Help Center",
-  description: `${siteConfig.name} help center — role-based guides for merchants, riders, warehouse admins, and super admins, plus answers to common questions.`,
+  description: `${siteConfig.name} help center — task-by-task guides for merchants, riders, warehouse admins, and super admins.`,
 }
 
 const GUIDE_ICONS: Record<
@@ -39,7 +39,7 @@ export default function HelpPage() {
       <div className="mx-auto max-w-3xl px-6 py-12">
         <PageHeader
           title="Help Center"
-          description={`Task-by-task guides for every ${siteConfig.name} role, plus a FAQ covering accounts, orders, pricing, packages, and payouts.`}
+          description={`Task-by-task guides for every ${siteConfig.name} role, covering accounts, orders, pricing, packages, and payouts.`}
         />
 
         <div className="flex flex-col gap-4">
@@ -74,19 +74,11 @@ export default function HelpPage() {
         </div>
 
         <p className="text-muted-foreground mt-8 text-sm">
-          Looking for a quick answer instead? Read the{" "}
-          <Link
-            href="/faq"
-            data-testid="help-faq-link"
-            className="text-primary hover:underline"
-          >
-            FAQ
-          </Link>
-          , or track a parcel on the{" "}
+          Tracking a parcel? Open the{" "}
           <Link href="/track" className="text-primary hover:underline">
             tracking page
-          </Link>
-          .
+          </Link>{" "}
+          and paste your code — no account needed.
         </p>
       </div>
       <PublicFooter />

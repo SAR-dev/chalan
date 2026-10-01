@@ -50,7 +50,7 @@ export function isRoleAllowed(role: string, mode?: PortalMode): boolean {
 }
 
 // Page prefixes of the portals each mode does NOT serve. Shared surface
-// (/login, /register, /track, /faq, /help, /apply, landing, public APIs) is
+// (/login, /register, /track, /help, /apply, landing, public APIs) is
 // intentionally absent — it stays reachable in every mode.
 const DISABLED_PORTAL_PREFIXES: Record<Exclude<PortalMode, "all">, string[]> = {
   admin: ["/merchant", "/rider"],

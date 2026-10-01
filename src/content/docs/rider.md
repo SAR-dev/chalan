@@ -36,10 +36,10 @@ How to work your pickup and delivery queues on {{APP_NAME}}. Sign in at **{{APP_
 
 ## 5. Check your earnings and cash
 
-1. Open **Earnings** (`/rider/earnings`).
-2. Review **Cash on hand** (collected but not yet submitted), **Total collected**, and **Total submitted**.
-3. Scroll the transaction list for each **Collected**, **Submitted**, and **Confirmed** cash entry, with the order it belongs to and who confirmed it.
-4. Hand collected cash to your hub as instructed — the warehouse confirms submissions, and confirmed cash is what reaches merchant payouts.
+1. Open **Earnings** (`/rider/earnings`) from the **Money** section of the sidebar.
+2. Review **Cash on Hand** (collected but not yet handed over), **Total Collected**, and **Total Submitted**.
+3. Scroll the transaction list: each entry is a **Collected** delivery or a **Confirmed** one, with the order it belongs to and who confirmed it.
+4. Hand collected cash to your hub as instructed. **Confirmed** means your warehouse has settled that order — settled cash is what reaches merchant payouts.
 
 ## 6. What happens to a parcel after you collect it
 
@@ -54,10 +54,11 @@ How to work your pickup and delivery queues on {{APP_NAME}}. Sign in at **{{APP_
 2. **The pickup button is disabled** — you have not added the required parcel photo yet.
 3. **I cannot record an outcome** — the parcel must be marked **Out for delivery** first; **In transit** parcels only offer the "out for delivery" action.
 4. **Cash totals do not match** — compare the **Earnings** transaction list with what you handed to the hub, then raise it with your warehouse supervisor before the cash is confirmed.
-5. **Nothing loads or my account is blocked** — check the **Inbox** for announcements, then contact the platform team at **{{APP_EMAIL}}** with your rider name.
+5. **Nothing loads or my account is blocked** — check the **Inbox** for announcements, then raise it on **Support** (`/rider/support`) with your rider name.
 
-## 8. Account and announcements
+## 8. Account, announcements, and support
 
 1. Open **Inbox** (`/rider/announcements`) for platform announcements (also shown as a banner at the top of the app).
-2. Open **Account** (`/rider/account`) to update your name and change your password (current password + at least 8 characters).
-3. Task type (pickup, delivery, or both) and your home warehouse are set by a Super Admin when your application is approved — ask the platform team if they look wrong.
+2. Open **Support** (`/rider/support`) to raise a ticket and follow the replies — the fastest route for a wrong cash total or a parcel that will not resolve.
+3. Open **Account** (`/rider/account`) to update your name and change your password (current password + at least 8 characters).
+4. Task type (pickup, delivery, or both) and your home warehouse are set by a Super Admin when your application is approved — ask the platform team if they look wrong.

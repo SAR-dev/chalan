@@ -16,7 +16,7 @@ type ContentKey = keyof typeof appContent
  * without trace. Leaving the token visible means the problem shows up in review
  * and is caught by `content-keywords.spec.ts` before release.
  *
- * Shared by every page that renders from `src/content/` (FAQ, help guides,
+ * Shared by every page that renders from `src/content/` (help guides,
  * privacy, terms).
  */
 export function replaceContentKeywords(content: string): string {
