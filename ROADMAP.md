@@ -3,8 +3,8 @@
 > Forward-looking only — shipped work lives in git history and in the
 > `ROADMAP <id>` annotations left beside the code it changed.
 >
-> **Health:** `pnpm ci:check` green (819 files) · Unit **2060 pass** (197 spec
-> files) · coverage **54.5 / 47.89 / 42.28 / 55.34** against floors
+> **Health:** `pnpm ci:check` green (821 files) · Unit **2074 pass** (198 spec
+> files) · coverage **54.63 / 47.97 / 42.4 / 55.47** against floors
 > **49 / 42 / 37 / 50** · real-DB integration **18/18** · E2E **125 tests /
 > 32 files / S1–S73** (S36 retired with the branding feature), run locally only
 > (`pnpm test:e2e`) by decision — CI stays on lint, typecheck, coverage and
@@ -42,7 +42,7 @@ nothing in R4 ships while an R0 item is open.
 
 | Decision | Detail |
 |---|---|
-| **E2E runs locally, not in CI** | `pnpm test:e2e` (129 tests, ~7.5 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost — do not "helpfully" re-add an `e2e` job. The `e2e:` block in `ci.yml:169-215` stays commented out on purpose. |
+| **E2E runs locally, not in CI** | `pnpm test:e2e` (125 tests, ~6 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost — do not "helpfully" re-add an `e2e` job. The `e2e:` block in `ci.yml:169-215` stays commented out on purpose. |
 | **Coverage floors are a floor, not a target** | Raise them as tests land; never lower them to make CI pass. |
 
 ---
@@ -121,41 +121,16 @@ layout specs (`26-toast-responsive`, `27-sign-out`).
 
 ---
 
-
 # R3 — Platform, ops & performance
 
 | ID | Shipped |
 |---|---|
+| R3.1 | `src/lib/error-report.ts` — a vendor-neutral reporter POSTing to `ERROR_WEBHOOK_URL` (deliberately no SDK: picking Sentry is procurement, not code); an access log in `withErrorHandler` where `logger.child` is finally called (5xx `error`, 4xx `warn`, ≥1s `slow request`, success `debug`); `redact.ts` wired into `logger.emit` — it guarded the mailer but not the log line; `statement_timeout` on both pools; `log_min_duration_statement=250` in postgres; `pool.waiting` surfaced from `/api/ready` |
 | R3.6 | New `logAuditMany()`; all eight `Promise.all(logAudit(...))` endpoints converted — they opened up to 100 concurrent pool connections per request |
 | R3.8 | `order_package_id_idx` + `order_package_tier_id_idx` (both `ON DELETE set null`, so every package/tier delete seq-scanned the largest table) and `user_created_at_idx` — the `user` table had only trigram GINs while two endpoints `ORDER BY createdAt DESC` |
 | R3.9 | Partial indexes on `user.activationToken` and `merchant.emailVerificationToken`: both are **unauthenticated** lookups that were seq-scanning whole tables |
 
 
-### R3.1 No error tracking, metrics or alerting anywhere
-
-Zero hits for `sentry|opentelemetry|prom-client|prometheus|posthog|newrelic`
-across the repo and `package.json`. `@vercel/analytics` is imported in
-`src/app/layout.tsx:1`, but the app deploys to Docker, so it reports nothing.
-There is no uptime rule, no alert, nothing in `.github/` but `ci.yml` and
-`deploy.yml`.
-
-**Fix:** wire an error reporter through `src/instrumentation.ts`. Minimum bar
-in the meantime: an uptime check on `/api/ready`, which already returns 503
-correctly (`src/app/api/ready/route.ts:43`).
-
-Two related gaps are folded in here rather than kept as their own items —
-both are symptoms of this same missing layer, not separate pieces of work:
-
-- **No request or access logging.** Only unhandled 500s reach the log
-  (`src/lib/with-error-handler.ts:61-66`): no slow-request line, no 4xx line,
-  no route latency. `logger.child()` is implemented (`src/lib/logger.ts:78-86`)
-  and called nowhere, and `src/lib/redact.ts` exists but is not wired into
-  `emit()`.
-- **No slow-query or pool-saturation signal.** No `log_min_duration_statement`,
-  no `statement_timeout` on the pool (`src/lib/db/index.ts`), no `pool.waiting`
-  gauge. `pg_stat_statements` is enabled in `docker/compose.postgres.yml` and
-  documented in `docs/DEPLOYMENT.md` — nothing queries it, so a query taking
-  30s simply hangs a request with no signal.
 
 ### R3.2 The in-cluster upload limit is per-instance
 

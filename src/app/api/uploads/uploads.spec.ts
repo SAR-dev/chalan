@@ -6,6 +6,11 @@ const state = vi.hoisted(() => ({
   session: null as Record<string, unknown> | null,
   tokenValid: false,
   rateLimited: false,
+  rateLimitCalls: [] as {
+    prefix: string
+    max: number
+    window: number
+  }[],
   saved: [] as { path: string; mime: string; size: number }[],
 }))
 
@@ -18,8 +23,15 @@ vi.mock("@/lib/api-auth", () => ({
 // token-minting endpoint unthrottled).
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: () => null,
-  rateLimitByIp: () =>
-    state.rateLimited ? ({ status: 429 } as Response) : null,
+  rateLimitByIp: (
+    _req: Request,
+    prefix: string,
+    max: number,
+    window: number,
+  ) => {
+    state.rateLimitCalls.push({ prefix, max, window })
+    return state.rateLimited ? ({ status: 429 } as Response) : null
+  },
   getClientIp: () => "127.0.0.1",
 }))
 
@@ -106,6 +118,7 @@ beforeEach(() => {
   state.session = null
   state.tokenValid = false
   state.rateLimited = false
+  state.rateLimitCalls.length = 0
   state.saved.length = 0
 })
 
@@ -228,5 +241,39 @@ describe("POST /api/uploads/token", () => {
     state.rateLimited = true
     const res = await issueUploadToken(tokenReq())
     expect(res.status).toBe(429)
+  })
+})
+
+// The upload budget used to be enforced in `src/proxy.ts` with its own
+// in-process Map. Middleware cannot reach the Redis-backed limiter the rest of
+// the app shares, so four instances each applied 20/min against a 20/min
+// intent — 80 uploads/min/IP (ROADMAP R3.2). It lives here now, where the
+// shared limiter is reachable.
+describe("upload rate limiting (ROADMAP R3.2)", () => {
+  const uploadReq = () =>
+    new Request("http://test.local/api/uploads", { method: "POST" })
+
+  it("uses the shared per-IP limiter with the documented budget", async () => {
+    state.session = { userId: "u_1", role: "MERCHANT" }
+    const res = await POST(req({ folder: "avatars", file: validFile }))
+    expect(res.status).toBe(200)
+    expect(state.rateLimitCalls).toEqual([
+      { prefix: "upload", max: 20, window: 60 },
+    ])
+  })
+
+  it("429s before touching the body once the budget is spent", async () => {
+    state.rateLimited = true
+    const res = await POST(req({ folder: "avatars", file: validFile }))
+    expect(res.status).toBe(429)
+    // Throttled before parsing: a rejected upload must not cost a read.
+    expect(state.saved).toHaveLength(0)
+  })
+
+  it("throttles every POST, not only authenticated ones", async () => {
+    state.rateLimited = true
+    const res = await POST(req({ folder: "nids", file: validFile }))
+    expect(res.status).toBe(429)
+    expect(state.rateLimitCalls).toHaveLength(1)
   })
 })

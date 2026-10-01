@@ -12,7 +12,7 @@ import {
   reportStaleCronJobs,
   staleCronJobs,
 } from "@/lib/cron-heartbeat"
-import { dbRead } from "@/lib/db"
+import { dbRead, pool } from "@/lib/db"
 import { logger } from "@/lib/logger"
 import { pingRedis, rateLimiterDegraded } from "@/lib/rate-limit"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -62,6 +62,15 @@ export const GET = withErrorHandler(async () => {
       ok,
       checks: { db, redis },
       rateLimiter: { degraded: rateLimiterDegraded() },
+      // Pool saturation was invisible before (ROADMAP R3.1): when every
+      // connection is checked out, requests queue behind `waitingCount` and
+      // nothing in the app says so. `waiting > 0` sustained means the pool —
+      // not the database — is the bottleneck.
+      pool: {
+        waiting: pool.waitingCount,
+        total: pool.totalCount,
+        max: pool.options.max,
+      },
       cron: { stale, neverRan },
     },
     { status: ok ? 200 : 503 },

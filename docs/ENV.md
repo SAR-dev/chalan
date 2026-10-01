@@ -117,6 +117,7 @@ HTML is not persisted.
 | `AUDIT_LOG_RETENTION_DAYS`   | No       | `30`    | Days to retain audit logs. Older entries are cleaned daily                                      |
 | `EMAIL_LOG_RETENTION_DAYS`   | No       | `10`    | Days to retain sent email logs. Failed emails are never deleted                                 |
 | `UPLOAD_SWEEP_MIN_AGE_HOURS` | No       | `48`    | Hours an unreferenced upload must age before `/api/cron/cleanup-uploads` may delete it          |
+| `ERROR_WEBHOOK_URL`          | No       | -       | Where unhandled 500s are POSTed as JSON. Unset = stdout logs only                               |
 
 `/api/cron/cleanup-uploads` (ROADMAP 5.6 — storage hygiene) is scheduled via
 crontab / the Docker cron container (pg_cron cannot make HTTP calls, so it is

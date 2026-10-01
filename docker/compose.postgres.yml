@@ -36,6 +36,11 @@ services:
       - pg_stat_statements.track=all
       - -c
       - pg_stat_statements.max=10000
+      # Anything slower than 250ms lands in the server log with its text and
+      # duration — the half of ROADMAP R3.1 that `pg_stat_statements` alone
+      # cannot give, because nothing was querying it.
+      - -c
+      - log_min_duration_statement=250
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "app"]
       interval: 10s

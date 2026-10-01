@@ -19,10 +19,19 @@ const IS_SERVERLESS = Boolean(
 )
 const POOL_MAX = IS_SERVERLESS ? 5 : 20
 
+// Server-side ceiling on a single statement (ROADMAP R3.1). Without it a
+// query that plans badly simply hangs its request — there was no
+// `log_min_duration_statement`, no `statement_timeout`, and no signal of any
+// kind, so a 30s query looked identical to a healthy slow one. 15s is far
+// above anything this app legitimately issues; raise it deliberately if a
+// real workload needs more, rather than discovering it as a hang.
+const STATEMENT_TIMEOUT_MS = 15_000
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: POOL_MAX,
   idleTimeoutMillis: 10_000,
+  statement_timeout: STATEMENT_TIMEOUT_MS,
   options: SESSION_TIMEZONE,
 })
 
@@ -37,6 +46,7 @@ export const readPool = readUrl
       connectionString: readUrl,
       max: POOL_MAX,
       idleTimeoutMillis: 10_000,
+      statement_timeout: STATEMENT_TIMEOUT_MS,
       options: SESSION_TIMEZONE,
     })
   : pool

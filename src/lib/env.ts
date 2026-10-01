@@ -168,6 +168,22 @@ export function validateEnv(): void {
       }
     }
 
+    // Optional — where unhandled errors are POSTed (ROADMAP R3.1).
+    //
+    // Deliberately not a vendor SDK: anything that accepts a JSON POST works
+    // (Slack incoming webhook, Grafana OnCall, a self-hosted collector), so
+    // choosing a vendor stays a deployment decision instead of a code change.
+    // Unset — the default — means errors go to stdout only, which is all that
+    // existed before this. Validated only when present.
+    if (process.env.ERROR_WEBHOOK_URL) {
+      if (!/^https?:\/\//.test(process.env.ERROR_WEBHOOK_URL)) {
+        e.push({
+          key: "ERROR_WEBHOOK_URL",
+          message: "Must be an http(s) URL.",
+        })
+      }
+    }
+
     // AES-256-GCM key for SMTP password at rest (64 hex chars = 32 bytes).
     // Optional in development (crypto.ts falls back to a dev key so local
     // setups keep working), REQUIRED in production — silently using the
