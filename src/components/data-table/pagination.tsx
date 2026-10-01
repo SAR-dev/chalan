@@ -73,6 +73,7 @@ export function TableFooter<T>({
               <label className="flex items-center gap-1.5">
                 <span className="sr-only">Rows per page</span>
                 <select
+                  data-testid={id ? `table-page-size-${id}` : undefined}
                   value={size}
                   onChange={(e) => {
                     const newSize = Number(e.target.value)
@@ -94,7 +95,10 @@ export function TableFooter<T>({
                 </select>
               </label>
             ) : null}
-            <span className="text-muted-foreground tabular-nums">
+            <span
+              data-testid={id ? `table-page-label-${id}` : undefined}
+              className="text-muted-foreground tabular-nums"
+            >
               Page {page} of {totalPages}
             </span>
             <div className="flex items-center gap-1">
@@ -102,6 +106,7 @@ export function TableFooter<T>({
                 variant="outline"
                 size="icon"
                 className="size-8"
+                data-testid={id ? `table-prev-${id}` : undefined}
                 onClick={() => {
                   const newPage = Math.max(1, page - 1)
                   if (serverPaginated && onPageChange) {
@@ -119,6 +124,7 @@ export function TableFooter<T>({
                 variant="outline"
                 size="icon"
                 className="size-8"
+                data-testid={id ? `table-next-${id}` : undefined}
                 onClick={() => {
                   const newPage = Math.min(totalPages, page + 1)
                   if (serverPaginated && onPageChange) {
@@ -181,6 +187,7 @@ export function TableFooter<T>({
           <Button
             type="button"
             variant="outline"
+            data-testid={id ? `table-csv-${id}` : undefined}
             onClick={handleDownloadCsv}
             disabled={!csv.downloadUrl && !csv.parser}
             className="gap-1.5"

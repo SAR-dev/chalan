@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
@@ -98,5 +98,59 @@ describe("retention defaults (ROADMAP R0.7)", () => {
     expect(
       read("src", "app", "api", "cron", "cleanup-email-logs", "route.ts"),
     ).toContain('from "@/lib/env"')
+  })
+})
+
+/**
+ * E2E serials are a documented invariant ("unique, no gaps or duplicates"), and
+ * AGENTS.md had drifted to S65/104 while the suite was already at S71/129 —
+ * with a duplicate S68 nobody noticed (ROADMAP R1.4). Structural facts are
+ * asserted rather than exact totals: file and test counts churn with every new
+ * spec, but a duplicate serial or a gap is always a mistake.
+ */
+describe("E2E suite invariants (ROADMAP R1.4)", () => {
+  function serials() {
+    const dir = join(process.cwd(), "e2e", "specs")
+    return readdirSync(dir)
+      .filter((file) => file.endsWith(".spec.ts"))
+      .flatMap((file) => {
+        const raw = readFileSync(join(dir, file), "utf-8")
+        return [...raw.matchAll(/describe\("S(\d+)\.\s*([^"]*)"/g)].map(
+          (m) => ({ id: Number(m[1]), name: m[2], file }),
+        )
+      })
+  }
+
+  it("assigns every scenario a unique serial", () => {
+    const seen = new Map<number, string>()
+    const dupes: string[] = []
+    for (const { id, file, name } of serials()) {
+      const where = `${file} ("${name}")`
+      if (seen.has(id)) dupes.push(`S${id}: ${seen.get(id)} and ${where}`)
+      seen.set(id, where)
+    }
+    expect(dupes, "scenario serials must be unique").toEqual([])
+  })
+
+  it("leaves no gaps in the serial range", () => {
+    const ids = serials().map((s) => s.id)
+    expect(ids.length).toBeGreaterThan(0)
+    const max = Math.max(...ids)
+    const missing = Array.from({ length: max }, (_, i) => i + 1).filter(
+      (n) => !ids.includes(n),
+    )
+    expect(
+      missing,
+      `unused serials: ${missing.map((n) => `S${n}`).join(", ")}`,
+    ).toEqual([])
+  })
+
+  it("documents coverage floors that match vitest.config.ts", () => {
+    const config = read("vitest.config.ts")
+    const agents = read("AGENTS.md")
+    const floor = (key: string) =>
+      Number(config.match(new RegExp(`\\b${key}:\\s*(\\d+)`))?.[1])
+    const documented = `${floor("statements")} / ${floor("branches")} / ${floor("functions")} / ${floor("lines")}`
+    expect(agents).toContain(`(${documented})`)
   })
 })

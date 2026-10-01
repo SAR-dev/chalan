@@ -130,6 +130,7 @@ export function FormDialog({
         <Button
           type="button"
           variant="outline"
+          data-testid="form-dialog-cancel"
           onClick={() => (onCancel ? onCancel() : onOpenChange?.(false))}
           className={buttonWidth}
         >

@@ -170,7 +170,8 @@ must match text, scope it to a tagged container (e.g.
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
 describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique with no gaps or duplicates (suite is
-currently S1-S65 across 25 files / 104 tests).
+currently S1-S73 across 32 files / 132 tests — asserted by
+`src/app/__tests__/docs-drift.spec.ts`, which fails on a duplicate serial).
 
 ## Coding Patterns
 
@@ -291,7 +292,7 @@ function formatOrderError(data: {
 
 - `pnpm test:coverage` runs the unit suite under `@vitest/coverage-v8` and
   fails if statements/branches/functions/lines drop below the floors in
-  `vitest.config.ts` (48 / 41 / 37 / 49). A CI `coverage` job enforces it.
+  `vitest.config.ts` (49 / 42 / 37 / 50). A CI `coverage` job enforces it.
 - Raise the floors as tests land — they are a regression guard, not a target.
   New code should come with tests, not with a lowered threshold.
 

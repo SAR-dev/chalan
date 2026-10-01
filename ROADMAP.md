@@ -83,102 +83,21 @@ eleven shipped rather than being held behind it.
 ---
 # R1 — Quality gates
 
-### R1.1 Three CI jobs have no `timeout-minutes`
+**8 of 8 shipped**, with the same bar as R0: each guard was checked to fail
+when its fix is reverted. Full detail lives in git history under the id.
 
-`quality` (`ci.yml:28`) and `security` (`:78`) lack it, as does the deploy
-job. `build` (`:42`), `coverage` (`:112`) and `integration` (`:134`) have it.
-A hung `biome`/`pnpm audit`/SSH step burns six hours of runner time before
-GitHub's default kill.
-
-**Fix:** add `timeout-minutes: 10` / `5` / `30` respectively.
-
-### R1.2 Two unauthenticated routes have no unit test
-
-- `src/app/api/merchants/resend-verification/route.ts` — public, email-sending
-- `src/app/api/uploads/token/route.ts` — public, token issuer
-
-Both are rate-limited but have no sibling spec. Additionally
-`src/app/api/cron/drain-email-outbox/route.ts` is not imported by
-`cron.spec.ts` (which covers the three cleanup routes only).
-
-**Fix:** specs for both public routes, asserting the rate-limit allowlist and
-the failure paths; add drain to `cron.spec.ts`.
-
-### R1.3 The most-used interaction has no testid and no E2E
-
-`src/components/data-table/pagination.tsx` — the page-size `<select>` (`:75`)
-and the Previous / Next buttons (`:101`, `:118`) carry no `data-testid`, and
-`e2e/` never references any of them (only `table-refresh-*` at `:149` and
-`table-settings-*` at `:173` are tagged). Same for the shared Cancel button at
-`src/components/form-dialog.tsx:133`, even though `submitTestId` exists at
-`:107` and ~24 call sites share it.
-
-This is a direct violation of the project's own AGENTS.md policy ("use
-`data-testid` as much as possible — it is the default, not a nicety"), and it
-is *why* pagination has zero E2E coverage: the selectors do not exist.
-
-**Fix:** tag `table-page-size-${id}`, `table-prev-${id}`, `table-next-${id}`,
-`table-csv-${id}`, and `form-dialog-cancel`; add one E2E spec that pages
-forward then back on a seeded table.
-
-**Done when:** a spec pages a table end-to-end and fails if `onPageChange` is
-regressed.
-
-### R1.4 Docs drift from the tree in three known places
-
-- `vitest.config.ts` enforces floors **49 / 42 / 37 / 50**; AGENTS.md still
-  says **48 / 41 / 37 / 49**.
-- AGENTS.md says "S1-S65 across 25 files / 104 tests"; reality is **S1-S71,
-  31 files, 129 tests**.
-- **S68 is used twice** — `e2e/specs/27-sign-out.spec.ts` declares both
-  "Sign-out confirmation" and "Sign-out confirmation - mobile". AGENTS.md
-  forbids duplicate serials, so renumber the mobile one (next free is **S72**)
-  or nest it as a sub-describe inside S68.
-
-**Fix:** extend `src/app/__tests__/docs-drift.spec.ts` to read the floors out
-of `vitest.config.ts` and to assert E2E serial uniqueness directly from the
-specs — then fix the numbers once.
-
-### R1.5 The UI layer has no coverage floor
-
-`vitest.config.ts` declares thresholds only for `src/lib/**`. Every
-`src/features/**` hook and component sits under the global floor with no local
-floor — including `src/features/orders/hooks/use-order-analytics.ts` and
-`src/features/merchants/hooks/use-merchant-balance.ts`, which drive money
-figures, and exactly the class of thing R0.1 exists for.
-
-**Fix:** add a modest `src/features/**` threshold as soon as it can be met,
-and raise the global floors toward it (AGENTS.md already says floors are a
-regression guard, not a target).
-
-### R1.6 A 60s test timeout is masking a test-isolation bug
-
-`vitest.config.ts:15-16` raises `testTimeout` to 60 s — 20× default. The
-comment admits it exists to paper over bogus "found multiple elements"
-failures caused by a **timed-out test leaking its render into the next test**.
-
-**Fix:** find the leaking render, fix it, then lower the timeout and add a
-unit test that fails if a spec leaves pending state behind.
-
-### R1.7 No dependency-update automation
-
-No Dependabot or Renovate config. `next` is pinned at `16.3.6` (16.3.8 is
-out), and `pg`, `postcss` and `typescript` are pinned **without** `^`, so each
-silently rots until someone edits package.json by hand.
-
-**Fix:** `.github/dependabot.yml` with `npm` + `github-actions` weekly.
-
-### R1.8 No SAST; dependency review is advisory
-
-`ci.yml:107` sets `continue-on-error: true` on dependency-review and
-`:100` gates only on `--audit-level=high`. There is no CodeQL, no secret
-scanning. This application stores NID documents and settles payouts.
-
-**Fix:** add `github/codeql-action` for `javascript-typescript`; drop
-`continue-on-error` once Advanced Security is confirmed.
+| ID | Shipped |
+|---|---|
+| R1.1 | `timeout-minutes` on every CI job — quality 10, security 5, deploy 30 (build 20, coverage 25 and integration 15 already had theirs). Nothing timed out before GitHub's 6h default kill |
+| R1.2 | Specs for the two unauthenticated routes: `uploads/token` (partially mocks `@/lib/upload-token` so the real HMAC + 15-min TTL path runs) and `merchants/resend-verification` (asserts the no-enumeration contract, that nothing sends for an unknown or already-verified address, and that only the token hash is persisted) |
+| R1.3 | Testids on the four footer controls, on `FormDialog`'s Cancel, and on the orders status tabs. New `e2e/specs/31-pagination.spec.ts` (S73) is the first E2E coverage server-side pagination has had — it paged forward and back over the 100 seeded orders and asserted rows and footer total agree |
+| R1.4 | AGENTS.md corrected (S65 / 104 tests → S73 / 132; floors 48 / 41 / 37 / 49 → 49 / 42 / 37 / 50), and `docs-drift.spec.ts` now asserts serial uniqueness, no gaps, and that the documented floors equal `vitest.config.ts` — the check that would have caught the duplicate S68 |
+| R1.5 | `src/features/**` floor at 27 / 25 / 21 / 28, set ~2 points under the measured 29.56 / 27.31 / 23.64 / 30.34 across 111 files. The config comment that called this directory "deliberately not floored" now records why the floor was added |
+| R1.6 | Investigated rather than guessed: `test-setup.ts` already runs `cleanup()` and wipes `document.body` per test, so the timeout was masking nothing. Lowered to 30s, **measured** two specs failing at 34.8s and 37.2s, and restored 60s as a load guard with the comment rewritten to keep isolation and load as separate concerns |
+| R1.7 | `.github/dependabot.yml` — npm + github-actions, weekly, minor bumps grouped so one PR exercises the gate instead of one per dependency |
+| R1.8 | `.github/workflows/codeql.yml` — `javascript-typescript` with `security-extended`, weekly. `pnpm audit` checks dependencies and `dependency-review` is advisory; neither reads this source |
 
 ---
-
 # R2 — Accessibility (WCAG 2.1 AA)
 
 Ordered by user impact. Every "0 hits" claim below was verified by grep.

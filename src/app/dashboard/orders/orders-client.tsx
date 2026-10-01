@@ -369,9 +369,21 @@ export function OrdersPageClient({
               <div className="flex items-center gap-3">
                 <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
                   <TabsList>
-                    <TabsTrigger value="PENDING">Pending</TabsTrigger>
-                    <TabsTrigger value="APPROVED">Approved</TabsTrigger>
-                    <TabsTrigger value="ALL">All</TabsTrigger>
+                    <TabsTrigger
+                      value="PENDING"
+                      data-testid="orders-tab-PENDING"
+                    >
+                      Pending
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="APPROVED"
+                      data-testid="orders-tab-APPROVED"
+                    >
+                      Approved
+                    </TabsTrigger>
+                    <TabsTrigger value="ALL" data-testid="orders-tab-ALL">
+                      All
+                    </TabsTrigger>
                   </TabsList>
                 </Tabs>
                 <QuickFilters

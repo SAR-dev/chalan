@@ -133,7 +133,11 @@ export const orders = {
   // DataTable prefixes its toolbar field with the table id.
   searchInput: "[data-testid='table-search-dashboard-orders']",
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
-  tab: (name: string) => `[data-testid='tab-${name}']`,
+  // Status tabs, tagged by value. `dashboard/orders` opens on PENDING, which
+  // holds only 8 of the 100 seeded orders, so anything asserting pagination
+  // must switch to ALL first (ROADMAP R1.3). The previous `tab-${name}` value
+  // matched nothing in `src/`.
+  tab: (name: string) => `[data-testid='orders-tab-${name}']`,
   // CSV bulk import — the page and its testids.
   bulkImportOpen: "[data-testid='bulk-import-open']",
   bulkImportTemplate: "[data-testid='bulk-import-template']",
@@ -455,7 +459,23 @@ export const dialog = {
   confirmButton: "[data-testid='confirm-button']",
   cancelButton: "[data-testid='cancel-button']",
   formDialog: "[data-testid='form-dialog']",
+  // `FormDialog`'s Cancel is shared by ~24 call sites; it carries the default
+  // `form-dialog-cancel` because callers can override submit but not cancel.
+  formDialogCancel: "[data-testid='form-dialog-cancel']",
   closeButton: "[data-testid='dialog-close']",
+}
+
+// ─── Pagination ──────────────────────────────────────────────────────────────
+// Tagged per table id (ROADMAP R1.3): these four controls sit under every list
+// page and carried no testid at all, which is why server-side pagination — the
+// most-used interaction in the app — had zero E2E coverage.
+export const pagination = {
+  prev: (tableId: string) => `[data-testid='table-prev-${tableId}']`,
+  next: (tableId: string) => `[data-testid='table-next-${tableId}']`,
+  pageSize: (tableId: string) => `[data-testid='table-page-size-${tableId}']`,
+  csv: (tableId: string) => `[data-testid='table-csv-${tableId}']`,
+  /** "Page X of Y" — the only thing that proves a page change landed. */
+  pageLabel: (tableId: string) => `[data-testid='table-page-label-${tableId}']`,
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────

@@ -1,0 +1,41 @@
+# CodeQL static analysis (ROADMAP R1.8).
+#
+# `pnpm audit` only reports known-vulnerable *dependencies*, and
+# `dependency-review` is advisory (`continue-on-error: true`) — neither reads
+# this codebase. Given what it stores (NID documents) and moves (COD payout
+# settlement), the source itself needs scanning.
+#
+# JavaScript/TypeScript needs no build step, so there is no `autobuild`: `init`
+# indexes `src/` directly and `analyze` reports.
+name: CodeQL
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Weekly even when nothing lands, so a newly-disclosed rule catches up.
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
