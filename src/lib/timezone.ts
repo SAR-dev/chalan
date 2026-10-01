@@ -118,6 +118,38 @@ export function addBusinessDays(date: string, days: number): string {
   return formatUtcDate(new Date(Date.UTC(y, m - 1, d + days)))
 }
 
+/**
+ * Inclusive business-day range for a quick-filter preset.
+ *
+ * Returns `YYYY-MM-DD` strings, not instants: the server expands each end
+ * through `businessRangeBound`, so the Dhaka boundary is applied exactly once,
+ * server-side, and the browser's own zone never enters the calculation. An
+ * instant computed here would land on the *device's* midnight — up to six hours
+ * off (ROADMAP R0.3), which is enough for "Today" to include or drop orders at
+ * the edges and disagree with the totals shown above the same table.
+ *
+ * Mirrors `DateRangePicker.applyPreset`, which already worked this way.
+ */
+export type BusinessDatePreset = "today" | "yesterday" | "last7"
+
+export function businessPresetRange(
+  preset: BusinessDatePreset,
+  now: Date = new Date(),
+): { from: string; to: string } {
+  const today = businessToday(now)
+  switch (preset) {
+    case "today":
+      return { from: today, to: today }
+    case "yesterday": {
+      const yesterday = addBusinessDays(today, -1)
+      return { from: yesterday, to: yesterday }
+    }
+    case "last7":
+      // Inclusive of today, matching DateRangePicker's "Last 7 days".
+      return { from: addBusinessDays(today, -6), to: today }
+  }
+}
+
 /** First day of the month containing `date`, as `YYYY-MM-DD`. */
 export function businessMonthStart(date: string): string {
   return `${date.slice(0, 7)}-01`

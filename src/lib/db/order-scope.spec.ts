@@ -20,22 +20,27 @@ describe("buildWarehouseOrderScope", () => {
     expect(params).toContain("wh_1")
   })
 
-  it("includes picked-up parcels not yet assigned to a warehouse", () => {
-    const { sql, params } = render("wh_1")
-    expect(sql).toContain('"order"."warehouseId" is null')
-    expect(params).toContain("PICKED_UP")
-  })
-
   it("includes APPROVED orders with no pickup rider (assignable)", () => {
     const { sql, params } = render("wh_1")
     expect(sql).toContain('"order"."pickupRiderId" is null')
     expect(params).toContain("APPROVED")
   })
 
-  it("ORs the three branches together", () => {
+  it("ORs the two branches together", () => {
     const { sql } = render("wh_1")
-    // Three alternatives → two ORs.
-    expect(sql.match(/ or /g)).toHaveLength(2)
+    // Two alternatives → one OR.
+    expect(sql.match(/ or /g)).toHaveLength(1)
+  })
+
+  // A third clause — `warehouseId is null and status = 'PICKED_UP'` for
+  // "incoming intake candidates" — used to sit here. It could never match
+  // (`order.warehouseId` is NOT NULL, FK `ON DELETE no action`, and nothing in
+  // the codebase nulls it), and the intake queue is driven by status rather
+  // than a null warehouse. Keeping it only forced a bitmap-OR over an
+  // index-friendly predicate (ROADMAP R0.12).
+  it("does not reintroduce an unreachable warehouse-null clause", () => {
+    const { sql } = render("wh_1")
+    expect(sql).not.toContain('"order"."warehouseId" is null')
   })
 
   it("binds the warehouse id exactly once", () => {

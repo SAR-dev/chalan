@@ -7,6 +7,7 @@ import {
   businessDayRange,
   businessDayStart,
   businessMonthStart,
+  businessPresetRange,
   businessPrevMonthRange,
   businessRangeBound,
   businessToday,
@@ -111,5 +112,67 @@ describe("date arithmetic", () => {
 
   it("derives today from an instant", () => {
     expect(businessToday(new Date("2026-07-01T20:00:00Z"))).toBe("2026-07-02")
+  })
+})
+
+describe("businessPresetRange (ROADMAP R0.3)", () => {
+  // 20:00 UTC is 02:00 the next day in Dhaka — the instant where a device-local
+  // derivation and a Dhaka derivation disagree by a whole calendar day.
+  const instant = new Date("2026-07-01T20:00:00Z")
+
+  it("'today' is the Dhaka day, not the UTC day", () => {
+    const { from, to } = businessPresetRange("today", instant)
+    expect(from).toBe("2026-07-02")
+    expect(to).toBe("2026-07-02")
+    // Guards the shortcut that caused the bug: the UTC calendar day.
+    expect(from).not.toBe(instant.toISOString().slice(0, 10))
+  })
+
+  it("'yesterday' is the Dhaka day before it", () => {
+    expect(businessPresetRange("yesterday", instant)).toEqual({
+      from: "2026-07-01",
+      to: "2026-07-01",
+    })
+  })
+
+  it("'last7' is seven inclusive Dhaka days ending today", () => {
+    expect(businessPresetRange("last7", instant)).toEqual({
+      from: "2026-06-26",
+      to: "2026-07-02",
+    })
+  })
+
+  it("returns date-only strings for the server to expand", () => {
+    // The server's `businessRangeBound` applies the Dhaka edge only for a
+    // `YYYY-MM-DD`; an ISO instant here would be taken at face value.
+    for (const preset of ["today", "yesterday", "last7"] as const) {
+      const { from, to } = businessPresetRange(preset, instant)
+      expect(from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(to).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
+  })
+
+  // The presets previously used `setHours(0,0,0,0)` on the device clock, so the
+  // answer depended on where the browser was. Pinning TZ proves the result does
+  // not move with the host.
+  it("does not move with the host timezone", () => {
+    const previous = process.env.TZ
+    try {
+      const results = new Set<string>()
+      const localDays = new Set<string>()
+      for (const tz of ["America/New_York", "Asia/Tokyo", "UTC"]) {
+        process.env.TZ = tz
+        results.add(businessPresetRange("today", instant).from)
+        // Self-check: if these three agree the host zone never changed, and the
+        // assertion below would be proving nothing. For 20:00Z New York and UTC
+        // see the 1st while Tokyo already sees the 2nd.
+        localDays.add(instant.getDate().toString())
+      }
+      expect(localDays.size).toBeGreaterThan(1)
+      expect([...results]).toEqual(["2026-07-02"])
+    } finally {
+      if (previous === undefined) delete process.env.TZ
+      else process.env.TZ = previous
+    }
   })
 })

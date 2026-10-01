@@ -29,10 +29,13 @@ vi.mock("@/lib/db", () => {
         Promise.resolve(result).then(onFulfilled),
     }),
   })
+  const dbMock = {
+    select: () => makeChain(dbResult !== null ? [dbResult] : []),
+  }
   return {
-    db: {
-      select: () => makeChain(dbResult !== null ? [dbResult] : []),
-    },
+    db: dbMock,
+    // Session resolution reads through the read pool (ROADMAP R0.11).
+    dbRead: dbMock,
   }
 })
 

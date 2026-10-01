@@ -167,6 +167,7 @@ services:
         30 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://app:3000/api/cron/cleanup-audit-logs >> /var/log/cron.log 2>&1
         0 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://app:3000/api/cron/cleanup-email-logs >> /var/log/cron.log 2>&1
         30 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://app:3000/api/cron/cleanup-uploads >> /var/log/cron.log 2>&1
+        0 6 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/stale-orders >> /var/log/cron.log 2>&1
         CRONTAB
         crond -f -l 2
       "

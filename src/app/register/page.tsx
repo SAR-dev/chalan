@@ -3,6 +3,7 @@
 import { ArrowRight, CheckCircle2, Loader2, Mail } from "lucide-react"
 import Link from "next/link"
 import { FormEvent, useState } from "react"
+import { AuthCardBrand } from "@/components/auth-card-brand"
 import { FormErrors } from "@/components/form-errors"
 import { PublicFooter } from "@/components/public-footer"
 import { Button } from "@/components/ui/button"
@@ -182,18 +183,13 @@ export default function RegisterPage() {
         {/* Form panel */}
         <section className="flex flex-1 items-center justify-center p-6 sm:p-12">
           <div className="w-full max-w-md">
-            <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden">
-              <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-lg">
-                <SiteIcon className="size-5" />
-              </div>
-              <span className="text-lg font-semibold tracking-tight">
-                {siteConfig.name}
-              </span>
-            </Link>
-
             {submittedName ? (
               <Card className="border-border/70 shadow-sm">
                 <CardHeader className="flex flex-col gap-3">
+                  {/* Mobile brand: inside the card, so a phone shows one
+                      framed box instead of a detached logo above a second
+                      frame. */}
+                  <AuthCardBrand />
                   <div className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-full">
                     <Mail className="size-6" />
                   </div>
@@ -235,6 +231,7 @@ export default function RegisterPage() {
             ) : (
               <Card className="border-border/70 shadow-sm">
                 <CardHeader className="flex flex-col gap-1">
+                  <AuthCardBrand className="mb-3" />
                   <CardTitle className="text-2xl">
                     Create your merchant account
                   </CardTitle>

@@ -57,7 +57,6 @@ export default async function WarehouseDispatchPage() {
 
   const warehouseScope = or(
     eq(order.warehouseId, me.warehouseId),
-    and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
     and(isNull(order.pickupRiderId), eq(order.status, "APPROVED")),
   )
 

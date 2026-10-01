@@ -10,6 +10,7 @@
  * is resolved by `quoteParcel` and reported from the preview.
  */
 
+import { businessToday } from "@/lib/timezone"
 import type { CreateOrderInput, DeliveryType } from "@/lib/types"
 import { formatError, orderCreateSchema } from "@/lib/validation"
 import type { RawOrderRow } from "./csv-parse"
@@ -104,11 +105,9 @@ function findLookup(lookups: ResolveLookup[], name: string): string | null {
 }
 
 function csvImportTag(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-  return `[CSV import ${year}-${month}-${day}]`
+  // Business-local date (ROADMAP R0.3), so a batch imported just before Dhaka
+  // midnight is tagged with Dhaka's date rather than the browser's.
+  return `[CSV import ${businessToday()}]`
 }
 
 /**

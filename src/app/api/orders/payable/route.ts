@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lte, sql } from "drizzle-orm"
+import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
@@ -70,6 +70,19 @@ export const GET = withErrorHandler(async (req: Request) => {
     .leftJoin(deliveryCity, eq(order.deliveryCityId, deliveryCity.id))
     .where(where)
     .$dynamic()
+  // A total order is required, not just a sort. OFFSET paging over an unordered
+  // set lets Postgres return rows in any order it likes, so page 1 and page 2
+  // can overlap (the merchant sees the same order twice) or leave a gap (an
+  // order is never shown at all) — a silent defect on a payout list.
+  //
+  // `createdAt` matches the house pattern (orders/route.ts, payouts, merchants)
+  // and, critically, lines up with `order_merchant_status_created_at_idx`
+  // (merchantId, status, createdAt) which the WHERE clause already satisfies, so
+  // the index scan yields rows pre-sorted and no separate top-N sort is needed.
+  // `deliveredAt` would be the more semantic choice but has no index. `id`
+  // breaks ties: bulk-imported orders can share a `createdAt`, and a tie is
+  // exactly where OFFSET paging starts duplicating rows.
+  rowsQuery = rowsQuery.orderBy(desc(order.createdAt), desc(order.id))
   if (limit !== undefined) {
     rowsQuery = rowsQuery.limit(limit).offset(offset ?? 0)
   }

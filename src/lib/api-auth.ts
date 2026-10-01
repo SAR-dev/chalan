@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm"
 import { headers } from "next/headers"
 import { cache } from "react"
 import { auth } from "@/lib/auth" // ← was missing
-import { db } from "@/lib/db"
+// Session resolution is a read, so it belongs on the read pool: running it on
+// `db` cost every API request a session + profile⋈user⋈merchant join on the
+// primary before the route's own query ran (ROADMAP R0.11). `dbRead` falls
+// back to the primary when no replica is configured, so behaviour is unchanged
+// on a default deploy.
+import { dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
 import { isRoleAllowedIn, parsePortalMode } from "@/lib/portal-mode"
 import {
@@ -21,7 +26,7 @@ const loadSession = cache(async (lenient: boolean) => {
   const session = await auth.api.getSession({ headers: hdrs }) // ← replaces manual token extraction + DB query
   if (!session?.user) return null
 
-  const [row] = await db
+  const [row] = await dbRead
     .select({
       userId: profile.userId,
       role: profile.role,

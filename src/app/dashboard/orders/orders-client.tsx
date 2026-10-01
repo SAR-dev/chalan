@@ -34,6 +34,7 @@ import { ApproveOrderDialog } from "@/features/orders/dialogs/approve-order-dial
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { businessPresetRange } from "@/lib/timezone"
 import type { Order } from "@/lib/types"
 
 type FilterTab = "PENDING" | "APPROVED" | "ALL"
@@ -123,27 +124,12 @@ export function OrdersPageClient({
   type DatePreset = "today" | "yesterday" | "last7"
   const [datePreset, setDatePreset] = useState<DatePreset | null>(null)
 
+  // Business-local calendar days, not instants (ROADMAP R0.3) — see
+  // `businessPresetRange` for why the string form matters.
   function setDateRange(preset: DatePreset) {
-    const now = new Date()
-    const start = new Date(now)
-    const end = new Date(now)
-
-    if (preset === "today") {
-      start.setHours(0, 0, 0, 0)
-      end.setHours(23, 59, 59, 999)
-    } else if (preset === "yesterday") {
-      start.setDate(now.getDate() - 1)
-      start.setHours(0, 0, 0, 0)
-      end.setDate(now.getDate() - 1)
-      end.setHours(23, 59, 59, 999)
-    } else if (preset === "last7") {
-      start.setDate(now.getDate() - 6)
-      start.setHours(0, 0, 0, 0)
-      end.setHours(23, 59, 59, 999)
-    }
-
-    setDateFrom(start.toISOString())
-    setDateTo(end.toISOString())
+    const { from, to } = businessPresetRange(preset)
+    setDateFrom(from)
+    setDateTo(to)
   }
 
   function clearDateRange() {

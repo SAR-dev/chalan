@@ -33,19 +33,27 @@ vi.mock("@/features/merchants/hooks/use-merchants", () => ({
   useMerchants: () => ({ merchants: [] }),
 }))
 vi.mock("@/features/orders/hooks/use-orders", () => ({
-  useOrders: () => mockOrdersState,
+  // Record only when a queue is passed: the page's order dialogs also call
+  // `useOrders()` with no arguments, and those would overwrite the value.
+  useOrders: (opts?: { queue?: string }) => {
+    if (opts?.queue) receivedQueue = opts.queue
+    return mockOrdersState
+  },
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 let mockUser: ReturnType<typeof makeUser> | null
 let mockRider: ReturnType<typeof makeRider> | null
 let mockOrdersState: MockOrdersState
+/** The queue the page asked the API for. */
+let receivedQueue: string | undefined
 
 beforeEach(() => {
   resetIds()
   mockUser = makeUser()
   mockRider = makeRider()
   mockOrdersState = createMockOrders()
+  receivedQueue = undefined
 })
 
 async function importPage() {
@@ -54,40 +62,30 @@ async function importPage() {
 }
 
 describe("Rider pickup queue", () => {
-  it("filters by pickupRiderId — only assigned pickups appear", async () => {
+  // Splitting the queues is the API's job now: it returns only this rider's
+  // pickup rows for `?queue=pickup`, so the footer's `total` counts exactly
+  // what the table shows (ROADMAP R0.2). The page used to filter a union of
+  // both queues client-side while reporting the union's total.
+  it("asks the API for the pickup queue", async () => {
+    mockOrdersState = createMockOrders({
+      orders: [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+    })
+    await importPage()
+    expect(receivedQueue).toBe("pickup")
+  })
+
+  // The page must NOT re-filter — the API is the boundary that decides whose
+  // rows may be seen, and a local filter desynchronises the row count from
+  // the footer total.
+  it("renders the API's rows as-is instead of re-filtering them", async () => {
     mockOrdersState = createMockOrders({
       orders: [
-        makeOrder({
-          pickupRiderId: "rider_1",
-          status: "APPROVED",
-        }),
-        makeOrder({
-          pickupRiderId: "rider_2",
-          status: "APPROVED",
-        }),
+        makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" }),
+        makeOrder({ pickupRiderId: "rider_2", status: "APPROVED" }),
       ],
     })
     await importPage()
     expect(screen.getByText("ORD-0001")).toBeInTheDocument()
-    expect(screen.queryByText("ORD-0002")).not.toBeInTheDocument()
-  })
-
-  it("hides delivery-only orders", async () => {
-    mockOrdersState = createMockOrders({
-      orders: [
-        makeOrder({
-          deliveryRiderId: "rider_1",
-          pickupRiderId: null,
-          status: "IN_TRANSIT",
-        }),
-        makeOrder({
-          pickupRiderId: "rider_1",
-          status: "APPROVED",
-        }),
-      ],
-    })
-    await importPage()
-    expect(screen.queryByText("ORD-0001")).not.toBeInTheDocument()
     expect(screen.getByText("ORD-0002")).toBeInTheDocument()
   })
 

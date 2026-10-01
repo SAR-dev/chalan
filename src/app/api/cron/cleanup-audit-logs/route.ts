@@ -6,7 +6,10 @@
 // Authentication: callers must supply the CRON_SECRET as a Bearer token.
 // This prevents arbitrary clients from triggering the route.
 //
-// Retention is controlled by the AUDIT_LOG_RETENTION_DAYS env var (default: 30).
+// Retention is controlled by the AUDIT_LOG_RETENTION_DAYS env var; the default
+// is DEFAULT_AUDIT_LOG_RETENTION_DAYS in src/lib/env.ts, which this route
+// imports so the two can never disagree (docs-drift.spec.ts asserts the SQL and
+// docs match the same constant).
 //
 // Deployment options:
 //   Vercel Cron — add to vercel.json; Vercel injects
@@ -20,6 +23,7 @@ import { NextResponse } from "next/server"
 import { isAuthorizedCron } from "@/lib/cron-auth"
 import { db } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
+import { DEFAULT_AUDIT_LOG_RETENTION_DAYS } from "@/lib/env"
 import { logger } from "@/lib/logger"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -29,7 +33,8 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
 
   const retentionDays = parseInt(
-    process.env.AUDIT_LOG_RETENTION_DAYS || "30",
+    process.env.AUDIT_LOG_RETENTION_DAYS ||
+      `${DEFAULT_AUDIT_LOG_RETENTION_DAYS}`,
     10,
   )
   const cutoff = sql`now() - interval '1 day' * ${retentionDays}`

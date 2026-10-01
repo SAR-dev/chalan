@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { forbidden, notFound, unauthorized } from "@/lib/api-response"
+import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
@@ -29,8 +29,22 @@ export const PATCH = withErrorHandler(
     const [updated] = await db
       .update(profile)
       .set({ isActive: !current.isActive })
-      .where(eq(profile.userId, id))
+      // Lost-update guard (ROADMAP R0.9). Without the `isActive` clause two
+      // concurrent toggles both read the same value and both write the same
+      // result, so one activation silently collapses: the second caller sees
+      // "success" while its own change was dropped. Conditioning the write on
+      // the state we actually read turns that into an explicit conflict the
+      // caller can surface — which use-team's `!res.ok` path already does.
+      .where(
+        and(eq(profile.userId, id), eq(profile.isActive, current.isActive)),
+      )
       .returning()
+
+    if (!updated) {
+      return conflict(
+        "Account status changed while saving. Reload and try again.",
+      )
+    }
 
     const [targetUser] = await db
       .select({ name: user.name })

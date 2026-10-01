@@ -47,6 +47,18 @@ import {
 type Session = NonNullable<Awaited<ReturnType<typeof requireSession>>>
 type OrderRow = typeof order.$inferSelect
 
+/**
+ * The transaction handle a `guard` / `buildUpdate` must read through.
+ *
+ * Reads issued on the module-level `db` (or through `dbRead`, which may point
+ * at a replica) run outside the transaction that is about to write — a
+ * different connection, a different snapshot, and under replica lag a
+ * *stale* one. Validation that agrees with itself but disagrees with the row
+ * being locked is exactly how a guard passes and a write lands anyway
+ * (ROADMAP R0.11).
+ */
+export type OrderTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 // A short-circuit error (mapped to a NextResponse) or null to continue.
 type GuardError = { error: string; status: number } | null
 
@@ -54,6 +66,7 @@ interface TransitionContext<Body> {
   order: OrderRow
   session: Session
   body: Body
+  tx: OrderTx
 }
 
 interface TransitionDef<Schema extends z.ZodType | undefined = undefined> {
@@ -78,15 +91,18 @@ function defineTransition<Schema extends z.ZodType | undefined>(
 }
 
 // In-memory twin of buildWarehouseOrderScope() (src/lib/db/order-scope.ts):
-// the same three clauses that decide which rows a WAREHOUSE_ADMIN sees in
-// the list/detail endpoints must decide which rows they may act on.
+// the same clauses that decide which rows a WAREHOUSE_ADMIN sees in the
+// list/detail endpoints must decide which rows they may act on.
 function warehouseOrderInScope(
   o: OrderRow,
   warehouseId: string | null | undefined,
 ): boolean {
   if (!warehouseId) return false
   if (o.warehouseId === warehouseId) return true
-  if (!o.warehouseId && o.status === "PICKED_UP") return true
+  // `!o.warehouseId && status === "PICKED_UP"` used to sit here too. It is
+  // unreachable — `order.warehouseId` is NOT NULL and nothing ever nulls it —
+  // and the intake queue is driven by status, which branch 1 already covers
+  // (ROADMAP R0.12).
   return o.status === "APPROVED" && !o.pickupRiderId
 }
 
@@ -101,11 +117,11 @@ class TransitionError extends Error {
 export const ORDER_TRANSITIONS = {
   approve: defineTransition({
     authorize: (me) => me.role === "SUPER_ADMIN",
-    guard: async ({ order: o }) => {
+    guard: async ({ order: o, tx }) => {
       if (o.status !== "PENDING") {
         return { error: "Only PENDING orders can be approved", status: 400 }
       }
-      const [merchantRow] = await db
+      const [merchantRow] = await tx
         .select({ status: merchant.status })
         .from(merchant)
         .where(eq(merchant.id, o.merchantId))
@@ -128,6 +144,7 @@ export const ORDER_TRANSITIONS = {
       const resolved = await resolveRoutePricing(
         o.warehouseId,
         o.deliveryCityId,
+        tx,
       )
       if (resolved.ok && o.parcelWeightKg > resolved.pricing.maxWeightKg) {
         return {
@@ -147,7 +164,7 @@ export const ORDER_TRANSITIONS = {
   "assign-pickup-rider": defineTransition({
     authorize: (me) => me.role === "WAREHOUSE_ADMIN" && Boolean(me.warehouseId),
     schema: orderAssignPickupRiderSchema,
-    guard: async ({ order: o, session, body }) => {
+    guard: async ({ order: o, session, body, tx }) => {
       if (o.status !== "APPROVED") {
         return {
           error: "Only APPROVED orders can be assigned a pickup rider.",
@@ -160,7 +177,7 @@ export const ORDER_TRANSITIONS = {
           status: 400,
         }
       }
-      const [riderRow] = await db
+      const [riderRow] = await tx
         .select()
         .from(rider)
         .where(eq(rider.id, body.riderId))
@@ -192,7 +209,7 @@ export const ORDER_TRANSITIONS = {
   dispatch: defineTransition({
     authorize: (me) => me.role === "WAREHOUSE_ADMIN" && Boolean(me.warehouseId),
     schema: orderDispatchSchema,
-    guard: async ({ order: o, session, body }) => {
+    guard: async ({ order: o, session, body, tx }) => {
       if (o.status !== "IN_WAREHOUSE") {
         return {
           error: "Only IN_WAREHOUSE parcels can be dispatched.",
@@ -205,7 +222,7 @@ export const ORDER_TRANSITIONS = {
           status: 400,
         }
       }
-      const [riderRow] = await db
+      const [riderRow] = await tx
         .select()
         .from(rider)
         .where(eq(rider.id, body.riderId))
@@ -247,9 +264,9 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: async ({ order: o, body }) => {
+    buildUpdate: async ({ order: o, body, tx }) => {
       const warehouseId = o.pickupLocationId
-        ? await pickupWarehouseId(o.pickupLocationId)
+        ? await pickupWarehouseId(o.pickupLocationId, tx)
         : null
       const update: Record<string, unknown> = {
         status: "PICKED_UP",
@@ -272,6 +289,7 @@ export const ORDER_TRANSITIONS = {
         const resolved = await resolveRoutePricing(
           o.warehouseId,
           o.deliveryCityId,
+          tx,
         )
 
         if (resolved.ok && body.parcelWeightKg > resolved.pricing.maxWeightKg) {
@@ -633,8 +651,6 @@ function transitionNote(name: TransitionName, body: unknown): string | null {
   return null
 }
 
-type OrderTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
 /**
  * Writes the fee settlement for a terminal order (returned/cancelled): reverses
  * the creation `ORDER_CHARGE` and optionally charges the cancellation fee, then
@@ -878,6 +894,7 @@ export async function applyOrderTransition(
       order: orderRow,
       session: me,
       body,
+      tx,
     } as TransitionContext<never>
 
     const guardError = await def.guard(ctx)
@@ -992,6 +1009,7 @@ export async function applyBulkOrderTransition(
         order: orderRow,
         session: me,
         body,
+        tx,
       } as TransitionContext<never>
       const guardError = await def.guard(ctx)
       if (guardError) {

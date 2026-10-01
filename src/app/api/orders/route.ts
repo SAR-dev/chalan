@@ -72,13 +72,29 @@ export const GET = withErrorHandler(async (req: Request) => {
       if (!me.merchantId) return NextResponse.json(paginateResponse([], 0))
       where = eq(order.merchantId, me.merchantId)
       break
-    case "RIDER":
+    case "RIDER": {
       if (!me.riderId) return NextResponse.json(paginateResponse([], 0))
-      where = or(
-        eq(order.pickupRiderId, me.riderId),
-        eq(order.deliveryRiderId, me.riderId),
-      )
+      // A rider has two queues, and this endpoint returned their union. Each
+      // queue page then filtered client-side while still reporting the union's
+      // `total`, so "Showing 1-20 of 137" sat above four visible rows and
+      // page 2 showed a different subset — a rider could believe a queue was
+      // cleared when it was not (ROADMAP R0.2). Filtering here makes the rows
+      // and the count the same query.
+      //
+      // An unrecognised value falls back to the union rather than matching
+      // nothing, mirroring parseStatusFilter's handling of unknown statuses.
+      const queue = new URL(req.url).searchParams.get("queue")
+      where =
+        queue === "pickup"
+          ? eq(order.pickupRiderId, me.riderId)
+          : queue === "delivery"
+            ? eq(order.deliveryRiderId, me.riderId)
+            : or(
+                eq(order.pickupRiderId, me.riderId),
+                eq(order.deliveryRiderId, me.riderId),
+              )
       break
+    }
     case "WAREHOUSE_ADMIN":
       if (!me.warehouseId) return NextResponse.json(paginateResponse([], 0))
       // Shared scope: logged-in orders, intake candidates, APPROVED orders

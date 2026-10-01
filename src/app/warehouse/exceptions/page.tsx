@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
@@ -39,10 +39,9 @@ export default async function WarehouseExceptionsPage() {
 
   const limit = 20
 
-  const warehouseScope = or(
-    eq(order.warehouseId, me.warehouseId),
-    and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
-  )
+  // `order.warehouseId` is NOT NULL, so no "incoming candidate" can sit outside
+  // this warehouse (ROADMAP R0.12).
+  const warehouseScope = eq(order.warehouseId, me.warehouseId)
   const statusFilter = inArray(order.status, ["FAILED_ATTEMPT", "RETURNED"])
 
   const [[{ total }], rows] = await Promise.all([

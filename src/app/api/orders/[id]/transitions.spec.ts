@@ -173,7 +173,11 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     status: "PENDING",
     merchantId: "merch_1",
     pickupLocationId: "pl_1",
-    warehouseId: null,
+    // NOT NULL in the schema and written at creation from the pickup hub
+    // (`orders/route.ts` → `warehouseId: hub.id`), so a row without one cannot
+    // exist. Defaulting this fixture to null used to model a state the data
+    // model forbids (ROADMAP R0.12).
+    warehouseId: "wh_1",
     pickupRiderId: null,
     deliveryRiderId: null,
     parcelWeightKg: 2,
@@ -814,14 +818,25 @@ describe("PATCH /orders/:id/receive", () => {
     })
   })
 
-  it("receives an unassigned pickup with no warehouse yet", async () => {
+  // There is no "no warehouse yet" row to receive: `order.warehouseId` is
+  // NOT NULL and is written at creation from the pickup hub. The scope
+  // predicate and its in-memory twin dropped their `warehouseId is null`
+  // clause for the same reason — a clause that can never match only forced a
+  // bitmap-OR over an index-friendly predicate (ROADMAP R0.12).
+  //
+  // Pinned here so that if the column is ever made nullable (an intake-
+  // candidate flow), the change has to be made consciously in both places.
+  it("has no null-warehouse receive path", async () => {
     sessionState.value = warehouseAdmin("wh_1")
     dbState.selectQueue = [
       [makeOrder({ status: "PICKED_UP", warehouseId: null })],
     ]
     dbState.updateResult = [makeOrder({ status: "IN_WAREHOUSE" })]
-    const { status } = await call(receive)
-    expect(status).toBe(200)
+    const { status, json } = await call(receive)
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "This parcel is held at a different warehouse.",
+    })
   })
 })
 

@@ -46,6 +46,7 @@ import { OrderStatusBadge } from "@/features/orders/components/order-status-badg
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrderAnalytics } from "@/features/orders/hooks/use-order-analytics"
+import { useOrderSummary } from "@/features/orders/hooks/use-order-summary"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
@@ -66,6 +67,11 @@ export default function MerchantOverviewPage() {
   const { currentMerchant } = useMerchants()
   const { orders, isLoading, isRefreshing, mutate: refreshOrders } = useOrders()
   const { analytics, isLoading: analyticsLoading } = useOrderAnalytics()
+  // Headline figures are aggregated server-side over the whole account
+  // (ROADMAP R0.1). `orders` above is a single page of rows, so deriving money
+  // totals from it showed a merchant with 400 delivered orders the earnings of
+  // their newest 20 — with nothing on screen to reveal the truncation.
+  const { summary, refresh: refreshSummary } = useOrderSummary()
 
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -81,35 +87,15 @@ export default function MerchantOverviewPage() {
     [orders, currentMerchant],
   )
 
+  // Row sets for the table below only — these narrow what is *displayed*,
+  // which is the one thing a single page of orders is authoritative for.
   const inProgress = myOrders.filter((o) =>
     IN_PROGRESS_STATUSES.includes(o.status),
   )
   const delivered = myOrders.filter((o) => o.status === "DELIVERED")
-  const codToSettle = myOrders.filter(
-    (o) => o.status === "DELIVERED" && !o.codSettledAt,
-  )
   const payoutReady = myOrders.filter(
     (o) => o.status === "DELIVERED" && o.codSettledAt && !o.payoutRequestId,
   )
-
-  const codToCollect = myOrders
-    .filter(
-      (o) =>
-        o.status !== "DELIVERED" &&
-        o.status !== "RETURNED" &&
-        o.status !== "CANCELLED" &&
-        o.status !== "FAILED_ATTEMPT",
-    )
-    .reduce((sum, o) => sum + o.productCost, 0)
-
-  const payoutToIssue = payoutReady.reduce(
-    (sum, o) => sum + o.merchantEarnings,
-    0,
-  )
-
-  const totalEarnings = delivered
-    .filter((o) => o.payoutRequestId)
-    .reduce((sum, o) => sum + o.merchantEarnings, 0)
 
   const isActive = currentMerchant?.status === "ACTIVE"
 
@@ -251,28 +237,26 @@ export default function MerchantOverviewPage() {
         items={[
           {
             label: "COD to collect",
-            value: formatTk(codToCollect),
-            hint: `${inProgress.length} orders in transit`,
+            value: formatTk(summary?.codToCollect ?? 0),
+            hint: `${summary?.inProgressCount ?? 0} orders in transit`,
             icon: Wallet,
           },
           {
             label: "COD to settle",
-            value: codToSettle.length,
-            hint: formatTk(
-              codToSettle.reduce((sum, o) => sum + o.productCost, 0),
-            ),
+            value: summary?.codToSettleCount ?? 0,
+            hint: formatTk(summary?.codToSettleAmount ?? 0),
             icon: Package,
           },
           {
             label: "Payout to issue",
-            value: formatTk(payoutToIssue),
-            hint: `${payoutReady.length} orders ready`,
+            value: formatTk(summary?.payoutToIssue ?? 0),
+            hint: `${summary?.payoutReadyCount ?? 0} orders ready`,
             icon: Wallet,
           },
           {
             label: "Total earnings",
-            value: formatTk(totalEarnings),
-            hint: `${delivered.length} delivered`,
+            value: formatTk(summary?.totalEarnings ?? 0),
+            hint: `${summary?.deliveredCount ?? 0} delivered`,
             icon: Wallet,
           },
         ]}
@@ -343,13 +327,13 @@ export default function MerchantOverviewPage() {
             <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
               <TabsList>
                 <TabsTrigger value="IN_PROGRESS">
-                  In progress ({inProgress.length})
+                  In progress ({summary?.inProgressCount ?? 0})
                 </TabsTrigger>
                 <TabsTrigger value="DELIVERED">
-                  Delivered ({delivered.length})
+                  Delivered ({summary?.deliveredCount ?? 0})
                 </TabsTrigger>
                 <TabsTrigger value="PAYOUT_READY">
-                  Payout ready ({payoutReady.length})
+                  Payout ready ({summary?.payoutReadyCount ?? 0})
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -363,7 +347,10 @@ export default function MerchantOverviewPage() {
             getRowKey={(o) => o.id}
             initialSortId="order"
             loading={isLoading || isRefreshing}
-            onRefresh={refreshOrders}
+            onRefresh={() => {
+              void refreshOrders()
+              void refreshSummary()
+            }}
             emptyMessage={
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <div className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full">

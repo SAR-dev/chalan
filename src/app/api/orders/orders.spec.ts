@@ -1,3 +1,4 @@
+import { PgDialect } from "drizzle-orm/pg-core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 // Receiver-note (public, token-gated) is covered by its own colocated spec:
 // src/app/api/orders/[id]/receiver-note/receiver-note.spec.ts
@@ -7,6 +8,7 @@ import { POST as bulkCreate } from "./bulk/route"
 import { GET as orderCounts } from "./counts/route"
 import { GET as payableOrders } from "./payable/route"
 import { POST as createOrder, GET as listOrders } from "./route"
+import { GET as orderSummary } from "./summary/route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
@@ -85,6 +87,13 @@ const insertPayloads: Record<string, unknown>[] = []
 const whereCalls: unknown[] = []
 /** Row-lock strengths requested by any query, in order. */
 const forCalls: string[] = []
+/**
+ * Arguments to every `orderBy`, in call order. A list endpoint paging with
+ * OFFSET must establish a total order or pages can overlap or gap; the count
+ * query deliberately does not sort, so a correctly-ordered list query is the
+ * one and only entry.
+ */
+const orderByCalls: unknown[][] = []
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -99,7 +108,10 @@ vi.mock("@/lib/db", () => {
       groupBy: () => chain,
       limit: () => chain,
       offset: () => chain,
-      orderBy: () => chain,
+      orderBy: (...args: unknown[]) => {
+        orderByCalls.push(args)
+        return chain
+      },
       $dynamic: () => chain,
       for: (strength: string) => {
         forCalls.push(strength)
@@ -162,6 +174,7 @@ beforeEach(() => {
   insertPayloads.length = 0
   whereCalls.length = 0
   forCalls.length = 0
+  orderByCalls.length = 0
   sessionState.value = null
   rateLimited = false
 })
@@ -506,6 +519,182 @@ describe("GET /api/orders/payable", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.total).toBe(1)
+  })
+
+  // OFFSET paging needs a *total* order (sort column + unique tiebreaker).
+  // Without one Postgres may return rows in any order, so consecutive pages
+  // overlap — the merchant is shown the same payable order twice — or leave a
+  // gap where an order is never shown. Both are silent on a payout list.
+  it("orders the rows by a total order so OFFSET pages cannot overlap or gap", async () => {
+    sessionState.value = merchant
+    selectQueue.push([{ count: 2 }], [{ id: "o1" }, { id: "o2" }])
+    const res = await payableOrders(req("GET"))
+    expect(res.status).toBe(200)
+
+    // Exactly one of the two queries (COUNT + rows) may sort — the COUNT must
+    // not, and the rows query must.
+    expect(orderByCalls).toHaveLength(1)
+    // Sort column plus tiebreaker: a single expression is not a total order.
+    expect(orderByCalls[0]).toHaveLength(2)
+  })
+
+  // Guards against "fixing" the sort by dropping the tiebreaker.
+  it("keeps the tiebreaker when the caller asks for a page", async () => {
+    sessionState.value = merchant
+    selectQueue.push([{ count: 2 }], [{ id: "o1" }, { id: "o2" }])
+    const res = await payableOrders(
+      req("GET", "http://test.local/api?limit=1&offset=1"),
+    )
+    expect(res.status).toBe(200)
+    expect(orderByCalls).toHaveLength(1)
+    expect(orderByCalls[0]).toHaveLength(2)
+  })
+})
+
+// A rider has two queues. Without `?queue=` the endpoint returned their union
+// and each queue page filtered client-side, so the footer's `total` counted
+// rows the table never rendered and page 2 showed a different subset
+// (ROADMAP R0.2).
+describe("GET /api/orders?queue= (ROADMAP R0.2)", () => {
+  const renderWhere = () =>
+    new PgDialect().sqlToQuery(
+      whereCalls[0] as Parameters<PgDialect["sqlToQuery"]>[0],
+    )
+
+  async function riderList(query?: string) {
+    sessionState.value = rider
+    whereCalls.length = 0
+    // COUNT + rows, both sharing the same `where`.
+    selectQueue.push([{ count: 0 }], [])
+    const res = await listOrders(
+      req("GET", `http://test.local/api${query ?? ""}`),
+    )
+    expect(res.status).toBe(200)
+    return renderWhere()
+  }
+
+  it("narrows to the pickup queue when asked", async () => {
+    const { sql, params } = await riderList("?queue=pickup")
+    expect(sql).toContain('"order"."pickupRiderId"')
+    expect(sql).not.toContain('"order"."deliveryRiderId"')
+    expect(params).toContain("r_1")
+  })
+
+  it("narrows to the delivery queue when asked", async () => {
+    const { sql, params } = await riderList("?queue=delivery")
+    expect(sql).toContain('"order"."deliveryRiderId"')
+    expect(sql).not.toContain('"order"."pickupRiderId"')
+    expect(params).toContain("r_1")
+  })
+
+  // Backwards compatible: with no queue the union is still returned, so the
+  // rows and the total agree either way.
+  it("returns both queues when no queue is requested", async () => {
+    const { sql } = await riderList()
+    expect(sql).toContain('"order"."pickupRiderId"')
+    expect(sql).toContain('"order"."deliveryRiderId"')
+  })
+
+  // A typo must not narrow to an empty set (or widen unexpectedly) — unknown
+  // values fall back to the union, mirroring parseStatusFilter.
+  it("falls back to the union for an unrecognised queue", async () => {
+    const { sql } = await riderList("?queue=bogus")
+    expect(sql).toContain('"order"."pickupRiderId"')
+    expect(sql).toContain('"order"."deliveryRiderId"')
+  })
+})
+
+describe("GET /api/orders/summary (ROADMAP R0.1)", () => {
+  const aggregates = {
+    inProgressCount: 7,
+    // node-postgres can hand numeric aggregates back as text; the route must
+    // still answer with a number, because `formatTk("42000")` would concatenate.
+    codToCollect: "42000",
+    codToSettleCount: 3,
+    codToSettleAmount: "9000",
+    payoutReadyCount: 2,
+    payoutToIssue: "7000",
+    deliveredCount: 400,
+    totalEarnings: "200000",
+  }
+
+  it("401 when unauthenticated", async () => {
+    const res = await orderSummary(req("GET"))
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for roles that have no merchant figures", async () => {
+    for (const session of [rider, whAdmin]) {
+      sessionState.value = session
+      const res = await orderSummary(req("GET"))
+      expect(res.status).toBe(403)
+    }
+  })
+
+  it("aggregates over the caller's merchant and reports numbers", async () => {
+    sessionState.value = merchant
+    selectQueue.push([aggregates])
+    const res = await orderSummary(req("GET"))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toEqual({
+      codToCollect: 42000,
+      inProgressCount: 7,
+      codToSettleCount: 3,
+      codToSettleAmount: 9000,
+      payoutReadyCount: 2,
+      payoutToIssue: 7000,
+      deliveredCount: 400,
+      totalEarnings: 200000,
+    })
+    // Scoped by the session's merchant, never by a query param the caller picks.
+    expect(whereCalls[0]).toBeDefined()
+    const { params } = new PgDialect().sqlToQuery(
+      whereCalls[0] as Parameters<PgDialect["sqlToQuery"]>[0],
+    )
+    expect(params).toContain("m_1")
+  })
+
+  it("403 when a merchant asks for another merchant's summary", async () => {
+    sessionState.value = merchant
+    const res = await orderSummary(
+      req("GET", "http://test.local/api?merchantId=m_2"),
+    )
+    expect(res.status).toBe(403)
+    expect(selectQueue).toHaveLength(0)
+  })
+
+  it("answers zero, not null, for a merchant with no orders", async () => {
+    sessionState.value = merchant
+    selectQueue.push([])
+    const res = await orderSummary(req("GET"))
+    const json = await res.json()
+    expect(json).toEqual({
+      codToCollect: 0,
+      inProgressCount: 0,
+      codToSettleCount: 0,
+      codToSettleAmount: 0,
+      payoutReadyCount: 0,
+      payoutToIssue: 0,
+      deliveredCount: 0,
+      totalEarnings: 0,
+    })
+  })
+
+  it("lets a super admin read an arbitrary merchant's summary", async () => {
+    sessionState.value = admin
+    selectQueue.push([aggregates])
+    const res = await orderSummary(
+      req("GET", "http://test.local/api?merchantId=m_9"),
+    )
+    expect(res.status).toBe(200)
+    expect((await res.json()).totalEarnings).toBe(200000)
+    const { params } = new PgDialect().sqlToQuery(
+      whereCalls[whereCalls.length - 1] as Parameters<
+        PgDialect["sqlToQuery"]
+      >[0],
+    )
+    expect(params).toContain("m_9")
   })
 })
 

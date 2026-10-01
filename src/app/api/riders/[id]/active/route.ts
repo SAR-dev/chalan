@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { forbidden, notFound, unauthorized } from "@/lib/api-response"
+import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { rider } from "@/lib/db/schema"
@@ -38,8 +38,18 @@ export const PATCH = withErrorHandler(
     const [updated] = await db
       .update(rider)
       .set({ isActive: !current.isActive })
-      .where(eq(rider.id, id))
+      // Lost-update guard (ROADMAP R0.9) — same reasoning as
+      // src/app/api/team/[id]/active/route.ts: without this clause two
+      // concurrent toggles write the same value and one activation is silently
+      // lost. A miss is reported as a conflict, not overwritten.
+      .where(and(eq(rider.id, id), eq(rider.isActive, current.isActive)))
       .returning()
+
+    if (!updated) {
+      return conflict(
+        "Rider status changed while saving. Reload and try again.",
+      )
+    }
 
     await logAudit({
       actor: { userId: me.userId, name: me.name, role: me.role },

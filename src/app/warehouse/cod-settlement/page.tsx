@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm"
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { requireSession } from "@/lib/api-auth"
@@ -43,10 +43,9 @@ export default async function WarehouseSettlementPage() {
 
   const limit = 20
 
-  const warehouseScope = or(
-    eq(order.warehouseId, me.warehouseId),
-    and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
-  )
+  // `order.warehouseId` is NOT NULL, so no "incoming candidate" can sit outside
+  // this warehouse (ROADMAP R0.12).
+  const warehouseScope = eq(order.warehouseId, me.warehouseId)
   const statusFilter = eq(order.status, "DELIVERED")
 
   const [[{ total }], rows, riderCash] = await Promise.all([

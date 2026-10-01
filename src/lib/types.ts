@@ -251,3 +251,24 @@ export interface OrderAnalytics {
   deliveryPerformance: DeliveryPerformance
   codSummary: CodSummary
 }
+
+/**
+ * Headline figures for the merchant overview, aggregated over the merchant's
+ * entire order history (ROADMAP R0.1).
+ *
+ * Deliberately server-computed: deriving these client-side from the array
+ * `useOrders()` returns meant every figure covered only the first
+ * `DEFAULT_TABLE_ROWS_PER_PAGE` rows, which read as authoritative and was
+ * wrong for any merchant with more than one page of orders.
+ */
+export interface MerchantOrderSummary {
+  /** Sum of `productCost` over orders still carrying COD. */
+  codToCollect: number
+  inProgressCount: number
+  codToSettleCount: number
+  codToSettleAmount: number
+  payoutReadyCount: number
+  payoutToIssue: number
+  deliveredCount: number
+  totalEarnings: number
+}
