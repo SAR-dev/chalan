@@ -35,23 +35,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { pageContent } from "@/config/content"
 import { CreateMailConfigDialog } from "@/features/platform-config/dialogs/create-mail-config-dialog"
+import {
+  type MailConfigRecord,
+  useMailConfigs,
+} from "@/features/platform-config/hooks/use-mail-configs"
 import { usePlatformConfig } from "@/features/platform-config/hooks/use-platform-config"
-import { formatError } from "@/lib/validation"
-
-interface MailConfig {
-  id: string
-  label: string
-  host: string
-  port: string
-  secure: boolean
-  user: string
-  pass: string
-  fromEmail: string
-  fromName: string
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-}
 
 const emptyForm = {
   label: "",
@@ -74,13 +62,23 @@ export default function DashboardSettingsPage() {
   const [saving, setSaving] = useState(false)
 
   // Mail config state
-  const [mailConfigs, setMailConfigs] = useState<MailConfig[]>([])
-  const [mailLoading, setMailLoading] = useState(true)
+  const {
+    mailConfigs,
+    isLoading: mailLoading,
+    isRefreshing: mailRefreshing,
+    refresh: loadMailConfigs,
+    createMailConfig,
+    testMailConfig,
+    activateMailConfig,
+    deleteMailConfig,
+  } = useMailConfigs()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [mailSaving, setMailSaving] = useState(false)
   const [mailTesting, setMailTesting] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<MailConfig | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<MailConfigRecord | null>(
+    null,
+  )
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
@@ -88,20 +86,6 @@ export default function DashboardSettingsPage() {
     if (!config) return
     setRefundOnCancel(config.refundOnCancel !== false)
   }, [config])
-
-  async function loadMailConfigs() {
-    setMailLoading(true)
-    try {
-      const res = await fetch("/api/admin/mail-config")
-      if (res.ok) setMailConfigs(await res.json())
-    } finally {
-      setMailLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadMailConfigs()
-  }, [])
 
   async function handleSave() {
     setSaving(true)
@@ -117,19 +101,13 @@ export default function DashboardSettingsPage() {
   async function handleCreateMail() {
     setMailSaving(true)
     try {
-      const res = await fetch("/api/admin/mail-config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      })
-      if (res.ok) {
+      const result = await createMailConfig(form)
+      if (result.ok) {
         toast.success("Mail config created.")
         setDialogOpen(false)
         setForm(emptyForm)
-        loadMailConfigs()
       } else {
-        const resData = await res.json()
-        toast.error(formatError(resData, "Failed to create config."))
+        toast.error(result.error ?? "Failed to create config.")
       }
     } finally {
       setMailSaving(false)
@@ -139,16 +117,11 @@ export default function DashboardSettingsPage() {
   async function handleTestMail() {
     setMailTesting(true)
     try {
-      const res = await fetch("/api/admin/mail-config/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      })
-      if (res.ok) {
+      const result = await testMailConfig(form)
+      if (result.ok) {
         toast.success("Test email sent — check your inbox.")
       } else {
-        const resData = await res.json()
-        toast.error(formatError(resData, "Failed to send test email."))
+        toast.error(result.error ?? "Failed to send test email.")
       }
     } finally {
       setMailTesting(false)
@@ -156,15 +129,11 @@ export default function DashboardSettingsPage() {
   }
 
   async function handleActivate(id: string) {
-    const res = await fetch(`/api/admin/mail-config/${id}/activate`, {
-      method: "PATCH",
-    })
-    if (res.ok) {
+    const result = await activateMailConfig(id)
+    if (result.ok) {
       toast.success("Config activated.")
-      loadMailConfigs()
     } else {
-      const data = await res.json().catch(() => null)
-      toast.error(formatError(data, "Failed to activate config."))
+      toast.error(result.error ?? "Failed to activate config.")
     }
   }
 
@@ -172,24 +141,20 @@ export default function DashboardSettingsPage() {
     if (!deleteTarget) return
     setDeleteLoading(true)
     try {
-      const res = await fetch(`/api/admin/mail-config/${deleteTarget.id}`, {
-        method: "DELETE",
-      })
-      if (res.ok) {
+      const result = await deleteMailConfig(deleteTarget.id)
+      if (result.ok) {
         toast.success("Config deleted.")
         setDeleteOpen(false)
         setDeleteTarget(null)
-        loadMailConfigs()
       } else {
-        const data = await res.json()
-        toast.error(data.error ?? "Failed to delete config.")
+        toast.error(result.error ?? "Failed to delete config.")
       }
     } finally {
       setDeleteLoading(false)
     }
   }
 
-  const mailColumns: DataTableColumn<MailConfig>[] = [
+  const mailColumns: DataTableColumn<MailConfigRecord>[] = [
     {
       id: "status",
       header: "Status",
@@ -381,7 +346,7 @@ export default function DashboardSettingsPage() {
             data={mailConfigs}
             getRowKey={(c) => c.id}
             initialSortId="status"
-            loading={mailLoading}
+            loading={mailLoading || mailRefreshing}
             onRefresh={loadMailConfigs}
             emptyMessage="No mail configs yet. Add one to start sending emails."
           />

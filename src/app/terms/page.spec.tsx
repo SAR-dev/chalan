@@ -12,6 +12,11 @@ async function importPage() {
 describe("Terms page", () => {
   it("renders terms heading", async () => {
     await importPage()
-    expect(screen.getByRole("heading", { name: /terms/i })).toBeInTheDocument()
+    // Scoped to level 1: the document legitimately contains other headings that
+    // mention "Terms" (section 9, "Changes to These Terms"), so an unscoped
+    // role query matches more than one and throws rather than asserting.
+    expect(
+      screen.getByRole("heading", { level: 1, name: /terms and conditions/i }),
+    ).toBeInTheDocument()
   })
 })

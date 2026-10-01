@@ -47,6 +47,17 @@ export const user = pgTable(
     // token never touches the database; cleared on successful activation.
     activationToken: text("activationToken"),
     activationTokenExpiresAt: ts("activationTokenExpiresAt"),
+    // Consent record: which version of the Terms/Privacy the account holder
+    // accepted, and when.
+    //
+    // Stamped server-side from config, never from the request body — a client
+    // that could choose its own timestamp or version could forge an acceptance.
+    // Nullable on purpose: an account created outside the UI forms, or by a
+    // caller that does not attest, records nothing rather than a consent nobody
+    // actually gave. Without this there is no way to show which wording a given
+    // user agreed to once the documents are revised.
+    termsAcceptedAt: ts("termsAcceptedAt"),
+    termsVersion: text("termsVersion"),
   },
   (t) => [
     index("user_name_trgm_idx").using("gin", sql`${t.name} gin_trgm_ops`),

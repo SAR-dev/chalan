@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { appContent } from "@/config/site"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, unauthorized } from "@/lib/api-response"
 import { auth } from "@/lib/auth"
@@ -222,6 +223,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     address,
     businessType,
     password,
+    termsAccepted,
   } = parsed.data
 
   const limited = await rateLimitByIp(req, "merchant-register", 3, 60, {
@@ -283,6 +285,21 @@ export const POST = withErrorHandler(async (req: Request) => {
         isActive: true,
         merchantId: row.id,
       })
+
+      // Consent record, in the same transaction as the account so an account
+      // can never exist with a half-written acceptance. Timestamp and version
+      // come from config rather than the request body — otherwise a client
+      // could back-date its own acceptance or claim a version never published.
+      // Absent `termsAccepted` means "no consent recorded", not "consented".
+      if (termsAccepted) {
+        await tx
+          .update(user)
+          .set({
+            termsAcceptedAt: new Date().toISOString(),
+            termsVersion: appContent.LEGAL_VERSION,
+          })
+          .where(eq(user.id, created.user.id))
+      }
 
       // Enqueue the verification email in the same transaction (ROADMAP P1.5).
       const template = await merchantRegisteredTemplate({

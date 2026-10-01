@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { appContent } from "@/config/site"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
@@ -56,6 +57,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     password,
     vehicleType,
     vehiclePlate,
+    termsAccepted,
   } = parsed.data
 
   // The selected warehouse must exist and be active.
@@ -129,6 +131,21 @@ export const POST = withErrorHandler(async (req: Request) => {
         isActive: false,
         riderId: row.id,
       })
+
+      // Consent record, in the same transaction as the application so an
+      // application can never exist with a half-written acceptance. Timestamp
+      // and version come from config rather than the request body — otherwise
+      // a client could back-date its own acceptance or claim a version never
+      // published. Absent `termsAccepted` means "no consent recorded".
+      if (termsAccepted) {
+        await tx
+          .update(user)
+          .set({
+            termsAcceptedAt: new Date().toISOString(),
+            termsVersion: appContent.LEGAL_VERSION,
+          })
+          .where(eq(user.id, createdUser.user.id))
+      }
 
       await logAudit(
         {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { appContent } from "@/config/site"
 import { logAudit } from "@/lib/audit"
 import { SEED_IMAGE_PLACEHOLDER } from "@/lib/db/seed/seed-content"
 import { PATCH as approveMerchant } from "./[id]/approve/route"
@@ -242,6 +243,68 @@ describe("POST /api/merchants", () => {
     const json = await res.json()
     expect(res.status).toBe(201)
     expect(json).toMatchObject({ id: "m_new" })
+  })
+
+  // Consent has to be provable *after* the documents are revised, so the record
+  // carries both the version published at the time and the moment it happened.
+  it("stamps the consent version and a timestamp when the form attests", async () => {
+    insertResult.push({
+      id: "m_new",
+      businessName: "New Biz",
+      status: "PENDING",
+    })
+    const res = await createMerchant(
+      req("POST", undefined, { ...validBody, termsAccepted: true }),
+    )
+    expect(res.status).toBe(201)
+    const stamp = updatePayloads.find((p) => "termsAcceptedAt" in p)
+    expect(stamp).toBeDefined()
+    expect(stamp?.termsVersion).toBe(appContent.LEGAL_VERSION)
+    // A timestamp the client did not choose: sent as a string for `ts()`
+    // columns, and inside a sane window of now.
+    expect(typeof stamp?.termsAcceptedAt).toBe("string")
+    const stamped = new Date(String(stamp?.termsAcceptedAt)).getTime()
+    expect(Number.isNaN(stamped)).toBe(false)
+    expect(Math.abs(Date.now() - stamped)).toBeLessThan(60_000)
+  })
+
+  it("records no consent when the caller does not attest", async () => {
+    insertResult.push({
+      id: "m_new",
+      businessName: "New Biz",
+      status: "PENDING",
+    })
+    const res = await createMerchant(req("POST", undefined, validBody))
+    expect(res.status).toBe(201)
+    expect(updatePayloads.some((p) => "termsAcceptedAt" in p)).toBe(false)
+  })
+
+  it("rejects an explicit termsAccepted: false rather than storing it", async () => {
+    const res = await createMerchant(
+      req("POST", undefined, { ...validBody, termsAccepted: false }),
+    )
+    expect(res.status).toBe(400)
+    expect(insertResult).toHaveLength(0)
+  })
+
+  it("ignores a client-supplied timestamp or version", async () => {
+    insertResult.push({
+      id: "m_new",
+      businessName: "New Biz",
+      status: "PENDING",
+    })
+    const res = await createMerchant(
+      req("POST", undefined, {
+        ...validBody,
+        termsAccepted: true,
+        termsVersion: "0.0-forged",
+        termsAcceptedAt: "1990-01-01T00:00:00.000Z",
+      }),
+    )
+    expect(res.status).toBe(201)
+    const stamp = updatePayloads.find((p) => "termsAcceptedAt" in p)
+    expect(stamp?.termsVersion).toBe(appContent.LEGAL_VERSION)
+    expect(stamp?.termsAcceptedAt).not.toBe("1990-01-01T00:00:00.000Z")
   })
 })
 

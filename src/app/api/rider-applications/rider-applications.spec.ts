@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { appContent } from "@/config/site"
 import { PATCH as approveApplication } from "./[id]/approve/route"
 import { PATCH as rejectApplication } from "./[id]/reject/route"
 import { GET as listApplications, POST as submitApplication } from "./route"
@@ -214,6 +215,46 @@ describe("POST /api/rider-applications", () => {
       userId: "auth_new_user",
       riderId: "r_new",
     })
+  })
+
+  // A rider is a data subject in their own right (see privacy.md §1.3), so their
+  // consent is recorded with the same version/time stamp a merchant's is.
+  it("stamps the consent version and a timestamp when the form attests", async () => {
+    selectQueue.push([{ id: "wh_1" }])
+    selectQueue.push([])
+    insertResult.push({ id: "r_new" }, { id: "profile_new" })
+    const res = await submitApplication(
+      req("POST", undefined, { ...validApplication, termsAccepted: true }),
+    )
+    expect(res.status).toBe(201)
+    const stamp = updatePayloads.find((p) => "termsAcceptedAt" in p)
+    expect(stamp).toBeDefined()
+    expect(stamp?.termsVersion).toBe(appContent.LEGAL_VERSION)
+    expect(typeof stamp?.termsAcceptedAt).toBe("string")
+    const stamped = new Date(String(stamp?.termsAcceptedAt)).getTime()
+    expect(Number.isNaN(stamped)).toBe(false)
+    expect(Math.abs(Date.now() - stamped)).toBeLessThan(60_000)
+  })
+
+  it("records no consent when the caller does not attest", async () => {
+    selectQueue.push([{ id: "wh_1" }])
+    selectQueue.push([])
+    insertResult.push({ id: "r_new" }, { id: "profile_new" })
+    const res = await submitApplication(
+      req("POST", undefined, validApplication),
+    )
+    expect(res.status).toBe(201)
+    expect(updatePayloads.some((p) => "termsAcceptedAt" in p)).toBe(false)
+  })
+
+  it("rejects an explicit termsAccepted: false rather than storing it", async () => {
+    selectQueue.push([{ id: "wh_1" }])
+    selectQueue.push([])
+    const res = await submitApplication(
+      req("POST", undefined, { ...validApplication, termsAccepted: false }),
+    )
+    expect(res.status).toBe(400)
+    expect(insertResult).toHaveLength(0)
   })
 
   it("returns 400 and removes the auth user when the unique index rejects a duplicate email", async () => {
