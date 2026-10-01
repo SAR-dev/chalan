@@ -396,6 +396,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="name"
                         data-testid="rider-name"
+                        error={errors.name}
                         placeholder="Karim Hossain"
                         value={form.name}
                         onChange={(e) => update("name", e.target.value)}
@@ -407,6 +408,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="phone"
                         data-testid="rider-phone"
+                        error={errors.phone}
                         type="tel"
                         placeholder="+8801712345678"
                         value={form.phone}
@@ -419,6 +421,7 @@ export default function ApplyRiderPage() {
                         <Label htmlFor="zone">Service zone</Label>
                         <Input
                           id="zone"
+                          error={errors.zone}
                           placeholder="Dhaka North"
                           value={form.zone}
                           onChange={(e) => update("zone", e.target.value)}
@@ -456,6 +459,7 @@ export default function ApplyRiderPage() {
                       <Label htmlFor="address">Home address</Label>
                       <Input
                         id="address"
+                        error={errors.address}
                         placeholder="House 14, Road 7, Dhanmondi, Dhaka"
                         value={form.address}
                         onChange={(e) => update("address", e.target.value)}
@@ -522,6 +526,7 @@ export default function ApplyRiderPage() {
                           <Input
                             id="vehiclePlate"
                             data-testid="rider-apply-vehicle-plate"
+                            error={errors.vehiclePlate}
                             value={form.vehiclePlate}
                             onChange={(e) =>
                               update("vehiclePlate", e.target.value)
@@ -538,6 +543,7 @@ export default function ApplyRiderPage() {
                         <Label htmlFor="nidNumber">National ID number</Label>
                         <Input
                           id="nidNumber"
+                          error={errors.nidNumber}
                           placeholder="1234567890"
                           value={form.nidNumber}
                           onChange={(e) => update("nidNumber", e.target.value)}
@@ -605,6 +611,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="email"
                         data-testid="rider-email"
+                        error={errors.email}
                         type="email"
                         placeholder="karim@email.com"
                         value={form.email}
@@ -618,6 +625,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="password"
                         type="password"
+                        error={errors.password}
                         placeholder="Choose a password"
                         value={form.password}
                         onChange={(e) => update("password", e.target.value)}

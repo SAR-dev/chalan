@@ -251,6 +251,7 @@ export default function RegisterPage() {
                       <Input
                         id="businessName"
                         data-testid="register-business-name"
+                        error={errors.businessName}
                         placeholder="Threadline Apparel"
                         value={form.businessName}
                         onChange={(e) => update("businessName", e.target.value)}
@@ -279,6 +280,7 @@ export default function RegisterPage() {
                       <Label htmlFor="ownerName">Owner / contact name</Label>
                       <Input
                         id="ownerName"
+                        error={errors.ownerName}
                         placeholder="Imran Kabir"
                         value={form.ownerName}
                         onChange={(e) => update("ownerName", e.target.value)}
@@ -290,6 +292,7 @@ export default function RegisterPage() {
                       <Input
                         id="phone"
                         type="tel"
+                        error={errors.phone}
                         placeholder="+8801712345678"
                         value={form.phone}
                         onChange={(e) => update("phone", e.target.value)}
@@ -300,6 +303,7 @@ export default function RegisterPage() {
                       <Label htmlFor="address">Business address</Label>
                       <Input
                         id="address"
+                        error={errors.address}
                         placeholder="House 14, Road 7, Dhanmondi, Dhaka"
                         value={form.address}
                         onChange={(e) => update("address", e.target.value)}
@@ -313,6 +317,7 @@ export default function RegisterPage() {
                           id="email"
                           data-testid="register-email"
                           type="email"
+                          error={errors.email}
                           placeholder="you@business.com"
                           value={form.email}
                           onChange={(e) => update("email", e.target.value)}
@@ -324,6 +329,7 @@ export default function RegisterPage() {
                         <Input
                           id="password"
                           type="password"
+                          error={errors.password}
                           placeholder="Choose a password"
                           value={form.password}
                           onChange={(e) => update("password", e.target.value)}

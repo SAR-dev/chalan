@@ -2,8 +2,25 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
-  return (
+interface TextareaProps extends React.ComponentProps<"textarea"> {
+  /**
+   * Message for this field, when the caller has one. Same contract as
+   * `Input.error` — nothing extra renders when it is absent, so existing call
+   * sites are untouched (ROADMAP R2.4).
+   */
+  error?: string
+}
+
+function Textarea({
+  className,
+  error,
+  id,
+  "aria-describedby": describedBy,
+  ...props
+}: TextareaProps) {
+  const errorId = React.useId()
+
+  const control = (
     <textarea
       data-slot="textarea"
       className={cn(
@@ -11,8 +28,33 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
         className,
       )}
       {...props}
+      id={id}
+      aria-invalid={error ? true : (props["aria-invalid"] ?? undefined)}
+      aria-describedby={
+        error
+          ? describedBy
+            ? `${errorId} ${describedBy}`
+            : errorId
+          : describedBy
+      }
     />
+  )
+
+  if (!error) return control
+
+  return (
+    <>
+      {control}
+      <p
+        id={errorId}
+        data-slot="textarea-error"
+        className="text-destructive text-xs"
+      >
+        {error}
+      </p>
+    </>
   )
 }
 
+export type { TextareaProps }
 export { Textarea }
