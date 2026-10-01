@@ -79,9 +79,9 @@ test.describe("S73. Server-side pagination", () => {
     await expect(prev).toBeDisabled()
     const page1First = await firstRowId(page)
 
-    // Assert with `toHaveText` FIRST: the page change is async (SWR refetch),
-    // and `innerText()` below does not retry, so reading it straight after the
-    // click captures the stale label.
+    // The label moves synchronously (local state in `handlePageChange`); the
+    // rows arrive with the SWR response. Reading them once races the fetch —
+    // which is how this assertion first failed with page 1's row still shown.
     await next.click()
     await expect(label).toHaveText(/Page 2 of \d+/)
     const second = await readPage(page)
@@ -89,17 +89,22 @@ test.describe("S73. Server-side pagination", () => {
     // Same set, further into it — the total must not move when paging.
     expect(second.total).toBe(first.total)
     await expect(prev).toBeEnabled()
-    await expect(page.locator(ROWS)).toHaveCount(PAGE_SIZE)
 
+    await expect
+      .poll(() => firstRowId(page), { timeout: 15_000 })
+      .not.toBe(page1First)
+    await expect(page.locator(ROWS)).toHaveCount(PAGE_SIZE)
     const page2First = await firstRowId(page)
     expect(page2First).not.toBe(page1First)
 
     await prev.click()
     await expect(label).toHaveText(/Page 1 of \d+/)
+    await expect
+      .poll(() => firstRowId(page), { timeout: 15_000 })
+      .toBe(page1First)
     const back = await readPage(page)
     expect(back.current).toBe(1)
     expect(back.total).toBe(first.total)
-    expect(await firstRowId(page)).toBe(page1First)
   })
 
   test("the footer controls are tagged on every list page", async ({

@@ -487,6 +487,23 @@ export function DataTable<T>({
   // because totalPages changes, which clamps down naturally.
   const currentPage = Math.min(Math.max(1, page), totalPages)
 
+  // In server mode the PARENT owns pagination: the footer hands control to
+  // `onPageChange`, which updated the parent's state and never came back here,
+  // so the footer's own `page` stayed at 1 — the label read "Page 1 of N" on
+  // every server-paginated table and Previous was permanently disabled.
+  // Found by the E2E spec added under ROADMAP R1.3, which is exactly why those
+  // controls had no coverage.
+  //
+  // Advancing the local copy is safe because `visible` returns `data`
+  // untouched when `serverPaginated` (L491) — this state is display-only here.
+  const handlePageChange = React.useCallback(
+    (nextPage: number, nextLimit: number) => {
+      setPage(nextPage)
+      onPageChange?.(nextPage, nextLimit)
+    },
+    [onPageChange],
+  )
+
   const visible = React.useMemo(() => {
     if (serverPaginated) return data
     if (!paginated) return sorted
@@ -860,10 +877,10 @@ export function DataTable<T>({
           displayTotal={displayTotal}
           pageSizeOptions={pageSizeOptions}
           size={size}
-          page={page}
+          page={currentPage}
           totalPages={totalPages}
           currentPage={currentPage}
-          onPageChange={onPageChange}
+          onPageChange={handlePageChange}
           userChangedSize={userChangedSize}
           setSize={setSize}
           setPage={setPage}
