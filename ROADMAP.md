@@ -219,41 +219,21 @@ There is no uptime rule, no alert, nothing in `.github/` but `ci.yml` and
 in the meantime: an uptime check on `/api/ready`, which already returns 503
 correctly (`src/app/api/ready/route.ts:43`).
 
-### R3.2 No request/access logging
+Two related gaps are folded in here rather than kept as their own items —
+both are symptoms of this same missing layer, not separate pieces of work:
 
-`src/lib/logger.ts` emits structured JSON correctly but only fires on
-unhandled 500s (`with-error-handler.ts:61-66`). There is no slow-request log,
-no 4xx log, no route latency. `logger.child()` is implemented (`:78-86`) and
-**never called** anywhere in the codebase. `src/lib/redact.ts` exists and is
-not wired into `emit()`.
+- **No request or access logging.** Only unhandled 500s reach the log
+  (`src/lib/with-error-handler.ts:61-66`): no slow-request line, no 4xx line,
+  no route latency. `logger.child()` is implemented (`src/lib/logger.ts:78-86`)
+  and called nowhere, and `src/lib/redact.ts` exists but is not wired into
+  `emit()`.
+- **No slow-query or pool-saturation signal.** No `log_min_duration_statement`,
+  no `statement_timeout` on the pool (`src/lib/db/index.ts`), no `pool.waiting`
+  gauge. `pg_stat_statements` is enabled in `docker/compose.postgres.yml` and
+  documented in `docs/DEPLOYMENT.md` — nothing queries it, so a query taking
+  30s simply hangs a request with no signal.
 
-**Fix:** a proxy-level access log keyed on `x-request-id` with a slow-request
-threshold; use `logger.child({ requestId })` in `withErrorHandler`; pass
-through `redact`.
-
-### R3.3 No slow-query or pool-saturation signal
-
-No `log_min_duration_statement`, no `statement_timeout` on the pool
-(`src/lib/db/index.ts`), no `pool.waiting` gauge. `pg_stat_statements` **is**
-enabled in `docker/compose.postgres.yml` and documented in
-`docs/DEPLOYMENT.md` — nothing queries it. A 30-second query simply hangs a
-request with no signal.
-
-**Fix:** set `log_min_duration_statement` in the Postgres config, add a
-`statement_timeout` guard on the pool, and surface `pool.waiting` in
-`/api/ready`.
-
-### R3.4 Docker image ships every devDependency
-
-`docker/Dockerfile:61` copies the full `node_modules` from the `deps` stage —
-so the runtime image contains `typescript`, `@playwright/test`, `vitest`,
-`drizzle-kit` and `tsx`. The image is otherwise excellent (multi-stage, build
-cache mounts, non-root `nextjs` user at `:65`, `HEALTHCHECK` at `:71`).
-
-**Fix:** a `pnpm deploy --prod` stage, or a separate build stage so test
-tooling never reaches the runner.
-
-### R3.5 The in-cluster upload limit is per-instance
+### R3.2 The in-cluster upload limit is per-instance
 
 `src/proxy.ts:186` keeps `uploadWindows` as an in-process `Map`; the comment
 at `:178` admits it. With four app instances in `compose.cluster.yml`, each
@@ -264,21 +244,7 @@ between requests.
 **Fix:** route uploads through the same Redis limiter the rest of the app uses
 (`src/lib/rate-limit.ts`); prune on a timer.
 
-### R3.6 CSP still allows `unsafe-inline` styles; no HSTS
-
-`src/proxy.ts:77` sets `style-src 'self' 'unsafe-inline'`. Both `next-themes`
-and `nextjs-toploader` accept a nonce, so it is removable. Also missing:
-`Strict-Transport-Security`, and `poweredByHeader: false` (`X-Powered-By:
-Next.js` on every response).
-
-### R3.7 Eleven `src/lib` modules have no spec
-
-Including financial and infrastructure code: `src/lib/rider-cash.ts` (under an
-80% `src/lib/**` floor, no direct test), `src/lib/db/index.ts` (unguarded
-tuning knobs — `POOL_MAX = IS_SERVERLESS ? 5 : 20`, `idleTimeoutMillis: 10_000`),
-`src/lib/login-redirect.ts`, `src/lib/demo-reset.ts`, `src/lib/auth-client.ts`.
-
-### R3.8 There is no display formatting layer
+### R3.3 There is no display formatting layer
 
 ≈27 `toLocaleString`/`toLocaleDateString` call sites, most passing a bare
 locale and **none** passing `timeZone`. The worst instance is public and
@@ -299,26 +265,7 @@ hardcoding `en-US` grouping.
 both pinned to `BUSINESS_TIMEZONE` and an explicit locale; codemod the ~27
 call sites; retire the duplicate `CURRENCY`.
 
-### R3.9 `recharts` is bundled eagerly on every chart page
-
-There is exactly **one** `next/dynamic` in the codebase
-(`src/app/merchant/page.tsx:11`). Every other chart page imports through the
-`@/components/charts` barrel, so all of `recharts` lands in the initial
-bundle of `delivery-performance`, `cod-settlement` and friends — on the
-dashboard's critical path. `src/components/markdown.tsx` has the same shape,
-pulling `react-markdown` + `remark-gfm` eagerly into three static server
-pages (`/privacy`, `/terms`, `/help/[slug]`).
-
-**Fix:** one dynamic wrapper shared by all chart pages; move `markdown.tsx` to
-a server component.
-
-### R3.10 `@aws-sdk/client-s3` ships even when `STORAGE_PROVIDER=local`
-
-The default install never touches R2 but pays the image cost
-(`docker/Dockerfile:61` copies it). Lazy-import `storage/r2.ts` behind the
-provider switch.
-
-### R3.11 Three-way hostname conflict, committed tunnel identity
+### R3.4 Three-way hostname conflict, committed tunnel identity
 
 `config.yml:2-4` hardcodes a tunnel UUID and `hostname: sarn.top` and is not
 gitignored; `deploy.yml:44` defaults `NEXT_PUBLIC_SITE_URL` to
@@ -329,7 +276,7 @@ shape.
 **Fix:** pick one, move `config.yml` under `.gitignore` or delete it, and
 assert no hostname literal survives in the tree.
 
-### R3.12 A bulk order transition runs ~900 statements in one transaction
+### R3.5 A bulk order transition runs ~900 statements in one transaction
 
 `src/features/orders/transitions.ts:975-1071` (`applyBulkOrderTransition`) is
 used by all six `/api/orders/bulk/*` routes with up to **100 ids**
@@ -351,7 +298,7 @@ updates into `UPDATE … WHERE id IN (…)`; one `insert(auditLog).values([...])
 one `insert(orderStatusHistory).values([...])`; move guard reads onto `tx`
 (see R0.11).
 
-### R3.13 Eight bulk endpoints fan out one audit INSERT per row
+### R3.6 Eight bulk endpoints fan out one audit INSERT per row
 
 `Promise.all(rows.map(logAudit))` at
 `src/app/api/merchants/bulk/approve/route.ts:45`,
@@ -364,7 +311,7 @@ single-row round trips. `logAudit` already builds a `values` object
 (`src/lib/audit.ts:66-79`), so `logAuditMany(inputs, tx)` doing one
 `values([...])` is a small change across eight files.
 
-### R3.14 Three full passes over `order` per `/dashboard/orders` view, nothing cached
+### R3.7 Three full passes over `order` per `/dashboard/orders` view, nothing cached
 
 - `src/app/dashboard/orders/page.tsx:17` — unpredicated `count(*)` over `order`
 - `:19-26` — a second pass, `GROUP BY status`
@@ -389,7 +336,7 @@ collapse into **one** pass with `FILTER`, exactly the technique already used in
 **Fix:** `unstable_cache` with tags and a 30–60 s TTL on the aggregates; merge
 the analytics passes with `FILTER`.
 
-### R3.15 Two FK columns on the largest table have no index
+### R3.8 Two FK columns on the largest table have no index
 
 `order.packageId` and `order.packageTierId` are declared FKs with
 `onDelete: "set null"` (`schema.postgres/orders.ts:129-135`) and **neither has
@@ -413,7 +360,7 @@ page.
 `index("user_created_at_idx").on(t.createdAt)`. All three are additive
 migrations with no data backfill — run `pnpm db:generate` then `pnpm db:push`.
 
-### R3.16 Public token lookups scan the whole table
+### R3.9 Public token lookups scan the whole table
 
 `src/lib/activation.ts:81-85` filters `WHERE user.activationToken = $1` and
 `src/app/api/auth/verify-email/route.ts:43` filters
@@ -424,7 +371,7 @@ is a sequential scan reachable by anyone.
 **Fix:** partial unique indexes `WHERE activationToken IS NOT NULL` and
 `WHERE emailVerificationToken IS NOT NULL`.
 
-### R3.17 Cross-table `ILIKE OR` search defeats every trigram index
+### R3.10 Cross-table `ILIKE OR` search defeats every trigram index
 
 `src/app/api/orders/route.ts:100-107` ORs `ilike` across
 `order.id/recipientName/recipientPhone` **and** `merchant.businessName` **and**
@@ -441,7 +388,7 @@ index. The gap is **query shape**, not missing indexes.
 **Fix:** per-table `EXISTS` subqueries, or a `UNION` of per-table hits, or a
 maintained `tsvector` column.
 
-### R3.18 Unbounded and uncached roster responses
+### R3.11 Unbounded and uncached roster responses
 
 `src/app/api/merchants/route.ts:64-91` — the RIDER and WAREHOUSE_ADMIN
 branches return **every** merchant with no pagination and no `Cache-Control`
@@ -577,7 +524,7 @@ Still floating above the card:
 `src/features/orders/components/tracking-timeline.tsx:20-97` re-declares
 `StepKey`, `STATUS_RANK` and `STEPS` that already exist in
 `src/app/track/[id]/lib.ts:47-124`. Two sources of truth for one concept —
-one of which carries the R3.8 formatter bug.
+one of which carries the R3.3 formatter bug.
 
 **Fix:** move them to a shared module and have both import it.
 
@@ -650,6 +597,30 @@ Covered by R1.4 — but note that AGENTS.md also claims a "route-audit" note
 about `/warehouse/warehouses` being undocumented; keep that as intentional (it
 redirects warehouse admins away).
 
+### R5.9 Bundle, image and response-header weight
+
+Moved out of R3 — real, but not the platform risk that band is for. They
+share a theme: everything the server ships out the door.
+
+- **The Docker image ships every devDependency.** `docker/Dockerfile:61`
+  copies the full `node_modules` from the `deps` stage, so `typescript`,
+  `@playwright/test`, `vitest` and `drizzle-kit` reach an image that only runs
+  `server.js`. A `pnpm deploy --prod` stage fixes it; the image is otherwise
+  excellent (multi-stage, cache mounts, non-root, `HEALTHCHECK`).
+- **`recharts` is bundled eagerly on every chart page.** There is exactly one
+  `next/dynamic` in the codebase (`src/app/merchant/page.tsx:11`); everything
+  else imports through the `@/components/charts` barrel, so all of recharts
+  lands on the dashboard critical path. Same shape in
+  `src/components/markdown.tsx`, pulling `react-markdown` + `remark-gfm` into
+  three static server pages.
+- **`@aws-sdk/client-s3` ships even when `STORAGE_PROVIDER=local`** — the
+  default install never touches R2. Lazy-import `storage/r2.ts` behind the
+  provider switch.
+- **`style-src` still allows `unsafe-inline` and nothing sets HSTS**
+  (`src/proxy.ts:77`). Both `next-themes` and `nextjs-toploader` accept a
+  nonce; HSTS is arguably the cloudflared edge's job, but nothing sets it
+  either. Also drop `poweredByHeader`.
+
 ---
 
 # Guardrails — verified-clean areas (don't regress these)
@@ -682,7 +653,7 @@ redirects warehouse admins away).
 | **Partial unique indexes as hard guarantees** | `finance.ts:89-91`, `packages.ts:122-125,166` |
 | **Outbox concurrency** | `FOR UPDATE SKIP LOCKED` + 10-min stale-`SENDING` recovery (`src/lib/email-outbox.ts:75-86,100`) |
 | **Lock ordering** | orders → balance, documented and consistent |
-| **Batching already done right in places** | `pickupLocationHubs` (`db/order-lookup.ts:61-79`), the bulk-endpoint pricing pre-fetch (`orders/bulk/route.ts:111-175`), `orders/counts` `FILTER` query (`:40-47`) — **these are the patterns R3.12–R3.14 should copy** |
+| **Batching already done right in places** | `pickupLocationHubs` (`db/order-lookup.ts:61-79`), the bulk-endpoint pricing pre-fetch (`orders/bulk/route.ts:111-175`), `orders/counts` `FILTER` query (`:40-47`) — **these are the patterns R3.5–R3.7 should copy** |
 | **Migration gate** | compose `depends_on: service_completed_successfully` on the migrate job |
 | **No raw SQL with user input** | the only `sql.raw` is `src/lib/db/time-sql.ts:15`, interpolating the constant `BUSINESS_TIMEZONE` |
 
@@ -693,4 +664,4 @@ redirects warehouse admins away).
 | **Docker hygiene** | non-root user, build-cache mounts, `HEALTHCHECK` on `/api/ready` |
 | **Cron auth** | timing-safe SHA-256 compare in `src/lib/cron-auth.ts` |
 | **Read/write replica split** | `db` for writes, `dbRead` for reads — but see R0.11 for where it leaks |
-| **Day-boundary rule** | `BUSINESS_TIMEZONE` + `businessToday()` — correct wherever it is used (extend it, don't reinvent it: see R0.3, R3.8) |
+| **Day-boundary rule** | `BUSINESS_TIMEZONE` + `businessToday()` — correct wherever it is used (extend it, don't reinvent it: see R0.3, R3.3) |
