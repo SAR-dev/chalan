@@ -62,6 +62,16 @@ export const user = pgTable(
   (t) => [
     index("user_name_trgm_idx").using("gin", sql`${t.name} gin_trgm_ops`),
     index("user_email_trgm_idx").using("gin", sql`${t.email} gin_trgm_ops`),
+    // `admin/users` and `admin/team` both default to `ORDER BY createdAt DESC`
+    // (ROADMAP R3.8). The table only ever had two trigram GINs, so every page
+    // turn sorted the whole user set.
+    index("user_created_at_idx").on(t.createdAt),
+    // `POST /api/auth/activate` is unauthenticated and looks the row up by this
+    // value, so every click on an activation link scanned the whole table
+    // (ROADMAP R3.9). Partial: activated accounts hold NULL and cost nothing.
+    index("user_activation_token_idx")
+      .on(t.activationToken)
+      .where(sql`${t.activationToken} is not null`),
   ],
 )
 

@@ -40,17 +40,7 @@ import { MerchantStatusBadge } from "@/features/merchants/components/merchant-st
 import { ModeratorsCard } from "@/features/merchants/components/moderators-card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { PickupLocationsManager } from "@/features/pickup-locations/components/pickup-locations-manager"
-import { brandThemeVars, lowContrastSides } from "@/lib/brand-color"
 import { merchantProfileSchema, validateFormData } from "@/lib/validation"
-
-const BRAND_PRESETS = [
-  { label: "Orange", value: "#f97316" },
-  { label: "Blue", value: "#2563eb" },
-  { label: "Emerald", value: "#10b981" },
-  { label: "Violet", value: "#8b5cf6" },
-  { label: "Red", value: "#ef4444" },
-  { label: "Cyan", value: "#06b6d4" },
-] as const
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString(undefined, {
@@ -86,36 +76,11 @@ export default function MerchantSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Branding state
-  const [brandColor, setBrandColor] = useState(
-    () => currentMerchant?.brandColor ?? "",
-  )
-  const [hidePlatformBranding, setHidePlatformBranding] = useState(
-    () => currentMerchant?.hidePlatformBranding ?? false,
-  )
-  const [savingBranding, setSavingBranding] = useState(false)
-
-  // Live preview + WCAG warning (warn, never block) — reflect unsaved edits.
-  const previewVars = brandThemeVars(brandColor)
-  const lowContrast = lowContrastSides(brandColor)
-  const contrastSides =
-    lowContrast.length === 2
-      ? "light and dark"
-      : lowContrast[0] === "light"
-        ? "light"
-        : "dark"
-  const contrastMessage =
-    lowContrast.length > 0
-      ? `Low contrast: this color as text on ${contrastSides} backgrounds is under the WCAG AA 4.5:1 threshold. Buttons and badges using it as a background stay readable.`
-      : null
-
   useEffect(() => {
     if (!currentMerchant) return
     setBusinessName(currentMerchant.businessName)
     setPhone(currentMerchant.phone)
     setAddress(currentMerchant.address)
-    setBrandColor(currentMerchant.brandColor ?? "")
-    setHidePlatformBranding(currentMerchant.hidePlatformBranding ?? false)
   }, [currentMerchant])
 
   if (!isReady || !isDataReady) return null
@@ -183,31 +148,6 @@ export default function MerchantSettingsPage() {
       }
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleSaveBranding() {
-    if (!currentMerchant) return
-    setSavingBranding(true)
-    try {
-      const res = await fetch(`/api/merchants/${currentMerchant.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brandColor: brandColor || null,
-          hidePlatformBranding,
-        }),
-      })
-      if (res.ok) {
-        toast.success("Branding settings saved.")
-        // Revalidate merchant data
-        window.location.reload()
-      } else {
-        const data = await res.json().catch(() => null)
-        toast.error(data?.error ?? "Could not save branding settings.")
-      }
-    } finally {
-      setSavingBranding(false)
     }
   }
 
@@ -289,161 +229,6 @@ export default function MerchantSettingsPage() {
                 </CardFooter>
               </Card>
             </form>
-
-            <Card data-testid="branding-section">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="size-4" />
-                  Branding
-                </CardTitle>
-                <CardDescription>
-                  Customize how your business appears in the sidebar and on
-                  order tracking.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-6">
-                {/* Live preview — uses unsaved values via inline theme vars */}
-                <div
-                  className="border-border bg-card rounded-lg border p-4"
-                  style={previewVars as React.CSSProperties | undefined}
-                  data-testid="branding-preview"
-                >
-                  <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-widest uppercase">
-                    Preview
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">
-                        {currentMerchant.businessName}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <span
-                          className="bg-primary text-primary-foreground rounded-md px-2.5 py-1 text-xs font-medium"
-                          data-testid="preview-chip"
-                        >
-                          Badge
-                        </span>
-                        <button
-                          type="button"
-                          className="bg-primary text-primary-foreground rounded-md px-3 py-1 text-xs font-medium"
-                          data-testid="preview-button"
-                        >
-                          Sample button
-                        </button>
-                        <span className="text-primary text-xs font-medium underline underline-offset-4">
-                          Link
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border-border mt-4 border-t pt-3">
-                    <p className="text-muted-foreground mb-1.5 text-xs font-medium">
-                      Where this appears:
-                    </p>
-                    <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                      <li className="flex items-center gap-1.5">
-                        <PanelLeft className="size-3.5" />
-                        Merchant sidebar
-                      </li>
-                      <li className="flex items-center gap-1.5">
-                        <Store className="size-3.5" />
-                        Order tracking page
-                      </li>
-                      {/* Emails are deliberately absent: they are greyscale, so
-                          a merchant colour has nowhere to go in one. Listing
-                          it here would promise a result the sender never
-                          delivers. */}
-                    </ul>
-                  </div>
-
-                  {contrastMessage && (
-                    <div
-                      className="border-amber-500/30 bg-amber-500/10 mt-3 flex items-start gap-2 rounded-md border px-3 py-2"
-                      data-testid="brand-contrast-warning"
-                    >
-                      <AlertTriangle className="text-amber-600 mt-0.5 size-3.5 shrink-0" />
-                      <p className="text-amber-700 text-xs leading-relaxed">
-                        {contrastMessage}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Brand color</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Applied to buttons, links, badges, and focus rings across
-                    your portal.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {BRAND_PRESETS.map((preset) => (
-                      <button
-                        key={preset.value}
-                        type="button"
-                        title={preset.label}
-                        onClick={() => setBrandColor(preset.value)}
-                        className={`size-8 rounded-full border-2 transition-all ${
-                          brandColor === preset.value
-                            ? "border-foreground scale-110"
-                            : "border-transparent hover:scale-105"
-                        }`}
-                        style={{ backgroundColor: preset.value }}
-                      />
-                    ))}
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="color"
-                        value={brandColor || "#f97316"}
-                        onChange={(e) => setBrandColor(e.target.value)}
-                        className="size-8 cursor-pointer p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-md"
-                      />
-                      <Input
-                        type="text"
-                        value={brandColor}
-                        onChange={(e) => setBrandColor(e.target.value)}
-                        placeholder="#f97316"
-                        className="w-24 font-mono text-xs"
-                        maxLength={7}
-                        data-testid="brand-color-input"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex flex-col gap-1">
-                    <Label>Hide platform branding</Label>
-                    <p className="text-muted-foreground text-xs">
-                      Show only your logo in the sidebar. It also removes the
-                      platform name and footer note from your emails — the one
-                      setting here that reaches them.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={hidePlatformBranding}
-                    onCheckedChange={setHidePlatformBranding}
-                    data-testid="hide-branding-toggle"
-                  />
-                </div>
-              </CardContent>
-              <CardFooter className="justify-end">
-                <Button
-                  onClick={handleSaveBranding}
-                  disabled={savingBranding}
-                  data-testid="save-branding"
-                >
-                  {savingBranding ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Saving
-                    </>
-                  ) : (
-                    "Save branding"
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
 
             <ModeratorsCard merchantId={currentMerchant.id} />
 

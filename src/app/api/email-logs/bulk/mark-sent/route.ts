@@ -2,7 +2,7 @@ import { and, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
-import { logAudit } from "@/lib/audit"
+import { logAuditMany } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { emailLog } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
@@ -41,16 +41,14 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     })
     .where(inArray(emailLog.id, failedIds))
 
-  await Promise.all(
-    faileds.map((l) =>
-      logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "EMAIL_LOG_MARKED_SENT",
-        entityType: "email_log",
-        entityId: l.id,
-        description: `Marked email to ${l.to} ("${l.subject}") as sent`,
-      }),
-    ),
+  await logAuditMany(
+    faileds.map((l) => ({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: "EMAIL_LOG_MARKED_SENT",
+      entityType: "email_log",
+      entityId: l.id,
+      description: `Marked email to ${l.to} ("${l.subject}") as sent`,
+    })),
   )
 
   return NextResponse.json({ ok: true, count: faileds.length })

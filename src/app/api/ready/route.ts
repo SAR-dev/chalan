@@ -7,6 +7,11 @@
 // timeout so a hung dependency cannot hang the healthcheck.
 import { sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import {
+  neverRanCronJobs,
+  reportStaleCronJobs,
+  staleCronJobs,
+} from "@/lib/cron-heartbeat"
 import { dbRead } from "@/lib/db"
 import { logger } from "@/lib/logger"
 import { pingRedis, rateLimiterDegraded } from "@/lib/rate-limit"
@@ -34,11 +39,30 @@ export const GET = withErrorHandler(async () => {
   const redis = await pingRedis(PROBE_TIMEOUT_MS)
   const ok = db && redis
 
+  // Cron liveness is reported, but deliberately does NOT fail readiness: if
+  // the scheduler dies the app itself is perfectly serviceable, and taking
+  // every instance out of rotation would turn one background fault into an
+  // outage. `reportStaleCronJobs` logs each lapse once instead of once per
+  // probe (ROADMAP R0.8).
+  let stale: string[] = []
+  let neverRan: string[] = []
+  if (db) {
+    try {
+      const staleJobs = await withTimeout(staleCronJobs(), PROBE_TIMEOUT_MS)
+      reportStaleCronJobs(staleJobs)
+      stale = staleJobs.map((s) => s.job)
+      neverRan = await withTimeout(neverRanCronJobs(), PROBE_TIMEOUT_MS)
+    } catch (err) {
+      logger.debug("cron watchdog skipped", { err })
+    }
+  }
+
   return NextResponse.json(
     {
       ok,
       checks: { db, redis },
       rateLimiter: { degraded: rateLimiterDegraded() },
+      cron: { stale, neverRan },
     },
     { status: ok ? 200 : 503 },
   )

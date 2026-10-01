@@ -37,7 +37,6 @@ export interface EmailSpec {
   rows?: [string, string][]
   cta?: { href: string; label: string }
   footnote?: string
-  hidePlatformBranding?: boolean
 }
 
 const FONT = "Arial, sans-serif"
@@ -83,8 +82,6 @@ function Facts({ rows }: { rows: [string, string][] }) {
 }
 
 function EmailLayout({ spec }: { spec: EmailSpec }) {
-  const showBranding = !spec.hidePlatformBranding
-
   return (
     <Html lang="en" dir="ltr">
       <Head />
@@ -107,18 +104,16 @@ function EmailLayout({ spec }: { spec: EmailSpec }) {
           }}
         >
           <Section style={{ padding: "32px 24px 8px" }}>
-            {showBranding ? (
-              <Text
-                style={{
-                  fontSize: "14px",
-                  lineHeight: "20px",
-                  color: MUTED,
-                  margin: 0,
-                }}
-              >
-                {siteConfig.name}
-              </Text>
-            ) : null}
+            <Text
+              style={{
+                fontSize: "14px",
+                lineHeight: "20px",
+                color: MUTED,
+                margin: 0,
+              }}
+            >
+              {siteConfig.name}
+            </Text>
             <Heading
               as="h1"
               style={{
@@ -200,28 +195,24 @@ function EmailLayout({ spec }: { spec: EmailSpec }) {
             ) : null}
           </Section>
 
-          {showBranding ? (
-            <>
-              <Hr style={{ borderColor: RULE, margin: "0 24px" }} />
-              <Section style={{ padding: "16px 24px" }}>
-                <Text
-                  style={{
-                    fontSize: "12px",
-                    lineHeight: "18px",
-                    // `MUTED`, not a lighter grey: at 12px a third, fainter
-                    // step measured ~2.5:1 against white, which is below the
-                    // 4.5:1 a reader needs. Collapsing it also leaves the
-                    // palette at one ink and one secondary — genuinely two
-                    // tones, not three shades of the same idea.
-                    color: MUTED,
-                    margin: 0,
-                  }}
-                >
-                  This is an automated message. Please do not reply.
-                </Text>
-              </Section>
-            </>
-          ) : null}
+          <Hr style={{ borderColor: RULE, margin: "0 24px" }} />
+          <Section style={{ padding: "16px 24px" }}>
+            <Text
+              style={{
+                fontSize: "12px",
+                lineHeight: "18px",
+                // `MUTED`, not a lighter grey: at 12px a third, fainter
+                // step measured ~2.5:1 against white, which is below the
+                // 4.5:1 a reader needs. Collapsing it also leaves the
+                // palette at one ink and one secondary — genuinely two
+                // tones, not three shades of the same idea.
+                color: MUTED,
+                margin: 0,
+              }}
+            >
+              This is an automated message. Please do not reply.
+            </Text>
+          </Section>
         </Container>
       </Body>
     </Html>

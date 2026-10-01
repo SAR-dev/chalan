@@ -13,6 +13,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: () => Promise.resolve(),
+  logAuditMany: () => Promise.resolve(),
 }))
 
 const selectQueue: unknown[][] = []

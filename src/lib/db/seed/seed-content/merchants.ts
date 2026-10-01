@@ -28,8 +28,6 @@ export interface MerchantSeedEntry {
     | "Other"
   emailVerifiedAt: string | null
   phoneVerifiedAt: string | null
-  brandColor?: string | null
-  hidePlatformBranding?: boolean
   approvedBy: string | null
   approvedAt: string | null
   nidFrontImage: string | null
@@ -66,8 +64,6 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-01T00:00:00.000Z",
     phoneVerifiedAt: "2026-07-01T00:00:00.000Z",
-    brandColor: "#2563eb",
-    hidePlatformBranding: false,
     approvedBy: ADMIN_USER_NAMES.tanvir,
     approvedAt: "2026-07-02T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,
@@ -169,8 +165,6 @@ export const SEED_MERCHANTS: MerchantSeedEntry[] = [
     businessType: "E-commerce",
     emailVerifiedAt: "2026-01-01T00:00:00.000Z",
     phoneVerifiedAt: "2026-01-01T00:00:00.000Z",
-    brandColor: "#f97316",
-    hidePlatformBranding: false,
     approvedBy: "System",
     approvedAt: "2026-01-01T00:00:00.000Z",
     nidFrontImage: SEED_IMAGE_PLACEHOLDER,

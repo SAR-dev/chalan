@@ -7,7 +7,6 @@ import {
   formatError,
   idsSchema,
   isValidBdPhone,
-  merchantBrandingSchema,
   normalizePhone,
   orderCreateSchema,
   parseBody,
@@ -463,69 +462,5 @@ describe("rider vehicle fields", () => {
       expect(withVehicle.data.vehicleType).toBe("VAN")
       expect(withVehicle.data.vehiclePlate).toBe("BA-11-1111")
     }
-  })
-})
-
-// ---------------------------------------------------------------------------
-// merchantBrandingSchema
-// ---------------------------------------------------------------------------
-
-describe("merchantBrandingSchema", () => {
-  it("accepts valid hex color", () => {
-    const result = merchantBrandingSchema.safeParse({ brandColor: "#f97316" })
-    expect(result.success).toBe(true)
-  })
-
-  it("accepts null values", () => {
-    const result = merchantBrandingSchema.safeParse({ brandColor: null })
-    expect(result.success).toBe(true)
-  })
-
-  it("accepts all fields", () => {
-    const result = merchantBrandingSchema.safeParse({
-      brandColor: "#10b981",
-      hidePlatformBranding: true,
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it("accepts empty object (all optional)", () => {
-    const result = merchantBrandingSchema.safeParse({})
-    expect(result.success).toBe(true)
-  })
-
-  it("rejects invalid hex without #", () => {
-    const result = merchantBrandingSchema.safeParse({ brandColor: "f97316" })
-    expect(result.success).toBe(false)
-  })
-
-  it("rejects invalid hex too short", () => {
-    const result = merchantBrandingSchema.safeParse({ brandColor: "#fff" })
-    expect(result.success).toBe(false)
-  })
-
-  it("rejects invalid hex too long", () => {
-    const result = merchantBrandingSchema.safeParse({ brandColor: "#1234567" })
-    expect(result.success).toBe(false)
-  })
-
-  it("accepts all valid preset colors", () => {
-    const presets = [
-      "#f97316",
-      "#2563eb",
-      "#10b981",
-      "#8b5cf6",
-      "#ef4444",
-      "#06b6d4",
-    ]
-    for (const color of presets) {
-      const result = merchantBrandingSchema.safeParse({ brandColor: color })
-      expect(result.success).toBe(true)
-    }
-  })
-
-  it("accepts uppercase hex", () => {
-    const result = merchantBrandingSchema.safeParse({ brandColor: "#F97316" })
-    expect(result.success).toBe(true)
   })
 })

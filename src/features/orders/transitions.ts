@@ -9,7 +9,7 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api-response"
-import { logAudit } from "@/lib/audit"
+import { type LogAuditInput, logAudit, logAuditMany } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
 import {
   cancellationChargeAmount,
@@ -1059,22 +1059,22 @@ export async function applyBulkOrderTransition(
       )
     }
 
+    const note = transitionNote(name, body)
+    const auditInputs: LogAuditInput[] = []
+    const historyRows: (typeof orderStatusHistory.$inferInsert)[] = []
+
     for (const row of updated) {
       const before = beforeById.get(row.id) ?? null
       const diff = diffEntity(before, row, ORDER_DIFF_FIELDS)
-      // Audit + history inside the same transaction (ROADMAP P1.4).
-      await logAudit(
-        {
-          actor: { userId: me.userId, name: me.name, role: me.role },
-          action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
-          entityType: "order",
-          entityId: row.id,
-          description: `${TRANSITION_LABELS[name]} order ${row.id} (bulk)`,
-          metadata: diff ? { diff } : null,
-        },
-        tx,
-      )
-      await tx.insert(orderStatusHistory).values({
+      auditInputs.push({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
+        entityType: "order",
+        entityId: row.id,
+        description: `${TRANSITION_LABELS[name]} order ${row.id} (bulk)`,
+        metadata: diff ? { diff } : null,
+      })
+      historyRows.push({
         orderId: row.id,
         fromStatus: before?.status ?? null,
         toStatus: row.status,
@@ -1082,9 +1082,19 @@ export async function applyBulkOrderTransition(
         actorId: me.userId,
         actorName: me.name,
         actorRole: me.role,
-        note: transitionNote(name, body),
+        note,
       })
     }
+
+    // Two statements for the whole batch instead of two per row, inside the
+    // same transaction (ROADMAP P1.4's atomicity, R3.5's round trips): a
+    // 100-order bulk approve was issuing 100 audit INSERTs + 100 history
+    // INSERTs here alone, holding the batch's row locks open the whole time.
+    await logAuditMany(auditInputs, tx)
+    if (historyRows.length > 0) {
+      await tx.insert(orderStatusHistory).values(historyRows)
+    }
+
     return NextResponse.json({ ok: true, count: updated.length })
   })
 

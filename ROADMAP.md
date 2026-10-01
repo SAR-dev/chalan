@@ -3,12 +3,13 @@
 > Forward-looking only — shipped work lives in git history and in the
 > `ROADMAP <id>` annotations left beside the code it changed.
 >
-> **Health:** `pnpm ci:check` green (814 files) · Unit **2009 pass / 16 skip**
-> (195 spec files) · coverage **54.04 / 47.37 / 42.17 / 54.85** against floors
-> **49 / 42 / 37 / 50** · E2E **129 tests / 31 files / S1–S71**, run locally
-> only (`pnpm test:e2e`) by decision — CI stays on lint, typecheck, coverage
-> and build · `route-auth-guard.spec.ts` enforces server-side auth on every API
-> route · real-DB integration suite green in CI · `pnpm build` green.
+> **Health:** `pnpm ci:check` green (819 files) · Unit **2060 pass** (197 spec
+> files) · coverage **54.5 / 47.89 / 42.28 / 55.34** against floors
+> **49 / 42 / 37 / 50** · real-DB integration **18/18** · E2E **125 tests /
+> 32 files / S1–S73** (S36 retired with the branding feature), run locally only
+> (`pnpm test:e2e`) by decision — CI stays on lint, typecheck, coverage and
+> build · `route-auth-guard.spec.ts` enforces server-side auth on every API
+> route · `pnpm build` green.
 >
 > **Every change verifies with:** `pnpm ci:check` → `pnpm test:unit:run` →
 > `pnpm build` → `pnpm test:e2e` (+ `pnpm test:integration` when DB invariants
@@ -32,7 +33,10 @@
 | **R4 Product** | growth / market fit | spec first, then build |
 | **R5 Polish** | consistency and dead weight | `pnpm ci:check` |
 
-**R0 is the whole point.** Nothing in R4 ships until R0 is clear.
+**R0 and R1 are closed**, so the ordering rule changes: R3 is now first (can
+this be run and observed in production?) with R4 behind it (does it do what the
+business needs?). A newly discovered R0-class defect still jumps the queue —
+nothing in R4 ships while an R0 item is open.
 
 ### Decisions already made (recorded so they are not re-opened)
 
@@ -45,7 +49,7 @@
 
 # R0 — Correctness (fix now)
 
-**11 of 12 shipped.** Each one was verified by reverting the fix and watching
+**12 of 12 shipped.** Each one was verified by reverting the fix and watching
 its test fail, so none of these are trust-me entries. Full detail — the
 `file:line` citations, the reasoning and the non-vacuity check — lives in git
 history under the id.
@@ -59,26 +63,11 @@ history under the id.
 | R0.5 | `stale-orders` added to both compose crontabs; `compose-cron.spec.ts` discovers cron routes from disk and checks the HTTP method each is called with |
 | R0.6 | Outbox failures requeue with 2/4/8/16-minute backoff and park as FAILED at attempt 5 |
 | R0.7 | Retention defaults single-sourced in `src/lib/env.ts`, with `docs-drift.spec.ts` asserting the SQL and `docs/ENV.md` match |
+| R0.8 | `cron_run` heartbeat table (one row per job, not per run — `drain-email-outbox` fires every minute), recorded from `isAuthorizedCron` so no route can forget to report in; `/api/ready` returns `{ stale, neverRan }` and logs each lapse **once per transition** rather than once per probe — deliberately *not* failing readiness, because a dead scheduler must not take healthy app instances out of rotation. Proven on real Postgres: upsert semantics + all six indexes |
 | R0.9 | Both activate toggles became compare-and-swap — a concurrent flip 409s instead of silently collapsing |
 | R0.10 | `orders/payable` gets a total order (`createdAt DESC, id DESC`) so OFFSET pages cannot overlap or gap |
 | R0.11 | Guards and `buildUpdate` read through `tx`; `resolveRoutePricing` and `pickupWarehouseId` accept a runner; session resolution moved to `dbRead` |
 | R0.12 | Dead `warehouseId IS NULL` branch removed from 6 sites (decision: the state cannot exist) |
-
-### R0.8 Retention scheduled by cron should be observable (deferred)
-
-Nothing notices when cron stops: `cleanup-uploads` and `drain-email-outbox`
-emit `logger.info` only, `stale-orders` a `logger.warn`, and the cron
-container has no healthcheck (`docker/compose.cluster.yml:149-169`).
-
-**Fix:** a watchdog that compares each job's last successful run to 2× its
-schedule and emits `logger.error` (or a page) on breach; give the cron
-container a healthcheck and stop writing logs into an ephemeral container.
-
-**Why it is deferred:** it needs somewhere to persist "last run" — a new table
-plus migration, or reusing `audit_log` (5 rows/day for the daily jobs, but
-1440 for `drain-email-outbox`). That is an architecture call, and this is the
-sole R0 item about *noticing* a problem rather than *having* one — so the other
-eleven shipped rather than being held behind it.
 
 ---
 # R1 — Quality gates
@@ -100,98 +89,21 @@ when its fix is reverted. Full detail lives in git history under the id.
 ---
 # R2 — Accessibility (WCAG 2.1 AA)
 
-Ordered by user impact. Every "0 hits" claim below was verified by grep.
+**9 of 10 shipped.** Ordered by user impact. Every "0 hits" claim the audit
+made below was verified by grep before it was fixed — `aria-current`,
+`prefers-reduced-motion` and `aria-describedby` all went from zero to present.
 
-### R2.1 `aria-current` is never used in navigation (0 hits)
-
-`src/components/navigation/role-sidebar.tsx` and `mobile-header.tsx` signal
-the active item with background colour alone, so a screen-reader user hears an
-undifferentiated list of links with no sense of place. The `<nav>` landmarks
-also carry no `aria-label`.
-
-**Fix:** `aria-current={active ? "page" : undefined}` on the `<Link>` in both
-files, plus `aria-label="Main"` on the `<nav>`s. Two lines, whole app.
-
-### R2.2 The bulk "select all" checkbox is `aria-hidden`
-
-`src/components/data-table/bulk-actions.tsx:36` puts `aria-hidden="true"` on
-the `<th>` wrapping the focusable select-all input at `:39`. Its subtree leaves
-the accessibility tree while staying in the tab order — a keyboard user tabs
-onto a control that announces as nothing, and a screen-reader user never finds
-bulk select at all. This is the primary bulk affordance on every list page.
-
-**Fix:** drop `aria-hidden`; add `aria-label="Select all rows on this page"`.
-Check the per-row cells for the same shape.
-
-### R2.3 Row click is mouse-only
-
-`src/components/data-table/index.tsx:794` puts `onClick` on a `<tr>` with no
-`tabIndex`, no `onKeyDown` and no role, while `:797` applies `cursor-pointer`
-— which makes it *look* interactive. WCAG 2.1.1. Live use:
-`src/app/warehouse/riders/riders-client.tsx`.
-
-**Fix:** fix centrally in `DataTable` — either make the primary cell a real
-link/button, or add `tabIndex={0}` + `Enter`/`Space` handling + an `aria-label`
-describing the destination. Don't make every page remember.
-
-### R2.4 No form error association (0 `aria-describedby`, 0 `aria-errormessage`)
-
-Only nine `aria-invalid` sites exist and none points at a message. `FormErrors`
-renders a `role="alert"` banner (`src/components/form-errors.tsx:22`), so
-*something* announces — but not which field failed. Focus never moves to the
-first invalid input on submit.
-
-**Fix:** in the shared input primitive, emit a stable id, wire
-`aria-invalid` + `aria-describedby` automatically from the error prop, mark
-`required`, and move focus to the first invalid field on failed submit.
-
-### R2.5 Icon-only links have no accessible name
-
-`src/app/rider/delivery/page.tsx` (and the pickup sibling) render a map link
-whose only content is an `<svg>` — announced as "link, blank". This is the
-rider's primary action in that column.
-
-**Fix:** `aria-label={`Open delivery location in maps for order ${code}`}` on
-every icon-only `<a>`/`<button>` in the file.
-
-### R2.6 No `prefers-reduced-motion` (0 hits) with infinite animations
-
-`animate-ping` loops forever at `src/app/landing/page.tsx`, `src/features/announcements/components/announcements-inbox.tsx`
-and `src/app/dashboard/announcements-inbox/inbox-client.tsx`; every skeleton
-uses `animate-pulse`. WCAG 2.3.3.
-
-**Fix:** one `@media (prefers-reduced-motion: reduce)` block in
-`globals.css` + a static fallback for skeletons.
-
-### R2.7 Async state changes are not announced
-
-`aria-live` / `role="status"` appears in only three or four places. Missing:
-the auth-init spinners in all four shells (`dashboard-shell.tsx:63`,
-`warehouse-shell.tsx:59`, `merchant-shell.tsx:226` — a screen-reader user
-lands on a blank region), the DataTable refresh overlay
-(`data-table/index.tsx:663`), and result counts on tab/filter change.
-
-**Fix:** `role="status"` + visually-hidden copy on the overlay; a polite live
-region announcing result counts; `aria-busy` on the shells' loading state.
-
-### R2.8 Five dialogs are missing descriptions
-
-`order-details-dialog.tsx`, `quick-filters.tsx`,
-`announcement-detail-modal.tsx`, `order-details-drawer.tsx` (title only) and
-`image-zoom.tsx` (raw `DialogPrimitive.Popup` with **no `DialogTitle` at
-all`). `FormDialog` itself is correct — the pattern is bypassed at these call
-sites.
-
-**Fix:** one sentence of purpose on each; make `description` required in
-`FormDialog`'s type so a new dialog cannot regress.
-
-### R2.9 Light-mode contrast fails on `--muted`
-
-`src/app/globals.css:53-76` — `--muted-foreground` on `--muted` computes to
-≈ **4.32:1**, below the 4.5:1 AA threshold, on a surface that backs table meta
-rows and empty-state helper copy. Dark mode (≈ 5.4:1) is fine.
-
-**Fix:** drop `--muted-foreground` to ~`oklch(0.50 0.02 256)` in `:root`.
+| ID | Shipped |
+|---|---|
+| R2.1 | `aria-current="page"` on both navs plus `aria-label="Main"` on both `<nav>`s — the codebase had **0** `aria-current` anywhere, so the active item was signalled by background colour alone |
+| R2.2 | Dropped `aria-hidden="true"` from the select-all `<th>`, which was hiding a focusable checkbox: a tab-stop that announced as nothing |
+| R2.3 | `tabIndex` + Enter/Space on clickable rows, fixed centrally in `DataTable` rather than left to each page |
+| R2.4 | `FormErrors` takes focus on failed submit (error-summary pattern — it renders **outside** any `<form>` in 12 of the 15 forms, so walking to the first invalid field was not available); `Input` and `Textarea` gained an opt-in `error` prop wiring `aria-invalid` + `aria-describedby` to a `useId()` id; wired on register (6 fields) and rider-apply (8) |
+| R2.5 | `aria-label` on both rider map links — previously announced as "link, blank", on a rider's primary action |
+| R2.6 | `prefers-reduced-motion` block in `globals.css` — **0 hits** before it, with `animate-ping` looping forever on three pages |
+| R2.7 | `role="status"` on the DataTable refresh overlay and on all four shells' auth-init spinners, each with an `sr-only` label |
+| R2.8 | `DialogDescription` / `SheetDescription` on four dialogs, plus an `sr-only` `DialogTitle` on `image-zoom`, which had none at all |
+| R2.9 | Light `--muted-foreground` `0.55` → `0.50`, clearing 4.5:1 on `--muted` (was ~4.32:1) |
 
 ### R2.10 Touch targets on the densest controls
 
@@ -203,9 +115,21 @@ product is for — riders and warehouse staff on phones.
 **Fix:** raise the floor to `min-h-11 min-w-11` on icon variants (or a
 non-layout-affecting `::after` hit-area expander).
 
+**Deliberately awaiting a decision:** it passes AA today, and the fix is a
+visual redesign of every button in the system — likely to break the mobile
+layout specs (`26-toast-responsive`, `27-sign-out`).
+
 ---
 
+
 # R3 — Platform, ops & performance
+
+| ID | Shipped |
+|---|---|
+| R3.6 | New `logAuditMany()`; all eight `Promise.all(logAudit(...))` endpoints converted — they opened up to 100 concurrent pool connections per request |
+| R3.8 | `order_package_id_idx` + `order_package_tier_id_idx` (both `ON DELETE set null`, so every package/tier delete seq-scanned the largest table) and `user_created_at_idx` — the `user` table had only trigram GINs while two endpoints `ORDER BY createdAt DESC` |
+| R3.9 | Partial indexes on `user.activationToken` and `merchant.emailVerificationToken`: both are **unauthenticated** lookups that were seq-scanning whole tables |
+
 
 ### R3.1 No error tracking, metrics or alerting anywhere
 
@@ -278,38 +202,27 @@ assert no hostname literal survives in the tree.
 
 ### R3.5 A bulk order transition runs ~900 statements in one transaction
 
-`src/features/orders/transitions.ts:975-1071` (`applyBulkOrderTransition`) is
-used by all six `/api/orders/bulk/*` routes with up to **100 ids**
-(`src/lib/validation.ts:14-18,826`). Per order it runs:
+**Shipped so far.** The audit and status-history writes are now one statement
+each instead of one per row — 200 fewer INSERTs per 100-order batch, inside the
+same transaction (`logAuditMany`, shared with R3.6).
 
-- `guard` + `buildUpdate` — for `approve`, the merchant lookup (`:108`) plus
-  `resolveRoutePricing` (`src/lib/order-pricing.ts:60-127`) is **5 sequential
-  queries** → 500 round trips; for `dispatch`/`assign-pickup-rider` the *same*
-  `riderId` is re-read once per order (`:163`, `:208`)
-- one `UPDATE … RETURNING` (`:1019-1026`)
-- `settleOrderFinancials` — up to 4 statements (`:1043` area) → 400
-- `logAudit` + `orderStatusHistory` inserts (`:1044-1069`) → 200
+**Still open**, all in the per-order loop at
+`src/features/orders/transitions.ts`:
 
-All while holding `FOR UPDATE` on up to 100 `order` rows plus
-`merchant_balance`.
+- Each `guard` / `buildUpdate` can hit the DB: `approve` does a merchant lookup
+  plus `resolveRoutePricing`'s four queries, so 100 orders is roughly 500 round
+  trips. Both reads have inputs that repeat across a batch (`merchantId`, and
+  the origin/destination lane) and should be memoised per distinct key.
+- `dispatch` and `assign-pickup-rider` re-read the **same** `riderId` once per
+  order even when the whole batch names one rider.
+- Every order is its own `UPDATE … WHERE id = …`; rows resolving to identical
+  values should be grouped into `UPDATE … WHERE id IN (…)`.
 
-**Fix:** prefetch riders/merchant once per distinct key; group identical
-updates into `UPDATE … WHERE id IN (…)`; one `insert(auditLog).values([...])`;
-one `insert(orderStatusHistory).values([...])`; move guard reads onto `tx`
-(see R0.11).
+**Fix:** memoise those two lookups by their natural key, group identical
+updates, leave the batched inserts as they are.
 
-### R3.6 Eight bulk endpoints fan out one audit INSERT per row
-
-`Promise.all(rows.map(logAudit))` at
-`src/app/api/merchants/bulk/approve/route.ts:45`,
-`…/suspend/route.ts:29`, `…/reactivate/route.ts:28`,
-`src/app/api/payouts/bulk/approve/route.ts:47`, `…/reject/route.ts:64`,
-`…/mark-paid/route.ts:53`,
-`src/app/api/email-logs/bulk/mark-sent/route.ts:44`,
-`src/app/api/announcements/bulk/route.ts:36` — up to 100 concurrent
-single-row round trips. `logAudit` already builds a `values` object
-(`src/lib/audit.ts:66-79`), so `logAuditMany(inputs, tx)` doing one
-`values([...])` is a small change across eight files.
+**Done when:** a spec holds the statement count for a 100-row batch flat as
+rows are added within the same merchant and lane.
 
 ### R3.7 Three full passes over `order` per `/dashboard/orders` view, nothing cached
 
@@ -335,41 +248,6 @@ collapse into **one** pass with `FILTER`, exactly the technique already used in
 
 **Fix:** `unstable_cache` with tags and a 30–60 s TTL on the aggregates; merge
 the analytics passes with `FILTER`.
-
-### R3.8 Two FK columns on the largest table have no index
-
-`order.packageId` and `order.packageTierId` are declared FKs with
-`onDelete: "set null"` (`schema.postgres/orders.ts:129-135`) and **neither has
-an index** — the DDL at `drizzle/postgres/0001_slim_kid_colt.sql` creates both
-constraints and no matching `CREATE INDEX`, while the sibling
-`merchantPackageId` does get `order_merchant_package_id_idx`.
-
-Because the FK is `SET NULL`, every parent delete must scan `order` for
-references: `src/app/api/packages/[id]/tiers/[tierId]/route.ts:136` and
-`src/app/api/packages/[id]/route.ts:133` — routine admin edits — each do a
-full sequential scan of the biggest table.
-
-Also missing: a btree on `user.createdAt`. The `"user"` table has exactly
-**two** indexes, both trigram GIN on `name` and `email`, yet
-`src/app/api/admin/users/route.ts:59-74` and `…/team/route.ts:76-90` default to
-`ORDER BY user.createdAt DESC` — an unindexed sort of the whole user set per
-page.
-
-**Fix:** `index("order_package_id_idx").on(t.packageId)`,
-`index("order_package_tier_id_idx").on(t.packageTierId)`,
-`index("user_created_at_idx").on(t.createdAt)`. All three are additive
-migrations with no data backfill — run `pnpm db:generate` then `pnpm db:push`.
-
-### R3.9 Public token lookups scan the whole table
-
-`src/lib/activation.ts:81-85` filters `WHERE user.activationToken = $1` and
-`src/app/api/auth/verify-email/route.ts:43` filters
-`WHERE merchant.emailVerificationToken = $1`. Neither column is indexed — and
-both are **unauthenticated** endpoints, so every click on an activation link
-is a sequential scan reachable by anyone.
-
-**Fix:** partial unique indexes `WHERE activationToken IS NOT NULL` and
-`WHERE emailVerificationToken IS NOT NULL`.
 
 ### R3.10 Cross-table `ILIKE OR` search defeats every trigram index
 
@@ -653,7 +531,7 @@ share a theme: everything the server ships out the door.
 | **Partial unique indexes as hard guarantees** | `finance.ts:89-91`, `packages.ts:122-125,166` |
 | **Outbox concurrency** | `FOR UPDATE SKIP LOCKED` + 10-min stale-`SENDING` recovery (`src/lib/email-outbox.ts:75-86,100`) |
 | **Lock ordering** | orders → balance, documented and consistent |
-| **Batching already done right in places** | `pickupLocationHubs` (`db/order-lookup.ts:61-79`), the bulk-endpoint pricing pre-fetch (`orders/bulk/route.ts:111-175`), `orders/counts` `FILTER` query (`:40-47`) — **these are the patterns R3.5–R3.7 should copy** |
+| **Batching already done right in places** | `pickupLocationHubs` (`db/order-lookup.ts:61-79`), the bulk-endpoint pricing pre-fetch (`orders/bulk/route.ts:111-175`), `orders/counts` `FILTER` query (`:40-47`) — **these are the patterns R3.5– and R3.7 should copy** |
 | **Migration gate** | compose `depends_on: service_completed_successfully` on the migrate job |
 | **No raw SQL with user input** | the only `sql.raw` is `src/lib/db/time-sql.ts:15`, interpolating the constant `BUSINESS_TIMEZONE` |
 

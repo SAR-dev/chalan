@@ -49,8 +49,6 @@ export const GET = withErrorHandler(async (req: Request) => {
         nidSubmittedAt: merchant.nidSubmittedAt,
         nidVerifiedAt: merchant.nidVerifiedAt,
         nidRejectedAt: merchant.nidRejectedAt,
-        brandColor: merchant.brandColor,
-        hidePlatformBranding: merchant.hidePlatformBranding,
         createdAt: merchant.createdAt,
       })
       .from(merchant)

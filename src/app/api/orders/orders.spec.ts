@@ -19,6 +19,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: () => Promise.resolve(),
+  logAuditMany: () => Promise.resolve(),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({

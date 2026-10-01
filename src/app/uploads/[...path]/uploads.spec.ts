@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { PUBLIC_UPLOAD_FOLDERS } from "@/lib/storage/config"
 import { GET } from "./route"
 
 const state = vi.hoisted(() => ({
@@ -44,10 +45,15 @@ beforeEach(() => {
 })
 
 describe("GET /uploads/[...path] access policy", () => {
-  it("serves public logos without a session (public cache)", async () => {
-    const res = await GET(...req(["logos", "u_1", "brand.png"]))
-    expect(res.status).toBe(200)
-    expect(res.headers.get("Cache-Control")).toContain("public")
+  // `logos` was the only world-readable folder and went with the branding
+  // feature: nothing uploaded to it and nothing rendered it. With
+  // PUBLIC_UPLOAD_FOLDERS empty, every stored file needs a session — asserted
+  // so a folder can never quietly become public again without a test noticing.
+  it("serves nothing without a session: no folder is public", async () => {
+    expect(PUBLIC_UPLOAD_FOLDERS).toEqual([])
+    const res = await GET(...req(["avatars", "u_1", "me.png"]))
+    expect(res.status).toBe(401)
+    expect(state.readCalls).toBe(0)
   })
 
   it("401s for a private file without a session", async () => {

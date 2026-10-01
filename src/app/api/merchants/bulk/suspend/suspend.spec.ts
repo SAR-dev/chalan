@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { logAudit } from "@/lib/audit"
+import { logAudit, logAuditMany } from "@/lib/audit"
 import { PATCH as suspendBulk } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -10,6 +10,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
+  logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -124,15 +125,19 @@ describe("PATCH /api/merchants/bulk/suspend", () => {
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true, count: 2 })
     expect(updatePayloads[0]).toMatchObject({ status: "SUSPENDED" })
-    expect(logAudit).toHaveBeenCalledTimes(2)
-    expect(logAudit).toHaveBeenCalledWith(
+    // Both rows land in one insert (ROADMAP R3.6).
+    expect(logAudit).not.toHaveBeenCalled()
+    expect(logAuditMany).toHaveBeenCalledTimes(1)
+    const [auditRows] = vi.mocked(logAuditMany).mock.calls[0]
+    expect(auditRows).toHaveLength(2)
+    expect(auditRows).toContainEqual(
       expect.objectContaining({
         action: "MERCHANT_SUSPENDED",
         entityType: "merchant",
         entityId: "m_1",
       }),
     )
-    expect(logAudit).toHaveBeenCalledWith(
+    expect(auditRows).toContainEqual(
       expect.objectContaining({
         action: "MERCHANT_SUSPENDED",
         entityType: "merchant",

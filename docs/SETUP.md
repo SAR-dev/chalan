@@ -219,7 +219,7 @@ pnpm db:admin
 - `e2e/` — Playwright tests: `helpers.ts` (shared `CREDS` + `login()`),
   `selectors.ts` (data-testid constants), `specs/01-core-flows.spec.ts`,
   `specs/02-business-flows.spec.ts`, `specs/03-onboarding.spec.ts`,
-  `specs/04-branding.spec.ts` (46 tests).
+  `specs/04-tracking-identity.spec.ts` (13 tests).
 
 ## Database schema (tables created by db:push)
 

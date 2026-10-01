@@ -5,7 +5,6 @@ import Link from "next/link"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { siteConfig } from "@/config/site"
-import { brandThemeVars } from "@/lib/brand-color"
 import { resolveClientIp } from "@/lib/client-ip"
 import { rateLimit } from "@/lib/rate-limit"
 import { NotFound } from "./components/not-found"
@@ -76,24 +75,12 @@ export default async function TrackDetailPage({ params }: Props) {
     }
   }
 
-  // Branding follows the ORDER's merchant (multi-merchant safe), never the
-  // instance — invalid hex makes brandThemeVars fall back to theme defaults.
   const merchant = data?.merchant ?? null
-  const brandVars = merchant?.brandColor
-    ? brandThemeVars(merchant.brandColor)
-    : undefined
 
   // If not found, render a friendly not-found UI (don't use Next's notFound()
   // so we can still show the search header)
   return (
-    <main
-      id="main-content"
-      className="bg-background min-h-screen"
-      style={brandVars as React.CSSProperties | undefined}
-    >
-      {brandVars && (
-        <div className="bg-primary h-1.5" data-testid="track-accent" />
-      )}
+    <main id="main-content" className="bg-background min-h-screen">
       {/* Header */}
       <header className="border-border/60 bg-background/80 sticky top-0 z-10 border-b backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3.5">
@@ -135,7 +122,7 @@ export default async function TrackDetailPage({ params }: Props) {
           <OrderDetail {...data} minimal={minimal} />
         )}
       </div>
-      {!merchant?.hidePlatformBranding && <PublicFooter />}
+      <PublicFooter />
     </main>
   )
 }

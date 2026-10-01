@@ -9,12 +9,16 @@ vi.mock("@/lib/api-auth", () => ({
   requireSession: () => Promise.resolve(sessionState.value),
 }))
 
-const { logAuditMock } = vi.hoisted(() => ({
+const { logAuditMock, logAuditManyMock } = vi.hoisted(() => ({
   logAuditMock: vi.fn(() => Promise.resolve()),
+  // Typed with its real parameter so `mock.calls[0][0]` indexes the row array
+  // rather than an empty tuple.
+  logAuditManyMock: vi.fn((_rows: unknown[]) => Promise.resolve()),
 }))
 
 vi.mock("@/lib/audit", () => ({
   logAudit: logAuditMock,
+  logAuditMany: logAuditManyMock,
 }))
 
 const selectQueue: unknown[][] = []
@@ -60,6 +64,7 @@ beforeEach(() => {
   updateResult.length = 0
   sessionState.value = null
   logAuditMock.mockClear()
+  logAuditManyMock.mockClear()
 })
 
 function req(method: string, url?: string, body?: unknown): Request {
@@ -235,15 +240,19 @@ describe("PATCH /api/email-logs/bulk/mark-sent", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toEqual({ ok: true, count: 2 })
-    expect(logAuditMock).toHaveBeenCalledTimes(2)
-    expect(logAuditMock).toHaveBeenCalledWith(
+    // Both rows land in one insert rather than one per row (ROADMAP R3.6).
+    expect(logAuditMock).not.toHaveBeenCalled()
+    expect(logAuditManyMock).toHaveBeenCalledTimes(1)
+    const [auditRows] = logAuditManyMock.mock.calls[0]
+    expect(auditRows).toHaveLength(2)
+    expect(auditRows).toContainEqual(
       expect.objectContaining({
         action: "EMAIL_LOG_MARKED_SENT",
         entityType: "email_log",
         entityId: "log_1",
       }),
     )
-    expect(logAuditMock).toHaveBeenCalledWith(
+    expect(auditRows).toContainEqual(
       expect.objectContaining({
         action: "EMAIL_LOG_MARKED_SENT",
         entityType: "email_log",

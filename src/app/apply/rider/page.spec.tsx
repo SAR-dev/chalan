@@ -40,12 +40,12 @@ describe("Rider apply page", () => {
       .closest("header")
     expect(headerLink).not.toBeNull()
     // The header logo link is the one NOT carrying the in-card testid.
-    const logos = Array.from(headerLink?.querySelectorAll("a") ?? []).filter(
-      (a) => a.textContent?.includes(siteConfig.name),
-    )
-    expect(logos).toHaveLength(1)
-    expect(logos[0].className).toContain("hidden")
-    expect(logos[0].className).toContain("lg:flex")
+    const headerLinks = Array.from(
+      headerLink?.querySelectorAll("a") ?? [],
+    ).filter((a) => a.textContent?.includes(siteConfig.name))
+    expect(headerLinks).toHaveLength(1)
+    expect(headerLinks[0].className).toContain("hidden")
+    expect(headerLinks[0].className).toContain("lg:flex")
   })
 
   // With the header logo hidden on mobile, the Print button is the header's

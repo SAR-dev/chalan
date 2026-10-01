@@ -132,17 +132,33 @@ describe("E2E suite invariants (ROADMAP R1.4)", () => {
     expect(dupes, "scenario serials must be unique").toEqual([])
   })
 
-  it("leaves no gaps in the serial range", () => {
+  // Deliberately NOT a "no gaps" assertion. Removing a feature holes the
+  // sequence — dropping the branding suites left S36 unused — and renumbering
+  // every later serial across 32 files to close one hole would churn history
+  // for no safety gain. What actually drifts is the summary AGENTS.md quotes,
+  // which had gone stale (S65 / 104 tests) while the suite was already at
+  // S71 / 129 with a duplicate nobody noticed.
+  it("quotes suite numbers in AGENTS.md that match the tree", () => {
     const ids = serials().map((s) => s.id)
     expect(ids.length).toBeGreaterThan(0)
-    const max = Math.max(...ids)
-    const missing = Array.from({ length: max }, (_, i) => i + 1).filter(
-      (n) => !ids.includes(n),
+
+    const files = readdirSync(join(process.cwd(), "e2e", "specs")).filter((f) =>
+      f.endsWith(".spec.ts"),
     )
+    let testCount = 0
+    for (const f of files) {
+      const raw = readFileSync(join(process.cwd(), "e2e", "specs", f), "utf-8")
+      testCount += [...raw.matchAll(/^\s*test\(/gm)].length
+    }
+
+    const expected = `S1-S${Math.max(...ids)} across ${files.length} files / ${testCount} tests`
+    // Markdown wraps prose, so the phrase can straddle a newline — compare
+    // whitespace-normalised text or every reflow would fail this.
+    const normalize = (s: string) => s.replace(/\s+/g, " ")
     expect(
-      missing,
-      `unused serials: ${missing.map((n) => `S${n}`).join(", ")}`,
-    ).toEqual([])
+      normalize(read("AGENTS.md")),
+      "AGENTS.md suite summary is stale — update it to: " + expected,
+    ).toContain(normalize(expected))
   })
 
   it("documents coverage floors that match vitest.config.ts", () => {

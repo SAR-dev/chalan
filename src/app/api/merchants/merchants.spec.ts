@@ -28,6 +28,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
+  logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -391,59 +392,6 @@ describe("PATCH /api/merchants/:id", () => {
     expect((await res.json()).error).toContain("already in use")
   })
 
-  it("updates branding fields", async () => {
-    sessionState.value = merchantSession
-    updateResult.push({
-      id: "m_1",
-      brandColor: "#10b981",
-      hidePlatformBranding: true,
-    })
-    const res = await updateMerchant(
-      req("PATCH", undefined, {
-        brandColor: "#10b981",
-        hidePlatformBranding: true,
-      }),
-      ctx(),
-    )
-    const json = await res.json()
-    expect(res.status).toBe(200)
-    expect(json).toMatchObject({
-      brandColor: "#10b981",
-      hidePlatformBranding: true,
-    })
-  })
-
-  it("updates only brandColor", async () => {
-    sessionState.value = merchantSession
-    updateResult.push({ id: "m_1", brandColor: "#f97316" })
-    const res = await updateMerchant(
-      req("PATCH", undefined, { brandColor: "#f97316" }),
-      ctx(),
-    )
-    expect(res.status).toBe(200)
-    expect(updatePayloads[0]).toMatchObject({ brandColor: "#f97316" })
-  })
-
-  it("updates only hidePlatformBranding", async () => {
-    sessionState.value = merchantSession
-    updateResult.push({ id: "m_1", hidePlatformBranding: true })
-    const res = await updateMerchant(
-      req("PATCH", undefined, { hidePlatformBranding: true }),
-      ctx(),
-    )
-    expect(res.status).toBe(200)
-    expect(updatePayloads[0]).toMatchObject({ hidePlatformBranding: true })
-  })
-
-  it("rejects invalid hex color", async () => {
-    sessionState.value = merchantSession
-    const res = await updateMerchant(
-      req("PATCH", undefined, { brandColor: "not-a-color" }),
-      ctx(),
-    )
-    expect(res.status).toBe(400)
-  })
-
   it("403 for a moderator (Business Settings is owner-only)", async () => {
     sessionState.value = {
       ...merchantSession,
@@ -451,7 +399,7 @@ describe("PATCH /api/merchants/:id", () => {
       moderatorPermissions: ["/merchant/orders"],
     }
     const res = await updateMerchant(
-      req("PATCH", undefined, { brandColor: "#10b981" }),
+      req("PATCH", undefined, { businessName: "Acme Ltd" }),
       ctx(),
     )
     expect(res.status).toBe(403)

@@ -20,21 +20,24 @@ export const UPLOAD_FOLDERS = [
   "delivery-proofs",
   "pickups",
   "nids",
-  "logos",
 ] as const
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[number]
 
 // Read policy for stored files (enforced by app/uploads/[...path]/route.ts,
 // ROADMAP P0.2):
 //
-//   public     — world-readable (merchant logos render on the public tracking
-//                page, so they cannot require a session).
+//   public     — world-readable. Intentionally empty: the only folder that
+//                ever lived here was `logos`, which nothing uploaded to and
+//                nothing rendered, and it was removed with the branding
+//                feature. Kept rather than deleted so a deliberate public
+//                folder is a one-line addition instead of resurrecting the
+//                mechanism.
 //   owner-only — readable by the uploader (the path's `{userId}` segment must
 //                equal the session's user) or by a SUPER_ADMIN. Used for
 //                identity documents and avatars.
 //   everything else — any authenticated session (order proofs, pickup photos,
 //                which are viewed across roles).
-export const PUBLIC_UPLOAD_FOLDERS: readonly UploadFolder[] = ["logos"]
+export const PUBLIC_UPLOAD_FOLDERS: readonly UploadFolder[] = []
 
 export const OWNER_ONLY_UPLOAD_FOLDERS: readonly UploadFolder[] = [
   "avatars",
@@ -70,5 +73,4 @@ export const UPLOAD_MAX_DIMENSIONS: Record<UploadFolder, number> = {
   "delivery-proofs": 1024,
   pickups: 1024,
   nids: 2048,
-  logos: 256,
 }

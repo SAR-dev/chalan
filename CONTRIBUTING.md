@@ -2507,7 +2507,7 @@ e2e/
     01-core-flows.spec.ts       # login per role, order lifecycle, warehouse/rider flows
     02-business-flows.spec.ts   # order ops, warehouse dispatch/intake/exceptions
     03-onboarding.spec.ts       # merchant onboarding + registration gate
-    04-branding.spec.ts         # merchant branding settings
+    04-tracking-identity.spec.ts   # merchant sidebar identity + tracking token
     05-two-factor.spec.ts       # 2FA enrollment + TOTP login for admins
     06-support.spec.ts          # support ticket create → admin reply
 ```
@@ -2568,7 +2568,7 @@ These mirror `src/lib/db/seed/seed-content.ts`.
    `page.request`. No test depends on the outcome of another.
 
 > **Watch for side effects across spec files.** Tests that mutate shared
-> entities (suspending a merchant, toggling branding) can break later specs.
+> entities (suspending a merchant, expiring a session) can break later specs.
 > Prefer entities created for the specific test.
 
 #### Running tests

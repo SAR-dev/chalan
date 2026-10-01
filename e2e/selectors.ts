@@ -374,7 +374,6 @@ export const settings = {
   savePolicy: "[data-testid='save-policy']",
 }
 
-// ─── Branding ────────────────────────────────────────────────────────────────
 // --- Public tracking (P0.1 token-gated receiver note) ---
 export const tracking = {
   noteInput: "[data-testid='receiver-note-input']",
@@ -434,17 +433,13 @@ export const team = {
   warehouseSelect: "[data-testid='team-warehouse']",
 }
 
-export const branding = {
-  section: "[data-testid='branding-section']",
-  colorInput: "[data-testid='brand-color-input']",
-  hideToggle: "[data-testid='hide-branding-toggle']",
-  saveButton: "[data-testid='save-branding']",
-  preview: "[data-testid='branding-preview']",
-  previewButton: "[data-testid='preview-button']",
-  previewChip: "[data-testid='preview-chip']",
-  contrastWarning: "[data-testid='brand-contrast-warning']",
+// ─── Merchant identity in chrome ─────────────────────────────────────────────
+// What replaces the branding selectors: the merchant's *name* is shown in the
+// sidebar and on the public tracking header. There is no colour, logo or
+// hide-platform toggle any more (those columns were dropped), so only the
+// two identity markers remain.
+export const identity = {
   trackBrand: "[data-testid='track-brand']",
-  trackAccent: "[data-testid='track-accent']",
   sidebarBrand: "[data-testid='sidebar-brand']",
 }
 

@@ -127,12 +127,12 @@ describe("listLocalFiles", () => {
   })
 
   it("skips directories", async () => {
-    mkdirSync(join(tmpRoot, "logos", "m1"), { recursive: true })
-    writeFileSync(join(tmpRoot, "logos", "m1", "x.png"), "x")
+    mkdirSync(join(tmpRoot, "nids", "m1"), { recursive: true })
+    writeFileSync(join(tmpRoot, "nids", "m1", "x.png"), "x")
 
     const files = await listLocalFiles()
 
-    expect(files.map((file) => file.key)).toEqual(["logos/m1/x.png"])
+    expect(files.map((file) => file.key)).toEqual(["nids/m1/x.png"])
   })
 
   it("returns an empty list when the uploads dir is missing", async () => {

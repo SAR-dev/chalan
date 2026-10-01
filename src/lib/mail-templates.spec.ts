@@ -241,31 +241,11 @@ describe("XSS protection via React escaping", () => {
   })
 })
 
-describe("merchant branding in emails", () => {
-  const branded = {
-    ownerName: "Bob Smith",
-    businessName: "Acme Corp",
-    verificationUrl: "http://localhost:3000/verify?token=abc",
-    hidePlatformBranding: true,
-  }
-
-  // Emails are greyscale now. The merchant branding setting still themes the
-  // web UI — it is only the email path that dropped it — so what remains to
-  // prove here is that no merchant-supplied colour reaches the markup. The
-  // property is gone from the spec types rather than accepted and ignored, so
-  // a caller passing one gets a type error instead of a silent no-op.
-  it("renders no brand colour into the markup", async () => {
-    const { html } = await merchantRegisteredTemplate(branded)
-    expect(html).not.toContain("#10b981")
-    expect(html).not.toContain("#2563eb")
-  })
-
-  it("drops the platform footer when hidePlatformBranding is set", async () => {
-    const { html, text } = await merchantRegisteredTemplate(branded)
-    expect(html).not.toContain("automated message")
-    expect(text).not.toContain("automated message")
-  })
-
+describe("merchant email footers", () => {
+  // The `hidePlatformBranding` toggle was removed with the branding feature,
+  // so the platform footer and its rule are unconditional now. Kept as a
+  // positive assertion: an earlier version dropped both when the toggle was
+  // set, and a future conditional would silently bring that back.
   it("keeps the platform footer by default", async () => {
     const { html, text } = await merchantRegisteredTemplate({
       ownerName: "Bob Smith",
@@ -274,15 +254,6 @@ describe("merchant branding in emails", () => {
     })
     expect(html).toContain("automated message")
     expect(text).toContain("automated message")
-  })
-
-  it("order emails carry the branding toggle", async () => {
-    const { html, text } = await orderApprovedTemplate({
-      ...data,
-      hidePlatformBranding: true,
-    })
-    expect(html).not.toContain("automated message")
-    expect(text).not.toContain("automated message")
   })
 })
 

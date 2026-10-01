@@ -27,31 +27,22 @@ export function RoleSidebar({
   fallbackName,
   fallbackInitials = "?",
   businessName,
-  brandColor,
-  hidePlatformBranding = false,
 }: {
   config: SidebarConfig
   footerSubtitle?: string | null
   fallbackName?: string
   fallbackInitials?: string
   businessName?: string
-  brandColor?: string
-  hidePlatformBranding?: boolean
 }) {
   const pathname = usePathname()
   const { currentUser } = useAuth()
   const BrandIcon = config.brandIcon
   const [signOutOpen, setSignOutOpen] = useState(false)
 
-  const sidebarStyle = brandColor
-    ? ({ "--sidebar-primary": brandColor } as React.CSSProperties)
-    : undefined
-
   return (
     <aside
       data-testid="sidebar"
       className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden md:flex"
-      style={sidebarStyle}
     >
       {/* Brand — the merchant's business name (no logo), or the platform brand */}
       <Link
@@ -66,9 +57,7 @@ export function RoleSidebar({
         ) : (
           <>
             <BrandIcon className="size-4 shrink-0" />
-            {!hidePlatformBranding && (
-              <p className="text-[13px] font-semibold">{BRAND_NAME}</p>
-            )}
+            <p className="text-[13px] font-semibold">{BRAND_NAME}</p>
           </>
         )}
         <span className="bg-sidebar-primary text-sidebar-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
