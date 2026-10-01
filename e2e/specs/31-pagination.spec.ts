@@ -79,7 +79,11 @@ test.describe("S73. Server-side pagination", () => {
     await expect(prev).toBeDisabled()
     const page1First = await firstRowId(page)
 
+    // Assert with `toHaveText` FIRST: the page change is async (SWR refetch),
+    // and `innerText()` below does not retry, so reading it straight after the
+    // click captures the stale label.
     await next.click()
+    await expect(label).toHaveText(/Page 2 of \d+/)
     const second = await readPage(page)
     expect(second.current).toBe(2)
     // Same set, further into it — the total must not move when paging.
@@ -91,6 +95,7 @@ test.describe("S73. Server-side pagination", () => {
     expect(page2First).not.toBe(page1First)
 
     await prev.click()
+    await expect(label).toHaveText(/Page 1 of \d+/)
     const back = await readPage(page)
     expect(back.current).toBe(1)
     expect(back.total).toBe(first.total)
