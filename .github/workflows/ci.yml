@@ -95,7 +95,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      # Advisory gate (H1): blocks on any high/critical vulnerability in the
+      # Advisory gate: blocks on any high/critical vulnerability in the
       # dependency tree. Moderate/low findings are printed but do not block.
       # Fixes: bump the package or add an override in pnpm-workspace.yaml.
       - name: Audit dependencies (fail on high/critical)
@@ -162,8 +162,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Real-DB invariants that the mocked unit suite cannot prove (P1.1 unique
-      # indexes, P1.2 ledger + advisory lock, P1.3 business timezone).
+      # Real-DB invariants that the mocked unit suite cannot prove (unique
+      # indexes, ledger + advisory lock, business timezone).
       - run: pnpm db:migrate
       - run: pnpm test:integration
 

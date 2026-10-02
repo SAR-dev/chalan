@@ -240,7 +240,7 @@ describe("PATCH /api/email-logs/bulk/mark-sent", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toEqual({ ok: true, count: 2 })
-    // Both rows land in one insert rather than one per row (ROADMAP R3.6).
+    // Both rows land in one insert rather than one per row.
     expect(logAuditMock).not.toHaveBeenCalled()
     expect(logAuditManyMock).toHaveBeenCalledTimes(1)
     const [auditRows] = logAuditManyMock.mock.calls[0]

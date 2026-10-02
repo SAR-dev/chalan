@@ -19,7 +19,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   const { ids } = parsed.data
 
   // Skip merchants that are already ACTIVE — the status predicate makes the
-  // "read then write" of the single route unnecessary here (ROADMAP P1.1).
+  // "read then write" of the single route unnecessary here.
   const updated = await db
     .update(merchant)
     .set({ status: "ACTIVE" })

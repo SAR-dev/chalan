@@ -84,12 +84,12 @@ type JoinedUser = Omit<
     // Global "admins must enroll in 2FA" flag (platform_config), surfaced by
     // /api/users/me so the shells can enforce it. Not a user column.
     twoFactorRequired?: boolean
-    // Portal-mode gate (ROADMAP 5.4): false when this role is outside the
+    // Portal-mode gate: false when this role is outside the
     // deployment's PORTAL_MODE. Surfaced by /api/users/me so the client can
     // explain and sign the user out instead of hitting opaque 401s. Not a
     // user column.
     portalAllowed?: boolean
-    // Staff-account activation (ROADMAP 5.2): true while a moderator or
+    // Staff-account activation: true while a moderator or
     // warehouse-admin invite is still PENDING (never activated). Surfaced by
     // /api/users/me so the login page shows the "check your email" panel.
     // Computed from isActive + activatedAt — not a user column.
@@ -108,7 +108,7 @@ export type TeamMember = Pick<
   "id" | "name" | "email" | "role" | "phone" | "isActive" | "warehouseId"
 > & {
   /** Lifecycle status: PENDING = created by an admin, activation link not
-   *  yet clicked (warehouse-admin invites, ROADMAP 5.2). */
+   *  yet clicked (warehouse-admin invites). */
   status: "ACTIVE" | "PENDING" | "DEACTIVATED"
 }
 
@@ -254,7 +254,7 @@ export interface OrderAnalytics {
 
 /**
  * Headline figures for the merchant overview, aggregated over the merchant's
- * entire order history (ROADMAP R0.1).
+ * Entire order history.
  *
  * Deliberately server-computed: deriving these client-side from the array
  * `useOrders()` returns meant every figure covered only the first

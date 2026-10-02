@@ -78,7 +78,7 @@ export const GET = withErrorHandler(async (req: Request) => {
       // queue page then filtered client-side while still reporting the union's
       // `total`, so "Showing 1-20 of 137" sat above four visible rows and
       // page 2 showed a different subset — a rider could believe a queue was
-      // cleared when it was not (ROADMAP R0.2). Filtering here makes the rows
+      // Cleared when it was not. Filtering here makes the rows
       // and the count the same query.
       //
       // An unrecognised value falls back to the union rather than matching
@@ -111,8 +111,8 @@ export const GET = withErrorHandler(async (req: Request) => {
   const search = new URL(req.url).searchParams.get("q")?.trim()
   if (search) {
     const likeQ = `%${search}%`
-    // Per-table EXISTS instead of one OR spanning every joined table (ROADMAP
-    // R3.10). A trigram GIN index can serve a same-table bitmap-OR, but not ORs
+    // Per-table EXISTS instead of one OR spanning every joined table.
+    // A trigram GIN index can serve a same-table bitmap-OR, but not ORs
     // that cross relations — with all six `ilike`s inlined after four LEFT
     // JOINs the planner's only real choice was "join everything, then filter".
     // Each EXISTS is now self-contained: one index scan per table, short-
@@ -163,7 +163,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   }
 
   // The merchant join is for the projection (`merchantPhone`); the search no
-  // longer needs it — see the EXISTS clauses above (ROADMAP R3.10). The
+  // Longer needs it — see the EXISTS clauses above. The
   // warehouse join went away entirely with them.
   let dbQuery = dbRead
     .select(listColumns)
@@ -228,7 +228,6 @@ export const POST = withErrorHandler(async (req: Request) => {
     return forbidden("Only merchants can create orders")
   }
   // Order creation is the New Order surface — a moderator needs the grant
-  // (ROADMAP 5.2 hard server checks).
   if (!hasNavPermission(me, "/merchant/orders/new")) {
     return forbidden("You don't have access to create orders.")
   }
@@ -253,14 +252,14 @@ export const POST = withErrorHandler(async (req: Request) => {
     merchantNote,
   } = parsed.data
 
-  // Money is stored to paisa (ROADMAP P0.4) — never carry sub-paisa noise.
+  // Money is stored to paisa — never carry sub-paisa noise.
   const productCost = toPaisa(rawProductCost)
 
   const normalizedMapLink = deliveryMapLink?.trim()
     ? deliveryMapLink.trim()
     : null
 
-  // Idempotency (ROADMAP B13): a retried create with the same key returns the
+  // Idempotency: a retried create with the same key returns the
   // original order instead of charging twice. Checked before any pricing work;
   // the unique (merchantId, key) index makes the concurrent case safe too.
   const idempotencyKey = req.headers.get("idempotency-key")?.trim() || null

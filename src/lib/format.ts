@@ -2,7 +2,7 @@ import { CURRENCY_SUFFIX } from "@/lib/constants"
 import { BUSINESS_TIMEZONE } from "@/lib/timezone"
 
 // =============================================================================
-// Display formatting (ROADMAP R3.3)
+// Display formatting
 //
 // There were ~29 `toLocaleString` / `toLocaleDateString` call sites across 25
 // files, none of which passed a `timeZone`. Everything therefore rendered in

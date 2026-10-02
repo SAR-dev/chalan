@@ -47,8 +47,8 @@ export async function seedPayoutRequests() {
       paidAt,
     })
 
-    // Link the referenced orders so the payout actually owns them (ROADMAP
-    // P0.3): without this the seeded orders stay "payable" and could be paid a
+    // Link the referenced orders so the payout actually owns them:
+    // without this the seeded orders stay "payable" and could be paid a
     // second time, and the payout would have no orders to settle against.
     if (
       orderIds.length > 0 &&

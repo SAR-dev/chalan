@@ -280,7 +280,7 @@ export default function EmailLogsPage() {
             initialSortId="createdAt"
             initialSortDir="desc"
             // Skeletons cover the first load, so only the empty-result branch
-            // is ever rendered here (ROADMAP R5.4).
+            // Is ever rendered here.
             emptyMessage="No email log entries yet."
             serverSortId={sortId}
             serverSortDir={sortDir}

@@ -2,7 +2,7 @@ import "dotenv/config"
 
 import { expect, test } from "@playwright/test"
 
-// ─── S54. Readiness probe (ROADMAP P2.3) ────────────────────────────────────
+// ─── S54. Readiness probe ────────────────────────────────────
 //
 // `/api/ready` must run a real dependency check (DB `SELECT 1`); `/api/health`
 // stays a liveness probe with no DB dependency.

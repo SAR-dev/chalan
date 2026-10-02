@@ -84,7 +84,7 @@ export const GET = withErrorHandler(async () => {
   }
 
   // Package catalogue: changes rarely, and every merchant fetches it on
-  // load (ROADMAP R3.11).
+  // Load.
   return NextResponse.json(
     {
       packages: visible.map((p) => ({

@@ -20,7 +20,6 @@ export const PATCH = withErrorHandler(async (req: Request) => {
 
   // Only merchants that are not already suspended are transitioned, so the
   // reported count is honest and a concurrent change is not overwritten
-  // (ROADMAP P1.1).
   const updated = await db
     .update(merchant)
     .set({ status: "SUSPENDED" })

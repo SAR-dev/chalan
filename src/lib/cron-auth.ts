@@ -36,7 +36,7 @@ export function isAuthorizedCron(req: Request): boolean {
   // Only an authenticated call counts as the job actually running, so a dead
   // scheduler — or a leaked secret — cannot make the heartbeat look healthy.
   // Recorded here rather than in each of the six routes so no route can forget
-  // to report in (ROADMAP R0.8).
+  // To report in.
   if (authorized) noteCronInvocation(req)
   return authorized
 }

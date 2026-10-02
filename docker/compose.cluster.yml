@@ -125,7 +125,7 @@ services:
   # ── Migration service ───────────────────────────────────────────────────
   # A single runner applies the versioned migrations (src/lib/db/migrate.ts)
   # under a database-wide advisory lock, then exits. Every app service waits
-  # for it via `depends_on: service_completed_successfully` (ROADMAP P1.2).
+  # For it via `depends_on: service_completed_successfully`.
   # Previously each role had its own migrate-* service, so four runners raced
   # on first boot. APP_IMAGE lets deploys pin an exact image (e.g.
   # ghcr.io/…:<sha>); defaults to the locally-built app:latest.
@@ -183,7 +183,7 @@ services:
       - uploads_data:/app/uploads
     environment:
       # cloudflared (the only thing in front of the app) writes the forwarding
-      # headers — one trusted hop (ROADMAP P0.6). Without this the app ignores
+      # Headers — one trusted hop. Without this the app ignores
       # them and per-IP rate limiting / ADMIN_IP_ALLOWLIST cannot work.
       TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: dashboard
@@ -217,7 +217,7 @@ services:
       - uploads_data:/app/uploads
     environment:
       # cloudflared (the only thing in front of the app) writes the forwarding
-      # headers — one trusted hop (ROADMAP P0.6).
+      # Headers — one trusted hop.
       TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: merchant
       NEXT_PUBLIC_SITE_URL: http://localhost:3002
@@ -250,7 +250,7 @@ services:
       - uploads_data:/app/uploads
     environment:
       # cloudflared (the only thing in front of the app) writes the forwarding
-      # headers — one trusted hop (ROADMAP P0.6).
+      # Headers — one trusted hop.
       TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: rider
       NEXT_PUBLIC_SITE_URL: http://localhost:3003
@@ -283,7 +283,7 @@ services:
       - uploads_data:/app/uploads
     environment:
       # cloudflared (the only thing in front of the app) writes the forwarding
-      # headers — one trusted hop (ROADMAP P0.6).
+      # Headers — one trusted hop.
       TRUSTED_PROXY_HOPS: "1"
       ALLOWED_ROLE: warehouse
       NEXT_PUBLIC_SITE_URL: http://localhost:3004

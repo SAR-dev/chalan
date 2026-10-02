@@ -1,7 +1,7 @@
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core"
 import { merchant, order, rider, user } from "@/lib/db/schema"
 
-// Storage hygiene (ROADMAP 5.6) — decides which stored uploads are orphans.
+// Storage hygiene — decides which stored uploads are orphans.
 //
 // A file is an orphan when NO image column references it AND it is older
 // than the grace period. The grace period is mandatory: ImageUpload posts to

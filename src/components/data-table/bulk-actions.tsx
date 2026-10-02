@@ -35,7 +35,7 @@ export function SelectAllHeadCell({
       data-sticky-col="__select__"
       // NOT aria-hidden: this cell wraps the focusable select-all checkbox, so
       // hiding the subtree left a tab-stop that announced as nothing and made
-      // bulk select unreachable to a screen reader (ROADMAP R2.2).
+      // Bulk select unreachable to a screen reader.
     >
       <input
         ref={selectAllRef}

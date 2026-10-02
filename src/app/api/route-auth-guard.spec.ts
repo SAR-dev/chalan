@@ -1,5 +1,5 @@
 /**
- * Static auth guard for every API route (ROADMAP 5.1).
+ * Static auth guard for every API route.
  *
  * Walks every `route.ts` under src/app/api and fails when a handler file has no
  * server-side auth entry point and is not explicitly allowlisted as public by
@@ -43,7 +43,7 @@ const PUBLIC_ALLOWLIST = new Set<string>([
   // no session possible (merchant moderators + warehouse admins).
   "activate/route.ts",
   // Issues a short-lived signed token for the anonymous rider-application NID
-  // upload (ROADMAP P0.2) — rate-limited, no session exists at that point.
+  // Upload — rate-limited, no session exists at that point.
   "uploads/token/route.ts",
   // Unverified merchants resend their activation email from the login page.
   "merchants/resend-verification/route.ts",

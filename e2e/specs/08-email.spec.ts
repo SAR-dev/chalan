@@ -12,7 +12,7 @@ const SITE_ORIGIN = "http://localhost:3000"
 /**
  * Point a merchant's stored verification token at a known raw value.
  *
- * ROADMAP P0.7: the column holds only the SHA-256 hash of the token, so the raw
+ * The column holds only the SHA-256 hash of the token, so the raw
  * value (which only ever exists inside the emailed link — the e2e environment
  * has no SMTP) is unknowable from the database. This asserts the column really
  * is a hash, then swaps in the hash of a token the test controls. Same

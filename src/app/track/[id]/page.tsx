@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const raw = decodeURIComponent(id).trim()
   const data = await fetchOrderData(raw)
 
-  // Only the unguessable token link may reveal the live status (ROADMAP B11);
+  // Only the unguessable token link may reveal the live status;
   // a sequential order-code lookup gets a generic title.
   const byToken = Boolean(data?.matchedByToken)
   const code = data?.order.id ?? raw.toUpperCase()

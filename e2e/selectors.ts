@@ -32,7 +32,7 @@ export const register = {
   email: "[data-testid='register-email']",
 }
 
-// ─── Two-factor authentication (H4) ─────────────────────────────────────────
+// ─── Two-factor authentication ─────────────────────────────────────────
 export const twoFactor = {
   status: "[data-testid='two-factor-status']",
   policy: "[data-testid='two-factor-policy']",
@@ -135,7 +135,7 @@ export const orders = {
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
   // Status tabs, tagged by value. `dashboard/orders` opens on PENDING, which
   // holds only 8 of the 100 seeded orders, so anything asserting pagination
-  // must switch to ALL first (ROADMAP R1.3). The previous `tab-${name}` value
+  // Must switch to ALL first. The previous `tab-${name}` value
   // matched nothing in `src/`.
   tab: (name: string) => `[data-testid='orders-tab-${name}']`,
   // CSV bulk import — the page and its testids.
@@ -376,7 +376,7 @@ export const settings = {
   savePolicy: "[data-testid='save-policy']",
 }
 
-// --- Public tracking (P0.1 token-gated receiver note) ---
+// --- Public tracking (token-gated receiver note) ---
 export const tracking = {
   noteInput: "[data-testid='receiver-note-input']",
   noteLocked: "[data-testid='receiver-note-locked']",
@@ -463,7 +463,7 @@ export const dialog = {
 }
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
-// Tagged per table id (ROADMAP R1.3): these four controls sit under every list
+// Tagged per table id: these four controls sit under every list
 // page and carried no testid at all, which is why server-side pagination — the
 // most-used interaction in the app — had zero E2E coverage.
 export const pagination = {

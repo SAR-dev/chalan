@@ -19,7 +19,7 @@ import { formatTk } from "@/lib/pricing"
 // recharts is heavy and this chart only appears once the analytics payload has
 // arrived, so it ships as its own chunk rather than in the dashboard's initial
 // bundle. Importing the file directly also keeps the barrel's other charts out
-// (ROADMAP R5.10). `ssr: false` because there is nothing to draw until the
+//. `ssr: false` because there is nothing to draw until the
 // client has the data either.
 const AreaChart = dynamic(
   () => import("@/components/charts/area-chart").then((m) => m.AreaChart),

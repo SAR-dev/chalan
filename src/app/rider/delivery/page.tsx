@@ -65,7 +65,7 @@ export default function RiderDeliveryQueuePage() {
   }, [setPage])
 
   // Rows come pre-filtered to this queue by the API (`?queue=delivery`), so the
-  // table and the footer's `total` count the same set (ROADMAP R0.2).
+  // Table and the footer's `total` count the same set.
 
   const dateFilterLabel =
     dateFrom || dateTo

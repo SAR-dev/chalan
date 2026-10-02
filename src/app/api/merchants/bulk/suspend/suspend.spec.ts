@@ -125,7 +125,7 @@ describe("PATCH /api/merchants/bulk/suspend", () => {
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true, count: 2 })
     expect(updatePayloads[0]).toMatchObject({ status: "SUSPENDED" })
-    // Both rows land in one insert (ROADMAP R3.6).
+    // Both rows land in one insert.
     expect(logAudit).not.toHaveBeenCalled()
     expect(logAuditMany).toHaveBeenCalledTimes(1)
     const [auditRows] = vi.mocked(logAuditMany).mock.calls[0]

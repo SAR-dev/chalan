@@ -556,7 +556,7 @@ describe("GET /api/orders/payable", () => {
 // LEFT JOINs. A trigram GIN index answers a same-table bitmap-OR; it cannot
 // answer ORs that cross relations, so the planner's realistic choice was "join
 // all four tables, then filter" — the search got slower the more it matched
-// nothing (ROADMAP R3.10).
+// Nothing.
 describe("GET /api/orders?q= search shape (ROADMAP R3.10)", () => {
   async function searchClauseFor(q: string) {
     sessionState.value = admin
@@ -606,7 +606,6 @@ describe("GET /api/orders?q= search shape (ROADMAP R3.10)", () => {
 // A rider has two queues. Without `?queue=` the endpoint returned their union
 // and each queue page filtered client-side, so the footer's `total` counted
 // rows the table never rendered and page 2 showed a different subset
-// (ROADMAP R0.2).
 describe("GET /api/orders?queue= (ROADMAP R0.2)", () => {
   const renderWhere = () =>
     new PgDialect().sqlToQuery(
@@ -966,7 +965,7 @@ describe("GET /api/orders/analytics", () => {
     expect(res.status).toBe(200)
     expect(whereCalls).toHaveLength(3)
     // No merchant/warehouse scope, but the default window still bounds the scan
-    // (ROADMAP P3) — so a where clause is present on every aggregate.
+    // — so a where clause is present on every aggregate.
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
     expect(json).toMatchObject({
       ordersByDay: [],
@@ -1083,8 +1082,8 @@ describe("GET /api/orders/analytics", () => {
         { status: "RETURNED", count: 1 },
       ],
       [
-        // Delivery performance and COD summary are one query now (ROADMAP
-        // R3.7) — both are ungrouped, so they are the same scan.
+        // Delivery performance and COD summary are one query now -
+        // both ungrouped, so they are the same scan.
         {
           totalDelivered: 8,
           totalFailed: 1,

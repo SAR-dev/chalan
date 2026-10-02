@@ -373,7 +373,7 @@ describe("PATCH /api/merchants/:id", () => {
     expect(res.status).toBe(200)
     expect(json).toBeDefined()
     // A second write syncs the owner's auth user (no businessName) so login
-    // keeps working (P1.4c).
+    // Keeps working.
     expect(
       updatePayloads.some(
         (p) => p.email === "new@test.com" && !("businessName" in p),
@@ -473,7 +473,7 @@ describe("PATCH /api/merchants/:id/approve", () => {
   })
 
   it("409 when the status changed between the read and the write", async () => {
-    // P1.1: the write is predicated on the status that was validated, so a
+    // The write is predicated on the status that was validated, so a
     // concurrent approve/suspend cannot be overwritten.
     sessionState.value = admin
     selectQueue.push([
@@ -528,7 +528,7 @@ describe("PATCH /api/merchants/:id/approve", () => {
           },
         },
       }),
-      // Audit + email outbox row commit in the approval transaction (P1.4/P1.5).
+      // Audit + email outbox row commit in the approval transaction.
       expect.anything(),
     )
   })
@@ -773,7 +773,7 @@ describe("POST /api/merchants/:id/balance/payment", () => {
   })
 
   it("409 when a payment is already pending (checked inside the transaction)", async () => {
-    // P1.1: the check moved inside the transaction, after the balance row lock.
+    // The check moved inside the transaction, after the balance row lock.
     sessionState.value = merchantSession
     selectQueue.push([{ merchantId: "m_1" }])
     selectQueue.push([{ id: "tx_pending" }])
@@ -1310,7 +1310,7 @@ describe("PATCH /api/merchants/:id/nid/verify", () => {
 
 // Public by design — no session, it is how an unverified merchant resends their
 // own activation email from the login page. Its only guards are the body schema
-// and a per-IP budget, and no spec covered it (ROADMAP R1.2).
+// And a per-IP budget, and no spec covered it.
 describe("POST /api/merchants/resend-verification", () => {
   const emailReq = (email?: string) =>
     req(

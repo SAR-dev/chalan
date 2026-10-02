@@ -130,7 +130,7 @@ describe("Merchant dashboard", () => {
     expect(screen.getByText(/cod to collect/i)).toBeInTheDocument()
   })
 
-  // The bug ROADMAP R0.1 fixes: every card used to be `.filter().reduce()`
+  // Before the fix, every card used to be `.filter().reduce()`
   // over the visible page of orders, so a merchant with 400 delivered orders
   // was shown the money of their newest 20 and nothing on screen revealed the
   // truncation. The server summary must win even when the page contradicts it.

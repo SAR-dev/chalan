@@ -40,9 +40,9 @@ export const user = pgTable(
     banned: boolean("banned"),
     banReason: text("banReason"),
     banExpires: ts("banExpires"),
-    // Required by the better-auth two-factor plugin (ROADMAP H4)
+    // Required by the better-auth two-factor plugin
     twoFactorEnabled: boolean("twoFactorEnabled").default(false),
-    // Account-activation flow (ROADMAP 5.2): SHA-256 hash of the single-use
+    // Account-activation flow: SHA-256 hash of the single-use
     // token emailed to invited staff (moderators, warehouse admins). The raw
     // token never touches the database; cleared on successful activation.
     activationToken: text("activationToken"),
@@ -63,12 +63,12 @@ export const user = pgTable(
     index("user_name_trgm_idx").using("gin", sql`${t.name} gin_trgm_ops`),
     index("user_email_trgm_idx").using("gin", sql`${t.email} gin_trgm_ops`),
     // `admin/users` and `admin/team` both default to `ORDER BY createdAt DESC`
-    // (ROADMAP R3.8). The table only ever had two trigram GINs, so every page
+    //. The table only ever had two trigram GINs, so every page
     // turn sorted the whole user set.
     index("user_created_at_idx").on(t.createdAt),
     // `POST /api/auth/activate` is unauthenticated and looks the row up by this
     // value, so every click on an activation link scanned the whole table
-    // (ROADMAP R3.9). Partial: activated accounts hold NULL and cost nothing.
+    //. Partial: activated accounts hold NULL and cost nothing.
     index("user_activation_token_idx")
       .on(t.activationToken)
       .where(sql`${t.activationToken} is not null`),
@@ -137,7 +137,7 @@ export const verification = pgTable(
 )
 
 // =============================================================================
-// Two-factor authentication (better-auth twoFactor plugin — ROADMAP H4)
+// Two-factor authentication (better-auth twoFactor plugin)
 //
 // One row per user while TOTP is enrolled. `secret` holds the plugin's
 // symmetric-encrypted TOTP secret and `backupCodes` the encrypted recovery
@@ -185,7 +185,6 @@ export const profile = pgTable(
     // Domain entity references. Only the field matching the user's role is
     // expected to be populated. FKs with `ON DELETE SET NULL` so removing the
     // domain row unlinks the account instead of leaving a dangling id
-    // (ROADMAP P1.6).
     warehouseId: text("warehouseId").references(() => warehouse.id, {
       onDelete: "set null",
     }), // WAREHOUSE_ADMIN: the warehouse they manage
@@ -195,7 +194,7 @@ export const profile = pgTable(
     riderId: text("riderId").references(() => rider.id, {
       onDelete: "set null",
     }), // RIDER: their rider profile
-    // Merchant moderator accounts (ROADMAP 5.2). `isModerator` distinguishes
+    // Merchant moderator accounts. `isModerator` distinguishes
     // staff from the merchant owner; `moderatorPermissions` holds the nav
     // hrefs the owner granted (jsonb array, null for owners). `activatedAt`
     // is set once the invitee clicks their activation link — null + isActive
@@ -209,7 +208,7 @@ export const profile = pgTable(
     index("profile_role_idx").on(t.role),
     index("profile_rider_id_idx").on(t.riderId),
     // Hot moderator/owner lookups filter by merchant; warehouse rosters by
-    // warehouse (ROADMAP P1.6).
+    // Warehouse.
     index("profile_merchant_id_idx").on(t.merchantId),
     index("profile_warehouse_id_idx").on(t.warehouseId),
     index("profile_phone_trgm_idx").using("gin", sql`${t.phone} gin_trgm_ops`),

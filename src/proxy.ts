@@ -126,7 +126,7 @@ function roleGuard(pathname: string, req: NextRequest): NextResponse | null {
 }
 
 // ---------------------------------------------------------------------------
-// Portal-mode gating (ROADMAP 5.4) — PORTAL_MODE selects which portals this
+// Portal-mode gating — PORTAL_MODE selects which portals this
 // instance serves. Pages of a disabled portal 404 at the edge, so its shell
 // (and nav) never renders. `all` (default) serves everything: the guard is a
 // no-op. API/session-side enforcement lives in requireSession().
@@ -166,7 +166,7 @@ function isAdminPath(pathname: string): boolean {
 }
 
 function proxyClientIp(req: NextRequest): string | null {
-  // Same trusted-proxy rule as the API rate limiter (ROADMAP P0.6): forwarding
+  // Same trusted-proxy rule as the API rate limiter: forwarding
   // headers are only believed when the deployment declares its proxy hops, so a
   // client cannot forge its way past ADMIN_IP_ALLOWLIST.
   return resolveClientIp(req.headers).ip
@@ -209,7 +209,7 @@ export function proxy(req: NextRequest) {
   if (portal) return withRequestId(portal, requestId)
 
   // 4. Upload rate limiting now lives in the route handler itself — see
-  //    `src/app/api/uploads/route.ts` (ROADMAP R3.2).
+  //    `src/app/api/uploads/route.ts`.
 
   // 5. Per-request CSP nonce (page routes only — enforced by the matcher).
   const nonce = createNonce()
@@ -235,7 +235,7 @@ export const config = {
    * Every HTML page route needs the nonce'd CSP. API routes, static assets,
    * _next, and uploads are handled specially:
    *   - /api/uploads      → passes through here for the request id; the rate
-   *                         limit moved into the route handler (ROADMAP R3.2)
+   *                         Limit moved into the route handler
    *                         because middleware cannot reach Redis.
    *   - /api/admin        → IP-allowlisted above, then passed through
    *                          without a CSP nonce (API response).

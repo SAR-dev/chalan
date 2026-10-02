@@ -39,7 +39,7 @@ export const PATCH = withErrorHandler(
     const [updated] = await db
       .update(rider)
       .set({ isActive: !current.isActive })
-      // Lost-update guard (ROADMAP R0.9) — same reasoning as
+      // Lost-update guard — same reasoning as
       // src/app/api/team/[id]/active/route.ts: without this clause two
       // concurrent toggles write the same value and one activation is silently
       // lost. A miss is reported as a conflict, not overwritten.

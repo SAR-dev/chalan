@@ -6,7 +6,7 @@ interface TextareaProps extends React.ComponentProps<"textarea"> {
   /**
    * Message for this field, when the caller has one. Same contract as
    * `Input.error` — nothing extra renders when it is absent, so existing call
-   * sites are untouched (ROADMAP R2.4).
+   * Sites are untouched.
    */
   error?: string
 }

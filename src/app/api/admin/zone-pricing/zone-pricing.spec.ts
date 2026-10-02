@@ -234,7 +234,7 @@ describe("POST /api/admin/zone-pricing", () => {
   })
 
   it("retries the update when a concurrent request inserted the pair first", async () => {
-    // P1.1: the first update finds nothing, the insert loses the unique-index
+    // The first update finds nothing, the insert loses the unique-index
     // race, so the route must fall back to updating the winner's row instead
     // of creating a duplicate pair.
     sessionState.value = admin

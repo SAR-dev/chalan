@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-// ROADMAP R5.7 widened Biome's scope to the root configs. Both ways of getting
+// Biome now covers the root configs too. Both ways of getting
 // it wrong fail confusingly rather than obviously, so both are pinned.
 
 const raw = readFileSync(join(process.cwd(), "biome.json"), "utf-8")

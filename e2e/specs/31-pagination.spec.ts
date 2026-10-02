@@ -6,7 +6,7 @@ import { orders, pagination } from "../selectors"
 
 // ─── S73. Server-side pagination ─────────────────────────────────────────────
 //
-// Roadmap R1.3. The four footer controls under every list page carried no
+// The four footer controls under every list page carried no
 // `data-testid` at all, and `e2e/` never referenced them — so server-side
 // pagination, the most-used interaction in the product, had zero coverage.
 // A regression in `onPageChange` would have shipped silently.
@@ -111,7 +111,7 @@ test.describe("S73. Server-side pagination", () => {
     page,
   }) => {
     await openOrdersAsAdmin(page)
-    // The whole point of R1.3: these existed in the DOM with no stable
+    // The whole point of this spec: these existed in the DOM with no stable
     // selector, so nothing could ever have pinned their behaviour.
     for (const control of [
       pagination.prev(TABLE),

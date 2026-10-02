@@ -56,7 +56,6 @@ type OrderRow = typeof order.$inferSelect
  * different connection, a different snapshot, and under replica lag a
  * *stale* one. Validation that agrees with itself but disagrees with the row
  * being locked is exactly how a guard passes and a write lands anyway
- * (ROADMAP R0.11).
  */
 export type OrderTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -74,7 +73,7 @@ interface TransitionContext<Body> {
    * Not read from the clock inside `buildUpdate` on purpose. A bulk call applies
    * one transition to N orders, and each row stamping its own `Date.now()` made
    * all N `SET` payloads differ, so they could never collapse into a single
-   * `UPDATE ... WHERE id IN (...)` (ROADMAP R3.5). It is also simply truer: a
+   * `UPDATE ... WHERE id IN (...)`. It is also simply truer: a
    * batch approved together *was* approved at one instant.
    */
   now: string
@@ -150,7 +149,6 @@ function warehouseOrderInScope(
   // `!o.warehouseId && status === "PICKED_UP"` used to sit here too. It is
   // unreachable — `order.warehouseId` is NOT NULL and nothing ever nulls it —
   // and the intake queue is driven by status, which branch 1 already covers
-  // (ROADMAP R0.12).
   return o.status === "APPROVED" && !o.pickupRiderId
 }
 
@@ -177,7 +175,7 @@ export const ORDER_TRANSITIONS = {
           .limit(1),
       )
       // A suspended/closed merchant must not have new orders enter the pipeline
-      // (ROADMAP B8). New orders are already blocked at creation; this closes
+      //. New orders are already blocked at creation; this closes
       // the gap for PENDING orders queued before suspension.
       if (merchantRow && merchantRow.status !== "ACTIVE") {
         return {
@@ -442,7 +440,7 @@ export const ORDER_TRANSITIONS = {
           status: 400,
         }
       }
-      // Partial COD (ROADMAP B2): can't collect more than owed, and a shortfall
+      // Partial COD: can't collect more than owed, and a shortfall
       // must be explained.
       const collected = body.amountCollected
       if (collected !== undefined && collected > o.productCost) {
@@ -591,7 +589,6 @@ export const ORDER_TRANSITIONS = {
 
   cancel: defineTransition({
     // Merchants cancel from the Orders surface, so a moderator needs that grant
-    // (ROADMAP 5.2 hard server checks).
     authorize: (me) =>
       me.role === "SUPER_ADMIN" ||
       me.role === "WAREHOUSE_ADMIN" ||
@@ -761,7 +758,7 @@ async function applyFeeSettlement(
 }
 
 /**
- * The `refundOnCancel` platform toggle (ROADMAP B15). Read once per transaction
+ * The `refundOnCancel` platform toggle. Read once per transaction
  * and threaded through, so a bulk cancel does not hit the config per order.
  */
 async function loadRefundOnCancelPolicy(tx: OrderTx): Promise<boolean> {
@@ -808,7 +805,7 @@ async function settleOrderFinancials(
   refundOnCancel: boolean,
 ): Promise<void> {
   // If the order is delivered, the platform has collected the COD from the
-  // recipient — credit the merchant the GROSS amount (ROADMAP P0.4). The fee
+  // Recipient — credit the merchant the GROSS amount. The fee
   // charge written at creation nets this to the merchant's earnings, so a
   // later payout of those earnings settles the balance to zero.
   const collectedAmount = updated.amountCollected ?? updated.productCost
@@ -875,7 +872,7 @@ async function settleOrderFinancials(
   }
 
   // A returned order refunds the creation charge and charges the zone-pair
-  // cancellation fee instead (ROADMAP B4). Net: the merchant's obligation
+  // Cancellation fee instead. Net: the merchant's obligation
   // becomes just the cancellation fee.
   if (name === "return") {
     await applyFeeSettlement(tx, updated, actorName, {
@@ -888,7 +885,7 @@ async function settleOrderFinancials(
 
   // A cancelled order is refunded the creation charge. Before pickup nothing
   // has been rendered, so the refund is total; once the parcel has moved, the
-  // zone-pair cancellation fee applies instead (ROADMAP B4/B10). The
+  // Zone-pair cancellation fee applies instead. The
   // `refundOnCancel` platform toggle can disable the refund entirely (B15).
   if (name === "cancel") {
     const postPickup =
@@ -988,7 +985,7 @@ export async function applyOrderTransition(
     )
 
     // Audit and status history commit with the change they describe
-    // (ROADMAP P1.4): a crash between commit and the audit write used to lose
+    //: a crash between commit and the audit write used to lose
     // the trail entirely. Inside the transaction a failure rolls the whole
     // change back, so state and trail can never diverge.
     const diff = diffEntity(orderRow, updated, ORDER_DIFF_FIELDS)
@@ -1021,7 +1018,7 @@ export async function applyOrderTransition(
   // lands would let the next read repopulate the cache from pre-write state.
   // Every status change in the system funnels through this function or
   // `applyBulkOrderTransition`, so this is the one place the order tiles and the
-  // COD cash figures have to be told (ROADMAP R3.7).
+  // COD cash figures have to be told.
   if (response.ok) {
     refreshStats(statTag("order"), statTag("rider"))
   }
@@ -1065,7 +1062,7 @@ export async function applyBulkOrderTransition(
 
     const beforeById = new Map(rows.map((row) => [row.id, row]))
 
-    // One instant and one lookup memo for the whole batch (ROADMAP R3.5).
+    // One instant and one lookup memo for the whole batch.
     // Scoped to this transaction, so the memo is only ever as stale as the
     // rows already locked `FOR UPDATE` above.
     const batchNow = new Date().toISOString()
@@ -1105,7 +1102,7 @@ export async function applyBulkOrderTransition(
     }
 
     // Group rows that resolve to the *same* column values into one
-    // `UPDATE ... WHERE id IN (...)` (ROADMAP R3.5). A bulk approve/dispatch
+    // `UPDATE ... WHERE id IN (...)`. A bulk approve/dispatch
     // writes an identical `SET` for every row — the only per-row difference
     // used to be the freshly-read clock, now pinned to `batchNow` — so a
     // 100-order batch is one statement instead of 100, and each one was
@@ -1184,7 +1181,7 @@ export async function applyBulkOrderTransition(
     }
 
     // Two statements for the whole batch instead of two per row, inside the
-    // same transaction (ROADMAP P1.4's atomicity, R3.5's round trips): a
+    // Same transaction: a
     // 100-order bulk approve was issuing 100 audit INSERTs + 100 history
     // INSERTs here alone, holding the batch's row locks open the whole time.
     await logAuditMany(auditInputs, tx)

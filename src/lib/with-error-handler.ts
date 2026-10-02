@@ -8,8 +8,8 @@ import { getRequestId, REQUEST_ID_HEADER } from "@/lib/request-id"
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 
 /**
- * A request at or above this is worth a line even when it succeeded (ROADMAP
- * R3.1). Below it, success is `debug` — visible with `LOG_LEVEL=debug`, quiet
+ * A request at or above this is worth a line even when it succeeded.
+ * Below it, success is `debug` - visible with `LOG_LEVEL=debug`, quiet
  * otherwise, because SWR polls and a default `info` would bury the signal in
  * traffic.
  */
@@ -27,7 +27,6 @@ function pathOf(req?: Request): string | undefined {
 /**
  * The access log. There was none: only unhandled 500s produced a line, so
  * there was no 4xx record, no route latency, and no slow-request signal at all
- * (ROADMAP R3.1).
  */
 function logResponse(log: Logger, status: number, durationMs: number): void {
   if (status >= 500) log.error("request failed", { status, durationMs })
@@ -41,7 +40,7 @@ function logResponse(log: Logger, status: number, durationMs: number): void {
  * Wrap a Next.js route handler so any thrown error (e.g. a SQL/FK violation
  * inside a transition) is logged with request context and converted into a
  * structured `{ error, requestId }` 500 — the shape the UI's toast pipeline
- * expects — instead of a bare HTML 500 (ROADMAP P2.2).
+ * Expects — instead of a bare HTML 500.
  *
  * Every response (success or failure) also carries the `x-request-id` header so
  * a client can quote the id when reporting a problem.
@@ -60,7 +59,7 @@ export function withErrorHandler<
     const requestId = getRequestId(req)
     const method = req?.method
     const path = pathOf(req)
-    // One child logger per request (ROADMAP R3.1): `logger.child` existed but
+    // One child logger per request: `logger.child` existed but
     // was called nowhere, so context had to be restated on every line.
     const log = logger.child({ requestId, method, path })
     const startedAt = Date.now()
@@ -91,7 +90,7 @@ export function withErrorHandler<
       const durationMs = Date.now() - startedAt
       log.error("Unhandled route error", { err, durationMs })
       // The log line only helps if something is watching it. When a sink is
-      // configured this pushes the same redacted payload to it (ROADMAP R3.1).
+      // Configured this pushes the same redacted payload to it.
       reportError(err, { requestId, method, path, durationMs })
       const res = NextResponse.json(
         { error: "Internal server error", requestId },

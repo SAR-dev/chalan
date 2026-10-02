@@ -323,7 +323,7 @@ describe("POST /api/merchants/:id/moderators", () => {
 
   it("403 when the quota is full", async () => {
     state.session = owner
-    // P1.1: the check happens inside the transaction, under a row lock, and
+    // The check happens inside the transaction, under a row lock, and
     // before anything is written.
     state.freeSlots.mockReturnValue(0)
     const res = await POST(req("POST", validBody), params())
@@ -369,7 +369,7 @@ describe("POST /api/merchants/:id/moderators", () => {
         contextName: "Acme Corp",
         rawToken: "raw-token",
       }),
-      // Enqueued inside the creation transaction (ROADMAP P1.5).
+      // Enqueued inside the creation transaction.
       expect.anything(),
     )
   })
@@ -478,7 +478,7 @@ describe("PATCH /api/merchants/:id/moderators/:userId", () => {
   })
 
   it("409 when the row changed between the read and the update", async () => {
-    // P1.1: the conditional update is what stops a concurrent change from
+    // The conditional update is what stops a concurrent change from
     // slipping past the checks done earlier in the transaction.
     state.session = owner
     dbState.selectQueue.push([activeTarget])
@@ -611,7 +611,7 @@ describe("POST .../moderators/:userId/resend-activation", () => {
     expect(res.status).toBe(200)
     expect(state.issueActivationToken).toHaveBeenCalledWith(
       expect.any(String),
-      // Token re-issued inside the resend transaction (ROADMAP P1.5).
+      // Token re-issued inside the resend transaction.
       expect.anything(),
     )
     expect(state.sendActivationEmail).toHaveBeenCalledWith(

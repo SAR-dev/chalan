@@ -26,7 +26,7 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
 
-  // ROADMAP H4 — same gate as the dashboard shell, against the warehouse
+  // — same gate as the dashboard shell, against the warehouse
   // account page (/warehouse/account).
   const twoFactorSetupPath = currentUser
     ? twoFactorEnforcementPath({
@@ -56,7 +56,7 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
   ) {
     return (
       // Auth-init placeholder: without a live region a screen reader lands on
-      // a blank region with no indication anything is happening (ROADMAP R2.7).
+      // A blank region with no indication anything is happening.
       <div
         role="status"
         className="bg-background flex min-h-screen items-center justify-center"

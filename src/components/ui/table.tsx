@@ -71,7 +71,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
       data-slot="table-head"
       // Column header, not a data cell. Without it a screen reader announces
       // the cells' contents with no indication of which column they belong to
-      // once focus leaves the header row (ROADMAP R5.5). Spread last, so a
+      // Once focus leaves the header row. Spread last, so a
       // caller that genuinely needs `scope="row"` can still override it.
       scope="col"
       className={cn(

@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 // Static response headers live in `next.config.mjs`; the per-request CSP lives
-// in `src/proxy.ts`. Nothing asserted these two before (ROADMAP R5.9), so
+// In `src/proxy.ts`. Nothing asserted these two before, so
 // dropping either would have been invisible.
 
 const config = readFileSync(join(process.cwd(), "next.config.mjs"), "utf-8")

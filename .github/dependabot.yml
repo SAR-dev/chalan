@@ -1,4 +1,4 @@
-# Dependabot (ROADMAP R1.7).
+# Dependabot.
 #
 # `pg`, `postcss` and `typescript` are pinned without a `^`, and `next` was a
 # couple of patches behind, so nothing in the tree moved on its own — every

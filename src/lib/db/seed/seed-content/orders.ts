@@ -107,7 +107,7 @@ const ITEM_TYPES = [
 // ---------------------------------------------------------------------------
 export interface OrderSeedEntry {
   id: string
-  /** Public tracking token (P0.1) — generated per seeded order. */
+  /** Public tracking token — generated per seeded order. */
   trackingToken: string
   merchantId: string
   pickupLocationId: string

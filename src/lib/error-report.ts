@@ -2,7 +2,7 @@ import { logger, serializeError } from "@/lib/logger"
 import { redactSecrets } from "@/lib/redact"
 
 // =============================================================================
-// Error reporting (ROADMAP R3.1)
+// Error reporting
 //
 // Nothing reported errors anywhere: zero hits for `sentry|opentelemetry|
 // prom-client|posthog|newrelic` across the repo, and `@vercel/analytics` is
@@ -46,7 +46,7 @@ export function isErrorReportingEnabled(): boolean {
  * caller: the response has already been decided by the time this runs.
  *
  * Redacted with the same helper as the logger — a webhook is another place a
- * reset link or 2FA code must not end up (ROADMAP P0.7).
+ * Reset link or 2FA code must not end up.
  */
 export function reportError(err: unknown, context: ErrorReportContext): void {
   const url = endpoint()

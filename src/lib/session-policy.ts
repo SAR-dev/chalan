@@ -1,5 +1,5 @@
 // =============================================================================
-// Server-side session policy (ROADMAP P0.5).
+// Server-side session policy.
 //
 // Both rules used to live in the browser only: `ADMIN_2FA_REQUIRED` was
 // enforced by a redirect in the dashboard/warehouse shells, and merchant email

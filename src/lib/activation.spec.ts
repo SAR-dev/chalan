@@ -105,7 +105,7 @@ describe("lockModeratorQuota", () => {
     dbState.selectQueue.push([{ maxModerators: 5 }], [{ userId: "u1" }])
     const quota = await lockModeratorQuota(tx(), "MER-1")
     expect(quota).toEqual({ maxModerators: 5, used: 1 })
-    // ROADMAP P1.1: the lock is what makes the count-then-write atomic.
+    // The lock is what makes the count-then-write atomic.
     expect(dbState.forCalls).toEqual(["update"])
   })
 

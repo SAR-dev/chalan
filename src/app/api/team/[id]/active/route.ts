@@ -30,7 +30,7 @@ export const PATCH = withErrorHandler(
     const [updated] = await db
       .update(profile)
       .set({ isActive: !current.isActive })
-      // Lost-update guard (ROADMAP R0.9). Without the `isActive` clause two
+      // Lost-update guard. Without the `isActive` clause two
       // concurrent toggles both read the same value and both write the same
       // result, so one activation silently collapses: the second caller sees
       // "success" while its own change was dropped. Conditioning the write on

@@ -35,7 +35,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
  * work table, which is an all-or-nothing lookup, so capping it can make a name
  * fall back silently. 5000 is orders of magnitude past any real roster; the
  * point is that a runaway count yields a bounded response instead of an
- * unbounded one (ROADMAP R3.11). Resolving only the ids a page actually shows
+ * Unbounded one. Resolving only the ids a page actually shows
  * is the real fix, and is a different design.
  */
 const ROSTER_LIMIT = 5000
@@ -252,7 +252,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   })
   if (limited) return limited
 
-  // Only the SHA-256 hash of the verification token is stored (P0.7); the raw
+  // Only the SHA-256 hash of the verification token is stored; the raw
   // token exists only inside the emailed link.
   const {
     raw: verificationToken,
@@ -263,7 +263,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   const verificationUrl = verifyTokenUrl(verificationToken, siteUrl)
 
-  // The merchant row and the owner's profile are one unit (ROADMAP P1.4).
+  // The merchant row and the owner's profile are one unit.
   // Better Auth owns its own connection, so the user is created first and the
   // two app tables are written in a transaction; a failure deletes the user
   // instead of leaving an account with no merchant.
@@ -322,7 +322,7 @@ export const POST = withErrorHandler(async (req: Request) => {
           .where(eq(user.id, created.user.id))
       }
 
-      // Enqueue the verification email in the same transaction (ROADMAP P1.5).
+      // Enqueue the verification email in the same transaction.
       const template = await merchantRegisteredTemplate({
         ownerName,
         businessName,

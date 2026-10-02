@@ -37,7 +37,7 @@ export const POST = withErrorHandler(
         // Serialize submissions for this merchant by locking its balance row,
         // then re-check inside the transaction. The check used to happen
         // before the transaction, so two double-clicks both saw "no pending
-        // payment" and both reserved `pendingBalance` (ROADMAP P1.1).
+        // Payment" and both reserved `pendingBalance`.
         await tx
           .select({ merchantId: merchantBalance.merchantId })
           .from(merchantBalance)

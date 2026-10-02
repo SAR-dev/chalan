@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 // Three mechanisms, two hostnames and a committed tunnel UUID — the "which one
-// is actually live?" problem (ROADMAP R3.4):
+// Is actually live?" problem:
 //
 //   config.yml         → committed tunnel UUID + `hostname: sarn.top`
 //   deploy.yml         → defaulted NEXT_PUBLIC_SITE_URL to `chalan.sarn.top`

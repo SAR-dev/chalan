@@ -38,7 +38,7 @@ export const supportTicket = pgTable(
   (t) => [
     index("support_ticket_status_created_at_idx").on(t.status, t.createdAt),
     index("support_ticket_user_id_idx").on(t.userId),
-    // Admin list search filters these with ILIKE (ROADMAP P1.6).
+    // Admin list search filters these with ILIKE.
     index("support_ticket_subject_trgm_idx").using(
       "gin",
       sql`${t.subject} gin_trgm_ops`,

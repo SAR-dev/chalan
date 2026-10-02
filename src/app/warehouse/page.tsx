@@ -16,7 +16,7 @@ export default async function WarehouseIntakePage() {
 
   // Warehouse scope: orders that belong to this warehouse. The intake queue's
   // INCOMING tab is selected by status client-side, not by a null warehouse —
-  // `order.warehouseId` is NOT NULL (ROADMAP R0.12).
+  // `order.warehouseId` is NOT NULL.
   const warehouseScope = eq(order.warehouseId, me.warehouseId)
 
   const [[{ total }], rows] = await Promise.all([

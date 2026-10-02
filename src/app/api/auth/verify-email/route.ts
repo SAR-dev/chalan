@@ -20,7 +20,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     return NextResponse.redirect(new URL("/login?error=missing-token", req.url))
   }
 
-  // Better Auth's change-email confirmation link (ROADMAP 5.3) resolves to
+  // Better Auth's change-email confirmation link resolves to
   // this same path: Next.js routes a static segment ahead of the
   // /api/auth/[...all] catch-all. Those tokens are stateless HS256 JWTs (they
   // contain dots), never a merchant cuid — hand them to Better Auth's own
@@ -31,7 +31,7 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const now = new Date().toISOString()
 
-  // The table holds only the SHA-256 hash of the token (ROADMAP P0.7) — the
+  // The table holds only the SHA-256 hash of the token — the
   // raw value exists solely inside the emailed link.
   const [current] = await db
     .select({

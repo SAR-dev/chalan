@@ -83,7 +83,7 @@ export const orderStatuses = [
 
 export const emailLogStatuses = ["SENT", "FAILED"] as const
 
-// Transactional email outbox (ROADMAP P1.5): a row is written in the same
+// Transactional email outbox: a row is written in the same
 // transaction as the domain change, then drained by a worker/cron.
 export const emailOutboxStatuses = [
   "PENDING",

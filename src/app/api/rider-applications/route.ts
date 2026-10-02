@@ -70,7 +70,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     return badRequest("Select a valid warehouse.")
   }
 
-  // Friendly pre-check; `rider_email_uniq` is the guarantee (P1.1).
+  // Friendly pre-check; `rider_email_uniq` is the guarantee.
   const [existing] = await dbRead
     .select({ id: rider.id })
     .from(rider)

@@ -23,7 +23,7 @@ type Panel = "none" | "password" | "verify" | "codes" | "disable"
 type PasswordPurpose = "enable" | "regenerate"
 
 /**
- * TOTP enrollment (ROADMAP H4) — available to every role (merchants/riders
+ * TOTP enrollment — available to every role (merchants/riders
  * opt in freely; admins may be covered by the ADMIN_2FA_REQUIRED env policy,
  * surfaced by /api/users/me as twoFactorRequired). Every Better Auth call
  * goes through `authClient.twoFactor.*`; disabling goes through this app's

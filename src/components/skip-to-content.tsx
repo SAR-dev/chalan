@@ -1,5 +1,5 @@
 /**
- * Keyboard skip link (ROADMAP P4.4).
+ * Keyboard skip link.
  *
  * The sidebar + header chrome sits ahead of the page content in the tab order,
  * so a keyboard user had to traverse it on every navigation. This is the

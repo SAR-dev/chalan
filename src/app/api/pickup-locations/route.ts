@@ -120,7 +120,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     return forbidden()
   }
   // Pickup locations live under Business Settings, which is owner-only — a
-  // moderator never passes `hasNavPermission` for it (ROADMAP 5.2).
+  // Moderator never passes `hasNavPermission` for it.
   if (!hasNavPermission(me, "/merchant/settings")) {
     return forbidden("Only the account owner can manage pickup locations.")
   }

@@ -206,7 +206,7 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
     }
   }, [isReady, currentUser, currentMerchant, isMerchantLoading, router])
 
-  // Moderator route guard (ROADMAP 5.2, enforcement layer 2): a moderator
+  // Moderator route guard: a moderator
   // who opens a non-granted /merchant route is sent to their landing page.
   // The nav already renders only granted items; this closes direct URLs.
   useEffect(() => {
@@ -222,7 +222,7 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
   if (!isReady || !currentUser || currentUser.role !== "MERCHANT") {
     return (
       // Auth-init placeholder: without a live region a screen reader lands on
-      // a blank region with no indication anything is happening (ROADMAP R2.7).
+      // A blank region with no indication anything is happening.
       <div
         role="status"
         className="bg-background flex min-h-screen items-center justify-center"

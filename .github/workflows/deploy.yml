@@ -2,7 +2,7 @@ name: Deploy
 
 # Gate production on CI: this workflow only runs after the CI workflow
 # completes on `main`, and the job below skips unless CI succeeded
-# (ROADMAP P2.1). A red CI run can no longer reach production.
+#. A red CI run can no longer reach production.
 on:
   workflow_run:
     workflows: ["CI"]

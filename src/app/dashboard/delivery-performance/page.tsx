@@ -18,7 +18,7 @@ import { useOrderAnalytics } from "@/features/orders/hooks/use-order-analytics"
 // recharts is heavy and these three only appear once the analytics payload has
 // arrived, so each ships as its own chunk rather than in the dashboard's
 // initial bundle. Importing the files directly also keeps the barrel's unused
-// charts out (ROADMAP R5.10). `ssr: false` because there is nothing to draw
+// Charts out. `ssr: false` because there is nothing to draw
 // until the client has the data either.
 const AreaChart = dynamic(
   () => import("@/components/charts/area-chart").then((m) => m.AreaChart),

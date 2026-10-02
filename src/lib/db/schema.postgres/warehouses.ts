@@ -93,7 +93,7 @@ export const rider = pgTable(
     index("rider_phone_trgm_idx").using("gin", sql`${t.phone} gin_trgm_ops`),
     index("rider_zone_trgm_idx").using("gin", sql`${t.zone} gin_trgm_ops`),
     index("rider_email_trgm_idx").using("gin", sql`${t.email} gin_trgm_ops`),
-    // P1.1: one rider per email. The application route checked with
+    // One rider per email. The application route checked with
     // `ilike(...)` outside a transaction, so two simultaneous applications
     // (or one application racing an admin-created rider) both got through.
     // Case-insensitive because the check was case-insensitive, and partial

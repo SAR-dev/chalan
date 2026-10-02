@@ -37,7 +37,7 @@ export const PATCH = withErrorHandler(
     }
 
     // Only transition merchants that are not already active, so a concurrent
-    // change can't be silently overwritten (ROADMAP P1.1).
+    // Change can't be silently overwritten.
     const [updated] = await db
       .update(merchant)
       .set({ status: "ACTIVE" })

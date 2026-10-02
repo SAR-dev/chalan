@@ -173,7 +173,7 @@ export const POST = withErrorHandler(
           moderatorPermissions: permissions,
         })
         const rawToken = await issueActivationToken(created.user.id, tx)
-        // Enqueue the invite email in the same transaction (ROADMAP P1.5), so
+        // Enqueue the invite email in the same transaction, so
         // the account and its email commit together.
         await sendActivationEmail(
           {
@@ -185,7 +185,6 @@ export const POST = withErrorHandler(
           tx,
         )
         // Audit inside the tx: a crash can no longer lose the trail
-        // (ROADMAP P1.4).
         await logAudit(
           {
             actor: { userId: me.userId, name: me.name, role: me.role },

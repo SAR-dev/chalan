@@ -1,4 +1,4 @@
-// Request correlation id (ROADMAP P2.2).
+// Request correlation id.
 //
 // The edge proxy mints/forwards `x-request-id` for the routes it matches; every
 // other API route mints one on demand here so a 500 can be tied to its log

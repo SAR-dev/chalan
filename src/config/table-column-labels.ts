@@ -121,7 +121,7 @@ export const columnLabels = {
     actions: "",
   },
   // The two log tables. They were the last DataTables still spelling their
-  // headers out in the page - see ROADMAP R5.4.
+  // Headers out in the page
   auditLog: {
     when: "When",
     actor: "Actor",

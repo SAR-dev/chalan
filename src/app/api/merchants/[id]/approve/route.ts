@@ -47,7 +47,7 @@ export const PATCH = withErrorHandler(
     }
 
     // The status flip, audit row and approval email outbox row commit
-    // together (ROADMAP P1.4/P1.5).
+    // Together.
     const updated = await db.transaction(async (tx) => {
       const [row] = await tx
         .update(merchant)
@@ -98,7 +98,7 @@ export const PATCH = withErrorHandler(
     await flushEmailOutbox()
 
     // Clears the overview's "pending merchants" tile and the merchants tab
-    // counters immediately; the 30s TTL is only the backstop (ROADMAP R3.7).
+    // Counters immediately; the 30s TTL is only the backstop.
     refreshStats(statTag("merchant"))
 
     return NextResponse.json(updated)

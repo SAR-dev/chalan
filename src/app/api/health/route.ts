@@ -4,7 +4,7 @@
 // and doesn't produce noise in audit or access logs.
 //
 // `rateLimiter` reports whether the rate limiter is running degraded
-// (production without REDIS_URL → per-instance limits, ROADMAP P0.6). Liveness
+// (production without REDIS_URL → per-instance limits). Liveness
 // still reports 200: a config problem should be visible, not fatal.
 import { NextResponse } from "next/server"
 import { rateLimiterDegraded } from "@/lib/rate-limit"

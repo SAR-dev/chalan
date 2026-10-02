@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-// ROADMAP P2. Everything here is a *structural* claim - either dead code came
+// Everything here is a *structural* claim - either dead code came
 // back, or a file that has to exist in four places quietly does not. None of it
 // is visible in a rendered screenshot, so it is pinned against the source.
 

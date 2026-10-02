@@ -48,7 +48,7 @@ export function DateRangePicker({
     (value: string) => {
       setPreset(value)
       // Business-local calendar days, so "Today" is the Dhaka day even when
-      // the browser is not in that zone (ROADMAP P1.3).
+      // The browser is not in that zone.
       const today = businessToday()
 
       if (value === "Today") {

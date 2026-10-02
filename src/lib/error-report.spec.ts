@@ -70,7 +70,7 @@ describe("error reporting (ROADMAP R3.1)", () => {
       method: "POST",
       path: "/api/auth/reset",
     })
-    // The token must not travel to a third party (ROADMAP P0.7).
+    // The token must not travel to a third party.
     expect(String(body.message)).not.toContain("SECRETTOKEN123")
     expect(String(body.message)).toContain("[redacted]")
   })

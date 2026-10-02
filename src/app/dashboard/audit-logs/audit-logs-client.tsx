@@ -140,7 +140,7 @@ export function AuditLogsClient({
             // first load is in flight (and a refresh overlay once rows exist),
             // so this string is only ever rendered for an empty result set.
             // The `isLoading ? "Loading…" : …` it used to carry was a branch
-            // nothing could reach (ROADMAP R5.4).
+            // Nothing could reach.
             emptyMessage="No audit log entries yet."
             serverSortId={sortId}
             serverSortDir={sortDir}

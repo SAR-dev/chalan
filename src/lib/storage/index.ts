@@ -16,7 +16,7 @@ import {
 // The R2 driver is imported *lazily*, in each function below. `@aws-sdk/client-s3`
 // is a large dependency and the default `STORAGE_PROVIDER=local` never touches
 // R2, so a static import here made every storage route — including the
-// local-only ones — load and start the SDK (ROADMAP R5.10). `import()` resolves
+// Local-only ones — load and start the SDK. `import()` resolves
 // to the same cached module, so the second and later calls cost nothing.
 
 export type StorageProvider = "local" | "r2"
@@ -58,7 +58,7 @@ export async function saveFile(
 
 /**
  * Lists every stored file for whichever backend STORAGE_PROVIDER selects.
- * Used by the upload sweep (ROADMAP 5.6) to find orphaned uploads.
+ * Used by the upload sweep to find orphaned uploads.
  */
 export async function listFiles(): Promise<StoredFile[]> {
   const provider = getProvider()

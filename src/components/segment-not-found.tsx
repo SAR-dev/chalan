@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
  * them out of the shell entirely. This one renders *inside* the segment's
  * layout - which still runs first, so its auth gate applies and an
  * unauthenticated visitor is redirected to sign-in rather than shown a 404
- * (ROADMAP R5.5).
  */
 export function SegmentNotFound({
   home,

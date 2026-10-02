@@ -152,7 +152,7 @@ services:
 
   # ── Cron container ──────────────────────────────────────────────────────
   # Schedules the HTTP cleanup jobs against the single app instance
-  # (ROADMAP P2.5). The cluster compose has the same service pointing at
+  #. The cluster compose has the same service pointing at
   # `dashboard`; here the only app service is `app`.
   cron:
     image: alpine:3.20

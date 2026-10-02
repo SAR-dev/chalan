@@ -1,10 +1,10 @@
-// Real-Database integration invariants (ROADMAP P3)
+// Real-Database integration invariants
 //
 // Almost every other spec in the repo mocks `@/lib/db`, so the guarantees that
 // only Postgres can enforce — unique indexes backing the check-then-write
-// flows (P1.1), the migration ledger being complete (P1.2), the advisory lock
-// that serialises concurrent runners (P1.2), and the Asia/Dhaka business-day
-// timezone being available in the image (P1.3) — had no automated proof.
+// Flows, the migration ledger being complete, the advisory lock
+// That serialises concurrent runners, and the Asia/Dhaka business-day
+// Timezone being available in the image — had no automated proof.
 //
 // This suite talks to a real database and is therefore opt-in: it is skipped
 // unless INTEGRATION_DATABASE_URL points at a migrated database.
@@ -846,7 +846,7 @@ suite("ledger reconciliation with a bundle (Phase 9 DoD)", () => {
 
 // -----------------------------------------------------------------------------
 // Invariants added by the 0003 migration: the `cron_run` heartbeat table
-// (ROADMAP R0.8) and the indexes for R3.8 / R3.9. Every other spec mocks the
+// And the indexes. Every other spec mocks the
 // driver, so only this suite can prove the partial predicates and the upsert
 // semantics actually exist in Postgres.
 // -----------------------------------------------------------------------------

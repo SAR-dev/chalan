@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import manifest from "./manifest"
 
-// ROADMAP R5.6. The manifest claimed installability while leaving out the
+// The manifest claimed installability while leaving out the
 // fields that decide *which* app an installed shortcut belongs to.
 
 describe("PWA manifest (ROADMAP R5.6)", () => {

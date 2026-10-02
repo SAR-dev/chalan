@@ -33,7 +33,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     return badRequest("No APPROVED payout requests found for the given IDs.")
   }
 
-  // Settle through the SAME helper as the single endpoint (ROADMAP P0.3) so a
+  // Settle through the SAME helper as the single endpoint so a
   // bulk payout writes the ledger row and debits the balance exactly like a
   // single one — previously this path only flipped the status.
   const settled: string[] = []

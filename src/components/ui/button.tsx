@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  // `relative hit-target-44` (ROADMAP R2.10) gives every button a 44px hit
+  // `relative hit-target-44` gives every button a 44px hit
   // area without changing the painted size — see the rule in `globals.css`.
   // twMerge drops `relative` when a caller passes `absolute`, and the CSS
   // guard disables the pseudo-element in that case.

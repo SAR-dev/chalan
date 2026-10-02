@@ -3,7 +3,7 @@ import { cronRun } from "@/lib/db/schema"
 import { logger } from "@/lib/logger"
 
 // =============================================================================
-// Cron heartbeat (ROADMAP R0.8)
+// Cron heartbeat
 //
 // Nothing used to notice when cron stopped: every job logged at most an
 // `info` line, the cron container had no healthcheck, and its output went to a

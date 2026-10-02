@@ -4,7 +4,7 @@ import { type APIRequestContext, expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS } from "../helpers"
 
-// ─── S50. Business timezone (ROADMAP P1.3) ──────────────────────────────────
+// ─── S50. Business timezone ──────────────────────────────────
 //
 // The business runs in Asia/Dhaka (UTC+6) but containers/database default to
 // UTC. Day-bucketed analytics and date-range filters must use the Dhaka

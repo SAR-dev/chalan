@@ -250,7 +250,7 @@ describe("DataTable", () => {
         bulkActions={[{ label: "Delete", onClick: vi.fn() }]}
       />,
     )
-    // Select-all is in the accessibility tree now: R2.2 removed the
+    // Select-all is in the accessibility tree now: dropping the
     // `aria-hidden="true"` that was hiding this entire cell from `getAllByRole`
     // — which is what made bulk select invisible to a screen reader.
     const checkboxes = screen.getAllByRole("checkbox")
@@ -314,7 +314,7 @@ describe("DataTable", () => {
       />,
     )
     const checkboxes = () => screen.getAllByRole("checkbox")
-    // Index 0 is select-all (R2.2 put it back in the accessibility tree):
+    // Index 0 is select-all (it is back in the accessibility tree):
     // selecting everything, then unchecking Alice, leaves Charlie + Bob.
     await user.click(checkboxes()[0])
     await user.click(checkboxes()[2])
@@ -341,8 +341,8 @@ describe("DataTable", () => {
         bulkActions={[{ label: "Delete", onClick: vi.fn() }]}
       />,
     )
-    // Find it by label rather than by index — it is at index 0 now that R2.2
-    // removed the aria-hidden (this loop asserts every checkbox, which is the
+    // Find it by label rather than by index — it sits at index 0 now that the
+    // aria-hidden was dropped (this loop asserts every checkbox, which is the
     // behaviour under test).
     const selectAll = screen.getByLabelText("Select all rows")
     await user.click(selectAll)
@@ -386,7 +386,7 @@ describe("DataTable", () => {
         onSelectionChange={onSelectionChange}
       />,
     )
-    // Select-all is in the tree as well (ROADMAP R2.2), so the list is
+    // Select-all is in the tree as well, so the list is
     // [select-all, Charlie, Alice, Bob] — Alice, pre-selected via
     // `selectedKeys`, sits at index 2.
     const checkboxes = screen.getAllByRole("checkbox")

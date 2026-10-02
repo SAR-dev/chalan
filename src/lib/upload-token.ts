@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
 /**
- * Short-lived signed upload tokens (ROADMAP P0.2).
+ * Short-lived signed upload tokens.
  *
  * The rider-application NID upload happens before the applicant has an account,
  * so the upload endpoint cannot rely on a session. Instead the client first

@@ -150,11 +150,11 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   // WAREHOUSE_ADMIN accounts start PENDING: login is rejected until the
   // invitee clicks the emailed activation link and sets their own password
-  // (ROADMAP 5.2). The temporary password above seeds the credential.
+  //. The temporary password above seeds the credential.
   const pendingActivation = newRole === "WAREHOUSE_ADMIN"
 
   // The profile, activation token, warehouse manager link and audit row are one
-  // unit (ROADMAP P1.4): a failure deletes the auth user instead of leaving a
+  // Unit: a failure deletes the auth user instead of leaving a
   // half-created team member. Better Auth owns its own connection, so the user
   // is created first and cleaned up here if the transaction fails.
   try {
@@ -174,7 +174,7 @@ export const POST = withErrorHandler(async (req: Request) => {
 
       if (token) {
         // Enqueued in the same transaction: the invite and its email commit
-        // together (ROADMAP P1.5).
+        // Together.
         await sendActivationEmail(
           {
             to: email,

@@ -124,7 +124,7 @@ export function OrdersPageClient({
   type DatePreset = "today" | "yesterday" | "last7"
   const [datePreset, setDatePreset] = useState<DatePreset | null>(null)
 
-  // Business-local calendar days, not instants (ROADMAP R0.3) — see
+  // Business-local calendar days, not instants — see
   // `businessPresetRange` for why the string form matters.
   function setDateRange(preset: DatePreset) {
     const { from, to } = businessPresetRange(preset)

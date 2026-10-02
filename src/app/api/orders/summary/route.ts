@@ -9,7 +9,7 @@ import type { MerchantOrderSummary, OrderStatus } from "@/lib/types"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Headline figures for the merchant overview, computed over the merchant's
-// *entire* order history rather than one page of it (ROADMAP R0.1).
+// *entire* order history rather than one page of it.
 //
 // The dashboard used to derive all four stat cards client-side from the array
 // `useOrders()` returns — which is one `DEFAULT_TABLE_ROWS_PER_PAGE` (20) rows.

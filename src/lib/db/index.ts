@@ -3,7 +3,7 @@ import { Pool } from "pg"
 import { BUSINESS_TIMEZONE } from "@/lib/timezone"
 import * as schema from "./schema.postgres"
 
-// Pin the session timezone to the business zone (ROADMAP P1.3). Containers
+// Pin the session timezone to the business zone. Containers
 // default to UTC, so `now()`, `date(...)` and any implicit day math would
 // otherwise be six hours off. Explicit `AT TIME ZONE` (see `time-sql.ts`)
 // stays authoritative regardless, but this keeps ad-hoc SQL consistent too.
@@ -19,7 +19,7 @@ const IS_SERVERLESS = Boolean(
 )
 const POOL_MAX = IS_SERVERLESS ? 5 : 20
 
-// Server-side ceiling on a single statement (ROADMAP R3.1). Without it a
+// Server-side ceiling on a single statement. Without it a
 // query that plans badly simply hangs its request — there was no
 // `log_min_duration_statement`, no `statement_timeout`, and no signal of any
 // kind, so a 30s query looked identical to a healthy slow one. 15s is far

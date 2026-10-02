@@ -38,7 +38,7 @@ describe("rateLimit", () => {
   })
 })
 
-// ROADMAP P0.6: forwarding headers are only trusted when the deployment
+// Forwarding headers are only trusted when the deployment
 // declares its proxy hops, so these cases pass the env explicitly.
 describe("getClientIp", () => {
   it("returns IP from x-forwarded-for when a proxy is trusted", () => {

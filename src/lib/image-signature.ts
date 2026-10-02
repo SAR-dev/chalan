@@ -1,5 +1,5 @@
 /**
- * Magic-byte sniffing (ROADMAP P0.2).
+ * Magic-byte sniffing.
  *
  * A client-declared `file.type` and filename extension are attacker-controlled,
  * so the upload endpoint must decide what a file *is* from its bytes. This

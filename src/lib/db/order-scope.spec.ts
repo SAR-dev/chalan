@@ -37,7 +37,7 @@ describe("buildWarehouseOrderScope", () => {
   // (`order.warehouseId` is NOT NULL, FK `ON DELETE no action`, and nothing in
   // the codebase nulls it), and the intake queue is driven by status rather
   // than a null warehouse. Keeping it only forced a bitmap-OR over an
-  // index-friendly predicate (ROADMAP R0.12).
+  // Index-friendly predicate.
   it("does not reintroduce an unreachable warehouse-null clause", () => {
     const { sql } = render("wh_1")
     expect(sql).not.toContain('"order"."warehouseId" is null')

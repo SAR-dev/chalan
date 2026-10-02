@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 import { sumAbsMoney, sumMoney, sumMoneyFiltered } from "@/lib/db/money-sql"
 import { balanceTransaction, order } from "@/lib/db/schema"
 
-// ROADMAP P0.8 — the money columns are `numeric(14,2)`, and node-postgres
+// — the money columns are `numeric(14,2)`, and node-postgres
 // returns numeric (and therefore `sum(numeric)`) as a *string*. These helpers
 // exist so no call site is ever handed text while claiming a number; the tests
 // pin the cast that makes the `sql<number>` type honest.

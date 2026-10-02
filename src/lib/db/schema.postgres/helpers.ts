@@ -11,9 +11,9 @@ import { numeric, pgSequence, timestamp } from "drizzle-orm/pg-core"
 export const ts = (name: string) =>
   timestamp(name, { mode: "string", withTimezone: true })
 
-// Money is stored as exact decimal, never as a binary float (ROADMAP P0.8).
+// Money is stored as exact decimal, never as a binary float.
 // `double precision` cannot represent 0.1 exactly, so a ledger of such values
-// drifts and can never be audited exactly; P0.4's rounding + reconciliation
+// drifts and can never be audited exactly; the rounding + reconciliation
 // test only *bounds* that drift. `mode: "number"` keeps the TypeScript side a
 // `number` (drizzle converts the string node-postgres returns for numeric), so
 // no call site needs a conversion layer.

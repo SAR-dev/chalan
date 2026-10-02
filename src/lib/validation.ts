@@ -228,7 +228,7 @@ export const platformConfigSchema = z.object({
   refundOnCancel: z.boolean().optional(),
 })
 
-// Disabling 2FA (ROADMAP H4) requires a *current* second factor â€” a live TOTP
+// Disabling 2FA requires a *current* second factor â€” a live TOTP
 // code or one of the remaining recovery codes â€” even though the caller is
 // already signed in.
 export const twoFactorDisableSchema = z.object({
@@ -282,7 +282,7 @@ export const orderReceiverNoteSchema = z.object({
     .trim()
     .max(100, "Receiver note cannot exceed 100 characters")
     .min(1, "Note cannot be empty"),
-  // Public write authorization (ROADMAP P0.1): the order's tracking token.
+  // Public write authorization: the order's tracking token.
   token: requiredString("Tracking token"),
 })
 
@@ -328,7 +328,7 @@ export const orderPickedUpSchema = z.object({
 
 export const orderDeliveredSchema = z.object({
   proofRef: z.string().trim().min(1).optional(),
-  // COD actually collected (ROADMAP B2). Omitted = the full productCost.
+  // COD actually collected. Omitted = the full productCost.
   // The route rejects a value above the order's expected COD.
   amountCollected: z
     .number()
@@ -595,7 +595,7 @@ export const teamCreateSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
-// â”€â”€â”€ Merchant moderators (ROADMAP 5.2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ Merchant moderators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const moderatorCreateSchema = z.object({
   name: requiredString("Name"),

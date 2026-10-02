@@ -32,7 +32,7 @@ import { PATCH as settleCod } from "./settle-cod/route"
 const dbState = {
   selectQueue: [] as unknown[][],
   /**
-   * Every `SELECT` the code under test actually issued, for the R3.5 batch
+   * Every `SELECT` the code under test actually issued, for the batch
    * statement-count assertions. The queue alone can only answer "how many were
    * left over", not "what did this batch cost".
    */
@@ -130,11 +130,11 @@ vi.mock("@/lib/api-auth", () => ({
 // it so a successful transition does not throw after the write commits.
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
-  // The bulk path batches the audit trail into one call (ROADMAP R3.6).
+  // The bulk path batches the audit trail into one call.
   logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
-// Every transition ends by expiring the dashboard stat tiles (ROADMAP R3.7).
+// Every transition ends by expiring the dashboard stat tiles.
 // Mocked rather than left real for two reasons: the real `revalidateTag` throws
 // "static generation store missing" outside a request, and the resulting
 // `logger.warn` reads the clock — which would show up in the batch-stamping
@@ -205,7 +205,7 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     // NOT NULL in the schema and written at creation from the pickup hub
     // (`orders/route.ts` → `warehouseId: hub.id`), so a row without one cannot
     // exist. Defaulting this fixture to null used to model a state the data
-    // model forbids (ROADMAP R0.12).
+    // Model forbids.
     warehouseId: "wh_1",
     pickupRiderId: null,
     deliveryRiderId: null,
@@ -375,7 +375,7 @@ describe("PATCH /orders/:id/approve", () => {
           diff: { status: { from: "PENDING", to: "APPROVED" } },
         },
       }),
-      // Audit now commits inside the transition's transaction (ROADMAP P1.4).
+      // Audit now commits inside the transition's transaction.
       expect.anything(),
     )
     // Append-only status history row, written in the same transaction.
@@ -391,7 +391,7 @@ describe("PATCH /orders/:id/approve", () => {
 
   it("500 when the audit write fails (change is not committed)", async () => {
     // logAudit propagates inside the transaction, so a failed audit rolls the
-    // transition back instead of committing state without a trail (P1.4a).
+    // Transition back instead of committing state without a trail.
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 2 })],
@@ -853,7 +853,7 @@ describe("PATCH /orders/:id/receive", () => {
   // NOT NULL and is written at creation from the pickup hub. The scope
   // predicate and its in-memory twin dropped their `warehouseId is null`
   // clause for the same reason — a clause that can never match only forced a
-  // bitmap-OR over an index-friendly predicate (ROADMAP R0.12).
+  // Bitmap-OR over an index-friendly predicate.
   //
   // Pinned here so that if the column is ever made nullable (an intake-
   // candidate flow), the change has to be made consciously in both places.
@@ -968,7 +968,7 @@ describe("PATCH /orders/:id/delivered", () => {
       amountCollected: 750,
     })
     expect(typeof payload?.deliveredAt).toBe("string")
-    // P0.4: delivery credits the GROSS collected COD; the ORDER_CHARGE row
+    // Delivery credits the GROSS collected COD; the ORDER_CHARGE row
     // written at creation nets it down to the merchant's earnings.
     expect(
       dbState.insertPayloads.find((p) => p.type === "ORDER_EARNINGS"),
@@ -1672,7 +1672,7 @@ describe("PATCH /orders/:id/cancel", () => {
 // the guard re-read the merchant and re-resolved the lane (5 queries) for
 // *every* row, each row then got its own `UPDATE ... WHERE id =`, and each row
 // stamped its own `Date.now()` so those SET payloads could never have been
-// merged even if they had been attempted (ROADMAP R3.5).
+// Merged even if they had been attempted.
 //
 // The invariant that matters: adding more orders in the same merchant and on
 // the same lane must not add statements. Only genuinely new keys (a second
@@ -1770,7 +1770,7 @@ describe("bulk transition batch cost (ROADMAP R3.5)", () => {
   })
 
   it("expires the dashboard stat tiles after a successful transition", async () => {
-    // ROADMAP R3.7. The cached tiles on /dashboard, /dashboard/riders and
+    // The cached tiles on /dashboard, /dashboard/riders and
     // /warehouse/cod-settlement would otherwise keep serving pre-transition
     // numbers until the 30s TTL ran out. Asserted here because a missing
     // `refreshStats` call is invisible: the write succeeds, the response is

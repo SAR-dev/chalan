@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-// Guards the deploy-safety invariants from ROADMAP P2.1. The workflow can't be
+// Guards the deploy-safety invariants. The workflow can't be
 // executed in unit tests, so this asserts the properties that made the old one
 // unsafe: it must gate on CI, fail fast, and never swallow a migration failure.
 

@@ -63,7 +63,7 @@
   --muted: oklch(0.96 0.006 247);
   /* 0.55 put this at ~4.32:1 on `--muted`, below the 4.5:1 AA floor, and that
      surface backs table meta rows and empty-state helper copy. 0.50 clears it
-     with margin on `--background` and `--card` too (ROADMAP R2.9). */
+     with margin on `--background` and `--card` too. */
   --muted-foreground: oklch(0.5 0.02 256);
   --accent: oklch(0.93 0.04 195);
   --accent-foreground: oklch(0.3 0.06 220);
@@ -175,7 +175,7 @@
   }
 }
 
-/* Roadmap R2.6 — WCAG 2.3.3.
+/* — WCAG 2.3.3.
  *
  * Nothing in the tree honoured this before: `animate-ping` loops forever on
  * the landing page and both announcement inboxes, and every skeleton uses
@@ -196,7 +196,7 @@
   }
 }
 
-/* Roadmap R2.10 — WCAG 2.5.5 (AAA), 44x44 CSS px.
+/* — WCAG 2.5.5 (AAA), 44x44 CSS px.
  *
  * The dense variants are 24-36px (`h-6`, `h-7`, `size-6`, `size-7`, `h-8`,
  * `size-8`, `h-9`, `size-9`), which clears AA (2.5.8, 24px) but not AAA — and

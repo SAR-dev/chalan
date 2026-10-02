@@ -11,7 +11,7 @@ interface InputProps extends React.ComponentProps<"input"> {
    * unaffected. When present it marks the control invalid, links the message
    * to it via `aria-describedby`, and prints the message beneath — which is
    * what `aria-invalid:border-destructive` in the className below has been
-   * drawing attention to all along (ROADMAP R2.4).
+   * Drawing attention to all along.
    */
   error?: string
 }

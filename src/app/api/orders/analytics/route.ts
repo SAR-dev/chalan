@@ -52,7 +52,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   // Without an explicit range the endpoint used to aggregate over every order
   // ever created — an unbounded scan plus an unbounded `ordersByDay` series
   // (one row per business day since the table's creation). Default to the
-  // documented "last 30 days" window instead (ROADMAP P3). Callers that
+  // Documented "last 30 days" window instead. Callers that
   // genuinely want a wider range still pass `from`/`to` explicitly.
   const dateRange = parseDateRange(req)
   const dateClause = dateRange
@@ -64,7 +64,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   where = where ? and(where, dateClause) : dateClause
 
   // 1. Orders by day (last 30 days or date range). The day is the business
-  // (Asia/Dhaka) calendar day, not the DB session day (ROADMAP P1.3).
+  // (Asia/Dhaka) calendar day, not the DB session day.
   // NOTE: Postgres returns bigint (count) and numeric (avg) as JS *strings*
   // through node-postgres. `sql<number>` is a TypeScript-only assertion and
   // does not coerce at runtime, so every aggregate must be cast explicitly —
@@ -100,7 +100,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     //
     // Neither groups, so they are the same scan with different aggregates —
     // running them separately walked the identical index range twice on every
-    // dashboard poll (ROADMAP R3.7). `FILTER` is the technique already used in
+    // Dashboard poll. `FILTER` is the technique already used in
     // `orders/counts/route.ts`.
     dbRead
       .select({

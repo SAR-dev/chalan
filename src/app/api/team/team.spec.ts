@@ -82,7 +82,7 @@ const insertResult: unknown[] = []
  * Recording them matters: the mock ignores the clause entirely, so a test that
  * only checks the response would still pass if the lost-update guard were
  * deleted. Rendering the recorded clause to SQL is what proves the write is
- * actually conditional (ROADMAP R0.9).
+ * Actually conditional.
  */
 const updateWhereClauses: unknown[] = []
 
@@ -269,7 +269,7 @@ describe("POST /api/team", () => {
     })
     expect(activationState.issueActivationToken).toHaveBeenCalledWith(
       "auth_user_id",
-      // Token is issued inside the creation transaction (ROADMAP P1.4).
+      // Token is issued inside the creation transaction.
       expect.anything(),
     )
     expect(activationState.sendActivationEmail).toHaveBeenCalledWith(
@@ -277,7 +277,7 @@ describe("POST /api/team", () => {
         to: "new@test.com",
         rawToken: "raw-token",
       }),
-      // Enqueued inside the creation transaction (ROADMAP P1.5).
+      // Enqueued inside the creation transaction.
       expect.anything(),
     )
   })
@@ -337,7 +337,7 @@ describe("POST /api/team/:id/resend-activation", () => {
     expect(res.status).toBe(200)
     expect(activationState.issueActivationToken).toHaveBeenCalledWith(
       "user_1",
-      // Token re-issued inside the resend transaction (ROADMAP P1.5).
+      // Token re-issued inside the resend transaction.
       expect.anything(),
     )
     expect(activationState.sendActivationEmail).toHaveBeenCalledWith(

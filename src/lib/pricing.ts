@@ -82,7 +82,7 @@ export function calcDeliveryCharge(
   const exceedsMax = weightKg > pricing.maxWeightKg
   const extraKg = Math.max(0, weightKg - pricing.freeWeightKg)
   const billableExtraKg = Math.ceil(extraKg)
-  // Money is rounded to paisa at every computation boundary (ROADMAP P0.4) so
+  // Money is rounded to paisa at every computation boundary so
   // the stored fees/earnings can never carry float noise.
   const extraWeightCharge = toPaisa(billableExtraKg * pricing.extraRatePerKg)
   const total = toPaisa(pricing.baseRate + extraWeightCharge)
@@ -96,7 +96,7 @@ export function calcDeliveryCharge(
 }
 
 export function formatTk(amount: number): string {
-  // Delegates so locale, grouping and suffix live in one place (ROADMAP R3.3).
+  // Delegates so locale, grouping and suffix live in one place.
   return formatMoney(amount, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -119,7 +119,7 @@ export function calcCodFee(
  * Calculate merchant earnings for an order.
  * Earnings = COD amount - delivery fee - COD fee
  *
- * Signed on purpose (ROADMAP B7): when the fees exceed the COD collected the
+ * Signed on purpose: when the fees exceed the COD collected the
  * merchant is net-negative, and clamping to 0 would hide that debt from
  * payouts and reports. The ledger already stores the true signed balance.
  */

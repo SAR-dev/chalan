@@ -64,7 +64,7 @@ export const emailLog = pgTable(
 )
 
 // =============================================================================
-// Email outbox (ROADMAP P1.5)
+// Email outbox
 //
 // Durable queue for transactional email. Callers insert a row in the same
 // transaction as the domain change (via `enqueueEmail`), so a crash or a frozen
@@ -213,7 +213,7 @@ export const platformConfig = pgTable("platform_config", {
   maxCodFeePercentage: doublePrecision("maxCodFeePercentage")
     .notNull()
     .default(5),
-  // Whether a cancelled order is refunded its creation charge (ROADMAP B15).
+  // Whether a cancelled order is refunded its creation charge.
   // true = refund (default); false = the merchant keeps the fee.
   refundOnCancel: boolean("refundOnCancel").notNull().default(true),
   updatedAt: ts("updatedAt").notNull().defaultNow(),
@@ -244,7 +244,7 @@ export const mailConfig = pgTable("mail_config", {
 })
 
 // =============================================================================
-// Cron heartbeat (ROADMAP R0.8)
+// Cron heartbeat
 //
 // One row per scheduled job, upserted after each successful run, so "did cron
 // stop?" becomes `max(lastRanAt) GROUP BY job` rather than a guess read off log

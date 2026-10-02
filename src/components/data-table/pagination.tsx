@@ -69,7 +69,7 @@ export function TableFooter<T>({
             >
               Page {page} of {totalPages}
             </span>
-            {/* `gap-3`, not `gap-1`: the R2.10 hit-area expander grows each 32px button
+            {/* `gap-3`, not `gap-1`: the hit-area expander grows each 32px button
              * to 44px, i.e. 6px past each edge. At 4px apart the two expanders
              * overlap, and the later one paints on top — so a click aimed at the
              * right edge of "Previous page" would advance the page instead of

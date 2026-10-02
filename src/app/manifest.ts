@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     // Explicit on purpose: without `id` the browser derives one from
     // `start_url`, so re-pointing the deploy at another URL (or moving the
     // landing path) makes an existing install look like a *different* app —
-    // its data, icon and notification registration are left behind (ROADMAP
-    // R5.6). `/` is already both `start_url` and `scope`, so the id does not
+    // its data, icon and notification registration are left behind.
+    // `/` is already both `start_url` and `scope`, so the id does not
     // move when either of those does.
     id: "/",
     start_url: "/",

@@ -97,7 +97,7 @@ export async function login(
  * never goes quiet, so the wait is bounded and best-effort — the web-first
  * assertions that follow are the real gate. This replaces bare
  * `waitForLoadState("networkidle")` calls that could stall for the full default
- * timeout under CI load (ROADMAP P2.4).
+ * Timeout under CI load.
  */
 export async function waitForAppReady(
   page: Page,

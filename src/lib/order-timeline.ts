@@ -17,7 +17,7 @@ import type { Order, OrderStatus } from "@/lib/types"
  * This exists because the public tracking page and the admin order table each
  * kept their **own** copy of all three. They drifted: the two `formatStamp`s
  * disagreed about locale and time zone, so one order could show different
- * times for the same event on two screens (ROADMAP R3.3). Anything that
+ * Times for the same event on two screens. Anything that
  * describes the order lifecycle has to live here, in one place.
  *
  * Deliberately free of server imports — `track/[id]/lib.ts` pulls in `db`, and
@@ -140,7 +140,7 @@ export function stepDescription(
 
 /**
  * Pinned to the business zone and locale. Two implementations of this used to
- * exist and disagree (ROADMAP R3.3); there is now exactly one.
+ * Exist and disagree; there is now exactly one.
  */
 export function formatStamp(iso?: string | Date | null) {
   if (!iso) return null

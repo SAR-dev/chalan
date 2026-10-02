@@ -33,7 +33,7 @@ function storageKey(url: string): string {
   return new URL(url).pathname.replace(/^\/+/, "")
 }
 
-// ─── S44. Upload authorization (ROADMAP P0.2) ───────────────────────────────
+// ─── S44. Upload authorization ───────────────────────────────
 test.describe("S44. Upload authorization", () => {
   test("anonymous uploads need a token, and NID files are not public", async ({
     request,

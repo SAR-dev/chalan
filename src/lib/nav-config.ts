@@ -324,7 +324,7 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
   ],
 }
 
-// ─── Merchant moderator nav grants (ROADMAP 5.2) ────────────────────────────
+// ─── Merchant moderator nav grants ────────────────────────────
 //
 // Moderator access is modeled as grants over the MERCHANT_SIDEBAR hrefs.
 // The owner's own access is unrestricted; every other MERCHANT profile with

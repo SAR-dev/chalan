@@ -1,4 +1,4 @@
-// Roadmap R3.7 — contract for the shared stat-tile cache.
+// — contract for the shared stat-tile cache.
 //
 // The point of this module is that it is hard to misuse. Two of the tests here
 // exist to make a misuse impossible to commit: a cache entry with no tag

@@ -91,7 +91,7 @@ export const zonePricing = pgTable(
   (t) => [
     index("zone_pricing_from_idx").on(t.fromZoneId),
     index("zone_pricing_to_idx").on(t.toZoneId),
-    // P1.1: the matrix is keyed by the zone pair. Without this, two
+    // The matrix is keyed by the zone pair. Without this, two
     // concurrent upserts could each insert a row for the same pair and order
     // pricing would silently pick an arbitrary one of them.
     uniqueIndex("zone_pricing_pair_uniq").on(t.fromZoneId, t.toZoneId),

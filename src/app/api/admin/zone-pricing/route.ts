@@ -45,7 +45,7 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   // Update-first, insert-second, no read: the old select-then-branch let two
   // concurrent saves for the same zone pair each insert a row, and order
-  // pricing then picked an arbitrary one (ROADMAP P1.1). The unique index on
+  // Pricing then picked an arbitrary one. The unique index on
   // (fromZoneId, toZoneId) makes the pair single-valued, so:
   //   1. an existing row is updated (200),
   //   2. otherwise we try to insert (201),

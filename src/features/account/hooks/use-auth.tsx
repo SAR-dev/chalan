@@ -19,7 +19,7 @@ import type { User } from "@/lib/types"
 // canonical definition lives in the server-safe nav-config module.
 export { homeForRole }
 
-// Portal-mode gate (ROADMAP 5.4): this deployment does not serve the
+// Portal-mode gate: this deployment does not serve the
 // signed-in role. The server tells us via `portalAllowed` on /api/users/me —
 // sign the stray session back out and surface a clear message instead of
 // letting every shared API fail with opaque 401s.

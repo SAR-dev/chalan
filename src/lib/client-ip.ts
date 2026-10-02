@@ -1,6 +1,5 @@
 // =============================================================================
 // Client IP resolution for rate limiting and the admin IP allowlist
-// (ROADMAP P0.6).
 //
 // The previous implementation trusted `x-real-ip`, `cf-connecting-ip` and the
 // left-most `x-forwarded-for` entry unconditionally. Anyone talking to the app
