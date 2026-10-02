@@ -168,6 +168,8 @@ export const orderForm = {
   productCost: "[data-testid='product-cost']",
   submitOrder: "[data-testid='submit-order']",
   addParcel: "[data-testid='add-parcel']",
+  // 1-based: `removeParcel(1)` is the first card, matching its "Parcel 1"
+  // heading and its aria-label.
   removeParcel: (index: number) => `[data-testid='remove-parcel-${index}']`,
   // Shown instead of a delivery charge when the lane has no configured rate.
   pricingUnavailable: "[data-testid='parcel-pricing-unavailable']",
