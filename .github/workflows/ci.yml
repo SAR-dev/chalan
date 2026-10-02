@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -80,7 +80,7 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       # No `pnpm install` here on purpose: `pnpm audit` resolves the tree from
       # pnpm-lock.yaml and queries the registry, and the dependency-review
@@ -113,7 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -155,7 +155,7 @@ jobs:
       BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
       INTEGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -202,7 +202,7 @@ jobs:
   #       LOCAL_UPLOADS_DIR: ./.uploads
   #       TZ: Asia/Dhaka
   #     steps:
-  #       - uses: actions/checkout@v4
+  #       - uses: actions/checkout@v7
   #       - uses: pnpm/action-setup@v4
   #       - uses: actions/setup-node@v4
   #         with:
