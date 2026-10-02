@@ -30,6 +30,7 @@ import { CreateTicketDialog } from "@/features/support/dialogs/create-ticket-dia
 import { ReplyTicketDialog } from "@/features/support/dialogs/reply-ticket-dialog"
 import { useSupport } from "@/features/support/hooks/use-support"
 import { ROLE_LABELS } from "@/lib/constants"
+import { formatDateTime } from "@/lib/format"
 import type { SupportTicket } from "@/lib/types"
 
 type FilterTab = "ALL" | "OPEN" | "ANSWERED" | "CLOSED"
@@ -49,7 +50,7 @@ function supportContentFor(role?: string) {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString(undefined, {
+  return formatDateTime(value, {
     month: "short",
     day: "numeric",
     year: "numeric",

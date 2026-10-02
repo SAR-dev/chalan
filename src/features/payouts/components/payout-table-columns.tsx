@@ -7,6 +7,7 @@ import {
 } from "@/components/data-table"
 import { columnLabels } from "@/config/table-column-labels"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { PayoutRequest } from "@/lib/types"
 import { PayoutStatusBadge } from "./payout-status-badge"
@@ -64,7 +65,7 @@ export function usePayoutRequestColumns({
       sortValue: (p) => p.requestedAt,
       cellClassName: "text-muted-foreground",
       cell: (p) =>
-        new Date(p.requestedAt).toLocaleDateString("en-US", {
+        formatDateTime(p.requestedAt, {
           day: "numeric",
           month: "short",
           year: "numeric",
@@ -98,7 +99,7 @@ export function usePayoutRequestColumns({
           {p.status === "PAID" && p.paidAt ? (
             <CellContent className="text-chart-2">
               Paid{" "}
-              {new Date(p.paidAt).toLocaleDateString("en-US", {
+              {formatDateTime(p.paidAt, {
                 day: "numeric",
                 month: "short",
               })}

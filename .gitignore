@@ -34,3 +34,7 @@ test-results/
 
 # Vitest coverage output
 /coverage/
+
+# Local cloudflared tunnel config — carries your tunnel UUID and hostname.
+# Copy config.example.yml to create it (ROADMAP R3.4).
+config.yml

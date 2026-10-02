@@ -18,10 +18,11 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useRiderEarnings } from "@/features/riders/hooks/use-rider-earnings"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return formatDateTime(dateStr, {
     year: "numeric",
     month: "short",
     day: "numeric",

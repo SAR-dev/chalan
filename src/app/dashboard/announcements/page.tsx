@@ -32,6 +32,7 @@ import { CreateAnnouncementDialog } from "@/features/announcements/dialogs/creat
 import { EditAnnouncementDialog } from "@/features/announcements/dialogs/edit-announcement-dialog"
 import { useAnnouncements } from "@/features/announcements/hooks/use-announcements"
 import { ANNOUNCEMENT_TARGET_ROLE_LABELS } from "@/lib/constants"
+import { formatDateTime } from "@/lib/format"
 import type { Announcement } from "@/lib/types"
 
 type TabFilter = "ALL" | "ACTIVE" | "INACTIVE"
@@ -171,9 +172,7 @@ export default function AnnouncementsPage() {
       cellClassName: "hidden lg:table-cell",
       cell: (a) => (
         <span className="text-muted-foreground text-sm">
-          {a.publishedAt
-            ? new Date(a.publishedAt).toLocaleDateString()
-            : "Draft"}
+          {a.publishedAt ? formatDateTime(a.publishedAt) : "Draft"}
         </span>
       ),
     },
@@ -186,7 +185,7 @@ export default function AnnouncementsPage() {
       cellClassName: "hidden lg:table-cell",
       cell: (a) => (
         <span className="text-muted-foreground text-sm">
-          {a.expiresAt ? new Date(a.expiresAt).toLocaleDateString() : "Never"}
+          {a.expiresAt ? formatDateTime(a.expiresAt) : "Never"}
         </span>
       ),
     },

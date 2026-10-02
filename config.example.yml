@@ -1,0 +1,20 @@
+# Cloudflare cloudflared tunnel config — TEMPLATE.
+#
+# Copy to `config.yml` (which is gitignored) and fill in your own tunnel:
+#
+#   cp config.example.yml config.yml
+#   cloudflared tunnel --config config.yml run <YOUR_TUNNEL_NAME>
+#
+# The real `config.yml` used to be committed with a live tunnel UUID and a
+# production hostname in it, while `docker/compose.cluster.yml` ran the
+# token-based flow (`CLOUDFLARE_TUNNEL_TOKEN`) and `deploy.yml` defaulted to a
+# third hostname — three mechanisms, two names, one secret committed to the
+# repo (ROADMAP R3.4). The token flow is the documented deployment path (see
+# docs/DEPLOYMENT.md); this file exists for local development only, which is
+# why nothing in `docker/` or `.github/` may reference a hostname literal.
+tunnel: REPLACE_WITH_YOUR_TUNNEL_UUID
+ingress:
+  # Local only. Do not commit a real hostname here.
+  - hostname: localhost
+    service: http://localhost:3000
+  - service: http_status:404

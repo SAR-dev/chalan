@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchantBalance } from "@/features/merchants/hooks/use-merchant-balance"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { BalanceTransaction } from "@/lib/types"
 
@@ -163,7 +164,7 @@ export default function MerchantBalancePage({
       cellClassName: "text-sm text-muted-foreground whitespace-nowrap",
       cell: (t) =>
         t.createdAt
-          ? new Date(t.createdAt).toLocaleDateString(undefined, {
+          ? formatDateTime(t.createdAt, {
               month: "short",
               day: "numeric",
               year: "numeric",
@@ -328,7 +329,7 @@ export default function MerchantBalancePage({
                   <p className="text-muted-foreground text-xs">
                     Submitted{" "}
                     {tx.createdAt
-                      ? new Date(tx.createdAt).toLocaleDateString(undefined, {
+                      ? formatDateTime(tx.createdAt, {
                           month: "short",
                           day: "numeric",
                           year: "numeric",

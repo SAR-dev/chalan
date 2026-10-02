@@ -111,15 +111,22 @@ export const GET = withErrorHandler(async (req: Request) => {
   const search = new URL(req.url).searchParams.get("q")?.trim()
   if (search) {
     const likeQ = `%${search}%`
-    // Use explicit LEFT JOINs instead of subselects so Postgres can plan
-    // hash joins rather than potentially materialising correlated subqueries.
+    // Per-table EXISTS instead of one OR spanning every joined table (ROADMAP
+    // R3.10). A trigram GIN index can serve a same-table bitmap-OR, but not ORs
+    // that cross relations — with all six `ilike`s inlined after four LEFT
+    // JOINs the planner's only real choice was "join everything, then filter".
+    // Each EXISTS is now self-contained: one index scan per table, short-
+    // circuited as soon as a hit is found, and the joins are no longer needed
+    // to *filter* at all (only to project `merchantPhone`).
     const searchClause = or(
       ilike(order.id, likeQ),
       ilike(order.recipientName, likeQ),
       ilike(order.recipientPhone, likeQ),
-      ilike(merchant.businessName, likeQ),
-      ilike(warehouse.name, likeQ),
-      ilike(warehouse.city, likeQ),
+      // `sql` not drizzle's `exists()`: these are correlated on `order`, and
+      // only a hand-built `EXISTS (…)` expresses that — the helper wants a
+      // plain subquery and would emit a non-correlated `in`-style scan.
+      sql`exists (select 1 from ${merchant} where ${merchant.id} = ${order.merchantId} and ${merchant.businessName} ilike ${likeQ})`,
+      sql`exists (select 1 from ${warehouse} where ${warehouse.id} = ${order.warehouseId} and (${warehouse.name} ilike ${likeQ} or ${warehouse.city} ilike ${likeQ}))`,
     )
     where = where ? and(where, searchClause) : searchClause
   }
@@ -155,30 +162,24 @@ export const GET = withErrorHandler(async (req: Request) => {
     pickupLocationMapLink: pickupLocation.mapLink,
   }
 
-  // Build the base query with LEFT JOINs so the search clause can reference
-  // merchant/warehouse columns directly without subselects.
+  // The merchant join is for the projection (`merchantPhone`); the search no
+  // longer needs it — see the EXISTS clauses above (ROADMAP R3.10). The
+  // warehouse join went away entirely with them.
   let dbQuery = dbRead
     .select(listColumns)
     .from(order)
     .leftJoin(merchant, eq(order.merchantId, merchant.id))
-    .leftJoin(warehouse, eq(order.warehouseId, warehouse.id))
     .leftJoin(pickupLocation, eq(order.pickupLocationId, pickupLocation.id))
     .leftJoin(deliveryCityTable, eq(order.deliveryCityId, deliveryCityTable.id))
     .$dynamic()
   if (where) dbQuery = dbQuery.where(where)
 
-  // COUNT only needs JOINs when the search clause references merchant/warehouse columns.
-  const countQuery = search
-    ? dbRead
-        .select({ count: sql<number>`count(*)::int` })
-        .from(order)
-        .leftJoin(merchant, eq(order.merchantId, merchant.id))
-        .leftJoin(warehouse, eq(order.warehouseId, warehouse.id))
-        .where(where)
-    : dbRead
-        .select({ count: sql<number>`count(*)::int` })
-        .from(order)
-        .where(where)
+  // COUNT walks `order` alone: every search term now resolves inside its own
+  // EXISTS subquery, so no join is reachable from `where`.
+  const countQuery = dbRead
+    .select({ count: sql<number>`count(*)::int` })
+    .from(order)
+    .where(where)
 
   const sortColumnMap = {
     order: order.id,

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AnnouncementDetailModal } from "@/features/announcements/components/announcement-detail-modal"
 import { useActiveAnnouncements } from "@/features/announcements/hooks/use-active-announcements"
+import { formatDateTime } from "@/lib/format"
 import type { Announcement } from "@/lib/types"
 
 export function AnnouncementsInboxClient({
@@ -100,14 +101,11 @@ export function AnnouncementsInboxClient({
                       </p>
                       {a.publishedAt && (
                         <time className="text-muted-foreground shrink-0 text-xs">
-                          {new Date(a.publishedAt).toLocaleDateString(
-                            undefined,
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
+                          {formatDateTime(a.publishedAt, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </time>
                       )}
                     </div>

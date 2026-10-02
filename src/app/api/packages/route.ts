@@ -83,14 +83,23 @@ export const GET = withErrorHandler(async () => {
     latestRequest = request ?? null
   }
 
-  return NextResponse.json({
-    packages: visible.map((p) => ({
-      ...p,
-      tiers: tiers.filter((t) => t.packageId === p.id),
-    })),
-    activePackage,
-    latestRequest,
-  })
+  // Package catalogue: changes rarely, and every merchant fetches it on
+  // load (ROADMAP R3.11).
+  return NextResponse.json(
+    {
+      packages: visible.map((p) => ({
+        ...p,
+        tiers: tiers.filter((t) => t.packageId === p.id),
+      })),
+      activePackage,
+      latestRequest,
+    },
+    {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+      },
+    },
+  )
 })
 
 export const POST = withErrorHandler(async (req: Request) => {

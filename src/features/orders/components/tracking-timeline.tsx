@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { Fragment } from "react"
 import { ImageZoom } from "@/components/image-zoom"
+import { formatDateTime } from "@/lib/format"
 import type { Order, OrderStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -100,7 +101,11 @@ function formatStamp(iso?: string | null) {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleString(undefined, {
+  // Same shape as `track/[id]/lib.ts`'s `formatStamp` — those two used to
+  // disagree (`undefined` locale here, `"en-US"` there, neither with a zone),
+  // so the timeline and the order header could show different times for one
+  // event (ROADMAP R3.3).
+  return formatDateTime(d, {
     day: "numeric",
     month: "short",
     year: "numeric",

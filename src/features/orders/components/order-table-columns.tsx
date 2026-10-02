@@ -15,6 +15,7 @@ import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 import { OrderStatusBadge } from "./order-status-badge"
@@ -338,7 +339,7 @@ export function createdAtColumn(): DataTableColumn<Order> {
     cellClassName: "text-sm text-muted-foreground",
     cell: (o) =>
       o.createdAt
-        ? new Date(o.createdAt).toLocaleString(undefined, {
+        ? formatDateTime(o.createdAt, {
             month: "short",
             day: "numeric",
             year: "numeric",

@@ -123,17 +123,28 @@ layout specs (`26-toast-responsive`, `27-sign-out`).
 
 # R3 — Platform, ops & performance
 
+**10 of 11 shipped** (R3.7 partly — see its note). Each item below carries a
+`**As shipped**` note recording what actually landed, which is not always what
+the item proposed; two proposals were corrected on the evidence, and those
+corrections are stated rather than quietly dropped.
+
 | ID | Shipped |
 |---|---|
 | R3.1 | `src/lib/error-report.ts` — a vendor-neutral reporter POSTing to `ERROR_WEBHOOK_URL` (deliberately no SDK: picking Sentry is procurement, not code); an access log in `withErrorHandler` where `logger.child` is finally called (5xx `error`, 4xx `warn`, ≥1s `slow request`, success `debug`); `redact.ts` wired into `logger.emit` — it guarded the mailer but not the log line; `statement_timeout` on both pools; `log_min_duration_statement=250` in postgres; `pool.waiting` surfaced from `/api/ready` |
 | R3.2 | Upload rate limiting moved out of `src/proxy.ts` into the route handler: middleware cannot reach the Redis-backed limiter, so each of the four cluster instances enforced its own 20/min budget — 80 uploads/min/IP. The bespoke `Map` and its prune loop are gone entirely; the route throttles before it reads the body |
+| R3.3 | New `src/lib/format.ts` (`DISPLAY_LOCALE`, `formatDateTime`, `formatMoney`) pinned to `Asia/Dhaka` — all 29 `toLocale*` call sites across 25 files converted, so `src/app/track/[id]/lib.ts` and `tracking-timeline.tsx` can no longer disagree about one order's timestamp. `formatTk` kept its public name and delegates. **Correction to the original item:** `appContent.CURRENCY` (`"BDT"`) was *not* retired — it is the legal currency code feeding the `{{CURRENCY}}` token in the Terms/Privacy templates, not a duplicate of the `"TK"` display suffix. The split-brain was only ever `CURRENCY_SUFFIX` vs the `en-US` grouping in `formatTk` |
+| R3.4 | `config.yml` untracked and gitignored (not deleted — local tunnels keep working), with a committed `config.example.yml` placeholder. `chalan.sarn.top` in `deploy.yml` is kept as the single documented deploy default; the asserted invariant is narrower and more honest: *no bare `sarn.top` and no tunnel UUID* anywhere in deployment config |
+| R3.5 | Guard lookups memoised per distinct key for the length of one transaction (`ctx.cache`), so a batch pays for each merchant, lane and rider **once** instead of once per order; identical `SET` payloads grouped into `UPDATE … WHERE id IN (…)`. Requires one timestamp per batch (`ctx.now`) — previously every row stamped its own clock, so no two `SET`s could ever have been equal. A 100-row approve went from ~500 reads + 100 writes to 5 reads + 1 write |
 | R3.6 | New `logAuditMany()`; all eight `Promise.all(logAudit(...))` endpoints converted — they opened up to 100 concurrent pool connections per request |
+| R3.7 | `dashboard/orders` counts merged into one `FILTER` aggregate (was an unpredicated `count(*)` + `GROUP BY status` on every render) behind `unstable_cache` with an `order-counts` tag and a 30 s TTL; `requireSession()` deliberately left *outside* the cached callback so the key cannot vary with who is asking. Analytics delivery-performance + COD-summary merged into one `FILTER` query (4 → 3). **Not shipped:** the ~20 other list endpoints and `dashboard/*` pages that still recompute `count(*)` per render |
 | R3.8 | `order_package_id_idx` + `order_package_tier_id_idx` (both `ON DELETE set null`, so every package/tier delete seq-scanned the largest table) and `user_created_at_idx` — the `user` table had only trigram GINs while two endpoints `ORDER BY createdAt DESC` |
 | R3.9 | Partial indexes on `user.activationToken` and `merchant.emailVerificationToken`: both are **unauthenticated** lookups that were seq-scanning whole tables |
+| R3.10 | Search split into per-table `EXISTS` subqueries (`select 1 from … where <correlated>`) instead of one OR spanning every joined table, so each trigram index can serve its own table and the joins are no longer needed *to filter*. The count query dropped its joins entirely — a filter no longer requires them. Note drizzle's `exists()` helper is not used: these subqueries are correlated on `order` and only hand-built `EXISTS (…)` expresses that |
+| R3.11 | `Cache-Control: private, max-age=30, stale-while-revalidate=60` on the four uncached roster responses, plus `merchant_business_name_idx` — a **btree**, not a trigram GIN: the roster's `ORDER BY businessName` needs an ordered index and GIN cannot serve one. `ROSTER_LIMIT = 5000` is a circuit breaker, *not* pagination — capping a name-resolution lookup makes it silently fall back, which is why the header is the actual cost fix |
 
 
 
-### R3.3 There is no display formatting layer
+### R3.3 There is no display formatting layer — **shipped**
 
 ≈27 `toLocaleString`/`toLocaleDateString` call sites, most passing a bare
 locale and **none** passing `timeZone`. The worst instance is public and
@@ -154,7 +165,15 @@ hardcoding `en-US` grouping.
 both pinned to `BUSINESS_TIMEZONE` and an explicit locale; codemod the ~27
 call sites; retire the duplicate `CURRENCY`.
 
-### R3.4 Three-way hostname conflict, committed tunnel identity
+> **Correction.** The last clause of that fix was wrong and was not carried out.
+> `appContent.CURRENCY` is `"BDT"` and feeds the `{{CURRENCY}}` token in the
+> Terms and Privacy templates — it is the *legal currency code* that must match
+> the printed contract, not a second copy of the `"TK"` display suffix. Deleting
+> it would have shipped Terms pages reading `{{CURRENCY}}`-less. The real
+> split-brain was only the `en-US` grouping inside `formatTk`, which
+> `formatMoney` now pins.
+
+### R3.4 Three-way hostname conflict, committed tunnel identity — **shipped**
 
 `config.yml:2-4` hardcodes a tunnel UUID and `hostname: sarn.top` and is not
 gitignored; `deploy.yml:44` defaults `NEXT_PUBLIC_SITE_URL` to
@@ -165,7 +184,14 @@ shape.
 **Fix:** pick one, move `config.yml` under `.gitignore` or delete it, and
 assert no hostname literal survives in the tree.
 
-### R3.5 A bulk order transition runs ~900 statements in one transaction
+> **As shipped, narrower than proposed.** `config.yml` is untracked rather than
+> deleted, so an existing local tunnel keeps working, and `config.example.yml`
+> is committed as the placeholder. `deploy.yml` keeps `chalan.sarn.top` as the
+> one documented deploy default. The asserted invariant is therefore *no bare
+> `sarn.top` and no tunnel UUID in deployment config* — not "no hostname
+> literal anywhere", which would have meant inventing a second hostname.
+
+### R3.5 A bulk order transition runs ~900 statements in one transaction — **shipped**
 
 **Shipped so far.** The audit and status-history writes are now one statement
 each instead of one per row — 200 fewer INSERTs per 100-order batch, inside the
@@ -189,7 +215,19 @@ updates, leave the batched inserts as they are.
 **Done when:** a spec holds the statement count for a 100-row batch flat as
 rows are added within the same merchant and lane.
 
-### R3.7 Three full passes over `order` per `/dashboard/orders` view, nothing cached
+> **As shipped.** All three points are done, plus a fourth the item did not
+> anticipate: grouping is only possible if every row shares one timestamp, so
+> `ctx.now` replaced 12 per-row `new Date().toISOString()` calls in
+> `buildUpdate`. A 100-order approve is now 5 reads + 1 write.
+>
+> One subtlety worth recording, because it looks like a micro-optimisation and
+> is not: the memo caches through `Promise.resolve().then(load)`, *not*
+> `load()`'s return value. A Drizzle query builder is a thenable that
+> **re-executes on every `await`**, so caching the builder would have re-issued
+> the query once per row — the precise repetition the memo exists to remove. The
+> test caught this as a statement count 3× the expected value.
+
+### R3.7 Three full passes over `order` per `/dashboard/orders` view — **partly shipped**
 
 - `src/app/dashboard/orders/page.tsx:17` — unpredicated `count(*)` over `order`
 - `:19-26` — a second pass, `GROUP BY status`
@@ -214,6 +252,21 @@ collapse into **one** pass with `FILTER`, exactly the technique already used in
 **Fix:** `unstable_cache` with tags and a 30–60 s TTL on the aggregates; merge
 the analytics passes with `FILTER`.
 
+> **As shipped.** Both proposed halves done for this page: the two full passes
+> are one `FILTER` aggregate behind `unstable_cache` (`order-counts` tag, 30 s
+> TTL), and the analytics delivery-performance + COD-summary passes are one
+> query (4 → 3). The recent-orders scan itself is deliberately *not* cached —
+> it is a `LIMIT 20` index walk, and it is the data on screen.
+>
+> **Still open:** `requireSession()` is outside the cached callback, so the
+> cache key is role-independent — correct only because this page is
+> `SUPER_ADMIN`-only. Any page needing a *scoped* aggregate must rebuild its
+> `where` from plain serialisable scope values and pass those as cache-key
+> parts. The wider claim in the item — ~20 list endpoints and every
+> `dashboard/*` server page recomputing `count(*)` per render — is untouched and
+> would be the natural next step; nothing here invalidates on write yet, so the
+> tag is a hook with no caller.
+
 ### R3.10 Cross-table `ILIKE OR` search defeats every trigram index
 
 `src/app/api/orders/route.ts:100-107` ORs `ilike` across
@@ -231,7 +284,18 @@ index. The gap is **query shape**, not missing indexes.
 **Fix:** per-table `EXISTS` subqueries, or a `UNION` of per-table hits, or a
 maintained `tsvector` column.
 
-### R3.11 Unbounded and uncached roster responses
+> **As shipped.** `EXISTS`, one per joined table. Drizzle's `exists()` helper is
+> deliberately *not* used — these subqueries are correlated on `order`, and the
+> helper takes a plain subquery and would have emitted a non-correlated scan.
+> The count query lost its joins as a result, since filtering no longer needs
+> them.
+>
+> **Correction.** "Same shape at `payouts/route.ts:45-55`" was wrong:
+> `payouts` already used an `inArray(…, subquery)` semi-join with its own
+> trigram-indexed inner scan. It needed no change, and re-rewriting it would
+> have been churn.
+
+### R3.11 Unbounded and uncached roster responses — **shipped**
 
 `src/app/api/merchants/route.ts:64-91` — the RIDER and WAREHOUSE_ADMIN
 branches return **every** merchant with no pagination and no `Cache-Control`
@@ -245,6 +309,16 @@ package at `:87-91`) and `src/app/api/delivery-cities/route.ts:7-20`.
 
 **Fix:** at minimum `Cache-Control` + a generous default limit on the merchant
 roster; give `merchant.businessName` an index if the sort stays.
+
+> **As shipped.** `Cache-Control: private, max-age=30, stale-while-revalidate=60`
+> on all four responses (the header is the actual cost fix — it removes the
+> repeat fetch per work-table mount), plus `merchant_business_name_idx` as a
+> **btree**: the roster's `ORDER BY businessName` needs an ordered index and a
+> trigram GIN cannot serve one. Migration `0005_parallel_piledriver`.
+>
+> The `ROSTER_LIMIT = 5000` is a **circuit breaker, not pagination** — a
+> truncated name-resolution list fails silently by falling back, which is worse
+> than a slow response. It is commented as such at the declaration.
 
 ---
 

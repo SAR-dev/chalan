@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AnnouncementDetailModal } from "@/features/announcements/components/announcement-detail-modal"
 import { useActiveAnnouncements } from "@/features/announcements/hooks/use-active-announcements"
+import { formatDateTime } from "@/lib/format"
 import type { Announcement } from "@/lib/types"
 
 interface Props {
@@ -99,14 +100,11 @@ export function AnnouncementsInbox({ title, description }: Props) {
                       </p>
                       {a.publishedAt && (
                         <time className="text-muted-foreground shrink-0 text-xs">
-                          {new Date(a.publishedAt).toLocaleDateString(
-                            undefined,
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
+                          {formatDateTime(a.publishedAt, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </time>
                       )}
                     </div>

@@ -30,6 +30,7 @@ import { BanDialog } from "@/features/users/dialogs/ban-dialog"
 import { ResetPasswordDialog } from "@/features/users/dialogs/reset-password-dialog"
 import { type AdminUser, useUsers } from "@/features/users/hooks/use-users"
 import { USER_STATUS_LABELS } from "@/lib/constants"
+import { formatDateTime } from "@/lib/format"
 
 const TAB_ROLES = ["ALL", "SUPER_ADMIN", "WAREHOUSE_ADMIN", "MERCHANT", "RIDER"]
 
@@ -42,7 +43,7 @@ const TAB_LABELS: Record<string, string> = {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString(undefined, {
+  return formatDateTime(value, {
     year: "numeric",
     month: "short",
     day: "numeric",

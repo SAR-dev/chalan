@@ -40,10 +40,11 @@ import { MerchantStatusBadge } from "@/features/merchants/components/merchant-st
 import { ModeratorsCard } from "@/features/merchants/components/moderators-card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { PickupLocationsManager } from "@/features/pickup-locations/components/pickup-locations-manager"
+import { formatDateTime } from "@/lib/format"
 import { merchantProfileSchema, validateFormData } from "@/lib/validation"
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return formatDateTime(dateStr, {
     year: "numeric",
     month: "short",
     day: "numeric",

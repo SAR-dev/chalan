@@ -2121,8 +2121,11 @@ to the corresponding container's internal port (`dashboard:3000`,
 `merchant:3000`, etc.). If you're running locally without a tunnel, you can
 remove the `cloudflared` service block from the compose file.
 
-The tunnel hostname and routing rules live in `config.yml` — edit it to match
-your actual Cloudflare Tunnel configuration.
+Copy `config.example.yml` to `config.yml` and edit it to match your actual
+Cloudflare Tunnel configuration. `config.yml` is gitignored — it carries your
+tunnel UUID and hostname, which is why it is never committed (ROADMAP R3.4).
+The token-based flow (`CLOUDFLARE_TUNNEL_TOKEN`, see `docs/DEPLOYMENT.md`) is
+what the compose deployment uses.
 
 ---
 

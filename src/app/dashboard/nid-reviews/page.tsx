@@ -19,12 +19,13 @@ import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { RejectNidDialog } from "@/features/merchants/dialogs/reject-nid-dialog"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { formatDateTime } from "@/lib/format"
 import type { Merchant } from "@/lib/types"
 
 type NidFilter = "all" | "pending" | "verified" | "rejected"
 
 function formatNidDate(value: string) {
-  return new Date(value).toLocaleDateString(undefined, {
+  return formatDateTime(value, {
     year: "numeric",
     month: "short",
     day: "numeric",

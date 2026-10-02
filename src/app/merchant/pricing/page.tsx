@@ -35,6 +35,7 @@ import {
   useZonePricingPublic,
   type ZonePricingEstimate,
 } from "@/features/platform-config/hooks/use-zone-pricing-public"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 
 function TierList({ pkg }: { pkg: PackageRow }) {
@@ -147,7 +148,7 @@ export default function MerchantPricingPage() {
               <div>
                 <p className="text-muted-foreground text-xs">Started</p>
                 <p className="text-sm font-medium">
-                  {new Date(activePackage.startedAt).toLocaleDateString()}
+                  {formatDateTime(activePackage.startedAt)}
                 </p>
               </div>
               <div>

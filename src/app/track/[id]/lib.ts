@@ -10,6 +10,7 @@ import {
 import { cache } from "react"
 import { db } from "@/lib/db"
 import { merchant, order, rider, warehouse } from "@/lib/db/schema"
+import { formatDateTime } from "@/lib/format"
 import type { Order, OrderStatus } from "@/lib/types"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -33,7 +34,11 @@ export function formatStamp(iso?: string | Date | null) {
   if (!iso) return null
   const d = typeof iso === "string" ? new Date(iso) : iso
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleString("en-US", {
+  // Pinned to the business zone and locale: this runs **server-side**, so a
+  // bare `toLocaleString` rendered whatever the container's zone happened to
+  // be — a customer in Dhaka and an ops user in the same office could read
+  // different times for one order (ROADMAP R3.3).
+  return formatDateTime(d, {
     day: "numeric",
     month: "short",
     year: "numeric",

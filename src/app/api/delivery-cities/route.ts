@@ -17,5 +17,11 @@ export const GET = withErrorHandler(async () => {
     .where(eq(deliveryCity.isActive, true))
     .orderBy(asc(deliveryCity.name))
 
-  return NextResponse.json(cities)
+  // A dropdown source that changes rarely — cached briefly so repeat
+  // navigation does not re-query (ROADMAP R3.11).
+  return NextResponse.json(cities, {
+    headers: {
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+    },
+  })
 })

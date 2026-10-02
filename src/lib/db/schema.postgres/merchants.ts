@@ -89,6 +89,11 @@ export const merchant = pgTable(
       "gin",
       sql`${t.businessName} gin_trgm_ops`,
     ),
+    // Serves the roster's `ORDER BY businessName ASC` — a trigram GIN can
+    // answer a search but cannot satisfy a sort, so riders' and warehouses'
+    // merchant rosters were sorting the whole table on every page load
+    // (ROADMAP R3.11).
+    index("merchant_business_name_idx").on(t.businessName),
     index("merchant_owner_name_trgm_idx").using(
       "gin",
       sql`${t.ownerName} gin_trgm_ops`,

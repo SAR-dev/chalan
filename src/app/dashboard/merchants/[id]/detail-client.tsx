@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { formatDateTime } from "@/lib/format"
 import type { Merchant } from "@/lib/types"
 
 function VerificationBadge({ verified }: { verified: boolean }) {
@@ -41,7 +42,7 @@ function VerificationBadge({ verified }: { verified: boolean }) {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return formatDateTime(dateStr, {
     year: "numeric",
     month: "short",
     day: "numeric",

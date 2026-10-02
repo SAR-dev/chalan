@@ -7,10 +7,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { pageContent } from "@/config/content"
 import { AuditDiffCell } from "@/features/audit-logs/components/audit-diff"
 import { useAuditLogs } from "@/features/audit-logs/hooks/use-audit-logs"
+import { formatDateTime } from "@/lib/format"
 import type { AuditLog } from "@/lib/types"
 
 function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString(undefined, {
+  return formatDateTime(value, {
     year: "numeric",
     month: "short",
     day: "numeric",

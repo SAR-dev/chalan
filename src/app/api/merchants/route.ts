@@ -28,6 +28,27 @@ import { merchantRegisterSchema, parseBody } from "@/lib/validation"
 import { issueVerifyToken, verifyTokenUrl } from "@/lib/verify-token"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
+/**
+ * Circuit breaker for the merchant roster — **not** pagination.
+ *
+ * Riders and warehouse admins fetch this list to resolve merchant *names* on a
+ * work table, which is an all-or-nothing lookup, so capping it can make a name
+ * fall back silently. 5000 is orders of magnitude past any real roster; the
+ * point is that a runaway count yields a bounded response instead of an
+ * unbounded one (ROADMAP R3.11). Resolving only the ids a page actually shows
+ * is the real fix, and is a different design.
+ */
+const ROSTER_LIMIT = 5000
+
+/** The roster is a stable projection, so it is safe to cache briefly. */
+function rosterResponse(rows: unknown[]) {
+  return NextResponse.json(paginateResponse(rows, rows.length), {
+    headers: {
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+    },
+  })
+}
+
 export const GET = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
@@ -69,7 +90,8 @@ export const GET = withErrorHandler(async (req: Request) => {
       })
       .from(merchant)
       .orderBy(asc(merchant.businessName))
-    return NextResponse.json(paginateResponse(rows, rows.length))
+      .limit(ROSTER_LIMIT)
+    return rosterResponse(rows)
   }
 
   // Warehouse admins resolve merchant names on their order/intake work tables,
@@ -85,7 +107,8 @@ export const GET = withErrorHandler(async (req: Request) => {
       })
       .from(merchant)
       .orderBy(asc(merchant.businessName))
-    return NextResponse.json(paginateResponse(rows, rows.length))
+      .limit(ROSTER_LIMIT)
+    return rosterResponse(rows)
   }
 
   const { limit, offset } = parsePagination(req, {

@@ -552,6 +552,57 @@ describe("GET /api/orders/payable", () => {
   })
 })
 
+// One `ilike` OR spanning order + merchant + warehouse, all inlined after four
+// LEFT JOINs. A trigram GIN index answers a same-table bitmap-OR; it cannot
+// answer ORs that cross relations, so the planner's realistic choice was "join
+// all four tables, then filter" — the search got slower the more it matched
+// nothing (ROADMAP R3.10).
+describe("GET /api/orders?q= search shape (ROADMAP R3.10)", () => {
+  async function searchClauseFor(q: string) {
+    sessionState.value = admin
+    whereCalls.length = 0
+    // COUNT + rows share the same `where`.
+    selectQueue.push([{ count: 0 }], [])
+    const res = await listOrders(
+      req("GET", `http://test.local/api?q=${encodeURIComponent(q)}`),
+    )
+    expect(res.status).toBe(200)
+    // Each EXISTS subquery is itself built through the mocked `dbRead`, so it
+    // pushes its own inner `where` ahead of the top-level one. Take the
+    // outermost clause — the only one that mentions an `order` column.
+    const rendered = whereCalls.map((w) =>
+      new PgDialect().sqlToQuery(w as Parameters<PgDialect["sqlToQuery"]>[0]),
+    )
+    const outer = rendered.find((r) => r.sql.includes('"order"."id"'))
+    expect(outer, rendered.map((r) => r.sql).join("\n---\n")).toBeDefined()
+    return outer!
+  }
+
+  it("gives each joined table its own EXISTS subquery", async () => {
+    const { sql, params } = await searchClauseFor("ABC Traders")
+    const existsCount = sql.match(/exists\s*\(select/gi)?.length ?? 0
+    expect(existsCount, sql).toBe(2)
+    // The correlated key of each subquery, plus the table it scans.
+    expect(sql).toMatch(/exists\s*\(select[\s\S]*"merchant"/i)
+    expect(sql).toMatch(/exists\s*\(select[\s\S]*"warehouse"/i)
+    // Params survive the restructure — otherwise the term silently becomes
+    // `ilike %null%` and search stops matching anything.
+    expect(params).toContain("%ABC Traders%")
+  })
+
+  it("keeps order-level matches outside the subqueries", async () => {
+    const { sql } = await searchClauseFor("01711")
+    // These two live on `order` itself, so they stay in the top-level OR and
+    // keep serving from the order table's own trigram indexes.
+    expect(sql).toMatch(/exists\s*\(select/i)
+    expect(sql).toContain('"order"."recipientName" ilike')
+    expect(sql).toContain('"order"."recipientPhone" ilike')
+    // ...and neither appears inside a subquery, which is the whole point: a
+    // hit on `order` alone must not drag the merchant/warehouse scans in.
+    expect(sql).not.toMatch(/exists\s*\([^)]*"recipientName"/i)
+  })
+})
+
 // A rider has two queues. Without `?queue=` the endpoint returned their union
 // and each queue page filtered client-side, so the footer's `total` counted
 // rows the table never rendered and page 2 showed a different subset
@@ -899,7 +950,7 @@ describe("POST /api/orders/bulk", () => {
 
 describe("GET /api/orders/analytics", () => {
   function pushEmptyAnalytics() {
-    selectQueue.push([], [], [], [])
+    selectQueue.push([], [], [])
   }
 
   it("401 when unauthenticated", async () => {
@@ -913,7 +964,7 @@ describe("GET /api/orders/analytics", () => {
     const res = await analytics(req("GET"))
     const json = await res.json()
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     // No merchant/warehouse scope, but the default window still bounds the scan
     // (ROADMAP P3) — so a where clause is present on every aggregate.
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
@@ -944,7 +995,7 @@ describe("GET /api/orders/analytics", () => {
       req("GET", "http://test.local/api/orders/analytics?merchantId=m_1"),
     )
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -963,7 +1014,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -972,7 +1023,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -981,7 +1032,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -990,7 +1041,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -1004,7 +1055,7 @@ describe("GET /api/orders/analytics", () => {
       ),
     )
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -1015,7 +1066,7 @@ describe("GET /api/orders/analytics", () => {
       req("GET", "http://test.local/api/orders/analytics?from=nope&to=nope"),
     )
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -1032,15 +1083,13 @@ describe("GET /api/orders/analytics", () => {
         { status: "RETURNED", count: 1 },
       ],
       [
+        // Delivery performance and COD summary are one query now (ROADMAP
+        // R3.7) — both are ungrouped, so they are the same scan.
         {
           totalDelivered: 8,
           totalFailed: 1,
           totalReturned: 1,
           avgDeliveryTimeHours: 5.56,
-        },
-      ],
-      [
-        {
           totalCollected: 1000,
           totalSettled: 400,
           settledCount: 2,
