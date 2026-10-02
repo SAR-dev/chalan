@@ -6,8 +6,8 @@
 > **Open work only:** R4 Product and R5 Polish. Grouped **by priority** below,
 > and **R5 ships before R4**.
 >
-> **Health:** `pnpm ci:check` green (831 files) · Unit **2126 pass** (206 spec
-> files) · coverage **55.37 / 48.57 / 43.31 / 56.16** against floors
+> **Health:** `pnpm ci:check` green (844 files) · Unit **2142 pass** (208 spec
+> files) · coverage **55.43 / 48.65 / 43.42 / 56.21** against floors
 > **49 / 42 / 37 / 50** · real-DB integration **18/18** · E2E **125 tests /
 > 32 files / S1-S73** (S36 retired with the branding feature), run locally only
 > (`pnpm test:e2e`) by decision - CI stays on lint, typecheck, coverage and
@@ -37,7 +37,7 @@
 
 | Priority | Items |
 |---|---|
-| **P1 - Do first** | R5.1 · R5.2 · R5.7 · R5.9 |
+| **P1 - Do first** | *closed* - R5.1, R5.2, R5.7, R5.9 shipped (two of R5.9's four bullets are recorded as decisions instead, below) |
 | **P2 - Cleanup** | R5.3 · R5.4 · R5.5 · R5.6 · R5.10 |
 | **P3 - High-leverage product work** | R4.2 · R4.4 · R4.3 · R4.1 |
 | **P4 - Later product bets** | R4.5 · R4.6 · R4.7 · R4.8 · R4.9 |
@@ -84,6 +84,8 @@ kept, only the build moved.
 | **Coverage floors are a floor, not a target** | Raise them as tests land; never lower them to make CI pass. |
 | **Closed bands are not carried in this document** | Do not re-add R0-R3 summaries. The ids stay useful as pointers (the annotations in code and the git log), which is why they are still cited in prose. |
 | **CI is lint, typecheck, coverage, integration and build** | `.github/workflows/` holds `ci.yml` and `deploy.yml` only. Code scanning is not part of the gate - `ci.yml`'s `security` job covers `pnpm audit` plus the advisory dependency review, and nothing more. |
+| **`style-src` keeps `'unsafe-inline'`** | Investigated under R5.9 and rejected. ~50 React `style={{...}}` bindings need `style-src-attr 'unsafe-inline'`, and `nextjs-toploader`'s `<style>` cannot be nonced: it renders the nonce without `suppressHydrationWarning`, so server value and client render disagree and hydration breaks. The reasoning is already written down at `src/app/layout.tsx:94`. The only real hardening left is splitting `style-src-elem` (nonce) from `style-src-attr`; do not "simplify" the directive away. |
+| **The Docker runner keeps the full dependency tree** | Also investigated under R5.9 and rejected. The monolith's `migrate` service runs `node_modules/.bin/tsx` out of this same image, so a `--prod` install would break migrations. A `deps-prod` stage already existed and was removed as dead work, and `dockerfile-stages.spec.ts` now asserts `COPY --from=deps ...node_modules` and forbids `pnpm install --prod`. Reducing image weight means moving `tsx` into `dependencies` first, not adding a stage. |
 
 ---
 
