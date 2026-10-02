@@ -37,7 +37,7 @@
 
 | Priority | Items |
 |---|---|
-| **P1 - Do first** | *closed* - R5.1, R5.2, R5.7, R5.9 shipped (two of R5.9's four bullets are recorded as decisions instead, below) |
+| **P1 - Do first** | *closed* - R5.1, R5.2, R5.7 and the shippable half of R5.9 are done; its `style-src` and Docker halves are recorded as decisions |
 | **P2 - Cleanup** | R5.3 · R5.4 · R5.5 · R5.6 · R5.10 |
 | **P3 - High-leverage product work** | R4.2 · R4.4 · R4.3 · R4.1 |
 | **P4 - Later product bets** | R4.5 · R4.6 · R4.7 · R4.8 · R4.9 |
@@ -70,7 +70,9 @@ consequences worth stating so they do not look like mistakes:
   assertions, and the quoted numbers now match the tree.
 - **R5.9 was split.** Its two halves are genuinely different work at different
   priorities, so the response-header/Docker half stayed R5.9 (P1) and the
-  front-end bundle half became **R5.10** (P2).
+  front-end bundle half became **R5.10** (P2). R5.9's response-header half has
+  since shipped; its other two concerns are recorded as decisions below rather
+  than left as open work.
 
 **R5 before R4.** P1 and P2 are all R5; R4 starts at P3. The notification design
 deferred by the previous roadmap carries forward as R4.1 - the design work was
@@ -91,81 +93,17 @@ kept, only the build moved.
 
 # P1 - Do first
 
-### R5.1 In-card brand on mobile - shipped on 3 pages, 4 remain
+**P1 is closed.** All four shipped. Detail - citations, reasoning and the
+revert checks that prove each test is non-vacuous - is in git history under
+each id.
 
-Mobile logo placement moved **inside** the bordered card on `/login`,
-`/register` and `/apply/rider`, via the shared `src/components/auth-card-brand.tsx`
-(`lg:hidden`, first child of `CardHeader`, `data-testid="auth-card-brand"`),
-with DOM-containment specs on all three pages.
+| Item | What landed |
+|---|---|
+| **R5.1** | The floating logo on `/forgot-password`, `/reset-password`, `/activate` and `/activated` moved inside the card with `AuthCardBrand`, and each page now has a DOM-containment spec. `/activate` and `/activated` have no large-screen brand panel at all, so they pass the new `hideOnLarge={false}` instead of vanishing from `lg` up. The invalid-token branch of `/reset-password` gained the lockup too - it had no logo on mobile whatsoever. |
+| **R5.2** | `StepKey`, `STATUS_RANK`, `STEPS` and `formatStamp` exist once, in `src/lib/order-timeline.ts`, shared by the public tracking timeline and the admin order table; `track/[id]/lib.ts` re-exports them, so its components did not have to change. The one genuinely audience-specific string is `descriptionForRecipient`, read through `stepDescription(step, "recipient" | "ops")`. A source scan fails if either consumer declares a second copy again. |
+| **R5.7** | `biome.json` gained `*.{ts,mts,js,mjs,cjs,json}`, pulling the root configs in (`biome check .`: 831 to 844 files). `lint-staged` dropped `md,mdx` (Biome cannot parse them) and `css` (Biome does not match it in `files.includes`) - both were silent no-ops, so the glob now names only what the command actually touches. |
+| **R5.9** | `poweredByHeader: false` plus `Strict-Transport-Security: max-age=31536000; includeSubDomains` in `next.config.mjs`, pinned by `security-headers.spec.ts`, which also keeps the per-request CSP out of the static config. The `style-src` and Docker halves are **not** shipped - see the decisions table above. |
 
-Still floating above the card:
-
-| Page | `src/app/.` | Floating logo line |
-|---|---|---|
-| Forgot password | `forgot-password/page.tsx` | `:101` |
-| Reset password | `reset-password/page.tsx` | `:164` |
-| Activate | `activate/page.tsx` | `:84` |
-| Activated | `activated/page.tsx` | `:38` |
-
-**Done when:** no `mb-8 flex items-center` logo link remains outside a
-`<Card>`, and each page has a containment spec asserting
-`brand.closest('[data-slot="card"]')?.contains(brand)`.
-
-### R5.2 Duplicate timeline step definitions
-
-`src/features/orders/components/tracking-timeline.tsx:20-97` re-declares
-`StepKey`, `STATUS_RANK` and `STEPS` that already exist in
-`src/app/track/[id]/lib.ts:47-124`. Two sources of truth for one concept - one
-of which was carrying the date-formatting bug that R3.3 had to fix.
-
-**Fix:** move them to a shared module and have both import it.
-
-### R5.7 Root configs, workflows and every markdown file are outside Biome
-
-`biome.json` `files.includes` covers only `src/**`, `e2e/**`, `env/**` and
-`scripts/**`. That leaves unformatted and unlinted:
-
-- `playwright.config.ts`, `vitest.config.ts`, `drizzle.config.ts`,
-  `next.config.mjs`, `test-setup.ts`
-- every `.json` at the root (`package.json`, `tsconfig.json`)
-- all of `.github/workflows/*.yml` and `docker/*.yml`
-- all `*.md` - README, CONTRIBUTING, `docs/*`, AGENTS.md, this file
-
-Meanwhile `lint-staged` (`package.json`) runs
-`biome check --write --no-errors-on-unmatched` over
-`*.{js,jsx,ts,tsx,json,css,md,mdx}` - Biome does not parse markdown, so
-`--no-errors-on-unmatched` silently turns the markdown entry into a no-op.
-
-**Fix:** widen `files.includes` to `*.{ts,mts,js,mjs,json}`, and either drop
-`md,mdx` from `lint-staged` or point them at a real markdown linter. Consider
-`actionlint` for the workflows - Biome would have caught the missing
-`timeout-minutes` on the CI jobs.
-
-**Done when:** `biome check .` reports the root configs in its "Checked"
-count, and `lint-staged` has no dead glob.
-
-*(Note: Biome's `a11y` ruleset is enabled - `noSvgWithoutTitle`,
-`useValidAriaRole`, `noLabelWithoutControl`, `noAutofocus`, `useButtonType` -
-which is why those classes of bug are absent. It does not catch the R2
-findings: `aria-current`, `aria-hidden` misuse, focus order, or keyboard
-operability are all outside its reach, so those still need a manual/aXe pass.)*
-
-### R5.9 Response-header and Docker image weight
-
-The two things the server ships with every response and every deploy. Real,
-but not the platform risk R3 was for.
-
-- **`style-src` still allows `unsafe-inline` and nothing sets HSTS**
-  (`src/proxy.ts:77`). Both `next-themes` and `nextjs-toploader` accept a
-  nonce; HSTS is arguably the cloudflared edge's job, but nothing sets it
-  either. Also drop `poweredByHeader`.
-- **The Docker image ships every devDependency.** `docker/Dockerfile:61`
-  copies the full `node_modules` from the `deps` stage, so `typescript`,
-  `@playwright/test`, `vitest` and `drizzle-kit` reach an image that only runs
-  `server.js`. A `pnpm deploy --prod` stage fixes it; the image is otherwise
-  excellent (multi-stage, cache mounts, non-root, `HEALTHCHECK`).
-
----
 
 # P2 - Cleanup
 
