@@ -3,8 +3,8 @@
 > Forward-looking only — shipped work lives in git history and in the
 > `ROADMAP <id>` annotations left beside the code it changed.
 >
-> **Health:** `pnpm ci:check` green (821 files) · Unit **2074 pass** (198 spec
-> files) · coverage **54.63 / 47.97 / 42.4 / 55.47** against floors
+> **Health:** `pnpm ci:check` green (821 files) · Unit **2073 pass** (198 spec
+> files) · coverage **54.58 / 47.91 / 42.37 / 55.41** against floors
 > **49 / 42 / 37 / 50** · real-DB integration **18/18** · E2E **125 tests /
 > 32 files / S1–S73** (S36 retired with the branding feature), run locally only
 > (`pnpm test:e2e`) by decision — CI stays on lint, typecheck, coverage and
@@ -126,22 +126,12 @@ layout specs (`26-toast-responsive`, `27-sign-out`).
 | ID | Shipped |
 |---|---|
 | R3.1 | `src/lib/error-report.ts` — a vendor-neutral reporter POSTing to `ERROR_WEBHOOK_URL` (deliberately no SDK: picking Sentry is procurement, not code); an access log in `withErrorHandler` where `logger.child` is finally called (5xx `error`, 4xx `warn`, ≥1s `slow request`, success `debug`); `redact.ts` wired into `logger.emit` — it guarded the mailer but not the log line; `statement_timeout` on both pools; `log_min_duration_statement=250` in postgres; `pool.waiting` surfaced from `/api/ready` |
+| R3.2 | Upload rate limiting moved out of `src/proxy.ts` into the route handler: middleware cannot reach the Redis-backed limiter, so each of the four cluster instances enforced its own 20/min budget — 80 uploads/min/IP. The bespoke `Map` and its prune loop are gone entirely; the route throttles before it reads the body |
 | R3.6 | New `logAuditMany()`; all eight `Promise.all(logAudit(...))` endpoints converted — they opened up to 100 concurrent pool connections per request |
 | R3.8 | `order_package_id_idx` + `order_package_tier_id_idx` (both `ON DELETE set null`, so every package/tier delete seq-scanned the largest table) and `user_created_at_idx` — the `user` table had only trigram GINs while two endpoints `ORDER BY createdAt DESC` |
 | R3.9 | Partial indexes on `user.activationToken` and `merchant.emailVerificationToken`: both are **unauthenticated** lookups that were seq-scanning whole tables |
 
 
-
-### R3.2 The in-cluster upload limit is per-instance
-
-`src/proxy.ts:186` keeps `uploadWindows` as an in-process `Map`; the comment
-at `:178` admits it. With four app instances in `compose.cluster.yml`, each
-allows its own 20/min — **80/min/IP**. The map is also only pruned when an
-upload arrives (`:191-195`), so it grows keyed by attacker-controlled IP
-between requests.
-
-**Fix:** route uploads through the same Redis limiter the rest of the app uses
-(`src/lib/rate-limit.ts`); prune on a timer.
 
 ### R3.3 There is no display formatting layer
 
