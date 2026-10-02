@@ -172,6 +172,20 @@ call sites; retire the duplicate `CURRENCY`.
 > it would have shipped Terms pages reading `{{CURRENCY}}`-less. The real
 > split-brain was only the `en-US` grouping inside `formatTk`, which
 > `formatMoney` now pins.
+>
+> **The one-function API has a trap worth writing down.** `formatDateTime`
+> chooses between `toLocaleString` and `toLocaleDateString` from the options,
+> and `toLocaleDateString` throws `TypeError: Invalid option : …` on *any* time
+> option. Deciding from `hour`/`minute` alone looks sufficient and is not: the
+> natural `{ dateStyle: "medium", timeStyle: "short" }` pair looks date-only
+> through those two keys, so it was routed to the date formatter and threw —
+> taking the whole merchant order page into its error boundary. Routing is now
+> decided by every time-only key (`timeStyle`, `dayPeriod`, `hour`, `minute`,
+> `second`, `fractionalSecondDigits`). It was caught by E2E S61, not by unit
+> tests: the spec exercised `hour`/`minute` and never `timeStyle`. The spec now
+> asserts a pass-through contract (each option set must equal the matching `Intl`
+> method's own output) rather than a rendered shape, because shapes like `hour`
+> → `"2 AM"` or `second` → `"0"` are `Intl`'s business, not this function's.
 
 ### R3.4 Three-way hostname conflict, committed tunnel identity — **shipped**
 

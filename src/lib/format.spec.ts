@@ -50,6 +50,70 @@ describe("formatDateTime (ROADMAP R3.3)", () => {
     expect(withTime).toContain("Jan 2")
   })
 
+  /**
+   * Regression: `toLocaleDateString` throws `TypeError: Invalid option :
+   * timeStyle` on *any* time option, so routing is decided by more than
+   * `hour`/`minute`. `{ dateStyle, timeStyle }` looks date-only through those
+   * two keys, went to `toLocaleDateString`, and crashed the merchant order page
+   * into its error boundary (E2E S61).
+   *
+   * The assertion is a pass-through contract rather than a rendered shape:
+   * whatever the caller asked for must come back from the matching `Intl`
+   * method, options unchanged. Shapes are unreliable to assert on — `hour`
+   * alone legitimately renders "2 AM", `second` alone "0" — so pinning them
+   * would encode `Intl`'s quirks instead of this function's contract.
+   */
+  it("routes by option kind, passing options through untouched", () => {
+    const value = "2025-01-01T20:00:00Z"
+    const date = new Date(value)
+    const pinned = (o: Intl.DateTimeFormatOptions) => ({
+      timeZone: BUSINESS_TIMEZONE,
+      ...o,
+    })
+
+    const timeOptions: Intl.DateTimeFormatOptions[] = [
+      { dateStyle: "medium", timeStyle: "short" },
+      { timeStyle: "short" },
+      { dayPeriod: "short" },
+      { second: "2-digit" },
+      { fractionalSecondDigits: 3 },
+      { hour: "numeric" },
+      { minute: "2-digit" },
+    ]
+    for (const options of timeOptions) {
+      const label = JSON.stringify(options)
+      expect(() => formatDateTime(value, options), label).not.toThrow()
+      expect(formatDateTime(value, options), label).toBe(
+        date.toLocaleString(DISPLAY_LOCALE, pinned(options)),
+      )
+    }
+
+    // And the date-only half must still avoid the time formatter, or callers
+    // asking for "14/7" would get a clock they did not want.
+    for (const options of [
+      { year: "numeric", month: "short", day: "numeric" },
+      { dateStyle: "medium" },
+      { dateStyle: "full" },
+      {},
+    ] satisfies Intl.DateTimeFormatOptions[]) {
+      const label = JSON.stringify(options)
+      expect(formatDateTime(value, options), label).toBe(
+        date.toLocaleDateString(DISPLAY_LOCALE, pinned(options)),
+      )
+    }
+  })
+
+  it("still renders the shape the merchant order page asks for", () => {
+    // The exact options `order-details-content.tsx` passes for "Placed …".
+    const rendered = formatDateTime("2025-01-01T20:00:00Z", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    })
+    // Jan 2 in Dhaka, not Jan 1 — so the zone pin survives the style path too.
+    expect(rendered).toContain("Jan 2")
+    expect(rendered).toMatch(/\d:\d\d/)
+  })
+
   it("uses an explicit locale rather than the host's", () => {
     expect(DISPLAY_LOCALE).toBe("en-US")
     // en-US groups with commas: 1,234 — a host locale would not.

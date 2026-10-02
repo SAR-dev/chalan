@@ -22,15 +22,40 @@ import { BUSINESS_TIMEZONE } from "@/lib/timezone"
 export const DISPLAY_LOCALE = "en-US"
 
 /**
+ * Options that ask for the clock rather than the calendar.
+ *
+ * `toLocaleDateString` throws `TypeError: Invalid option : <name>` on every one
+ * of these, so they are also what decides which method to call. Checking only
+ * `hour`/`minute` is not enough: the `{ dateStyle, timeStyle }` pair — the shape
+ * most call sites actually want, and the one the merchant order page uses —
+ * reveals nothing through those two keys, so it was routed to the date-only
+ * method and took the page's error boundary with it (E2E S61).
+ */
+const TIME_ONLY_OPTIONS = [
+  "timeStyle",
+  "dayPeriod",
+  "hour",
+  "minute",
+  "second",
+  "fractionalSecondDigits",
+] as const
+
+function asksForClock(options: Intl.DateTimeFormatOptions): boolean {
+  return TIME_ONLY_OPTIONS.some((key) => options[key] !== undefined)
+}
+
+/**
  * Render a date for display, in the business timezone.
  *
  * Accepts an ISO string, a `Date`, or `null`/`undefined`.
  *
- * Whether a time is shown follows the options: pass `hour`/`minute` and you get
- * date *and* time, omit them and you get a date only. That mirrors the two
- * functions this replaces (`toLocaleDateString` and `toLocaleString`) without
- * every call site having to pick one — a caller asking for `month`/`day` alone
- * never wants "14/7, 03:30" appended.
+ * Whether a time is shown follows the options: pass anything from
+ * `TIME_ONLY_OPTIONS` (`hour`/`minute`, or the `timeStyle` half of a
+ * `dateStyle`+`timeStyle` pair) and you get date *and* time; omit them and you
+ * get a date only. That mirrors the two functions this replaces
+ * (`toLocaleDateString` and `toLocaleString`) without every call site having to
+ * pick one — a caller asking for `month`/`day` alone never wants "14/7, 03:30"
+ * appended.
  */
 export function formatDateTime(
   value: string | number | Date | null | undefined,
@@ -40,12 +65,11 @@ export function formatDateTime(
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return ""
 
-  const wantsTime = options.hour !== undefined || options.minute !== undefined
   const opts: Intl.DateTimeFormatOptions = {
     timeZone: BUSINESS_TIMEZONE,
     ...options,
   }
-  return wantsTime
+  return asksForClock(options)
     ? date.toLocaleString(DISPLAY_LOCALE, opts)
     : date.toLocaleDateString(DISPLAY_LOCALE, opts)
 }
