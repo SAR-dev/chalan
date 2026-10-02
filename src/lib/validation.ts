@@ -818,6 +818,15 @@ export const bulkAssignRiderSchema = z.object({
   riderId: z.string().min(1, "Rider is required"),
 })
 
+/**
+ * Ask the planner which rider each of these parcels should go to. A read, not
+ * a write — the caller applies the returned plan through the ordinary bulk
+ * dispatch endpoint, so the `dispatch` transition still has the last word.
+ */
+export const autoAssignPlanSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(100),
+})
+
 /** Admin direct-assign of a package to a merchant (ops override / comp). */
 export const packageAssignSchema = z.object({
   packageId: z.string().min(1, "Package is required"),

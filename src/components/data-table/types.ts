@@ -30,6 +30,10 @@ export interface DataTableBulkAction<T> {
   icon?: React.ReactNode
   variant?: "default" | "destructive" | "outline" | "secondary"
   disabled?: boolean
+  /** Rendered as `data-testid` on the button. Bulk action labels are UI copy and
+   *  change with the wording; a test that anchors on the label breaks the next
+   *  time someone rewords it. */
+  testId?: string
   onClick: (selectedRows: T[], clearSelection: () => void) => void
 }
 

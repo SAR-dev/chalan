@@ -6,10 +6,10 @@
 > **Open work:** R4 Product only. R0-R3 closed earlier, and R5 Polish closed
 > with P2 - see the ledger in git history and the decisions below.
 >
-> **Health:** `pnpm ci:check` green (852 files) · Unit **2184 pass** (212 spec
-> files) · coverage **55.40 / 48.68 / 43.31 / 56.20** against floors
-> **49 / 42 / 37 / 50** · real-DB integration **18/18** · E2E **125 tests /
-> 32 files / S1-S73** (S36 retired with the branding feature), run locally only
+> **Health:** `pnpm ci:check` green (867 files) · Unit **2240 pass** (2258 total,
+> 218 spec files) · coverage **56.06 / 49.48 / 43.87 / 56.86** against floors
+> **49 / 42 / 37 / 50** · real-DB integration **18/18** · E2E **128 tests /
+> 33 files / S1-S74** (S36 retired with the branding feature), run locally only
 > (`pnpm test:e2e`) by decision - CI stays on lint, typecheck, coverage and
 > build · `route-auth-guard.spec.ts` enforces server-side auth on every API
 > route · `pnpm build` green.
@@ -30,7 +30,7 @@
 | Priority | Items | Status |
 |---|---|---|
 | **P3 - High-leverage product work** | R4.2 · R4.4 · R4.3 · R4.1 | open |
-| **P4 - Later product bets** | R4.5 · R4.6 · R4.7 · R4.8 · R4.9 | open |
+| **P4 - Later product bets** | R4.6 · R4.7 · R4.8 · R4.9 | open |
 
 P3 and P4 are the only groups left; earlier priorities were R5 polish work and
 are closed. The numbering stays as it was so an id still means one thing in
@@ -66,7 +66,7 @@ it.
 
 | Decision | Detail |
 |---|---|
-| **E2E runs locally, not in CI** | `pnpm test:e2e` (125 tests, ~6 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost - do not "helpfully" re-add an `e2e` job. The `e2e:` block in `ci.yml:169-215` stays commented out on purpose. |
+| **E2E runs locally, not in CI** | `pnpm test:e2e` (128 tests, ~6 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost - do not "helpfully" re-add an `e2e` job. The `e2e:` block in `ci.yml:169-215` stays commented out on purpose. |
 | **Coverage floors are a floor, not a target** | Raise them as tests land; never lower them to make CI pass. |
 | **CI is lint, typecheck, coverage, integration and build** | `.github/workflows/` holds `ci.yml` and `deploy.yml` only. Code scanning is not part of the gate - `ci.yml`'s `security` job covers `pnpm audit` plus the advisory dependency review, and nothing more. |
 | **Rows per page is one persisted preference, not a per-table control** | It lives on the user row (capped by `MAX_TABLE_ROWS_PER_PAGE`), is edited in Account Settings, and `DataTable` applies it as every table's default size. A second, unpersisted control in the footer would only have disagreed with the first. Do not add a rows-per-page `<select>` back to `TableFooter`. |
@@ -144,13 +144,6 @@ here rather than first.
 
 Each is a standalone feature with no dependency on the work above; they are
 last because none of them is blocking anything today.
-
-### R4.5 Route optimisation and auto-assignment
-
-No route optimisation (`routeOptim` → 0 hits) and no auto-assignment
-(`autoAssign`, `assignedRider` → 0 hits). Dispatch is fully manual
-(`dispatch` → 107 hits, all manual transitions). The first real ROI win for a
-fleet.
 
 ### R4.6 Delivery windows and time slots
 

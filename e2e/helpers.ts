@@ -22,6 +22,15 @@ export const CREDS = {
     home: "/merchant",
   },
   rider: { email: "rider1@email.com", password: "12qwaszx", home: "/rider" },
+  // Rider 1 is seeded PICKUP-only (`RIDER_TASK_TYPES` cycles PICKUP, DELIVERY,
+  // BOTH), so it is never given a delivery parcel and its delivery queue — and
+  // therefore its run sheet — is legitimately empty. Rider 2 is the first
+  // DELIVERY-capable seed rider and does get parcels.
+  deliveryRider: {
+    email: "rider2@email.com",
+    password: "12qwaszx",
+    home: "/rider",
+  },
   demoMerchant: {
     email: "demo@kikuya.com",
     password: "12qwaszx",

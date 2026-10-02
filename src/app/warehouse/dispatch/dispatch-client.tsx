@@ -6,6 +6,7 @@ import {
   PackageOpen,
   Send,
   ShoppingBag,
+  Sparkles,
   Truck,
   UserPlus,
 } from "lucide-react"
@@ -41,6 +42,7 @@ import {
   statusColumn,
 } from "@/features/orders/components/order-table-columns"
 import { AssignPickupRiderDialog } from "@/features/orders/dialogs/assign-pickup-rider-dialog"
+import { AutoAssignDialog } from "@/features/orders/dialogs/auto-assign-dialog"
 import { BulkAssignPickupRiderDialog } from "@/features/orders/dialogs/bulk-assign-pickup-rider-dialog"
 import { BulkDispatchDialog } from "@/features/orders/dialogs/bulk-dispatch-dialog"
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
@@ -87,6 +89,7 @@ export function WarehouseDispatchPageClient({
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
   const [bulkPickupOpen, setBulkPickupOpen] = useState(false)
   const [bulkDispatchOpen, setBulkDispatchOpen] = useState(false)
+  const [autoAssignOpen, setAutoAssignOpen] = useState(false)
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [assignTarget, setAssignTarget] = useState<Order | null>(null)
@@ -319,10 +322,18 @@ export function WarehouseDispatchPageClient({
             toolbarLeft={
               <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
                 <TabsList>
-                  <TabsTrigger value="PICKUP">Pickup</TabsTrigger>
-                  <TabsTrigger value="IN_PICKUP">In pickup</TabsTrigger>
-                  <TabsTrigger value="DELIVERY">Delivery</TabsTrigger>
-                  <TabsTrigger value="DISPATCHED">Dispatched</TabsTrigger>
+                  <TabsTrigger value="PICKUP" data-testid="tab-pickup">
+                    Pickup
+                  </TabsTrigger>
+                  <TabsTrigger value="IN_PICKUP" data-testid="tab-in-pickup">
+                    In pickup
+                  </TabsTrigger>
+                  <TabsTrigger value="DELIVERY" data-testid="tab-delivery">
+                    Delivery
+                  </TabsTrigger>
+                  <TabsTrigger value="DISPATCHED" data-testid="tab-dispatched">
+                    Dispatched
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             }
@@ -366,8 +377,17 @@ export function WarehouseDispatchPageClient({
                       {
                         label: "Assign delivery rider",
                         icon: <Send className="size-4" />,
+                        testId: "bulk-assign-delivery-rider",
                         onClick: async (_rows: Order[], _clear: () => void) => {
                           setBulkDispatchOpen(true)
+                        },
+                      },
+                      {
+                        label: "Auto-assign riders",
+                        icon: <Sparkles className="size-4" />,
+                        testId: "bulk-auto-assign",
+                        onClick: async (_rows: Order[], _clear: () => void) => {
+                          setAutoAssignOpen(true)
                         },
                       },
                     ]
@@ -421,6 +441,13 @@ export function WarehouseDispatchPageClient({
           if (!v) setSelectedOrders(new Set())
           setBulkDispatchOpen(v)
         }}
+        onComplete={() => setSelectedOrders(new Set())}
+      />
+
+      <AutoAssignDialog
+        ids={Array.from(selectedOrders)}
+        open={autoAssignOpen}
+        onOpenChange={setAutoAssignOpen}
         onComplete={() => setSelectedOrders(new Set())}
       />
 
