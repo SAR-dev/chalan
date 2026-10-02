@@ -6,7 +6,8 @@
       "e2e/**/*.{ts,tsx,js,jsx}",
       "env/**/*.{ts,tsx,js,jsx}",
       "scripts/**/*.{ts,tsx,js,jsx}",
-      "*.{ts,mts,js,mjs,cjs,json}"
+      "*.{ts,mts,js,mjs,cjs,json}",
+      "!next-env.d.ts"
     ],
     "ignoreUnknown": true
   },
