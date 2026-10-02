@@ -120,4 +120,21 @@ export const columnLabels = {
     created: "Created",
     actions: "",
   },
+  // The two log tables. They were the last DataTables still spelling their
+  // headers out in the page - see ROADMAP R5.4.
+  auditLog: {
+    when: "When",
+    actor: "Actor",
+    role: "Role",
+    action: "Action",
+    entity: "Entity",
+    description: "Description",
+    changes: "Changes",
+  },
+  emailLog: {
+    when: "When",
+    to: "To",
+    subject: "Subject",
+    status: "Status",
+  },
 } as const

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
+import { columnLabels } from "@/config/table-column-labels"
 import { EmailLogDetailDialog } from "@/features/email-logs/dialogs/email-log-detail-dialog"
 import {
   fetchEmailLog,
@@ -139,7 +140,7 @@ export default function EmailLogsPage() {
     },
     {
       id: "createdAt",
-      header: "When",
+      header: columnLabels.emailLog.when,
       sortable: true,
       sortValue: (l) => l.createdAt,
       cell: (l) => (
@@ -150,21 +151,21 @@ export default function EmailLogsPage() {
     },
     {
       id: "to",
-      header: "To",
+      header: columnLabels.emailLog.to,
       sortable: true,
       sortValue: (l) => l.to,
       cell: (l) => <CellContent>{l.to}</CellContent>,
     },
     {
       id: "subject",
-      header: "Subject",
+      header: columnLabels.emailLog.subject,
       sortable: true,
       sortValue: (l) => l.subject,
       cell: (l) => <CellContent>{l.subject}</CellContent>,
     },
     {
       id: "status",
-      header: "Status",
+      header: columnLabels.emailLog.status,
       sortable: true,
       sortValue: (l) => l.status,
       cell: (l) => (
@@ -278,7 +279,9 @@ export default function EmailLogsPage() {
             getRowKey={(l) => l.id}
             initialSortId="createdAt"
             initialSortDir="desc"
-            emptyMessage={isLoading ? "Loading…" : "No email log entries yet."}
+            // Skeletons cover the first load, so only the empty-result branch
+            // is ever rendered here (ROADMAP R5.4).
+            emptyMessage="No email log entries yet."
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}

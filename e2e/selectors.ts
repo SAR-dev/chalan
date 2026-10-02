@@ -469,7 +469,6 @@ export const dialog = {
 export const pagination = {
   prev: (tableId: string) => `[data-testid='table-prev-${tableId}']`,
   next: (tableId: string) => `[data-testid='table-next-${tableId}']`,
-  pageSize: (tableId: string) => `[data-testid='table-page-size-${tableId}']`,
   csv: (tableId: string) => `[data-testid='table-csv-${tableId}']`,
   /** "Page X of Y" — the only thing that proves a page change landed. */
   pageLabel: (tableId: string) => `[data-testid='table-page-label-${tableId}']`,

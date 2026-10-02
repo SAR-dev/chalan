@@ -88,7 +88,6 @@ export function DataTable<T>({
   searchColumns,
   getSearchValue,
   pageSize,
-  pageSizeOptions,
   initialSortId,
   initialSortDir = "asc",
   emptyMessage = "No records to display.",
@@ -898,14 +897,11 @@ export function DataTable<T>({
           serverTotal={serverTotal}
           sortedLength={sorted.length}
           displayTotal={displayTotal}
-          pageSizeOptions={pageSizeOptions}
           size={size}
           page={currentPage}
           totalPages={totalPages}
           currentPage={currentPage}
           onPageChange={handlePageChange}
-          userChangedSize={userChangedSize}
-          setSize={setSize}
           setPage={setPage}
           refreshing={refreshing}
           setRefreshing={setRefreshing}

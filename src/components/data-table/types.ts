@@ -75,8 +75,6 @@ export interface DataTableProps<T> {
    * unset/unauthenticated. An explicit prop always wins over the account
    * default. Clamped to 1-250 regardless of source. */
   pageSize?: number
-  /** Selectable page sizes shown in the footer. */
-  pageSizeOptions?: number[]
   /** Column id to sort by initially. */
   initialSortId?: string
   initialSortDir?: SortDir

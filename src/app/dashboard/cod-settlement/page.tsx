@@ -1,8 +1,8 @@
 "use client"
 
 import { Banknote, CheckCircle2, Clock, Receipt } from "lucide-react"
+import dynamic from "next/dynamic"
 import { useState } from "react"
-import { AreaChart } from "@/components/charts"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { PageHeader } from "@/components/page-header"
 import { StatCardList } from "@/components/stat-card-list"
@@ -15,6 +15,16 @@ import {
 } from "@/components/ui/card"
 import { useOrderAnalytics } from "@/features/orders/hooks/use-order-analytics"
 import { formatTk } from "@/lib/pricing"
+
+// recharts is heavy and this chart only appears once the analytics payload has
+// arrived, so it ships as its own chunk rather than in the dashboard's initial
+// bundle. Importing the file directly also keeps the barrel's other charts out
+// (ROADMAP R5.10). `ssr: false` because there is nothing to draw until the
+// client has the data either.
+const AreaChart = dynamic(
+  () => import("@/components/charts/area-chart").then((m) => m.AreaChart),
+  { ssr: false },
+)
 
 export default function CodSettlementPage() {
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined)

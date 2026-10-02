@@ -4,7 +4,6 @@ import {
   readLocalFile,
   saveLocalFile,
 } from "./local"
-import { deleteR2File, listR2Files, readR2File, saveR2File } from "./r2"
 
 // Unified storage entry point. Set STORAGE_PROVIDER in your .env to switch
 // backends without touching any other code.
@@ -13,6 +12,12 @@ import { deleteR2File, listR2Files, readR2File, saveR2File } from "./r2"
 //   STORAGE_PROVIDER=r2         — uploads to Cloudflare R2, served from R2 URL
 //
 // Defaults to "local" if the var is unset, so existing dev setups keep working.
+//
+// The R2 driver is imported *lazily*, in each function below. `@aws-sdk/client-s3`
+// is a large dependency and the default `STORAGE_PROVIDER=local` never touches
+// R2, so a static import here made every storage route — including the
+// local-only ones — load and start the SDK (ROADMAP R5.10). `import()` resolves
+// to the same cached module, so the second and later calls cost nothing.
 
 export type StorageProvider = "local" | "r2"
 export type UploadResult = { path: string; publicUrl: string }
@@ -41,7 +46,10 @@ export async function saveFile(
 ): Promise<UploadResult> {
   const provider = getProvider()
 
-  if (provider === "r2") return saveR2File(relativePath, buffer, mimeType)
+  if (provider === "r2") {
+    const { saveR2File } = await import("./r2")
+    return saveR2File(relativePath, buffer, mimeType)
+  }
 
   // local — mimeType is unused by the local driver but kept in the signature
   // so call sites are identical regardless of provider.
@@ -55,7 +63,10 @@ export async function saveFile(
 export async function listFiles(): Promise<StoredFile[]> {
   const provider = getProvider()
 
-  if (provider === "r2") return listR2Files()
+  if (provider === "r2") {
+    const { listR2Files } = await import("./r2")
+    return listR2Files()
+  }
   return listLocalFiles()
 }
 
@@ -67,7 +78,10 @@ export async function listFiles(): Promise<StoredFile[]> {
 export async function deleteFile(key: string): Promise<void> {
   const provider = getProvider()
 
-  if (provider === "r2") return deleteR2File(key)
+  if (provider === "r2") {
+    const { deleteR2File } = await import("./r2")
+    return deleteR2File(key)
+  }
   return deleteLocalFile(key)
 }
 
@@ -81,6 +95,9 @@ export async function readFile(
 ): Promise<{ buffer: Buffer; contentType: string | null } | null> {
   const provider = getProvider()
 
-  if (provider === "r2") return readR2File(key)
+  if (provider === "r2") {
+    const { readR2File } = await import("./r2")
+    return readR2File(key)
+  }
   return readLocalFile(key)
 }
