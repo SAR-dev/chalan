@@ -242,11 +242,11 @@ which is why those classes of bug are absent. It does not catch the R2
 findings: `aria-current`, `aria-hidden` misuse, focus order, or keyboard
 operability are all outside its reach, so those still need a manual/aXe pass.)*
 
-### R5.8 Bundle, image and response-header weight
+*(Numbering skips R5.8: "AGENTS.md suite metadata is stale" was retired as a
+completed task - the drift it described was closed by the docs-drift
+assertions, and the quoted numbers now match the tree.)*
 
-*(Numbering skipped: R5.8, "AGENTS.md suite metadata is stale", was retired -
-the drift it described was closed by the docs-drift assertions and the numbers
-now match the tree, so it is a completed task rather than work.)*
+### R5.9 Bundle, image and response-header weight
 
 Real, but not the platform risk R3 was for. They share a theme: everything
 the server ships out the door.
