@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/api-auth"
 import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { profile, user } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -64,6 +65,10 @@ export const PATCH = withErrorHandler(
       description: `${updated.isActive ? "Activated" : "Deactivated"} account for ${targetUser?.name ?? id}`,
       metadata: diff ? { diff } : null,
     })
+
+    // Activating or deactivating a warehouse admin changes the overview's
+    // "warehouse admins" tile.
+    refreshStats(statTag("profile"))
 
     return NextResponse.json(updated)
   },

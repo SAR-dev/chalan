@@ -13,8 +13,11 @@ export default async function PayoutsPage() {
 
   const limit = 20
 
-  const [[{ total }], rows, stats] = await Promise.all([
-    dbRead.select({ total: sql<number>`count(*)::int` }).from(payoutRequest),
+  // Same shape as the merchants list: the per-status counts and the row total
+  // are one number computed twice. Summing the groups saves a full scan of
+  // `payout_request` per render and stays exact, which is what the pagination
+  // footer needs.
+  const [rows, stats] = await Promise.all([
     dbRead
       .select({
         id: payoutRequest.id,
@@ -43,6 +46,7 @@ export default async function PayoutsPage() {
   ])
 
   const statMap = Object.fromEntries(stats.map((s) => [s.status, s.count]))
+  const total = stats.reduce((sum, s) => sum + s.count, 0)
 
   return (
     <PayoutsPageClient

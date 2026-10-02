@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { rider } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -58,6 +59,8 @@ export const PATCH = withErrorHandler(
       entityId: updated.id,
       description: `${updated.isActive ? "Activated" : "Deactivated"} rider ${updated.name}`,
     })
+
+    refreshStats(statTag("rider"))
 
     return NextResponse.json(updated)
   },

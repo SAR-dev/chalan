@@ -9,6 +9,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { profile, rider } from "@/lib/db/schema"
 import { enqueueEmail, flushEmailOutbox } from "@/lib/email-outbox"
@@ -105,6 +106,10 @@ export const PATCH = withErrorHandler(
 
     // Best-effort immediate delivery; the cron retries anything left behind.
     await flushEmailOutbox()
+
+    // Moves three numbers at once: the overview's pending-riders tile, the
+    // rider tile row, and the applications queue's own counters.
+    refreshStats(statTag("rider"), statTag("profile"))
 
     return NextResponse.json(updated)
   },

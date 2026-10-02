@@ -10,6 +10,7 @@ import {
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -59,6 +60,8 @@ export const PATCH = withErrorHandler(
       description: `Reactivated merchant ${updated.businessName}`,
       metadata: diff ? { diff } : null,
     })
+
+    refreshStats(statTag("merchant"))
 
     return NextResponse.json(updated)
   },

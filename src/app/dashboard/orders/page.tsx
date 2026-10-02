@@ -1,7 +1,7 @@
 import { desc, sql } from "drizzle-orm"
-import { unstable_cache } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
+import { cachedStats, statTag } from "@/lib/cached-stats"
 import { dbRead } from "@/lib/db"
 import { order } from "@/lib/db/schema"
 import { loginRedirectPath } from "@/lib/login-redirect"
@@ -16,13 +16,11 @@ import { OrdersPageClient } from "./orders-client"
  * come from one `FILTER` aggregate, the same technique
  * `src/app/api/orders/counts/route.ts` already uses.
  *
- * Cached for 30s: these totals move at most once per order, so a short window
- * costs a dashboard tile nothing visible and saves a scan per render. No
- * arguments and no request-scoped reads inside the callback — `requireSession()`
- * stays outside it, above — so the cache key cannot vary with who is asking.
- * The `order-counts` tag is the invalidation hook for order writes.
+ * `cachedStats` supplies the 30s TTL, the `stat:order` tag that every order
+ * write expires, and the no-arguments rule that keeps the key role-independent
+ * — `requireSession()` stays outside the callback, above.
  */
-const getOrderCounts = unstable_cache(
+const getOrderCounts = cachedStats(
   async () => {
     // `::int` is required: Postgres bigint arrives as a JS string via
     // node-postgres, and `sql<number>` is a compile-time assertion only.
@@ -41,8 +39,7 @@ const getOrderCounts = unstable_cache(
       inProgress: row?.inProgress ?? 0,
     }
   },
-  ["dashboard-order-counts"],
-  { revalidate: 30, tags: ["order-counts"] },
+  { key: "dashboard-order-counts", tags: [statTag("order")] },
 )
 
 export default async function OrdersPage() {

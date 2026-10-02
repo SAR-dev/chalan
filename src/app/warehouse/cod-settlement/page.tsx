@@ -2,6 +2,7 @@ import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { requireSession } from "@/lib/api-auth"
+import { cachedStats, statTag } from "@/lib/cached-stats"
 import { dbRead } from "@/lib/db"
 import { sumMoney } from "@/lib/db/money-sql"
 import { deliveryCity, order, rider } from "@/lib/db/schema"
@@ -35,6 +36,39 @@ const ORDER_COLUMNS = {
   codSettledBy: order.codSettledBy,
 }
 
+/**
+ * Outstanding COD cash per rider for one warehouse, cached.
+ *
+ * This is a money figure, so the caching is deliberately narrow: the scope is
+ * the warehouse id (part of the key) and the set is "delivered, not yet handed
+ * over" — a balance that only moves when an order is delivered or a settlement
+ * is recorded, and both of those routes call `refreshStats`. The list total
+ * below stays uncached, because a pagination footer that lags behind a delivery
+ * is the one staleness a user would actually notice.
+ */
+const getRiderCashInHand = cachedStats(
+  async (warehouseId: string) =>
+    dbRead
+      .select({
+        riderId: order.deliveryRiderId,
+        riderName: rider.name,
+        cash: sumMoney(order.amountCollected),
+        orders: sql<number>`count(*)::int`,
+      })
+      .from(order)
+      .leftJoin(rider, eq(order.deliveryRiderId, rider.id))
+      .where(
+        and(
+          eq(order.warehouseId, warehouseId),
+          eq(order.status, "DELIVERED"),
+          isNull(order.codSettledAt),
+          isNotNull(order.deliveryRiderId),
+        ),
+      )
+      .groupBy(order.deliveryRiderId, rider.name),
+  { key: "warehouse-rider-cash", tags: [statTag("order"), statTag("rider")] },
+)
+
 export default async function WarehouseSettlementPage() {
   const me = await requireSession()
   if (!me) redirect(await loginRedirectPath())
@@ -60,27 +94,7 @@ export default async function WarehouseSettlementPage() {
       .where(and(warehouseScope, statusFilter))
       .orderBy(desc(order.createdAt))
       .limit(limit),
-    // Cash each delivery rider is holding: delivered but not yet settled with
-    // the warehouse (ROADMAP B3). The `codSettledAt` stamp is the handover
-    // record; this surfaces the outstanding balance per rider.
-    dbRead
-      .select({
-        riderId: order.deliveryRiderId,
-        riderName: rider.name,
-        cash: sumMoney(order.amountCollected),
-        orders: sql<number>`count(*)::int`,
-      })
-      .from(order)
-      .leftJoin(rider, eq(order.deliveryRiderId, rider.id))
-      .where(
-        and(
-          eq(order.warehouseId, me.warehouseId),
-          eq(order.status, "DELIVERED"),
-          isNull(order.codSettledAt),
-          isNotNull(order.deliveryRiderId),
-        ),
-      )
-      .groupBy(order.deliveryRiderId, rider.name),
+    getRiderCashInHand(me.warehouseId),
   ])
 
   return (

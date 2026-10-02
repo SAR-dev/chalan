@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { logAuditMany } from "@/lib/audit"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
@@ -34,6 +35,8 @@ export const PATCH = withErrorHandler(async (req: Request) => {
       description: `Reactivated merchant ${m.businessName}`,
     })),
   )
+
+  refreshStats(statTag("merchant"))
 
   return NextResponse.json({ ok: true, count: updated.length })
 })

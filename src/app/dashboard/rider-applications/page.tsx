@@ -13,8 +13,10 @@ export default async function RiderApplicationsPage() {
 
   const limit = 20
 
-  const [[{ total }], rows, stats] = await Promise.all([
-    dbRead.select({ total: sql<number>`count(*)::int` }).from(rider),
+  // One scan instead of two: `GROUP BY status` already sees every row, so the
+  // row total is the sum of the groups. Exact, unlike a cached total, which
+  // matters because this one is the pagination footer for the queue below.
+  const [rows, stats] = await Promise.all([
     dbRead
       .select({
         id: rider.id,
@@ -58,6 +60,7 @@ export default async function RiderApplicationsPage() {
   ])
 
   const statsMap = Object.fromEntries(stats.map((s) => [s.status, s.count]))
+  const total = stats.reduce((sum, s) => sum + s.count, 0)
 
   return (
     <RiderApplicationsPageClient

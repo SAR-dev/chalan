@@ -196,7 +196,12 @@ export default function NidReviewsPage() {
       align: "right",
       headClassName: "w-32",
       cell: (m) => (
-        <div className="flex items-center justify-end gap-2">
+        // `gap-3`, not `gap-2`: the R2.10 hit-area expander grows each 32px
+        // button to 44px, i.e. 6px past each edge. At 8px apart the targets
+        // overlap by 4px and the later button paints on top, so a click aimed at
+        // the right edge of "Approve" could reject instead. At 12px each button
+        // owns its own half of the gap.
+        <div className="flex items-center justify-end gap-3">
           {isNidPending(m) && (
             <>
               <Button

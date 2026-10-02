@@ -133,7 +133,10 @@ describe("Dashboard orders page - aggregate pass and cache (ROADMAP R3.7)", () =
     expect(cacheCalls).toHaveLength(1)
     const [{ keys, options }] = cacheCalls
     expect(keys).toContain("dashboard-order-counts")
-    expect(options.tags).toContain("order-counts")
+    // Namespaced via `statTag` so it cannot collide with an unrelated cache, and
+    // expired by `applyOrderTransition`/`applyBulkOrderTransition` — a tag
+    // nothing refreshes would leave this tile frozen until the TTL.
+    expect(options.tags).toContain("stat:order")
     expect(options.revalidate).toBeGreaterThanOrEqual(30)
     expect(options.revalidate).toBeLessThanOrEqual(60)
   })

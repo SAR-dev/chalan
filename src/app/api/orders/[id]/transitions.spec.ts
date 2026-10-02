@@ -134,6 +134,20 @@ vi.mock("@/lib/audit", () => ({
   logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
+// Every transition ends by expiring the dashboard stat tiles (ROADMAP R3.7).
+// Mocked rather than left real for two reasons: the real `revalidateTag` throws
+// "static generation store missing" outside a request, and the resulting
+// `logger.warn` reads the clock — which would show up in the batch-stamping
+// test below as extra `toISOString` reads and make it measure the logger rather
+// than the transition.
+const revalidatedTags: string[] = []
+vi.mock("next/cache", () => ({
+  revalidateTag: (tag: string) => {
+    revalidatedTags.push(tag)
+  },
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+}))
+
 type Handler = (
   req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -211,6 +225,7 @@ beforeEach(() => {
   dbState.insertResult = []
   dbState.insertPayloads = []
   sessionState.value = null
+  revalidatedTags.length = 0
   vi.mocked(logAudit).mockClear()
 })
 
@@ -1752,6 +1767,41 @@ describe("bulk transition batch cost (ROADMAP R3.5)", () => {
     } finally {
       clock.mockRestore()
     }
+  })
+
+  it("expires the dashboard stat tiles after a successful transition", async () => {
+    // ROADMAP R3.7. The cached tiles on /dashboard, /dashboard/riders and
+    // /warehouse/cod-settlement would otherwise keep serving pre-transition
+    // numbers until the 30s TTL ran out. Asserted here because a missing
+    // `refreshStats` call is invisible: the write succeeds, the response is
+    // 200, and only the tile is quietly wrong.
+    sessionState.value = superAdmin
+    dbState.selectQueue = [
+      [makeOrder({ id: "order_a" })],
+      [{ status: "ACTIVE" }],
+    ]
+    dbState.updateResult = [makeOrder({ id: "order_a", status: "APPROVED" })]
+
+    const res = await applyBulkOrderTransition("approve", ["order_a"], {})
+
+    expect(res.status).toBe(200)
+    expect(revalidatedTags).toContain("stat:order")
+  })
+
+  it("leaves the tiles alone when the transition was rejected", async () => {
+    // A guard rejection means nothing was written, so expiring the tiles would
+    // throw away a cache entry that is still correct.
+    sessionState.value = superAdmin
+    // Not APPROVED-able: already APPROVED, so the guard refuses it.
+    dbState.selectQueue = [
+      [makeOrder({ id: "order_a", status: "APPROVED" })],
+      [{ status: "APPROVED" }],
+    ]
+
+    const res = await applyBulkOrderTransition("approve", ["order_a"], {})
+
+    expect(res.status).toBeGreaterThanOrEqual(400)
+    expect(revalidatedTags).toEqual([])
   })
 
   it("still writes one status-history row per order", async () => {

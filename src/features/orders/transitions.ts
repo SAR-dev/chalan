@@ -17,6 +17,7 @@ import {
   orderChargeReversalAmount,
   toPaisa,
 } from "@/lib/balance-ledger"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
 import {
@@ -1016,6 +1017,15 @@ export async function applyOrderTransition(
     return NextResponse.json(updated)
   })
 
+  // After the transaction commits, not inside it: a tag expired before the write
+  // lands would let the next read repopulate the cache from pre-write state.
+  // Every status change in the system funnels through this function or
+  // `applyBulkOrderTransition`, so this is the one place the order tiles and the
+  // COD cash figures have to be told (ROADMAP R3.7).
+  if (response.ok) {
+    refreshStats(statTag("order"), statTag("rider"))
+  }
+
   return response
 }
 
@@ -1184,6 +1194,12 @@ export async function applyBulkOrderTransition(
 
     return NextResponse.json({ ok: true, count: updated.length })
   })
+
+  // See `applyOrderTransition`: expired after commit, and only on success, so a
+  // rejected batch does not throw away a cache entry that is still correct.
+  if (response.ok) {
+    refreshStats(statTag("order"), statTag("rider"))
+  }
 
   return response
 }

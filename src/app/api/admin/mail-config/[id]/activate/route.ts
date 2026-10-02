@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { forbidden, notFound } from "@/lib/api-response"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { mailConfig } from "@/lib/db/schema"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -52,6 +53,11 @@ export const PATCH = withErrorHandler(
       .from(mailConfig)
       .where(eq(mailConfig.id, id))
       .limit(1)
+
+    // The overview shows a "mail not configured" warning derived from this
+    // table, and SMTP going live or being superseded is exactly when an admin
+    // goes looking for it.
+    refreshStats(statTag("mail-config"))
 
     return NextResponse.json(
       updated ? { ...updated, pass: updated.pass ? "••••••••" : "" } : updated,

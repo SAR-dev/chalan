@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { conflict, forbidden, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { DEFAULT_TABLE_ROWS_PER_PAGE } from "@/lib/constants"
 import { db, dbRead } from "@/lib/db"
 import { warehouse } from "@/lib/db/schema"
@@ -119,6 +120,8 @@ export const POST = withErrorHandler(async (req: Request) => {
     entityId: created.id,
     description: `Created warehouse ${created.name} (${created.city})`,
   })
+
+  refreshStats(statTag("warehouse"))
 
   return NextResponse.json(created, { status: 201 })
 })

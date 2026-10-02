@@ -101,7 +101,13 @@ export function TableFooter<T>({
             >
               Page {page} of {totalPages}
             </span>
-            <div className="flex items-center gap-1">
+            {/* `gap-3`, not `gap-1`: the R2.10 hit-area expander grows each 32px button
+             * to 44px, i.e. 6px past each edge. At 4px apart the two expanders
+             * overlap, and the later one paints on top — so a click aimed at the
+             * right edge of "Previous page" would advance the page instead of
+             * going back. At 12px they meet at the midpoint and each button owns
+             * its own half of the gap. */}
+            <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="icon"

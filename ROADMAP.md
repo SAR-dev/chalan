@@ -89,7 +89,7 @@ when its fix is reverted. Full detail lives in git history under the id.
 ---
 # R2 — Accessibility (WCAG 2.1 AA)
 
-**9 of 10 shipped.** Ordered by user impact. Every "0 hits" claim the audit
+**10 of 10 shipped.** Ordered by user impact. Every "0 hits" claim the audit
 made below was verified by grep before it was fixed — `aria-current`,
 `prefers-reduced-motion` and `aria-describedby` all went from zero to present.
 
@@ -104,26 +104,64 @@ made below was verified by grep before it was fixed — `aria-current`,
 | R2.7 | `role="status"` on the DataTable refresh overlay and on all four shells' auth-init spinners, each with an `sr-only` label |
 | R2.8 | `DialogDescription` / `SheetDescription` on four dialogs, plus an `sr-only` `DialogTitle` on `image-zoom`, which had none at all |
 | R2.9 | Light `--muted-foreground` `0.55` → `0.50`, clearing 4.5:1 on `--muted` (was ~4.32:1) |
+| R2.10 | `.hit-target-44` `::after` hit-area expander in `globals.css`, carried by `relative` in the `buttonVariants` base — see below |
 
-### R2.10 Touch targets on the densest controls
+### R2.10 Touch targets on the densest controls — shipped
 
-`src/components/ui/button.tsx:22-33` — `h-7` (28px), `h-6` (24px), `size-6`
+`src/components/ui/button.tsx:22-33` - `h-7` (28px), `h-6` (24px), `size-6`
 (24px) variants. WCAG 2.5.8 (AA) requires 24px so this technically passes;
 2.5.5 (AAA, 44px) is missed everywhere. It bites in exactly the context this
-product is for — riders and warehouse staff on phones.
+product is for - riders and warehouse staff on phones.
 
-**Fix:** raise the floor to `min-h-11 min-w-11` on icon variants (or a
-non-layout-affecting `::after` hit-area expander).
-
-**Deliberately awaiting a decision:** it passes AA today, and the fix is a
-visual redesign of every button in the system — likely to break the mobile
-layout specs (`26-toast-responsive`, `27-sign-out`).
+> **As shipped.** The `::after` expander rather than real button sizes: enlarging
+> `h-6`→`h-11` on every icon button reflows every toolbar and dialog header in
+> the product, and two e2e suites assert on that layout. The pseudo-element
+> grows the *hit* area to `max(100%, 44px)` and centres itself with
+> `translate: -50% -50%` while the painted box stays exactly as it was — no
+> layout shift, no visual diff, and buttons already ≥44px are untouched.
+>
+> Three details that are load-bearing rather than stylistic:
+>
+> - **`relative` lives in the `cva` base, not the CSS rule.** `cn()` runs
+>   `twMerge`, which resolves `relative` against a caller's `absolute`/`fixed` and
+>   keeps only the latter. A `position: relative` declared in CSS instead would
+>   be fought by Tailwind utilities on source order — and the dialog/sheet close
+>   buttons (`dialog.tsx:65`, `sheet.tsx:71`) *are* `absolute`.
+> - **`.absolute.hit-target-44::after, .fixed.hit-target-44::after { content:
+>   none }`.** Those buttons lose their positioning context, so an unguarded
+>   `::after` would anchor to an outer container and silently swallow clicks
+>   across that region. This is the one thing here that could break interaction
+>   rather than just miss a guideline.
+> - **`max(100%, 44px)`, not `44px`**, so the rule is safe on the base class and
+>   leaves already-large buttons alone rather than needing per-variant opt-outs.
+>
+> **Fourth detail, found the hard way.** The expander has a silent failure mode:
+> two buttons close enough that their 44px targets overlap, where the *later*
+> one in DOM order paints on top. Nothing is visible - the button looks right,
+> the target really is 44px - but a click aimed at one button's edge lands on
+> the other, which for a prev/next pair means the wrong direction. Two places
+> were doing it: `data-table/pagination.tsx` had prev/next at `gap-1` (4px apart,
+> 8px of overlap) and `dashboard/nid-reviews` had Approve/Reject/View at `gap-2`
+> (8px apart, 4px of overlap - a click near "Approve"'s right edge could reject).
+> Both moved to `gap-3`, which is exactly the tightest correct value: two 32px
+> buttons need `((44-32) + (44-32)) / 2 = 12px`, so at 12px each expander owns
+> its own half of the gap. Since it cannot be seen, `button.spec.tsx` now scans
+> every container in `src/` for adjacent square buttons whose gap is short of
+> that and fails on it. That guard is what found the `nid-reviews` pair after
+> pagination had already been fixed by eye.
+>
+> `button.spec.tsx` asserts the mechanism (hook on every variant, CSS really says
+> `max(100%, 44px)`, guard present, `twMerge` drops `relative` for an `absolute`
+> caller) because jsdom has no layout engine and cannot measure the result; the
+> pixel proof would need a browser. The overlap guard is the one piece of this
+> that *is* mechanical, and it is verified non-vacuous: put `gap-1` back and it
+> fails with the overlap in the message.
 
 ---
 
 # R3 — Platform, ops & performance
 
-**10 of 11 shipped** (R3.7 partly — see its note). Each item below carries a
+**11 of 11 shipped.** Each item below carries a
 `**As shipped**` note recording what actually landed, which is not always what
 the item proposed; two proposals were corrected on the evidence, and those
 corrections are stated rather than quietly dropped.
@@ -136,7 +174,7 @@ corrections are stated rather than quietly dropped.
 | R3.4 | `config.yml` untracked and gitignored (not deleted — local tunnels keep working), with a committed `config.example.yml` placeholder. `chalan.sarn.top` in `deploy.yml` is kept as the single documented deploy default; the asserted invariant is narrower and more honest: *no bare `sarn.top` and no tunnel UUID* anywhere in deployment config |
 | R3.5 | Guard lookups memoised per distinct key for the length of one transaction (`ctx.cache`), so a batch pays for each merchant, lane and rider **once** instead of once per order; identical `SET` payloads grouped into `UPDATE … WHERE id IN (…)`. Requires one timestamp per batch (`ctx.now`) — previously every row stamped its own clock, so no two `SET`s could ever have been equal. A 100-row approve went from ~500 reads + 100 writes to 5 reads + 1 write |
 | R3.6 | New `logAuditMany()`; all eight `Promise.all(logAudit(...))` endpoints converted — they opened up to 100 concurrent pool connections per request |
-| R3.7 | `dashboard/orders` counts merged into one `FILTER` aggregate (was an unpredicated `count(*)` + `GROUP BY status` on every render) behind `unstable_cache` with an `order-counts` tag and a 30 s TTL; `requireSession()` deliberately left *outside* the cached callback so the key cannot vary with who is asking. Analytics delivery-performance + COD-summary merged into one `FILTER` query (4 → 3). **Not shipped:** the ~20 other list endpoints and `dashboard/*` pages that still recompute `count(*)` per render |
+| R3.7 | `dashboard/orders` counts merged into one `FILTER` aggregate (was an unpredicated `count(*)` + `GROUP BY status` on every render) behind `unstable_cache`; `requireSession()` deliberately left *outside* the cached callback. Analytics delivery-performance + COD-summary merged into one `FILTER` query (4 → 3). Widened to the app via `src/lib/cached-stats.ts`: scope-as-cache-key-arguments, mandatory tags with real `refreshStats` callers, and the overview/riders/COD tiles cached. **Correction:** the "~20 list endpoints" claim was wrong — those are pagination totals, not stat tiles, so they stay exact; where a page ran a redundant `count(*)` alongside its own `GROUP BY` (merchants, payouts, rider-applications) the total is now the sum of the groups, removing the scan with no staleness |
 | R3.8 | `order_package_id_idx` + `order_package_tier_id_idx` (both `ON DELETE set null`, so every package/tier delete seq-scanned the largest table) and `user_created_at_idx` — the `user` table had only trigram GINs while two endpoints `ORDER BY createdAt DESC` |
 | R3.9 | Partial indexes on `user.activationToken` and `merchant.emailVerificationToken`: both are **unauthenticated** lookups that were seq-scanning whole tables |
 | R3.10 | Search split into per-table `EXISTS` subqueries (`select 1 from … where <correlated>`) instead of one OR spanning every joined table, so each trigram index can serve its own table and the joins are no longer needed *to filter*. The count query dropped its joins entirely — a filter no longer requires them. Note drizzle's `exists()` helper is not used: these subqueries are correlated on `order` and only hand-built `EXISTS (…)` expresses that |
@@ -249,37 +287,68 @@ rows are added within the same merchant and lane.
   (`src/app/api/orders/route.ts:155-165`) — and for `SUPER_ADMIN` the `where`
   is `undefined` (`:88-89`), so the count is unpredicated again.
 
-There is **no caching layer at all** — no `unstable_cache`, no cache tags, no
+There is **no caching layer at all** - no `unstable_cache`, no cache tags, no
 `revalidate`. Redis exists but is used only for rate limiting
 (`src/lib/rate-limit.ts`). The same per-render `count(*)` shape repeats across
-~20 list endpoints and every `dashboard/*` server page
-(`dashboard/page.tsx:21-57` alone runs 6 counts).
+every `dashboard/*` server page (`dashboard/page.tsx:21-57` alone runs 6 counts).
 
 Related: `src/app/api/orders/analytics/route.ts:77-147` runs four separate
 aggregate queries (`ordersByDay`, `ordersByStatus`, `deliveryPerformance`,
-`codSummary`) sharing one identical `WHERE` (`:64`) — for `SUPER_ADMIN` that
+`codSummary`) sharing one identical `WHERE` (`:64`) - for `SUPER_ADMIN` that
 predicate is only `createdAt >= now-30d` (`:63`), so the same index range is
 walked four times per dashboard poll. The three non-`groupBy` aggregates
 collapse into **one** pass with `FILTER`, exactly the technique already used in
 `src/app/api/orders/counts/route.ts:40-47`.
 
-**Fix:** `unstable_cache` with tags and a 30–60 s TTL on the aggregates; merge
+**Fix:** `unstable_cache` with tags and a 30-60 s TTL on the aggregates; merge
 the analytics passes with `FILTER`.
 
 > **As shipped.** Both proposed halves done for this page: the two full passes
-> are one `FILTER` aggregate behind `unstable_cache` (`order-counts` tag, 30 s
-> TTL), and the analytics delivery-performance + COD-summary passes are one
-> query (4 → 3). The recent-orders scan itself is deliberately *not* cached —
-> it is a `LIMIT 20` index walk, and it is the data on screen.
+> are one `FILTER` aggregate behind `unstable_cache`, and the analytics
+> delivery-performance + COD-summary passes are one query (4 → 3). The
+> recent-orders scan itself is deliberately *not* cached - it is a `LIMIT 20`
+> index walk, and it is the data on screen.
 >
-> **Still open:** `requireSession()` is outside the cached callback, so the
-> cache key is role-independent — correct only because this page is
-> `SUPER_ADMIN`-only. Any page needing a *scoped* aggregate must rebuild its
-> `where` from plain serialisable scope values and pass those as cache-key
-> parts. The wider claim in the item — ~20 list endpoints and every
-> `dashboard/*` server page recomputing `count(*)` per render — is untouched and
-> would be the natural next step; nothing here invalidates on write yet, so the
-> tag is a hook with no caller.
+> Then widened to the rest of the app via `src/lib/cached-stats.ts`, which
+> closes the two loose ends this item left. Both were failure modes that a
+> per-page review cannot see:
+>
+> - **A tag with no caller.** `cachedStats` refuses to build an entry with no
+>   tags, and `refreshStats` is the one way writes expire them. `transitions.ts`
+>   is the choke point every one of the 26 order status routes funnels through,
+>   so two functions cover all of them; merchants, rider applications, the
+>   rider toggle, warehouses, mail-config activation and team activation cover
+>   the rest. A spec walks `src/` and fails on any cached tag nothing refreshes,
+>   which is how the last two orphans were found.
+> - **A role-independent key.** `cachedStats` takes scope as *arguments*, and
+>   Next includes them in the key (`invocationKey = fixedKey +
+>   JSON.stringify(args)`, `unstable-cache.js:79`) — pinned by a spec against the
+>   installed Next, because dropping arguments from that key would leak one
+>   warehouse's riders to another warehouse's admin and nothing else would
+>   notice. `warehouse/riders` is the page where that is load-bearing.
+>
+> Tiles cached: overview (all six, as **one** entry so the row cannot render
+> half-updated), `dashboard/riders`, `warehouse/riders` (warehouse-scoped),
+> `warehouse/cod-settlement` cash-in-hand, `dashboard/orders`.
+>
+> `refreshStats` swallows and logs a failure. `revalidateTag` throws
+> "Invariant: static generation store missing" outside a request, which turned
+> every *successful* approval into a 500 — the write had already committed, and
+> failing it over a cache hint is strictly worse than a tile that is 30 s old.
+>
+> **Correction to the item's own claim.** The wider scope was described as "~20
+> list endpoints" recomputing `count(*)` per render. That is wrong in a way that
+> matters: those are almost all **pagination totals** — the `initialTotal` seed
+> for a `serverPaginated` table — not displayed aggregates. A pagination footer
+> is expected to move the moment the user acts, depends on the whole active
+> filter set, and is visible on screen; caching it is a UX regression, not a
+> win. Since R3.10 those counts are also join-free index-only scans. So the
+> API totals are deliberately left exact.
+>
+> Where such a page *also* runs a `GROUP BY` over the same table for tab badges,
+> the total is now the sum of the groups — `dashboard/merchants`, `dashboard/payouts`,
+> `dashboard/rider-applications`. That removes the redundant scan outright with
+> no staleness at all, which strictly beats caching a number the user watches.
 
 ### R3.10 Cross-table `ILIKE OR` search defeats every trigram index
 
