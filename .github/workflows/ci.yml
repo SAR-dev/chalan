@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -44,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -92,7 +92,7 @@ jobs:
       # fails the job with "Path Validation Error: Path(s) specified in the
       # action for caching do(es) not exist". The cache and the install have to
       # travel together — ci-workflow.spec.ts enforces that across every job.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       # Advisory gate (H1): blocks on any high/critical vulnerability in the
@@ -115,7 +115,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -157,7 +157,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -204,7 +204,7 @@ jobs:
   #     steps:
   #       - uses: actions/checkout@v4
   #       - uses: pnpm/action-setup@v4
-  #       - uses: actions/setup-node@v4
+  #       - uses: actions/setup-node@v7
   #         with:
   #           node-version: 24
   #           cache: pnpm
