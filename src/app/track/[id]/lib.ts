@@ -1,17 +1,22 @@
 import { eq, or } from "drizzle-orm"
-import {
-  Bike,
-  CheckCircle2,
-  ClipboardCheck,
-  PackageCheck,
-  Truck,
-  Warehouse,
-} from "lucide-react"
 import { cache } from "react"
 import { db } from "@/lib/db"
 import { merchant, order, rider, warehouse } from "@/lib/db/schema"
-import { formatDateTime } from "@/lib/format"
 import type { Order, OrderStatus } from "@/lib/types"
+
+export type { StepKey, TimelineStep } from "@/lib/order-timeline"
+// ─── timeline ────────────────────────────────────────────────────────────────
+//
+// The step list, its ranks and its formatter live in `@/lib/order-timeline`,
+// shared with the admin order table. This module pulls in `db`, so it can never
+// be the shared home — but its components import from here, so everything is
+// re-exported and `./lib` stays their single import point.
+export {
+  formatStamp,
+  STATUS_RANK,
+  STEPS,
+  stepDescription,
+} from "@/lib/order-timeline"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -30,103 +35,7 @@ export function generalArea(o: Order) {
   return [area, o.deliveryCity].filter(Boolean).join(", ")
 }
 
-export function formatStamp(iso?: string | Date | null) {
-  if (!iso) return null
-  const d = typeof iso === "string" ? new Date(iso) : iso
-  if (Number.isNaN(d.getTime())) return null
-  // Pinned to the business zone and locale: this runs **server-side**, so a
-  // bare `toLocaleString` rendered whatever the container's zone happened to
-  // be — a customer in Dhaka and an ops user in the same office could read
-  // different times for one order (ROADMAP R3.3).
-  return formatDateTime(d, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-}
-
-// ─── types ───────────────────────────────────────────────────────────────────
-
-export type StepKey =
-  | "PLACED"
-  | "APPROVED"
-  | "PICKED_UP"
-  | "IN_WAREHOUSE"
-  | "OUT_FOR_DELIVERY"
-  | "DELIVERED"
-
-export const STATUS_RANK: Record<OrderStatus, number> = {
-  PENDING: 0,
-  APPROVED: 1,
-  PICKED_UP: 2,
-  IN_WAREHOUSE: 3,
-  IN_TRANSIT: 3,
-  OUT_FOR_DELIVERY: 4,
-  DELIVERED: 5,
-  FAILED_ATTEMPT: 4,
-  RETURNED: 4,
-  CANCELLED: 0,
-}
-
-export const STEPS: {
-  key: StepKey
-  label: string
-  description: string
-  icon: React.ComponentType<{ className?: string }>
-  rank: number
-  timestamp: (o: Order) => string | Date | null | undefined
-}[] = [
-  {
-    key: "PLACED",
-    label: "Order placed",
-    description: "Merchant created the shipment",
-    icon: ClipboardCheck,
-    rank: 0,
-    timestamp: (o) => o.createdAt,
-  },
-  {
-    key: "APPROVED",
-    label: "Approved",
-    description: "Verified and ready for pickup",
-    icon: PackageCheck,
-    rank: 1,
-    timestamp: (o) => o.approvedAt,
-  },
-  {
-    key: "PICKED_UP",
-    label: "Picked up",
-    description: "Rider collected from merchant",
-    icon: Bike,
-    rank: 2,
-    timestamp: (o) => o.pickedUpAt,
-  },
-  {
-    key: "IN_WAREHOUSE",
-    label: "At sorting hub",
-    description: "Arrived at the delivery hub",
-    icon: Warehouse,
-    rank: 3,
-    timestamp: (o) => o.receivedAtWarehouseAt,
-  },
-  {
-    key: "OUT_FOR_DELIVERY",
-    label: "Out for delivery",
-    description: "Rider is heading to you now",
-    icon: Truck,
-    rank: 4,
-    timestamp: (o) => o.outForDeliveryAt ?? o.dispatchedAt,
-  },
-  {
-    key: "DELIVERED",
-    label: "Delivered",
-    description: "Handed to the recipient",
-    icon: CheckCircle2,
-    rank: 5,
-    timestamp: (o) => o.deliveredAt,
-  },
-]
+// ─── status copy ─────────────────────────────────────────────────────────────
 
 export const STATUS_COPY: Record<
   OrderStatus,

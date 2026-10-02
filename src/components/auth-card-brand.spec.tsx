@@ -30,6 +30,16 @@ describe("AuthCardBrand", () => {
     )
   })
 
+  // `/activate` and `/activated` are single-column with no brand panel at any
+  // width, so this lockup is the entire brand - hiding it above `lg` would
+  // leave large viewports with none.
+  it("stays visible from lg up when the page has no brand panel", () => {
+    render(<AuthCardBrand hideOnLarge={false} />)
+    const cls = screen.getByTestId("auth-card-brand").className
+    expect(cls).not.toContain("lg:hidden")
+    expect(cls).toContain("flex items-center")
+  })
+
   it("is left-aligned by default and centred on request", () => {
     const { rerender } = render(<AuthCardBrand />)
     expect(screen.getByTestId("auth-card-brand").className).not.toContain(

@@ -25,4 +25,18 @@ describe("/activated", () => {
     render(<ActivatedPage />)
     expect(document.querySelector("main#main-content")).not.toBeNull()
   })
+
+  // The single-column screens carry their own brand, so the lockup must not
+  // disappear at `lg` the way it does on the split-layout pages.
+  it("places the brand inside the card, visible at every width", () => {
+    render(<ActivatedPage />)
+
+    const brand = screen.getByTestId("auth-card-brand")
+    const card = brand.closest('[data-slot="card"]')
+    expect(card).not.toBeNull()
+    expect(card?.contains(brand)).toBe(true)
+    expect(brand.className).not.toContain("lg:hidden")
+    // Centred, matching the header it now sits in.
+    expect(brand.className).toContain("justify-center")
+  })
 })

@@ -1,118 +1,17 @@
 "use client"
 
-import {
-  Ban,
-  Bike,
-  CheckCircle2,
-  ClipboardCheck,
-  ImageOff,
-  PackageCheck,
-  Truck,
-  Undo2,
-  Warehouse,
-  XCircle,
-} from "lucide-react"
+import { Ban, ImageOff, Undo2, XCircle } from "lucide-react"
 import { Fragment } from "react"
 import { ImageZoom } from "@/components/image-zoom"
-import { formatDateTime } from "@/lib/format"
-import type { Order, OrderStatus } from "@/lib/types"
+import {
+  formatStamp,
+  STATUS_RANK,
+  STEPS,
+  type StepKey,
+  stepDescription,
+} from "@/lib/order-timeline"
+import type { Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
-
-type StepKey =
-  | "PLACED"
-  | "APPROVED"
-  | "PICKED_UP"
-  | "IN_WAREHOUSE"
-  | "OUT_FOR_DELIVERY"
-  | "DELIVERED"
-
-const STATUS_RANK: Record<OrderStatus, number> = {
-  PENDING: 0,
-  APPROVED: 1,
-  PICKED_UP: 2,
-  IN_WAREHOUSE: 3,
-  IN_TRANSIT: 3,
-  OUT_FOR_DELIVERY: 4,
-  DELIVERED: 5,
-  FAILED_ATTEMPT: 4,
-  RETURNED: 4,
-  CANCELLED: 0,
-}
-
-const STEPS: {
-  key: StepKey
-  label: string
-  description: string
-  icon: React.ComponentType<{ className?: string }>
-  rank: number
-  timestamp: (o: Order) => string | null | undefined
-}[] = [
-  {
-    key: "PLACED",
-    label: "Order placed",
-    description: "Merchant created the shipment",
-    icon: ClipboardCheck,
-    rank: 0,
-    timestamp: (o) => o.createdAt,
-  },
-  {
-    key: "APPROVED",
-    label: "Approved",
-    description: "Verified and ready for pickup",
-    icon: PackageCheck,
-    rank: 1,
-    timestamp: (o) => o.approvedAt,
-  },
-  {
-    key: "PICKED_UP",
-    label: "Picked up",
-    description: "Rider collected from merchant",
-    icon: Bike,
-    rank: 2,
-    timestamp: (o) => o.pickedUpAt,
-  },
-  {
-    key: "IN_WAREHOUSE",
-    label: "At sorting hub",
-    description: "Arrived at the delivery hub",
-    icon: Warehouse,
-    rank: 3,
-    timestamp: (o) => o.receivedAtWarehouseAt,
-  },
-  {
-    key: "OUT_FOR_DELIVERY",
-    label: "Out for delivery",
-    description: "Rider is heading to the recipient",
-    icon: Truck,
-    rank: 4,
-    timestamp: (o) => o.outForDeliveryAt ?? o.dispatchedAt,
-  },
-  {
-    key: "DELIVERED",
-    label: "Delivered",
-    description: "Handed to the recipient",
-    icon: CheckCircle2,
-    rank: 5,
-    timestamp: (o) => o.deliveredAt,
-  },
-]
-
-function formatStamp(iso?: string | null) {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  // Same shape as `track/[id]/lib.ts`'s `formatStamp` — those two used to
-  // disagree (`undefined` locale here, `"en-US"` there, neither with a zone),
-  // so the timeline and the order header could show different times for one
-  // event (ROADMAP R3.3).
-  return formatDateTime(d, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-}
 
 type RiderInfo = { name: string; phone: string; zone: string }
 type WarehouseInfo = { name: string; city: string }
@@ -260,7 +159,7 @@ export function TrackingTimeline({
                   </p>
                 ) : (
                   <p className="text-muted-foreground/50 mt-1 text-xs">
-                    {step.description}
+                    {stepDescription(step, "ops")}
                   </p>
                 )}
                 {detail && (

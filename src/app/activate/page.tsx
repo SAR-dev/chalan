@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, Lock, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { FormEvent, Suspense, useState } from "react"
+import { AuthCardBrand } from "@/components/auth-card-brand"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -16,10 +17,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { siteConfig } from "@/config/site"
 import { authClient } from "@/lib/auth-client"
-
-const BrandIcon = siteConfig.icon
 
 function ActivateForm() {
   const router = useRouter()
@@ -79,20 +77,12 @@ function ActivateForm() {
       </div>
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <Link
-            href="/"
-            className="mb-8 flex items-center justify-center gap-2"
-          >
-            <div className="flex size-9 items-center justify-center rounded-lg">
-              <BrandIcon className="size-5" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              {siteConfig.name}
-            </span>
-          </Link>
-
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="flex flex-col gap-1">
+              {/* Mobile brand: inside the card, so a phone shows one framed
+                  box instead of a detached logo above a second frame. This page
+                  has no large-screen brand panel, so it stays visible at `lg`. */}
+              <AuthCardBrand center hideOnLarge={false} className="mb-3" />
               <CardTitle className="text-2xl">
                 {done ? "Account activated" : "Activate your account"}
               </CardTitle>

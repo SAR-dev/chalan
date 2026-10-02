@@ -1,6 +1,6 @@
 import fs from "node:fs"
-import { config as loadEnv } from "dotenv"
 import { defineConfig, devices } from "@playwright/test"
+import { config as loadEnv } from "dotenv"
 
 // E2E can run against its own env file. If `.env.e2e` exists it is loaded here,
 // into the Playwright runner process, so every child inherits it:

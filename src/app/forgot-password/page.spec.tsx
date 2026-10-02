@@ -91,4 +91,18 @@ describe("Forgot password page", () => {
       }),
     )
   })
+
+  // The split brand panel covers `lg` and up, so this lockup is the mobile one
+  // only - and it belongs inside the card, not floating above a second frame.
+  it("places the mobile brand inside the card, not above it", async () => {
+    await importPage()
+
+    const brand = screen.getByTestId("auth-card-brand")
+    const card = brand.closest('[data-slot="card"]')
+    expect(card).not.toBeNull()
+    expect(card?.contains(brand)).toBe(true)
+    expect(brand.className).toContain("lg:hidden")
+    // Back into the sign-in flow, not to the site root.
+    expect(brand).toHaveAttribute("href", "/login")
+  })
 })

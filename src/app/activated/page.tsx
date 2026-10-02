@@ -1,5 +1,6 @@
 import { PartyPopper } from "lucide-react"
 import Link from "next/link"
+import { AuthCardBrand } from "@/components/auth-card-brand"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -10,14 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { siteConfig } from "@/config/site"
 
 export const metadata = {
   title: "Account activated",
   description: "Your account has been activated. Sign in to continue.",
 }
-
-const BrandIcon = siteConfig.icon
 
 // Landing page for a freshly activated account. The activation flow signs the
 // visitor out of whatever session they had and sends them here, so the only
@@ -33,20 +31,11 @@ export default function ActivatedPage() {
       </div>
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <Link
-            href="/"
-            className="mb-8 flex items-center justify-center gap-2"
-          >
-            <div className="flex size-9 items-center justify-center rounded-lg">
-              <BrandIcon className="size-5" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              {siteConfig.name}
-            </span>
-          </Link>
-
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="flex flex-col items-center gap-3 text-center">
+              {/* Inside the card rather than floating above it, and visible at
+                  every width: this page has no large-screen brand panel. */}
+              <AuthCardBrand center hideOnLarge={false} />
               <div className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 flex size-12 items-center justify-center rounded-full border">
                 <PartyPopper className="size-6 text-green-600 dark:text-green-400" />
               </div>

@@ -61,6 +61,20 @@ describe("/activate", () => {
     })
   })
 
+  // Below `lg` this screen has no brand panel at all, so the lockup is the
+  // only logo the page has at any width - hence `hideOnLarge={false}`.
+  // Asserted by DOM containment, so it holds at any viewport.
+  it("places the mobile brand inside the card, not above it", () => {
+    render(<ActivatePage />)
+
+    const brand = screen.getByTestId("auth-card-brand")
+    const card = brand.closest('[data-slot="card"]')
+    expect(card).not.toBeNull()
+    expect(card?.contains(brand)).toBe(true)
+    // Still present from `lg` up, where this page has no other brand.
+    expect(brand.className).not.toContain("lg:hidden")
+  })
+
   it("keeps the visitor on the form when activation fails", async () => {
     vi.stubGlobal(
       "fetch",
