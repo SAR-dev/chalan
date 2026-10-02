@@ -10,34 +10,18 @@ export interface OrderEmailData {
   merchantName: string
   recipientName: string
   deliveryAddress: string
-  hidePlatformBranding?: boolean
 }
 
 export interface MerchantEmailData {
   ownerName: string
   businessName: string
   verificationUrl?: string
-  hidePlatformBranding?: boolean
 }
 
 export interface MerchantVerifyEmailData {
   ownerName: string
   businessName: string
   verificationUrl: string
-  hidePlatformBranding?: boolean
-}
-
-/**
- * Fields every merchant-scoped template threads into the shared builder.
- *
- * Only `hidePlatformBranding` is left. `brandColor` used to ride along here
- * too, but emails are greyscale now, so a colour reaching this point would
- * have nowhere to go — it was dropped rather than left unused, which would
- * have looked like a working feature. The merchant branding setting itself is
- * untouched; it still themes the web UI.
- */
-function brandFields(data: { hidePlatformBranding?: boolean }) {
-  return { hidePlatformBranding: data.hidePlatformBranding }
 }
 
 // ---------------------------------------------------------------------------
@@ -51,15 +35,10 @@ const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? ""
 function renderText(
   status: string,
   lines: (string | false | null | undefined)[],
-  opts?: { hidePlatformBranding?: boolean },
 ): string {
   const body = lines.filter(Boolean).join("\n\n")
-  const header = opts?.hidePlatformBranding
-    ? status
-    : `${siteConfig.name}\n${status}`
-  const footer = opts?.hidePlatformBranding
-    ? null
-    : "---\nThis is an automated message. Please do not reply."
+  const header = `${siteConfig.name}\n${status}`
+  const footer = "---\nThis is an automated message. Please do not reply."
   return [header, body, footer].filter(Boolean).join("\n\n")
 }
 
@@ -73,17 +52,13 @@ function renderText(
 async function buildTemplate(t: EmailSpec) {
   const { renderEmailHtml } = await import("@/lib/email/templates")
   const html = await renderEmailHtml(t)
-  const text = renderText(
-    t.status,
-    [
-      `Hi ${t.greetingName},`,
-      t.message,
-      ...(t.rows ? t.rows.map(([label, value]) => `${label}: ${value}`) : []),
-      t.footnote,
-      t.cta ? `${t.cta.label}: ${t.cta.href}` : null,
-    ],
-    t,
-  )
+  const text = renderText(t.status, [
+    `Hi ${t.greetingName},`,
+    t.message,
+    ...(t.rows ? t.rows.map(([label, value]) => `${label}: ${value}`) : []),
+    t.footnote,
+    t.cta ? `${t.cta.label}: ${t.cta.href}` : null,
+  ])
 
   return { html, text }
 }
@@ -101,7 +76,6 @@ export async function merchantRegisteredTemplate(data: MerchantEmailData) {
     cta: data.verificationUrl
       ? { href: data.verificationUrl, label: "Verify email" }
       : { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return { subject: `Registration Received — ${data.businessName}`, html, text }
 }
@@ -112,7 +86,6 @@ export async function merchantApprovedTemplate(data: MerchantEmailData) {
     greetingName: data.ownerName,
     message: `Your business ${data.businessName} has been approved. You can now log in and start creating orders.`,
     cta: { href: siteUrl(), label: `Log in to ${siteConfig.name}` },
-    ...brandFields(data),
   })
   return { subject: `Your Merchant Account Has Been Approved`, html, text }
 }
@@ -127,7 +100,6 @@ export async function merchantVerifyEmailTemplate(
     footnote:
       "This link expires in 24 hours. If you didn't register, you can safely ignore this email.",
     cta: { href: data.verificationUrl, label: "Verify email" },
-    ...brandFields(data),
   })
   return { subject: `Verify your email — ${data.businessName}`, html, text }
 }
@@ -141,7 +113,6 @@ export async function merchantWelcomeTemplate(
     message: `Your business ${data.businessName} has been activated. You can now start creating orders and managing your deliveries.`,
     rows: [["Next steps", "Add pickup locations and create your first order"]],
     cta: { href: data.dashboardUrl, label: "Go to Dashboard" },
-    ...brandFields(data),
     footnote: "If you have any questions, reply to this email.",
   })
   return { subject: `Welcome to Kikuya — ${data.businessName}`, html, text }
@@ -239,7 +210,6 @@ export async function orderApprovedTemplate(data: OrderEmailData) {
       "Your order has been approved and a pickup rider has been assigned.",
     rows: orderRows(data, [["Delivery Address", data.deliveryAddress]]),
     cta: { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return {
     subject: `Order ${data.orderCode} Approved — Pickup Scheduled`,
@@ -256,7 +226,6 @@ export async function orderPickedUpTemplate(data: OrderEmailData) {
       "Your parcel has been picked up by the rider and is on its way to the warehouse.",
     rows: orderRows(data),
     cta: { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return { subject: `Order ${data.orderCode} Picked Up`, html, text }
 }
@@ -269,7 +238,6 @@ export async function orderInWarehouseTemplate(data: OrderEmailData) {
       "Your parcel is now in the warehouse and will be dispatched for delivery soon.",
     rows: orderRows(data, [["Delivery Address", data.deliveryAddress]]),
     cta: { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return {
     subject: `Order ${data.orderCode} Received at Warehouse`,
@@ -286,7 +254,6 @@ export async function orderInTransitTemplate(data: OrderEmailData) {
       "Your parcel has been dispatched and is heading to the delivery address.",
     rows: orderRows(data, [["Delivery Address", data.deliveryAddress]]),
     cta: { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return {
     subject: `Order ${data.orderCode} Dispatched for Delivery`,
@@ -303,7 +270,6 @@ export async function orderDeliveredTemplate(data: OrderEmailData) {
     rows: orderRows(data, [["Delivered To", data.deliveryAddress]]),
     footnote: "COD will be settled and reflected in your payout shortly.",
     cta: { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return { subject: `Order ${data.orderCode} Delivered`, html, text }
 }
@@ -319,7 +285,6 @@ export async function orderFailedAttemptTemplate(
     footnote:
       "Our team will assess the situation and attempt redelivery or initiate a return.",
     cta: { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return {
     subject: `Order ${data.orderCode} — Delivery Attempt Failed`,
@@ -338,7 +303,6 @@ export async function orderReturnedTemplate(
     rows: orderRows(data, [["Return Reason", data.reason]]),
     footnote: "Please contact support to arrange collection of the parcel.",
     cta: { href: siteUrl(), label: "View dashboard" },
-    ...brandFields(data),
   })
   return { subject: `Order ${data.orderCode} — Parcel Returned`, html, text }
 }

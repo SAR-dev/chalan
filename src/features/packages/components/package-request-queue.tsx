@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RejectRequestDialog } from "@/features/packages/dialogs/reject-request-dialog"
 import { usePackageRequests } from "@/features/packages/hooks/use-package-requests"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 
 type TabFilter = "PENDING" | "APPROVED" | "REJECTED" | "ALL"
@@ -85,7 +86,7 @@ export function PackageRequestQueue() {
       cellClassName: "hidden lg:table-cell",
       cell: (r) => (
         <span className="text-muted-foreground text-sm">
-          {new Date(r.requestedAt).toLocaleDateString()}
+          {formatDateTime(r.requestedAt)}
         </span>
       ),
     },

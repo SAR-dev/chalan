@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { conflict, forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db, dbRead } from "@/lib/db"
 import { order, profile, rider, warehouse } from "@/lib/db/schema"
 import { parseBody, warehouseUpdateSchema } from "@/lib/validation"
@@ -111,6 +112,8 @@ export const PATCH = withErrorHandler(
       description: `Updated warehouse ${updated.name}`,
       metadata: updates,
     })
+
+    refreshStats(statTag("warehouse"))
 
     return NextResponse.json(updated)
   },

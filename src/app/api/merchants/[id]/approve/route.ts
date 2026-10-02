@@ -10,6 +10,7 @@ import {
 } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { merchant } from "@/lib/db/schema"
 import { enqueueEmail, flushEmailOutbox } from "@/lib/email-outbox"
@@ -95,6 +96,10 @@ export const PATCH = withErrorHandler(
 
     // Best-effort immediate delivery; the cron retries anything left behind.
     await flushEmailOutbox()
+
+    // Clears the overview's "pending merchants" tile and the merchants tab
+    // counters immediately; the 30s TTL is only the backstop (ROADMAP R3.7).
+    refreshStats(statTag("merchant"))
 
     return NextResponse.json(updated)
   },

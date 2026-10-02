@@ -1,0 +1,1 @@
+CREATE INDEX "merchant_business_name_idx" ON "merchant" USING btree ("businessName");

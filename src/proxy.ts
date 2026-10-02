@@ -172,46 +172,6 @@ function proxyClientIp(req: NextRequest): string | null {
   return resolveClientIp(req.headers).ip
 }
 
-// ---------------------------------------------------------------------------
-// Simple in-process sliding-window rate limiter.
-// Sufficient for single-instance / single-region deployments.
-// Replace with @upstash/ratelimit for multi-instance setups.
-// ---------------------------------------------------------------------------
-
-interface Window {
-  count: number
-  resetAt: number
-}
-
-const uploadWindows = new Map<string, Window>()
-
-const UPLOAD_LIMIT = 20 // requests
-const UPLOAD_WINDOW_MS = 60_000 // per minute
-
-function pruneExpired(now: number): void {
-  for (const [ip, entry] of uploadWindows) {
-    if (now >= entry.resetAt) uploadWindows.delete(ip)
-  }
-}
-
-function uploadRateLimit(ip: string): boolean {
-  const now = Date.now()
-  pruneExpired(now)
-  const entry = uploadWindows.get(ip)
-
-  if (!entry || now >= entry.resetAt) {
-    uploadWindows.set(ip, { count: 1, resetAt: now + UPLOAD_WINDOW_MS })
-    return true // allowed
-  }
-
-  if (entry.count >= UPLOAD_LIMIT) return false // blocked
-
-  entry.count++
-  return true // allowed
-}
-
-// ---------------------------------------------------------------------------
-
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
@@ -248,21 +208,8 @@ export function proxy(req: NextRequest) {
   const portal = portalModeGuard(pathname)
   if (portal) return withRequestId(portal, requestId)
 
-  // 4. Upload rate limiting
-  if (req.method === "POST" && pathname === "/api/uploads") {
-    const ip = proxyClientIp(req)
-    // No resolvable IP → skip the limiter rather than share one "unknown"
-    // bucket across every visitor (cross-tenant DoS).
-    if (ip && !uploadRateLimit(ip)) {
-      return withRequestId(
-        NextResponse.json(
-          { error: "Too many uploads. Please wait a moment and try again." },
-          { status: 429 },
-        ),
-        requestId,
-      )
-    }
-  }
+  // 4. Upload rate limiting now lives in the route handler itself — see
+  //    `src/app/api/uploads/route.ts` (ROADMAP R3.2).
 
   // 5. Per-request CSP nonce (page routes only — enforced by the matcher).
   const nonce = createNonce()
@@ -287,7 +234,9 @@ export const config = {
   /*
    * Every HTML page route needs the nonce'd CSP. API routes, static assets,
    * _next, and uploads are handled specially:
-   *   - /api/uploads      → rate-limited above (needs the proxy to run).
+   *   - /api/uploads      → passes through here for the request id; the rate
+   *                         limit moved into the route handler (ROADMAP R3.2)
+   *                         because middleware cannot reach Redis.
    *   - /api/admin        → IP-allowlisted above, then passed through
    *                          without a CSP nonce (API response).
    *   - everything else   → matches the negative-lookahead, so page routes

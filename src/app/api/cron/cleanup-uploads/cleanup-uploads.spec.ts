@@ -92,7 +92,7 @@ describe("POST /api/cron/cleanup-uploads", () => {
     columnValues.set(user.image, ["/uploads/avatars/u1/used.png"])
     mockListFiles.mockResolvedValue([
       { key: "avatars/u1/used.png", size: 10, lastModified: hoursAgo(100) },
-      { key: "logos/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
+      { key: "nids/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
     ])
 
     const res = await cleanupUploads(
@@ -118,8 +118,8 @@ describe("POST /api/cron/cleanup-uploads", () => {
     columnValues.set(user.image, ["/uploads/avatars/u1/used.png"])
     mockListFiles.mockResolvedValue([
       { key: "avatars/u1/used.png", size: 10, lastModified: hoursAgo(100) },
-      { key: "logos/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
-      { key: "logos/m1/fresh.png", size: 30, lastModified: hoursAgo(1) },
+      { key: "nids/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
+      { key: "nids/m1/fresh.png", size: 30, lastModified: hoursAgo(1) },
     ])
 
     const res = await cleanupUploads(authReq())
@@ -135,18 +135,18 @@ describe("POST /api/cron/cleanup-uploads", () => {
       dryRun: false,
     })
     expect(mockDeleteFile).toHaveBeenCalledTimes(1)
-    expect(mockDeleteFile).toHaveBeenCalledWith("logos/m1/orphan.png")
+    expect(mockDeleteFile).toHaveBeenCalledWith("nids/m1/orphan.png")
     // Referenced set re-read right before the delete loop.
     expect(mockSelect).toHaveBeenCalledTimes(SWEEP_SIZE * 2)
   })
 
   it("re-checks the referenced set before deleting (no stale snapshot)", async () => {
     mockListFiles.mockResolvedValue([
-      { key: "logos/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
+      { key: "nids/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
     ])
     // Nothing referenced during the first sweep, but the file gets attached
     // before the second sweep runs.
-    lateValues.set(user.image, ["/uploads/logos/m1/orphan.png"])
+    lateValues.set(user.image, ["/uploads/nids/m1/orphan.png"])
 
     const res = await cleanupUploads(authReq())
     const json = await res.json()
@@ -159,7 +159,7 @@ describe("POST /api/cron/cleanup-uploads", () => {
   it("respects UPLOAD_SWEEP_MIN_AGE_HOURS", async () => {
     vi.stubEnv("UPLOAD_SWEEP_MIN_AGE_HOURS", "200")
     mockListFiles.mockResolvedValue([
-      { key: "logos/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
+      { key: "nids/m1/orphan.png", size: 20, lastModified: hoursAgo(100) },
     ])
 
     const res = await cleanupUploads(authReq())
@@ -172,8 +172,8 @@ describe("POST /api/cron/cleanup-uploads", () => {
   it("continues past a per-file delete failure", async () => {
     mockDeleteFile.mockRejectedValueOnce(new Error("disk on fire"))
     mockListFiles.mockResolvedValue([
-      { key: "logos/m1/a.png", size: 10, lastModified: hoursAgo(100) },
-      { key: "logos/m1/b.png", size: 20, lastModified: hoursAgo(100) },
+      { key: "nids/m1/a.png", size: 10, lastModified: hoursAgo(100) },
+      { key: "nids/m1/b.png", size: 20, lastModified: hoursAgo(100) },
     ])
 
     const res = await cleanupUploads(authReq())

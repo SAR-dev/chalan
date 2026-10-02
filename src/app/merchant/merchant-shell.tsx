@@ -20,7 +20,6 @@ import { AnnouncementBanner } from "@/features/announcements/components/announce
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { loginPathWithNext } from "@/lib/auth-redirect"
-import { brandThemeVars } from "@/lib/brand-color"
 import {
   isNavItemActive,
   MERCHANT_SIDEBAR,
@@ -222,8 +221,14 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
 
   if (!isReady || !currentUser || currentUser.role !== "MERCHANT") {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
+      // Auth-init placeholder: without a live region a screen reader lands on
+      // a blank region with no indication anything is happening (ROADMAP R2.7).
+      <div
+        role="status"
+        className="bg-background flex min-h-screen items-center justify-center"
+      >
         <Loader2 className="text-muted-foreground size-6 animate-spin" />
+        <span className="sr-only">Loading…</span>
       </div>
     )
   }
@@ -232,16 +237,10 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
   const hasPickupLocations = pickupLocations.some(
     (p) => p.merchantId === currentMerchant?.id,
   )
-  // Portal-wide brand theming: buttons, links, badges, tabs and focus rings
-  // take the merchant's color. Invalid hex falls back to the theme defaults.
-  const brandVars = currentMerchant?.brandColor
-    ? brandThemeVars(currentMerchant.brandColor)
-    : undefined
 
   return (
     <div
       className="bg-background flex min-h-screen"
-      style={brandVars as React.CSSProperties | undefined}
       data-testid="merchant-portal"
     >
       <MerchantSidebar />
@@ -249,8 +248,6 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
         <MobileHeader
           config={navConfig}
           businessName={currentMerchant?.businessName ?? undefined}
-          brandColor={currentMerchant?.brandColor ?? undefined}
-          hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}
         />
         <main
           id="main-content"

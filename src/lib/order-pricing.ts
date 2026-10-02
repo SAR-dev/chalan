@@ -28,6 +28,13 @@ export interface ResolvedPricing {
 /** Re-exported so callers can name the failure vocabulary. */
 export type { PricingUnavailableReason, ZoneRef } from "@/lib/pricing"
 
+/**
+ * Anything that can run a read against the pricing tables: the pool-backed
+ * `db` / `dbRead`, or a live transaction handle. Structurally `select`-shaped
+ * because a `PgTransaction`'s `$client` is not the pool's.
+ */
+export type PricingRunner = Pick<typeof dbRead, "select">
+
 export type ResolveRoutePricingResult =
   | { ok: true; pricing: ResolvedPricing }
   | {
@@ -56,15 +63,28 @@ export type ResolveRoutePricingResult =
 export async function resolveRoutePricing(
   originWarehouseId: string,
   deliveryCityId: string | null,
+  /**
+   * Where to read the lane from.
+   *
+   * Inside a transaction the caller passes `tx`, so the lane is validated
+   * against the same snapshot the write uses. Left at `dbRead`, the resolver
+   * reads through the replica — under lag a guard can approve against pricing
+   * the write then commits alongside (ROADMAP R0.11).
+   *
+   * Typed structurally as "anything with `select`" so both the pool-backed
+   * handle and a `PgTransaction` fit: the transaction's `$client` differs from
+   * the pool's, which is what rules out `typeof dbRead` directly.
+   */
+  runner: PricingRunner = dbRead,
 ): Promise<ResolveRoutePricingResult> {
-  const [w] = await dbRead
+  const [w] = await runner
     .select({ city: warehouse.city })
     .from(warehouse)
     .where(eq(warehouse.id, originWarehouseId))
     .limit(1)
 
   const [origCity] = w?.city
-    ? await dbRead
+    ? await runner
         .select({ zone: deliveryZone })
         .from(deliveryCity)
         .leftJoin(deliveryZone, eq(deliveryCity.zoneId, deliveryZone.id))
@@ -90,7 +110,7 @@ export async function resolveRoutePricing(
     }
   }
 
-  const [destCity] = await dbRead
+  const [destCity] = await runner
     .select({ zone: deliveryZone })
     .from(deliveryCity)
     .leftJoin(deliveryZone, eq(deliveryCity.zoneId, deliveryZone.id))
@@ -115,7 +135,7 @@ export async function resolveRoutePricing(
     }
   }
 
-  const [zp] = await dbRead
+  const [zp] = await runner
     .select()
     .from(zonePricing)
     .where(

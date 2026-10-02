@@ -78,7 +78,7 @@ test.describe("S68. Sign-out confirmation", () => {
   })
 })
 
-test.describe("S68. Sign-out confirmation — mobile", () => {
+test.describe("S72. Sign-out confirmation - mobile", () => {
   test.use({ viewport: { width: 375, height: 812 } })
 
   test("the mobile menu asks before signing out", async ({ page }) => {

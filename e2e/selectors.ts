@@ -133,7 +133,11 @@ export const orders = {
   // DataTable prefixes its toolbar field with the table id.
   searchInput: "[data-testid='table-search-dashboard-orders']",
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
-  tab: (name: string) => `[data-testid='tab-${name}']`,
+  // Status tabs, tagged by value. `dashboard/orders` opens on PENDING, which
+  // holds only 8 of the 100 seeded orders, so anything asserting pagination
+  // must switch to ALL first (ROADMAP R1.3). The previous `tab-${name}` value
+  // matched nothing in `src/`.
+  tab: (name: string) => `[data-testid='orders-tab-${name}']`,
   // CSV bulk import — the page and its testids.
   bulkImportOpen: "[data-testid='bulk-import-open']",
   bulkImportTemplate: "[data-testid='bulk-import-template']",
@@ -164,6 +168,8 @@ export const orderForm = {
   productCost: "[data-testid='product-cost']",
   submitOrder: "[data-testid='submit-order']",
   addParcel: "[data-testid='add-parcel']",
+  // 1-based: `removeParcel(1)` is the first card, matching its "Parcel 1"
+  // heading and its aria-label.
   removeParcel: (index: number) => `[data-testid='remove-parcel-${index}']`,
   // Shown instead of a delivery charge when the lane has no configured rate.
   pricingUnavailable: "[data-testid='parcel-pricing-unavailable']",
@@ -370,7 +376,6 @@ export const settings = {
   savePolicy: "[data-testid='save-policy']",
 }
 
-// ─── Branding ────────────────────────────────────────────────────────────────
 // --- Public tracking (P0.1 token-gated receiver note) ---
 export const tracking = {
   noteInput: "[data-testid='receiver-note-input']",
@@ -430,17 +435,13 @@ export const team = {
   warehouseSelect: "[data-testid='team-warehouse']",
 }
 
-export const branding = {
-  section: "[data-testid='branding-section']",
-  colorInput: "[data-testid='brand-color-input']",
-  hideToggle: "[data-testid='hide-branding-toggle']",
-  saveButton: "[data-testid='save-branding']",
-  preview: "[data-testid='branding-preview']",
-  previewButton: "[data-testid='preview-button']",
-  previewChip: "[data-testid='preview-chip']",
-  contrastWarning: "[data-testid='brand-contrast-warning']",
+// ─── Merchant identity in chrome ─────────────────────────────────────────────
+// What replaces the branding selectors: the merchant's *name* is shown in the
+// sidebar and on the public tracking header. There is no colour, logo or
+// hide-platform toggle any more (those columns were dropped), so only the
+// two identity markers remain.
+export const identity = {
   trackBrand: "[data-testid='track-brand']",
-  trackAccent: "[data-testid='track-accent']",
   sidebarBrand: "[data-testid='sidebar-brand']",
 }
 
@@ -455,7 +456,23 @@ export const dialog = {
   confirmButton: "[data-testid='confirm-button']",
   cancelButton: "[data-testid='cancel-button']",
   formDialog: "[data-testid='form-dialog']",
+  // `FormDialog`'s Cancel is shared by ~24 call sites; it carries the default
+  // `form-dialog-cancel` because callers can override submit but not cancel.
+  formDialogCancel: "[data-testid='form-dialog-cancel']",
   closeButton: "[data-testid='dialog-close']",
+}
+
+// ─── Pagination ──────────────────────────────────────────────────────────────
+// Tagged per table id (ROADMAP R1.3): these four controls sit under every list
+// page and carried no testid at all, which is why server-side pagination — the
+// most-used interaction in the app — had zero E2E coverage.
+export const pagination = {
+  prev: (tableId: string) => `[data-testid='table-prev-${tableId}']`,
+  next: (tableId: string) => `[data-testid='table-next-${tableId}']`,
+  pageSize: (tableId: string) => `[data-testid='table-page-size-${tableId}']`,
+  csv: (tableId: string) => `[data-testid='table-csv-${tableId}']`,
+  /** "Page X of Y" — the only thing that proves a page change landed. */
+  pageLabel: (tableId: string) => `[data-testid='table-page-label-${tableId}']`,
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────

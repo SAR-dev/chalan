@@ -21,6 +21,7 @@ import { RiderApplicationDetailDialog } from "@/features/riders/dialogs/rider-ap
 import type { RiderApplication } from "@/features/riders/hooks/use-rider-applications"
 import { useRiderApplications } from "@/features/riders/hooks/use-rider-applications"
 import { RIDER_STATUS_LABELS, RIDER_STATUS_TONES } from "@/lib/constants"
+import { formatDateTime } from "@/lib/format"
 import type { RiderStatus } from "@/lib/types"
 
 type FilterTab = "ALL" | RiderStatus
@@ -157,7 +158,7 @@ export function RiderApplicationsPageClient({
       sortValue: (a) => a.createdAt,
       cell: (a) => (
         <span className="text-muted-foreground text-sm">
-          {new Date(a.createdAt).toLocaleDateString()}
+          {formatDateTime(a.createdAt)}
         </span>
       ),
     },

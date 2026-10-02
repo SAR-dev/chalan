@@ -175,14 +175,14 @@ describe("collectReferencedKeys", () => {
   it("normalizes values and skips empty ones", async () => {
     const read = vi.fn(async () => [
       "/uploads/avatars/u1/x.png",
-      `${R2_BASE}/logos/m1/y.png`,
+      `${R2_BASE}/nids/m1/y.png`,
       null,
       undefined,
       "",
       "   ",
     ])
     const keys = await collectReferencedKeys(read, bases)
-    expect(keys).toEqual(new Set(["avatars/u1/x.png", "logos/m1/y.png"]))
+    expect(keys).toEqual(new Set(["avatars/u1/x.png", "nids/m1/y.png"]))
   })
 
   it("flattens array columns such as order.pickupProofRefs", async () => {
@@ -216,7 +216,7 @@ describe("isOrphan", () => {
     overrides: Partial<Parameters<typeof isOrphan>[0]> = {},
   ): ReturnType<typeof isOrphan> =>
     isOrphan({
-      key: "logos/m1/x.png",
+      key: "nids/m1/x.png",
       lastModified: old,
       referencedKeys: new Set<string>(),
       minAgeHours: 48,
@@ -316,8 +316,8 @@ describe("findOrphans", () => {
 
   it("compares listing keys against URL-form references", () => {
     const orphans = findOrphans({
-      files: [{ key: "logos/m1/x.png", size: 5, lastModified: old }],
-      referencedKeys: new Set(["logos/m1/x.png"]),
+      files: [{ key: "nids/m1/x.png", size: 5, lastModified: old }],
+      referencedKeys: new Set(["nids/m1/x.png"]),
       minAgeHours: 48,
       now,
       bases,

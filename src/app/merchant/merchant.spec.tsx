@@ -11,6 +11,7 @@ import {
   renderPage,
   resetIds,
 } from "@/app/__tests__/test-utils"
+import type { MerchantOrderSummary } from "@/lib/types"
 
 const mockMerchant = {
   id: "m_1",
@@ -43,15 +44,35 @@ vi.mock("@/features/orders/hooks/use-order-analytics", () => ({
     error: null,
   }),
 }))
+vi.mock("@/features/orders/hooks/use-order-summary", () => ({
+  useOrderSummary: () => ({
+    summary: mockSummary,
+    isLoading: false,
+    isRefreshing: false,
+    error: null,
+    refresh: () => {},
+  }),
+}))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 let mockUser: ReturnType<typeof makeUser> | null
 let mockOrdersState: MockOrdersState
+let mockSummary: MerchantOrderSummary
 
 beforeEach(() => {
   resetIds()
   mockUser = makeUser({ role: "MERCHANT", merchantId: "m_1" })
   mockOrdersState = createMockOrders()
+  mockSummary = {
+    codToCollect: 0,
+    inProgressCount: 0,
+    codToSettleCount: 0,
+    codToSettleAmount: 0,
+    payoutReadyCount: 0,
+    payoutToIssue: 0,
+    deliveredCount: 0,
+    totalEarnings: 0,
+  }
 })
 
 async function importPage() {
@@ -107,6 +128,48 @@ describe("Merchant dashboard", () => {
     })
     await importPage()
     expect(screen.getByText(/cod to collect/i)).toBeInTheDocument()
+  })
+
+  // The bug ROADMAP R0.1 fixes: every card used to be `.filter().reduce()`
+  // over the visible page of orders, so a merchant with 400 delivered orders
+  // was shown the money of their newest 20 and nothing on screen revealed the
+  // truncation. The server summary must win even when the page contradicts it.
+  it("shows server-computed money, not money derived from the visible page", async () => {
+    mockOrdersState = createMockOrders({
+      orders: [
+        makeOrder({
+          merchantId: "m_1",
+          status: "IN_TRANSIT",
+          productCost: 2000,
+        }),
+      ],
+    })
+    mockSummary = {
+      codToCollect: 999_000,
+      inProgressCount: 400,
+      codToSettleCount: 7,
+      codToSettleAmount: 55_000,
+      payoutReadyCount: 12,
+      payoutToIssue: 88_000,
+      deliveredCount: 610,
+      totalEarnings: 123_000,
+    }
+
+    await importPage()
+
+    // The visible page holds exactly one 2,000 TK order — deriving from it
+    // would show "2,000", never "999,000".
+    expect(screen.getByText("999,000 TK")).toBeInTheDocument()
+    expect(screen.getByText("55,000 TK")).toBeInTheDocument()
+    expect(screen.getByText("88,000 TK")).toBeInTheDocument()
+    expect(screen.getByText("123,000 TK")).toBeInTheDocument()
+    expect(screen.getByText("400 orders in transit")).toBeInTheDocument()
+    expect(screen.getByText("610 delivered")).toBeInTheDocument()
+    expect(screen.getByText("12 orders ready")).toBeInTheDocument()
+    // Tab badges are aggregates too, not page counts.
+    expect(screen.getByText("In progress (400)")).toBeInTheDocument()
+    expect(screen.getByText("Delivered (610)")).toBeInTheDocument()
+    expect(screen.getByText("Payout ready (12)")).toBeInTheDocument()
   })
 
   it("opens Cancel dialog and submits", async () => {

@@ -242,3 +242,34 @@ export const mailConfig = pgTable("mail_config", {
   createdAt: ts("createdAt").notNull().defaultNow(),
   updatedAt: ts("updatedAt").notNull().defaultNow(),
 })
+
+// =============================================================================
+// Cron heartbeat (ROADMAP R0.8)
+//
+// One row per scheduled job, upserted after each successful run, so "did cron
+// stop?" becomes `max(lastRanAt) GROUP BY job` rather than a guess read off log
+// lines nobody aggregates.
+//
+// A dedicated table rather than `audit_log` on purpose: `drain-email-outbox`
+// runs every minute, which would be 1440 rows/day into a table that already has
+// its own 30-day retention job — and it would couple "is the scheduler alive?"
+// to whether someone changed that retention.
+// =============================================================================
+
+export const cronRun = pgTable(
+  "cron_run",
+  {
+    /** Route name, e.g. `cleanup-audit-logs`. */
+    job: text("job").primaryKey(),
+    lastRanAt: ts("lastRanAt").notNull().defaultNow(),
+    durationMs: integer("durationMs"),
+    /** False when the run completed but reported failures. */
+    ok: boolean("ok").notNull().default(true),
+    lastError: text("lastError"),
+    updatedAt: ts("updatedAt").notNull().defaultNow(),
+  },
+  (t) => [
+    // The watchdog scans "oldest last run", so this is the only index it needs.
+    index("cron_run_last_ran_at_idx").on(t.lastRanAt),
+  ],
+)

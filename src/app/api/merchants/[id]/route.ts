@@ -8,7 +8,6 @@ import { merchant, profile, user } from "@/lib/db/schema"
 import { isUniqueViolation } from "@/lib/db-errors"
 import { hasNavPermission } from "@/lib/nav-config"
 import {
-  merchantBrandingSchema,
   merchantModeratorQuotaSchema,
   merchantProfileSchema,
   parseBody,
@@ -53,8 +52,6 @@ export const GET = withErrorHandler(
         nidSelfieImage: merchant.nidSelfieImage,
         approvedBy: merchant.approvedBy,
         approvedAt: merchant.approvedAt,
-        brandColor: merchant.brandColor,
-        hidePlatformBranding: merchant.hidePlatformBranding,
         createdAt: merchant.createdAt,
         updatedAt: merchant.updatedAt,
       })
@@ -68,7 +65,7 @@ export const GET = withErrorHandler(
   },
 )
 
-// Update a merchant's own business details or branding. A merchant may only
+// Update a merchant's own business details. A merchant may only
 // edit their own business; Admins / Super Admins may edit any merchant.
 export const PATCH = withErrorHandler(
   async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
@@ -83,26 +80,24 @@ export const PATCH = withErrorHandler(
       return forbidden()
     }
 
-    // Sensitive surface (settings/branding): moderators never pass —
+    // Sensitive surface (Business Settings): moderators never pass -
     // Business Settings is not a grantable nav section (ROADMAP 5.2).
     if (isOwner && !hasNavPermission(me, "/merchant/settings")) {
       return forbidden("Business settings are owner-only.")
     }
 
-    // Try profile schema first (businessName, email, phone, address), then
-    // branding, then the admin-managed moderator quota.
+    // Try the profile schema (businessName, email, phone, address) first, then
+    // the admin-managed moderator quota.
     const { data: body, error: bodyError } = await parseBody(
       req,
-      // Quota FIRST: branding is all-optional and would otherwise match a
-      // quota-only body first, stripping maxModerators from the parsed data.
-      merchantModeratorQuotaSchema
-        .or(merchantProfileSchema)
-        .or(merchantBrandingSchema),
+      // Quota before profile: it is all-optional, so it must be the one to
+      // claim a quota-only body rather than letting the required-field profile
+      // schema reject it outright.
+      merchantModeratorQuotaSchema.or(merchantProfileSchema),
     )
     if (bodyError) return bodyError
 
     const profileParsed = merchantProfileSchema.safeParse(body)
-    const brandingParsed = merchantBrandingSchema.safeParse(body)
     const quotaParsed = merchantModeratorQuotaSchema.safeParse(body)
     if (quotaParsed.success && !isAdmin) {
       return forbidden("Only administrators can change the moderator quota.")
@@ -116,13 +111,6 @@ export const PATCH = withErrorHandler(
       updates.email = email.trim()
       updates.phone = phone.trim()
       updates.address = address.trim()
-    }
-
-    if (brandingParsed.success) {
-      const { brandColor, hidePlatformBranding } = brandingParsed.data
-      if (brandColor !== undefined) updates.brandColor = brandColor
-      if (hidePlatformBranding !== undefined)
-        updates.hidePlatformBranding = hidePlatformBranding
     }
 
     if (quotaParsed.success) {

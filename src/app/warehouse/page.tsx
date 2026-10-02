@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm"
+import { desc, eq, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
@@ -14,12 +14,10 @@ export default async function WarehouseIntakePage() {
 
   const limit = 20
 
-  // Warehouse scope: orders already in this warehouse + picked-up parcels
-  // not yet assigned to any warehouse (incoming candidates).
-  const warehouseScope = or(
-    eq(order.warehouseId, me.warehouseId),
-    and(isNull(order.warehouseId), eq(order.status, "PICKED_UP")),
-  )
+  // Warehouse scope: orders that belong to this warehouse. The intake queue's
+  // INCOMING tab is selected by status client-side, not by a null warehouse —
+  // `order.warehouseId` is NOT NULL (ROADMAP R0.12).
+  const warehouseScope = eq(order.warehouseId, me.warehouseId)
 
   const [[{ total }], rows] = await Promise.all([
     dbRead

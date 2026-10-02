@@ -44,5 +44,10 @@ export const GET = withErrorHandler(async () => {
       desc(packagePurchaseRequest.requestedAt),
     )
 
-  return NextResponse.json(rows)
+  // Admin work queue: changes rarely between refreshes (ROADMAP R3.11).
+  return NextResponse.json(rows, {
+    headers: {
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+    },
+  })
 })

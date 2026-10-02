@@ -26,9 +26,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { formatDateTime } from "@/lib/format"
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return formatDateTime(dateStr, {
     year: "numeric",
     month: "short",
     day: "numeric",

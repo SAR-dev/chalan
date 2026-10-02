@@ -7,7 +7,10 @@
 // Authentication: callers must supply the CRON_SECRET as a Bearer token.
 // This prevents arbitrary clients from triggering the route.
 //
-// Retention is controlled by the EMAIL_LOG_RETENTION_DAYS env var (default: 10).
+// Retention is controlled by the EMAIL_LOG_RETENTION_DAYS env var; the default
+// is DEFAULT_EMAIL_LOG_RETENTION_DAYS in src/lib/env.ts, which this route
+// imports so the two can never disagree (docs-drift.spec.ts asserts the SQL and
+// docs match the same constant).
 //
 // Deployment options:
 //   Vercel Cron — add to vercel.json; Vercel injects
@@ -21,6 +24,7 @@ import { NextResponse } from "next/server"
 import { isAuthorizedCron } from "@/lib/cron-auth"
 import { db } from "@/lib/db"
 import { emailLog } from "@/lib/db/schema"
+import { DEFAULT_EMAIL_LOG_RETENTION_DAYS } from "@/lib/env"
 import { logger } from "@/lib/logger"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -30,7 +34,8 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
 
   const retentionDays = parseInt(
-    process.env.EMAIL_LOG_RETENTION_DAYS || "10",
+    process.env.EMAIL_LOG_RETENTION_DAYS ||
+      `${DEFAULT_EMAIL_LOG_RETENTION_DAYS}`,
     10,
   )
   const cutoff = sql`now() - interval '1 day' * ${retentionDays}`

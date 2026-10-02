@@ -1,12 +1,5 @@
 import { sql } from "drizzle-orm"
-import {
-  boolean,
-  index,
-  integer,
-  pgTable,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/pg-core"
+import { index, integer, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
 import { merchantStatuses } from "./enums"
 import { ts } from "./helpers"
 import { deliveryCity } from "./logistics"
@@ -72,12 +65,6 @@ export const merchant = pgTable(
     nidRejectedAt: ts("nidRejectedAt"),
     nidRejectedBy: text("nidRejectedBy"),
     nidRejectionReason: text("nidRejectionReason"),
-    // Branding — merchant-specific color + platform-branding toggle. The
-    // business name is the brand mark (no logos).
-    brandColor: text("brandColor"),
-    hidePlatformBranding: boolean("hidePlatformBranding")
-      .notNull()
-      .default(false),
     createdAt: ts("createdAt").notNull().defaultNow(),
     updatedAt: ts("updatedAt").notNull().defaultNow(),
   },
@@ -89,6 +76,12 @@ export const merchant = pgTable(
     // check-then-insert race can create duplicate merchant rows per email.
     uniqueIndex("merchant_email_unique").on(t.email),
     index("merchant_email_verified_at_idx").on(t.emailVerifiedAt),
+    // `GET /api/auth/verify-email` is unauthenticated and resolves the merchant
+    // by this token, so it seq-scanned `merchant` on every visit (ROADMAP
+    // R3.9). Partial — verified merchants hold NULL and cost nothing.
+    index("merchant_email_verification_token_idx")
+      .on(t.emailVerificationToken)
+      .where(sql`${t.emailVerificationToken} is not null`),
     index("merchant_nid_submitted_at_idx").on(t.nidSubmittedAt),
     index("merchant_nid_verified_at_idx").on(t.nidVerifiedAt),
     index("merchant_nid_rejected_at_idx").on(t.nidRejectedAt),
@@ -96,6 +89,11 @@ export const merchant = pgTable(
       "gin",
       sql`${t.businessName} gin_trgm_ops`,
     ),
+    // Serves the roster's `ORDER BY businessName ASC` — a trigram GIN can
+    // answer a search but cannot satisfy a sort, so riders' and warehouses'
+    // merchant rosters were sorting the whole table on every page load
+    // (ROADMAP R3.11).
+    index("merchant_business_name_idx").on(t.businessName),
     index("merchant_owner_name_trgm_idx").using(
       "gin",
       sql`${t.ownerName} gin_trgm_ops`,

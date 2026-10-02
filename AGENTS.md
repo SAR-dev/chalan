@@ -126,7 +126,7 @@ migration ledger, the advisory lock, session timezone) belongs in
 e2e/specs/01-core-flows.spec.ts    # Core flows: lifecycle, roles, public pages
 e2e/specs/02-business-flows.spec.ts # Business/ops flows
 e2e/specs/03-onboarding.spec.ts    # Merchant onboarding
-e2e/specs/04-branding.spec.ts      # Merchant branding
+e2e/specs/04-tracking-identity.spec.ts # Merchant sidebar identity + tracking token
 e2e/specs/05-two-factor.spec.ts    # 2FA for admins
 e2e/specs/06-support.spec.ts       # Support tickets
 e2e/selectors.ts                    # Centralized data-testid selectors
@@ -169,8 +169,11 @@ must match text, scope it to a tagged container (e.g.
 **Suite naming:** every `test.describe` must be prefixed with a unique scenario
 id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
 describes continue the serial from the current maximum (check the existing
-specs first); numbers must stay unique with no gaps or duplicates (suite is
-currently S1-S65 across 25 files / 104 tests).
+specs first); numbers must stay unique (a removed scenario leaves its serial
+unused rather than renumbering every later file). The summary below is
+asserted by `src/app/__tests__/docs-drift.spec.ts`, which fails on either a
+duplicate serial or stale counts: **currently S1-S73 across 32 files / 125
+tests**.
 
 ## Coding Patterns
 
@@ -291,7 +294,7 @@ function formatOrderError(data: {
 
 - `pnpm test:coverage` runs the unit suite under `@vitest/coverage-v8` and
   fails if statements/branches/functions/lines drop below the floors in
-  `vitest.config.ts` (48 / 41 / 37 / 49). A CI `coverage` job enforces it.
+  `vitest.config.ts` (49 / 42 / 37 / 50). A CI `coverage` job enforces it.
 - Raise the floors as tests land — they are a regression guard, not a target.
   New code should come with tests, not with a lowered threshold.
 

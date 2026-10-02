@@ -63,4 +63,43 @@ describe("logger", () => {
       serializeError(new Error("outer", { cause: new Error("inner") })),
     ).toMatchObject({ message: "outer", cause: { message: "inner" } })
   })
+
+  // `redact.ts` existed but was never called from here, so the helpers
+  // guarded the mailer while the log line itself was raw — and the log line is
+  // what reaches container stdout, CI output and whatever aggregates them
+  // (ROADMAP R3.1).
+  describe("redaction (ROADMAP P0.7)", () => {
+    it("redacts a credential in the message", () => {
+      logger.info("reset https://app.test/reset?token=SUPERSECRET123")
+      const record = lastRecord(logSpy)
+      expect(record.msg).toContain("[redacted]")
+      expect(record.msg).not.toContain("SUPERSECRET123")
+    })
+
+    it("redacts credentials in string fields", () => {
+      logger.info("delivery failed", {
+        url: "https://app.test/track/abc?verify=ANOTHERSECRET",
+      })
+      const record = lastRecord(logSpy)
+      expect(record.url).toContain("[redacted]")
+      expect(record.url).not.toContain("ANOTHERSECRET")
+    })
+
+    it("leaves non-string fields untouched", () => {
+      logger.info("counts", { attempts: 3, ok: true, ids: ["a", "b"] })
+      expect(lastRecord(logSpy)).toMatchObject({
+        attempts: 3,
+        ok: true,
+        ids: ["a", "b"],
+      })
+    })
+
+    it("redacts a token embedded in an error message and stack", () => {
+      const err = new Error("POST https://app.test/activate?token=RAWTOKEN99")
+      const serialized = serializeError(err)
+      expect(serialized.message).not.toContain("RAWTOKEN99")
+      expect(String(serialized.stack)).not.toContain("RAWTOKEN99")
+      expect(serialized.message).toContain("[redacted]")
+    })
+  })
 })

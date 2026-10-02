@@ -8,6 +8,7 @@ import {
   DialogClose,
   DialogOverlay,
   DialogPortal,
+  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
 
@@ -69,6 +70,11 @@ export function ImageZoom({
           className="fixed inset-0 z-50 flex items-center justify-center outline-none"
           aria-label={alt || "Image viewer"}
         >
+          {/* The popup's `aria-label` names it, but a dialog without a Title
+              has no programmatic heading — screen readers announce the region
+              without saying what it is (ROADMAP R2.8). Visually hidden: the
+              image's own `alt` is what a sighted-plus-AT user reads out. */}
+          <DialogTitle className="sr-only">{alt || "Image viewer"}</DialogTitle>
           {/* Close on backdrop click */}
           <button
             type="button"

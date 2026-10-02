@@ -50,6 +50,7 @@ export function useOrders({
   payableLimit = 20,
   payableDateFrom,
   payableDateTo,
+  queue,
 }: {
   initialData?: Order[]
   initialTotal?: number
@@ -58,6 +59,13 @@ export function useOrders({
   payableLimit?: number
   payableDateFrom?: string
   payableDateTo?: string
+  /**
+   * Restrict a RIDER's results to one queue (`pickup` | `delivery`).
+   *
+   * The API used to return both queues and leave the page to filter, so the
+   * reported `total` counted rows the table never rendered (ROADMAP R0.2).
+   */
+  queue?: "pickup" | "delivery"
 } = {}) {
   const { currentUser } = useAuth()
   const { currentWarehouse } = useWarehouses()
@@ -74,6 +82,7 @@ export function useOrders({
     sortDir: filters.sortId ? filters.sortDir : undefined,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
+    queue,
   })
 
   const isDefaultQuery =
@@ -82,6 +91,9 @@ export function useOrders({
     !filters.sortId &&
     !filters.dateFrom &&
     !filters.dateTo &&
+    // A queue-filtered query is never the default one: `initialData` would be
+    // the unfiltered list (ROADMAP R0.2).
+    !queue &&
     filters.page === 1
 
   const {

@@ -15,10 +15,11 @@ import {
   EMAIL_LOG_STATUS_LABELS,
   EMAIL_LOG_STATUS_TONES,
 } from "@/lib/constants"
+import { formatDateTime } from "@/lib/format"
 import type { EmailLogListItem } from "@/lib/types"
 
 function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString(undefined, {
+  return formatDateTime(value, {
     year: "numeric",
     month: "short",
     day: "numeric",

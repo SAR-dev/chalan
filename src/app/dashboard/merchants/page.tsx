@@ -13,8 +13,12 @@ export default async function MerchantsPage() {
 
   const limit = 20
 
-  const [[{ total }], rows, counts] = await Promise.all([
-    dbRead.select({ total: sql<number>`count(*)::int` }).from(merchant),
+  // The per-status counts and the row total are the same number arrived at
+  // twice. `GROUP BY status` already visits every row, so summing the groups
+  // gives the total for one scan instead of two — and unlike a cache it is
+  // still exact, which matters because this total is the list's pagination
+  // footer, not just a tab badge.
+  const [rows, counts] = await Promise.all([
     dbRead
       .select()
       .from(merchant)
@@ -30,6 +34,7 @@ export default async function MerchantsPage() {
   ])
 
   const countMap = Object.fromEntries(counts.map((c) => [c.status, c.count]))
+  const total = counts.reduce((sum, c) => sum + c.count, 0)
 
   return (
     <MerchantsPageClient

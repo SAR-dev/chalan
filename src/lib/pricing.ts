@@ -1,5 +1,5 @@
 import { toPaisa } from "@/lib/balance-ledger"
-import { CURRENCY_SUFFIX } from "@/lib/constants"
+import { formatMoney } from "@/lib/format"
 
 export interface DeliveryChargeBreakdown {
   baseRate: number
@@ -96,10 +96,11 @@ export function calcDeliveryCharge(
 }
 
 export function formatTk(amount: number): string {
-  return `${amount.toLocaleString("en-US", {
+  // Delegates so locale, grouping and suffix live in one place (ROADMAP R3.3).
+  return formatMoney(amount, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  })} ${CURRENCY_SUFFIX}`
+  })
 }
 
 /**

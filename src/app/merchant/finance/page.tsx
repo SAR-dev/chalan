@@ -35,6 +35,7 @@ import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePayoutRequestColumns } from "@/features/payouts/components/payout-table-columns"
 import { PayoutRequestDialog } from "@/features/payouts/dialogs/payout-request-dialog"
 import { usePayouts } from "@/features/payouts/hooks/use-payouts"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { BalanceTransaction, Order } from "@/lib/types"
 
@@ -167,7 +168,7 @@ export default function MerchantFinancePage() {
       cellClassName: "text-sm text-muted-foreground",
       cell: (o) =>
         o.deliveredAt
-          ? new Date(o.deliveredAt).toLocaleDateString(undefined, {
+          ? formatDateTime(o.deliveredAt, {
               month: "short",
               day: "numeric",
             })
@@ -230,7 +231,7 @@ export default function MerchantFinancePage() {
       sortValue: (t) => t.createdAt,
       cell: (t) => (
         <span className="text-muted-foreground text-sm tabular-nums">
-          {new Date(t.createdAt).toLocaleDateString()}
+          {formatDateTime(t.createdAt)}
         </span>
       ),
     },

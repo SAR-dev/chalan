@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { POST } from "./route"
+import { POST as issueUploadToken } from "./token/route"
 
 const state = vi.hoisted(() => ({
   session: null as Record<string, unknown> | null,
   tokenValid: false,
+  rateLimited: false,
+  rateLimitCalls: [] as {
+    prefix: string
+    max: number
+    window: number
+  }[],
   saved: [] as { path: string; mime: string; size: number }[],
 }))
 
@@ -11,9 +18,33 @@ vi.mock("@/lib/api-auth", () => ({
   requireSession: () => Promise.resolve(state.session),
 }))
 
-vi.mock("@/lib/upload-token", () => ({
-  verifyUploadToken: () => state.tokenValid,
+// `POST /api/uploads/token` is public, so its ONLY throttle is this limiter
+// (with `failClosed: true`, because an unresolvable IP would otherwise leave a
+// token-minting endpoint unthrottled).
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimit: () => null,
+  rateLimitByIp: (
+    _req: Request,
+    prefix: string,
+    max: number,
+    window: number,
+  ) => {
+    state.rateLimitCalls.push({ prefix, max, window })
+    return state.rateLimited ? ({ status: 429 } as Response) : null
+  },
+  getClientIp: () => "127.0.0.1",
 }))
+
+// Partially mocked: `verifyUploadToken` is stubbed for the upload tests, but
+// `createUploadToken` stays real so `POST /api/uploads/token` exercises the
+// genuine HMAC + TTL path (ROADMAP R1.2).
+vi.mock("@/lib/upload-token", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/upload-token")>()
+  return {
+    ...actual,
+    verifyUploadToken: () => state.tokenValid,
+  }
+})
 
 vi.mock("@/lib/storage", () => ({
   saveFile: (path: string, buffer: Buffer, mime: string) => {
@@ -86,6 +117,8 @@ const validFile = { bytes: PNG, name: "id.png", type: "image/png" }
 beforeEach(() => {
   state.session = null
   state.tokenValid = false
+  state.rateLimited = false
+  state.rateLimitCalls.length = 0
   state.saved.length = 0
 })
 
@@ -175,5 +208,72 @@ describe("POST /api/uploads", () => {
     const res = await POST(req({ folder: "nids", file: validFile }))
     expect(res.status).toBe(200)
     expect(state.saved[0]?.path).toMatch(/^nids\/u_9\/[0-9a-f-]{36}\.png$/)
+  })
+})
+
+// Public by design — the rider-application NID upload happens before the
+// applicant has an account, so this endpoint is on the route-auth-guard
+// allowlist and its rate limit is the ONLY thing bounding anonymous use.
+// No spec covered it (ROADMAP R1.2).
+describe("POST /api/uploads/token", () => {
+  // The token is HMAC-signed with BETTER_AUTH_SECRET and `createUploadToken`
+  // throws without it — the same setup `upload-token.spec.ts` uses.
+  beforeEach(() => {
+    process.env.BETTER_AUTH_SECRET = "test-secret-".padEnd(32, "x")
+  })
+
+  const tokenReq = () =>
+    new Request("http://localhost/api/uploads/token", { method: "POST" })
+
+  it("mints a short-lived signed token without a session", async () => {
+    const res = await issueUploadToken(tokenReq())
+    expect(res.status).toBe(200)
+    const json = (await res.json()) as { token: string; expiresAt: string }
+    expect(json.token).toBeTruthy()
+    // Short-lived: a leaked token must not authorise uploads indefinitely.
+    expect(Date.parse(json.expiresAt)).toBeGreaterThan(Date.now())
+    expect(Date.parse(json.expiresAt) - Date.now()).toBeLessThanOrEqual(
+      60 * 60 * 1000,
+    )
+  })
+
+  it("is throttled — 429 once the anonymous budget is spent", async () => {
+    state.rateLimited = true
+    const res = await issueUploadToken(tokenReq())
+    expect(res.status).toBe(429)
+  })
+})
+
+// The upload budget used to be enforced in `src/proxy.ts` with its own
+// in-process Map. Middleware cannot reach the Redis-backed limiter the rest of
+// the app shares, so four instances each applied 20/min against a 20/min
+// intent — 80 uploads/min/IP (ROADMAP R3.2). It lives here now, where the
+// shared limiter is reachable.
+describe("upload rate limiting (ROADMAP R3.2)", () => {
+  const uploadReq = () =>
+    new Request("http://test.local/api/uploads", { method: "POST" })
+
+  it("uses the shared per-IP limiter with the documented budget", async () => {
+    state.session = { userId: "u_1", role: "MERCHANT" }
+    const res = await POST(req({ folder: "avatars", file: validFile }))
+    expect(res.status).toBe(200)
+    expect(state.rateLimitCalls).toEqual([
+      { prefix: "upload", max: 20, window: 60 },
+    ])
+  })
+
+  it("429s before touching the body once the budget is spent", async () => {
+    state.rateLimited = true
+    const res = await POST(req({ folder: "avatars", file: validFile }))
+    expect(res.status).toBe(429)
+    // Throttled before parsing: a rejected upload must not cost a read.
+    expect(state.saved).toHaveLength(0)
+  })
+
+  it("throttles every POST, not only authenticated ones", async () => {
+    state.rateLimited = true
+    const res = await POST(req({ folder: "nids", file: validFile }))
+    expect(res.status).toBe(429)
+    expect(state.rateLimitCalls).toHaveLength(1)
   })
 })

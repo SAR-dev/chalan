@@ -1663,23 +1663,30 @@ Example structure to mirror: **merchants** (rich).
 
 ### Form validation error display
 
-Forms use a two-layer error strategy — pick the right one per field:
+Forms use a two-layer error strategy - pick the right one per field:
 
 | Layer | When to use | Pattern |
 |---|---|---|
-| **Inline field error** | Dropdowns / selects where the user may not notice a toast (e.g. pickup location). Also for fields with continuous validation (e.g. password too short). | `<p className="text-destructive text-xs">` below the input. Gate with a `submitAttempted` flag or per-field dirty state. Set `aria-invalid` on the trigger/input. |
-| **Toast** | Submit-time validation for text inputs where the `required` attribute + browser UX is sufficient, or server errors from the API. | `toast.error("message")` — already the norm. |
-| **Form-level banner** | When multiple fields fail at once and you want a single summary. | `<FormErrors errors={...} />` from `src/components/form-errors.tsx`. |
+| **Inline field error** | Where the message has to sit next to the control: selects (no native `required`), anything on a long or multi-section form where the summary is a screenful away, and anything the control itself does not already show. | `Input`'s `error` prop - it renders the message and wires `aria-invalid` + `aria-describedby` for you. For controls with no such prop (the `Select` trigger), `<p className="text-destructive text-xs">` below it. |
+| **Toast** | Submit-time validation for text inputs where the `required` attribute + browser UX is sufficient, or server errors from the API. | `toast.error("message")` - already the norm. |
+| **Form-level banner** | Multiple fields fail at once and you want one summary. It is also the focus target on a failed submit. | `<FormErrors errors={...} />` from `src/components/form-errors.tsx`. |
 
 **Rules of thumb:**
 
-- Don't add inline errors to every text input — it's noisy. The `required`
-  attribute + the browser's native ":invalid" styling covers most cases.
-- Reserve inline errors for controls where the error state is not visually
-  obvious from the control itself (empty select trigger, weight exceeds limit).
+- **Freeze errors on submit; never derive them per keystroke.** `FormErrors`
+  takes focus whenever its error count changes, so live validation would pull
+  focus out of the field the user is halfway through correcting. Compute the
+  messages in the submit handler, keep them in state, and recompute on the next
+  submit. `src/app/merchant/orders/new/types.ts` (`ParcelValidation`) records
+  this, and that page is the reference implementation.
+- On a long form, show the failure twice: once in the summary (so it is
+  announced) and once under the control (so it can be acted on). Prefix each
+  summary entry with its group - "Parcel 2: " - only when there is more than one.
 - Always set `aria-invalid` on the failing control and link the error via
-  `aria-describedby` when possible.
-- Keep error text short — one sentence, no icons.
+  `aria-describedby` when possible - `Input`'s `error` prop does both.
+- Keep error text short - one sentence, no icons.
+- Say why a *disabled* button is disabled. A disabled submit with no
+  explanation is a dead end; render the reason beside it.
 
 ### API error contract (backend → hook → UI)
 
@@ -2121,8 +2128,11 @@ to the corresponding container's internal port (`dashboard:3000`,
 `merchant:3000`, etc.). If you're running locally without a tunnel, you can
 remove the `cloudflared` service block from the compose file.
 
-The tunnel hostname and routing rules live in `config.yml` — edit it to match
-your actual Cloudflare Tunnel configuration.
+Copy `config.example.yml` to `config.yml` and edit it to match your actual
+Cloudflare Tunnel configuration. `config.yml` is gitignored — it carries your
+tunnel UUID and hostname, which is why it is never committed (ROADMAP R3.4).
+The token-based flow (`CLOUDFLARE_TUNNEL_TOKEN`, see `docs/DEPLOYMENT.md`) is
+what the compose deployment uses.
 
 ---
 
@@ -2507,7 +2517,7 @@ e2e/
     01-core-flows.spec.ts       # login per role, order lifecycle, warehouse/rider flows
     02-business-flows.spec.ts   # order ops, warehouse dispatch/intake/exceptions
     03-onboarding.spec.ts       # merchant onboarding + registration gate
-    04-branding.spec.ts         # merchant branding settings
+    04-tracking-identity.spec.ts   # merchant sidebar identity + tracking token
     05-two-factor.spec.ts       # 2FA enrollment + TOTP login for admins
     06-support.spec.ts          # support ticket create → admin reply
 ```
@@ -2568,7 +2578,7 @@ These mirror `src/lib/db/seed/seed-content.ts`.
    `page.request`. No test depends on the outcome of another.
 
 > **Watch for side effects across spec files.** Tests that mutate shared
-> entities (suspending a merchant, toggling branding) can break later specs.
+> entities (suspending a merchant, expiring a session) can break later specs.
 > Prefer entities created for the specific test.
 
 #### Running tests

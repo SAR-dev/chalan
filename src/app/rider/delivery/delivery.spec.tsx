@@ -27,19 +27,27 @@ vi.mock("@/features/warehouses/hooks/use-warehouses", () => ({
   useWarehouses: () => ({ warehouses: [] }),
 }))
 vi.mock("@/features/orders/hooks/use-orders", () => ({
-  useOrders: () => mockOrdersState,
+  // Record only when a queue is passed: the page's order dialogs also call
+  // `useOrders()` with no arguments, and those would overwrite the value.
+  useOrders: (opts?: { queue?: string }) => {
+    if (opts?.queue) receivedQueue = opts.queue
+    return mockOrdersState
+  },
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 let mockUser: ReturnType<typeof makeUser> | null
 let mockRider: ReturnType<typeof makeRider> | null
 let mockOrdersState: MockOrdersState
+/** The queue the page asked the API for. */
+let receivedQueue: string | undefined
 
 beforeEach(() => {
   resetIds()
   mockUser = makeUser()
   mockRider = makeRider()
   mockOrdersState = createMockOrders()
+  receivedQueue = undefined
 })
 
 async function importPage() {
@@ -48,40 +56,32 @@ async function importPage() {
 }
 
 describe("Rider delivery queue", () => {
-  it("filters by deliveryRiderId — only assigned deliveries appear", async () => {
+  // Splitting the queues is the API's job now: it returns only this rider's
+  // delivery rows for `?queue=delivery`, so the footer's `total` counts exactly
+  // what the table shows (ROADMAP R0.2). The page used to filter a union of
+  // both queues client-side while still reporting the union's total —
+  // "Showing 1-20 of 137" over four rows, with page 2 showing a different
+  // subset, so a rider could think a queue was cleared when it was not.
+  it("asks the API for the delivery queue", async () => {
+    mockOrdersState = createMockOrders({
+      orders: [makeOrder({ deliveryRiderId: "rider_1", status: "IN_TRANSIT" })],
+    })
+    await importPage()
+    expect(receivedQueue).toBe("delivery")
+  })
+
+  // The page must NOT re-filter. A local `.filter()` here is exactly what
+  // made the row count and the footer total disagree — and the API, not this
+  // component, is the boundary that decides whose rows may be seen.
+  it("renders the API's rows as-is instead of re-filtering them", async () => {
     mockOrdersState = createMockOrders({
       orders: [
-        makeOrder({
-          deliveryRiderId: "rider_1",
-          status: "IN_TRANSIT",
-        }),
-        makeOrder({
-          deliveryRiderId: "rider_2",
-          status: "IN_TRANSIT",
-        }),
+        makeOrder({ deliveryRiderId: "rider_1", status: "IN_TRANSIT" }),
+        makeOrder({ deliveryRiderId: "rider_2", status: "IN_TRANSIT" }),
       ],
     })
     await importPage()
     expect(screen.getByText("ORD-0001")).toBeInTheDocument()
-    expect(screen.queryByText("ORD-0002")).not.toBeInTheDocument()
-  })
-
-  it("hides pickup-only orders", async () => {
-    mockOrdersState = createMockOrders({
-      orders: [
-        makeOrder({
-          pickupRiderId: "rider_1",
-          deliveryRiderId: null,
-          status: "APPROVED",
-        }),
-        makeOrder({
-          deliveryRiderId: "rider_1",
-          status: "IN_TRANSIT",
-        }),
-      ],
-    })
-    await importPage()
-    expect(screen.queryByText("ORD-0001")).not.toBeInTheDocument()
     expect(screen.getByText("ORD-0002")).toBeInTheDocument()
   })
 

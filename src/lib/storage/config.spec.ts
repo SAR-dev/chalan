@@ -3,6 +3,7 @@ import type { UploadFolder } from "./config"
 import {
   ALLOWED_IMAGE_TYPES,
   MAX_UPLOAD_BYTES,
+  PUBLIC_UPLOAD_FOLDERS,
   UPLOAD_FOLDERS,
   UPLOAD_MAX_DIMENSIONS,
 } from "./config"
@@ -38,8 +39,10 @@ describe("MAX_UPLOAD_BYTES", () => {
 })
 
 describe("UPLOAD_FOLDERS", () => {
-  it("contains 5 folders", () => {
-    expect(UPLOAD_FOLDERS).toHaveLength(5)
+  it("contains 4 folders", () => {
+    // Was 5: `logos` went with the branding feature — nothing uploaded to it
+    // and nothing rendered it.
+    expect(UPLOAD_FOLDERS).toHaveLength(4)
   })
 
   it("includes expected folder names", () => {
@@ -47,7 +50,11 @@ describe("UPLOAD_FOLDERS", () => {
     expect(UPLOAD_FOLDERS).toContain("delivery-proofs")
     expect(UPLOAD_FOLDERS).toContain("pickups")
     expect(UPLOAD_FOLDERS).toContain("nids")
-    expect(UPLOAD_FOLDERS).toContain("logos")
+    // Removed with the branding feature: nothing uploaded to it and nothing
+    // rendered it (ROADMAP branding removal).
+    expect(UPLOAD_FOLDERS).not.toContain("logos")
+    // …which leaves nothing world-readable, by design.
+    expect(PUBLIC_UPLOAD_FOLDERS).toEqual([])
   })
 })
 
@@ -73,10 +80,6 @@ describe("UPLOAD_MAX_DIMENSIONS", () => {
 
   it("nids are 2048px", () => {
     expect(UPLOAD_MAX_DIMENSIONS.nids).toBe(2048)
-  })
-
-  it("logos are 256px", () => {
-    expect(UPLOAD_MAX_DIMENSIONS.logos).toBe(256)
   })
 
   it("all dimensions are positive", () => {

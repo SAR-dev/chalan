@@ -72,112 +72,102 @@ export const GET = withErrorHandler(async (req: Request) => {
   // rendering blank charts.
   const dayExpr = businessDate(order.createdAt)
 
-  // All four aggregates share the same `where` and none depends on another, so
-  // run them together instead of paying four sequential round trips.
-  const [ordersByDay, ordersByStatus, deliveryRows, codRows] =
-    await Promise.all([
-      dbRead
-        .select({
-          date: dayExpr.as("date"),
-          count: sql<number>`count(*)::int`.as("count"),
-          revenue: sumMoney(order.merchantEarnings).as("revenue"),
-        })
-        .from(order)
-        .where(where)
-        .groupBy(dayExpr)
-        .orderBy(dayExpr),
+  // All aggregates share the same `where` and none depends on another, so the
+  // two grouping passes run together and the two plain ones are merged below.
+  const [ordersByDay, ordersByStatus, stats] = await Promise.all([
+    dbRead
+      .select({
+        date: dayExpr.as("date"),
+        count: sql<number>`count(*)::int`.as("count"),
+        revenue: sumMoney(order.merchantEarnings).as("revenue"),
+      })
+      .from(order)
+      .where(where)
+      .groupBy(dayExpr)
+      .orderBy(dayExpr),
 
-      // 2. Orders by status
-      dbRead
-        .select({
-          status: order.status,
-          count: sql<number>`count(*)::int`.as("count"),
-        })
-        .from(order)
-        .where(where)
-        .groupBy(order.status),
+    // 2. Orders by status
+    dbRead
+      .select({
+        status: order.status,
+        count: sql<number>`count(*)::int`.as("count"),
+      })
+      .from(order)
+      .where(where)
+      .groupBy(order.status),
 
-      // 3. Delivery performance
-      dbRead
-        .select({
-          totalDelivered:
-            sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')::int`.as(
-              "totalDelivered",
-            ),
-          totalFailed:
-            sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')::int`.as(
-              "totalFailed",
-            ),
-          totalReturned:
-            sql<number>`count(*) filter (where ${order.status} = 'RETURNED')::int`.as(
-              "totalReturned",
-            ),
-          avgDeliveryTimeHours:
-            sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)::float`.as(
-              "avgDeliveryTimeHours",
-            ),
-        })
-        .from(order)
-        .where(where)
-        .limit(1),
+    // 3. Delivery performance + COD summary, in ONE pass.
+    //
+    // Neither groups, so they are the same scan with different aggregates —
+    // running them separately walked the identical index range twice on every
+    // dashboard poll (ROADMAP R3.7). `FILTER` is the technique already used in
+    // `orders/counts/route.ts`.
+    dbRead
+      .select({
+        totalDelivered:
+          sql<number>`count(*) filter (where ${order.status} = 'DELIVERED')::int`.as(
+            "totalDelivered",
+          ),
+        totalFailed:
+          sql<number>`count(*) filter (where ${order.status} = 'FAILED_ATTEMPT')::int`.as(
+            "totalFailed",
+          ),
+        totalReturned:
+          sql<number>`count(*) filter (where ${order.status} = 'RETURNED')::int`.as(
+            "totalReturned",
+          ),
+        avgDeliveryTimeHours:
+          sql<number>`coalesce(avg(extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600), 0)::float`.as(
+            "avgDeliveryTimeHours",
+          ),
+        totalCollected: sumMoneyFiltered(
+          order.productCost,
+          sql`${order.status} = 'DELIVERED'`,
+        ).as("totalCollected"),
+        totalSettled: sumMoneyFiltered(
+          order.productCost,
+          sql`${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null`,
+        ).as("totalSettled"),
+        settledCount:
+          sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)::int`.as(
+            "settledCount",
+          ),
+        pendingCount:
+          sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)::int`.as(
+            "pendingCount",
+          ),
+      })
+      .from(order)
+      .where(where)
+      .limit(1),
+  ])
 
-      // 4. COD summary
-      dbRead
-        .select({
-          totalCollected: sumMoneyFiltered(
-            order.productCost,
-            sql`${order.status} = 'DELIVERED'`,
-          ).as("totalCollected"),
-          totalSettled: sumMoneyFiltered(
-            order.productCost,
-            sql`${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null`,
-          ).as("totalSettled"),
-          settledCount:
-            sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is not null)::int`.as(
-              "settledCount",
-            ),
-          pendingCount:
-            sql<number>`count(*) filter (where ${order.status} = 'DELIVERED' and ${order.codSettledAt} is null)::int`.as(
-              "pendingCount",
-            ),
-        })
-        .from(order)
-        .where(where)
-        .limit(1),
-    ])
-
-  const deliveryStats = deliveryRows[0]
-  const codSummary = codRows[0]
+  const s = stats[0]
 
   const totalOutcome =
-    (deliveryStats?.totalDelivered ?? 0) +
-    (deliveryStats?.totalFailed ?? 0) +
-    (deliveryStats?.totalReturned ?? 0)
+    (s?.totalDelivered ?? 0) + (s?.totalFailed ?? 0) + (s?.totalReturned ?? 0)
   const successRate =
-    totalOutcome > 0
-      ? ((deliveryStats?.totalDelivered ?? 0) / totalOutcome) * 100
-      : 0
+    totalOutcome > 0 ? ((s?.totalDelivered ?? 0) / totalOutcome) * 100 : 0
 
-  const pendingSettlement =
-    (codSummary?.totalCollected ?? 0) - (codSummary?.totalSettled ?? 0)
+  const pendingSettlement = (s?.totalCollected ?? 0) - (s?.totalSettled ?? 0)
 
   return NextResponse.json({
     ordersByDay,
     ordersByStatus,
     deliveryPerformance: {
-      totalDelivered: deliveryStats?.totalDelivered ?? 0,
-      totalFailed: deliveryStats?.totalFailed ?? 0,
-      totalReturned: deliveryStats?.totalReturned ?? 0,
+      totalDelivered: s?.totalDelivered ?? 0,
+      totalFailed: s?.totalFailed ?? 0,
+      totalReturned: s?.totalReturned ?? 0,
       successRate: Math.round(successRate * 10) / 10,
       avgDeliveryTimeHours:
-        Math.round((deliveryStats?.avgDeliveryTimeHours ?? 0) * 10) / 10,
+        Math.round((s?.avgDeliveryTimeHours ?? 0) * 10) / 10,
     },
     codSummary: {
-      totalCollected: codSummary?.totalCollected ?? 0,
-      totalSettled: codSummary?.totalSettled ?? 0,
+      totalCollected: s?.totalCollected ?? 0,
+      totalSettled: s?.totalSettled ?? 0,
       pendingSettlement,
-      settledCount: codSummary?.settledCount ?? 0,
-      pendingCount: codSummary?.pendingCount ?? 0,
+      settledCount: s?.settledCount ?? 0,
+      pendingCount: s?.pendingCount ?? 0,
     },
   })
 })

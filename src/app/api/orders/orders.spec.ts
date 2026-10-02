@@ -1,3 +1,4 @@
+import { PgDialect } from "drizzle-orm/pg-core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 // Receiver-note (public, token-gated) is covered by its own colocated spec:
 // src/app/api/orders/[id]/receiver-note/receiver-note.spec.ts
@@ -7,6 +8,7 @@ import { POST as bulkCreate } from "./bulk/route"
 import { GET as orderCounts } from "./counts/route"
 import { GET as payableOrders } from "./payable/route"
 import { POST as createOrder, GET as listOrders } from "./route"
+import { GET as orderSummary } from "./summary/route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 let rateLimited = false
@@ -17,6 +19,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: () => Promise.resolve(),
+  logAuditMany: () => Promise.resolve(),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -85,6 +88,13 @@ const insertPayloads: Record<string, unknown>[] = []
 const whereCalls: unknown[] = []
 /** Row-lock strengths requested by any query, in order. */
 const forCalls: string[] = []
+/**
+ * Arguments to every `orderBy`, in call order. A list endpoint paging with
+ * OFFSET must establish a total order or pages can overlap or gap; the count
+ * query deliberately does not sort, so a correctly-ordered list query is the
+ * one and only entry.
+ */
+const orderByCalls: unknown[][] = []
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -99,7 +109,10 @@ vi.mock("@/lib/db", () => {
       groupBy: () => chain,
       limit: () => chain,
       offset: () => chain,
-      orderBy: () => chain,
+      orderBy: (...args: unknown[]) => {
+        orderByCalls.push(args)
+        return chain
+      },
       $dynamic: () => chain,
       for: (strength: string) => {
         forCalls.push(strength)
@@ -162,6 +175,7 @@ beforeEach(() => {
   insertPayloads.length = 0
   whereCalls.length = 0
   forCalls.length = 0
+  orderByCalls.length = 0
   sessionState.value = null
   rateLimited = false
 })
@@ -507,6 +521,233 @@ describe("GET /api/orders/payable", () => {
     expect(res.status).toBe(200)
     expect(json.total).toBe(1)
   })
+
+  // OFFSET paging needs a *total* order (sort column + unique tiebreaker).
+  // Without one Postgres may return rows in any order, so consecutive pages
+  // overlap — the merchant is shown the same payable order twice — or leave a
+  // gap where an order is never shown. Both are silent on a payout list.
+  it("orders the rows by a total order so OFFSET pages cannot overlap or gap", async () => {
+    sessionState.value = merchant
+    selectQueue.push([{ count: 2 }], [{ id: "o1" }, { id: "o2" }])
+    const res = await payableOrders(req("GET"))
+    expect(res.status).toBe(200)
+
+    // Exactly one of the two queries (COUNT + rows) may sort — the COUNT must
+    // not, and the rows query must.
+    expect(orderByCalls).toHaveLength(1)
+    // Sort column plus tiebreaker: a single expression is not a total order.
+    expect(orderByCalls[0]).toHaveLength(2)
+  })
+
+  // Guards against "fixing" the sort by dropping the tiebreaker.
+  it("keeps the tiebreaker when the caller asks for a page", async () => {
+    sessionState.value = merchant
+    selectQueue.push([{ count: 2 }], [{ id: "o1" }, { id: "o2" }])
+    const res = await payableOrders(
+      req("GET", "http://test.local/api?limit=1&offset=1"),
+    )
+    expect(res.status).toBe(200)
+    expect(orderByCalls).toHaveLength(1)
+    expect(orderByCalls[0]).toHaveLength(2)
+  })
+})
+
+// One `ilike` OR spanning order + merchant + warehouse, all inlined after four
+// LEFT JOINs. A trigram GIN index answers a same-table bitmap-OR; it cannot
+// answer ORs that cross relations, so the planner's realistic choice was "join
+// all four tables, then filter" — the search got slower the more it matched
+// nothing (ROADMAP R3.10).
+describe("GET /api/orders?q= search shape (ROADMAP R3.10)", () => {
+  async function searchClauseFor(q: string) {
+    sessionState.value = admin
+    whereCalls.length = 0
+    // COUNT + rows share the same `where`.
+    selectQueue.push([{ count: 0 }], [])
+    const res = await listOrders(
+      req("GET", `http://test.local/api?q=${encodeURIComponent(q)}`),
+    )
+    expect(res.status).toBe(200)
+    // Each EXISTS subquery is itself built through the mocked `dbRead`, so it
+    // pushes its own inner `where` ahead of the top-level one. Take the
+    // outermost clause — the only one that mentions an `order` column.
+    const rendered = whereCalls.map((w) =>
+      new PgDialect().sqlToQuery(w as Parameters<PgDialect["sqlToQuery"]>[0]),
+    )
+    const outer = rendered.find((r) => r.sql.includes('"order"."id"'))
+    expect(outer, rendered.map((r) => r.sql).join("\n---\n")).toBeDefined()
+    return outer!
+  }
+
+  it("gives each joined table its own EXISTS subquery", async () => {
+    const { sql, params } = await searchClauseFor("ABC Traders")
+    const existsCount = sql.match(/exists\s*\(select/gi)?.length ?? 0
+    expect(existsCount, sql).toBe(2)
+    // The correlated key of each subquery, plus the table it scans.
+    expect(sql).toMatch(/exists\s*\(select[\s\S]*"merchant"/i)
+    expect(sql).toMatch(/exists\s*\(select[\s\S]*"warehouse"/i)
+    // Params survive the restructure — otherwise the term silently becomes
+    // `ilike %null%` and search stops matching anything.
+    expect(params).toContain("%ABC Traders%")
+  })
+
+  it("keeps order-level matches outside the subqueries", async () => {
+    const { sql } = await searchClauseFor("01711")
+    // These two live on `order` itself, so they stay in the top-level OR and
+    // keep serving from the order table's own trigram indexes.
+    expect(sql).toMatch(/exists\s*\(select/i)
+    expect(sql).toContain('"order"."recipientName" ilike')
+    expect(sql).toContain('"order"."recipientPhone" ilike')
+    // ...and neither appears inside a subquery, which is the whole point: a
+    // hit on `order` alone must not drag the merchant/warehouse scans in.
+    expect(sql).not.toMatch(/exists\s*\([^)]*"recipientName"/i)
+  })
+})
+
+// A rider has two queues. Without `?queue=` the endpoint returned their union
+// and each queue page filtered client-side, so the footer's `total` counted
+// rows the table never rendered and page 2 showed a different subset
+// (ROADMAP R0.2).
+describe("GET /api/orders?queue= (ROADMAP R0.2)", () => {
+  const renderWhere = () =>
+    new PgDialect().sqlToQuery(
+      whereCalls[0] as Parameters<PgDialect["sqlToQuery"]>[0],
+    )
+
+  async function riderList(query?: string) {
+    sessionState.value = rider
+    whereCalls.length = 0
+    // COUNT + rows, both sharing the same `where`.
+    selectQueue.push([{ count: 0 }], [])
+    const res = await listOrders(
+      req("GET", `http://test.local/api${query ?? ""}`),
+    )
+    expect(res.status).toBe(200)
+    return renderWhere()
+  }
+
+  it("narrows to the pickup queue when asked", async () => {
+    const { sql, params } = await riderList("?queue=pickup")
+    expect(sql).toContain('"order"."pickupRiderId"')
+    expect(sql).not.toContain('"order"."deliveryRiderId"')
+    expect(params).toContain("r_1")
+  })
+
+  it("narrows to the delivery queue when asked", async () => {
+    const { sql, params } = await riderList("?queue=delivery")
+    expect(sql).toContain('"order"."deliveryRiderId"')
+    expect(sql).not.toContain('"order"."pickupRiderId"')
+    expect(params).toContain("r_1")
+  })
+
+  // Backwards compatible: with no queue the union is still returned, so the
+  // rows and the total agree either way.
+  it("returns both queues when no queue is requested", async () => {
+    const { sql } = await riderList()
+    expect(sql).toContain('"order"."pickupRiderId"')
+    expect(sql).toContain('"order"."deliveryRiderId"')
+  })
+
+  // A typo must not narrow to an empty set (or widen unexpectedly) — unknown
+  // values fall back to the union, mirroring parseStatusFilter.
+  it("falls back to the union for an unrecognised queue", async () => {
+    const { sql } = await riderList("?queue=bogus")
+    expect(sql).toContain('"order"."pickupRiderId"')
+    expect(sql).toContain('"order"."deliveryRiderId"')
+  })
+})
+
+describe("GET /api/orders/summary (ROADMAP R0.1)", () => {
+  const aggregates = {
+    inProgressCount: 7,
+    // node-postgres can hand numeric aggregates back as text; the route must
+    // still answer with a number, because `formatTk("42000")` would concatenate.
+    codToCollect: "42000",
+    codToSettleCount: 3,
+    codToSettleAmount: "9000",
+    payoutReadyCount: 2,
+    payoutToIssue: "7000",
+    deliveredCount: 400,
+    totalEarnings: "200000",
+  }
+
+  it("401 when unauthenticated", async () => {
+    const res = await orderSummary(req("GET"))
+    expect(res.status).toBe(401)
+  })
+
+  it("403 for roles that have no merchant figures", async () => {
+    for (const session of [rider, whAdmin]) {
+      sessionState.value = session
+      const res = await orderSummary(req("GET"))
+      expect(res.status).toBe(403)
+    }
+  })
+
+  it("aggregates over the caller's merchant and reports numbers", async () => {
+    sessionState.value = merchant
+    selectQueue.push([aggregates])
+    const res = await orderSummary(req("GET"))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toEqual({
+      codToCollect: 42000,
+      inProgressCount: 7,
+      codToSettleCount: 3,
+      codToSettleAmount: 9000,
+      payoutReadyCount: 2,
+      payoutToIssue: 7000,
+      deliveredCount: 400,
+      totalEarnings: 200000,
+    })
+    // Scoped by the session's merchant, never by a query param the caller picks.
+    expect(whereCalls[0]).toBeDefined()
+    const { params } = new PgDialect().sqlToQuery(
+      whereCalls[0] as Parameters<PgDialect["sqlToQuery"]>[0],
+    )
+    expect(params).toContain("m_1")
+  })
+
+  it("403 when a merchant asks for another merchant's summary", async () => {
+    sessionState.value = merchant
+    const res = await orderSummary(
+      req("GET", "http://test.local/api?merchantId=m_2"),
+    )
+    expect(res.status).toBe(403)
+    expect(selectQueue).toHaveLength(0)
+  })
+
+  it("answers zero, not null, for a merchant with no orders", async () => {
+    sessionState.value = merchant
+    selectQueue.push([])
+    const res = await orderSummary(req("GET"))
+    const json = await res.json()
+    expect(json).toEqual({
+      codToCollect: 0,
+      inProgressCount: 0,
+      codToSettleCount: 0,
+      codToSettleAmount: 0,
+      payoutReadyCount: 0,
+      payoutToIssue: 0,
+      deliveredCount: 0,
+      totalEarnings: 0,
+    })
+  })
+
+  it("lets a super admin read an arbitrary merchant's summary", async () => {
+    sessionState.value = admin
+    selectQueue.push([aggregates])
+    const res = await orderSummary(
+      req("GET", "http://test.local/api?merchantId=m_9"),
+    )
+    expect(res.status).toBe(200)
+    expect((await res.json()).totalEarnings).toBe(200000)
+    const { params } = new PgDialect().sqlToQuery(
+      whereCalls[whereCalls.length - 1] as Parameters<
+        PgDialect["sqlToQuery"]
+      >[0],
+    )
+    expect(params).toContain("m_9")
+  })
 })
 
 describe("GET /api/orders/:id", () => {
@@ -709,7 +950,7 @@ describe("POST /api/orders/bulk", () => {
 
 describe("GET /api/orders/analytics", () => {
   function pushEmptyAnalytics() {
-    selectQueue.push([], [], [], [])
+    selectQueue.push([], [], [])
   }
 
   it("401 when unauthenticated", async () => {
@@ -723,7 +964,7 @@ describe("GET /api/orders/analytics", () => {
     const res = await analytics(req("GET"))
     const json = await res.json()
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     // No merchant/warehouse scope, but the default window still bounds the scan
     // (ROADMAP P3) — so a where clause is present on every aggregate.
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
@@ -754,7 +995,7 @@ describe("GET /api/orders/analytics", () => {
       req("GET", "http://test.local/api/orders/analytics?merchantId=m_1"),
     )
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -773,7 +1014,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -782,7 +1023,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -791,7 +1032,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -800,7 +1041,7 @@ describe("GET /api/orders/analytics", () => {
     pushEmptyAnalytics()
     const res = await analytics(req("GET"))
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -814,7 +1055,7 @@ describe("GET /api/orders/analytics", () => {
       ),
     )
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -825,7 +1066,7 @@ describe("GET /api/orders/analytics", () => {
       req("GET", "http://test.local/api/orders/analytics?from=nope&to=nope"),
     )
     expect(res.status).toBe(200)
-    expect(whereCalls).toHaveLength(4)
+    expect(whereCalls).toHaveLength(3)
     expect(whereCalls.every((w) => w !== undefined)).toBe(true)
   })
 
@@ -842,15 +1083,13 @@ describe("GET /api/orders/analytics", () => {
         { status: "RETURNED", count: 1 },
       ],
       [
+        // Delivery performance and COD summary are one query now (ROADMAP
+        // R3.7) — both are ungrouped, so they are the same scan.
         {
           totalDelivered: 8,
           totalFailed: 1,
           totalReturned: 1,
           avgDeliveryTimeHours: 5.56,
-        },
-      ],
-      [
-        {
           totalCollected: 1000,
           totalSettled: 400,
           settledCount: 2,

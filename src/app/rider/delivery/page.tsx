@@ -1,7 +1,7 @@
 "use client"
 
 import { CheckCircle2, MapPin, Navigation } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { PageHeader } from "@/components/page-header"
@@ -52,7 +52,7 @@ export default function RiderDeliveryQueuePage() {
     dateTo,
     setDateTo,
     mutate: refresh,
-  } = useOrders()
+  } = useOrders({ queue: "delivery" })
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [startTarget, setStartTarget] = useState<Order | null>(null)
@@ -64,13 +64,8 @@ export default function RiderDeliveryQueuePage() {
     setPage(1)
   }, [setPage])
 
-  const myDeliveries = useMemo(
-    () =>
-      currentRider
-        ? orders.filter((o) => o.deliveryRiderId === currentRider.id)
-        : [],
-    [orders, currentRider],
-  )
+  // Rows come pre-filtered to this queue by the API (`?queue=delivery`), so the
+  // table and the footer's `total` count the same set (ROADMAP R0.2).
 
   const dateFilterLabel =
     dateFrom || dateTo
@@ -147,6 +142,7 @@ export default function RiderDeliveryQueuePage() {
             href={mapLink}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Open delivery location in maps for order ${o.id}`}
             className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent"
           >
             <MapPin className="size-4" />
@@ -249,7 +245,7 @@ export default function RiderDeliveryQueuePage() {
             id="rider-delivery"
             searchable
             columns={columns}
-            data={myDeliveries}
+            data={orders}
             getRowKey={(o) => o.id}
             initialSortId="order"
             loading={isLoading || isRefreshing}

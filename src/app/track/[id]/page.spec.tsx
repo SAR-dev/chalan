@@ -56,8 +56,6 @@ const merchantRow = () => [
   {
     id: "m_1",
     businessName: "Acme Goods",
-    brandColor: "#2563eb",
-    hidePlatformBranding: false,
   },
 ]
 
@@ -68,36 +66,30 @@ describe("Track detail page", () => {
     expect(screen.getByText(/parcel not found/i)).toBeInTheDocument()
   })
 
-  it("shows merchant branding for a branded order", async () => {
+  it("names the fulfilling merchant in the header", async () => {
     dbQueue.reset()
     dbQueue.enqueue(orderRow(), [
       {
         id: "m_1",
         businessName: "Acme Goods",
-        brandColor: "#2563eb",
-        hidePlatformBranding: false,
       },
     ])
     await importPage("ORD-BRAND-1")
 
+    // Branding (colour / hide-platform toggle) was removed; what the header
+    // shows is the merchant's business name, which is identity, not branding.
     expect(screen.getByTestId("track-brand")).toHaveTextContent(
       "Fulfilled by Acme Goods",
     )
-    // Branding shows the business name, never the logo (ROADMAP branding change).
-    expect(screen.queryByTestId("track-brand-logo")).not.toBeInTheDocument()
-    expect(screen.getByTestId("track-accent")).toBeInTheDocument()
-    // Platform footer stays when hidePlatformBranding is off
     expect(screen.getByText(/All rights reserved/i)).toBeInTheDocument()
   })
 
-  it("hides the platform footer when hidePlatformBranding is set", async () => {
+  it("always shows the platform footer", async () => {
     dbQueue.reset()
     dbQueue.enqueue(orderRow(), [
       {
         id: "m_1",
         businessName: "Acme Goods",
-        brandColor: "#f97316",
-        hidePlatformBranding: true,
       },
     ])
     await importPage("ORD-BRAND-2")
@@ -105,10 +97,8 @@ describe("Track detail page", () => {
     expect(screen.getByTestId("track-brand")).toHaveTextContent(
       "Fulfilled by Acme Goods",
     )
-    // No logo uploaded → default chip instead of an <img>
-    expect(screen.queryByTestId("track-brand-logo")).not.toBeInTheDocument()
-    expect(screen.getByTestId("track-accent")).toBeInTheDocument()
-    expect(screen.queryByText(/All rights reserved/i)).not.toBeInTheDocument()
+    // Unconditional since the `hidePlatformBranding` toggle was removed.
+    expect(screen.getByText(/All rights reserved/i)).toBeInTheDocument()
   })
 
   it("falls back to platform identity for unknown codes", async () => {
@@ -119,7 +109,6 @@ describe("Track detail page", () => {
       "Fulfilled by",
     )
     expect(screen.queryByTestId("track-brand-logo")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("track-accent")).not.toBeInTheDocument()
   })
 
   it("enables the recipient note form when opened with the tracking token", async () => {

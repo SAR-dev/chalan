@@ -1,3 +1,4 @@
+import { PgDialect } from "drizzle-orm/pg-core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { PATCH as toggleRiderActive } from "./[id]/active/route"
 import { GET as getRiderCash } from "./[id]/cash/route"
@@ -15,6 +16,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: () => Promise.resolve(),
+  logAuditMany: () => Promise.resolve(),
 }))
 
 vi.mock("@/lib/auth", () => ({
@@ -29,6 +31,17 @@ const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
 const insertResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
+/**
+ * WHERE clauses passed to `db.update()`, in call order. The mock discards them,
+ * so rendering the recorded clause to SQL is the only way to prove the toggle's
+ * lost-update guard is really in the query (ROADMAP R0.9).
+ */
+const updateWhereClauses: unknown[] = []
+
+// The guard is a SQL predicate — assert on the SQL it renders.
+const dialect = new PgDialect()
+const renderUpdateWhere = (clause: unknown) =>
+  dialect.sqlToQuery(clause as Parameters<PgDialect["sqlToQuery"]>[0])
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -53,7 +66,10 @@ vi.mock("@/lib/db", () => {
         updatePayloads.push(vals)
         return chain
       },
-      where: () => chain,
+      where: (clause?: unknown) => {
+        updateWhereClauses.push(clause)
+        return chain
+      },
       returning: () => Promise.resolve(updateResult),
     }
     return chain
@@ -84,6 +100,7 @@ beforeEach(() => {
   selectQueue.length = 0
   updateResult.length = 0
   updatePayloads.length = 0
+  updateWhereClauses.length = 0
   sessionState.value = null
 })
 
@@ -306,6 +323,34 @@ describe("PATCH /api/riders/:id/active", () => {
     selectQueue.push([{ isActive: true, warehouseId: "wh_2" }])
     const res = await toggleRiderActive(req("PATCH"), ctx())
     expect(res.status).toBe(403)
+  })
+
+  // The write must be conditional on the state we read; otherwise two
+  // concurrent toggles write the same value and one activation is silently
+  // lost. Asserted on rendered SQL because the mock discards WHERE.
+  it("makes the flip a conditional write, not a blind overwrite", async () => {
+    sessionState.value = admin
+    selectQueue.push([{ isActive: true, warehouseId: "wh_1" }])
+    updateResult.push({ id: "rider_1", name: "Rider", isActive: false })
+    const res = await toggleRiderActive(req("PATCH"), ctx())
+    expect(res.status).toBe(200)
+
+    expect(updateWhereClauses).toHaveLength(1)
+    const { sql, params } = renderUpdateWhere(updateWhereClauses[0])
+    expect(sql).toContain('"rider"."id" =')
+    expect(sql).toContain('"rider"."isActive" =')
+    expect(params).toContain("rider_1")
+    expect(params).toContain(true)
+  })
+
+  it("409s instead of reporting success when the row moved underneath it", async () => {
+    sessionState.value = admin
+    selectQueue.push([{ isActive: true, warehouseId: "wh_1" }])
+    // updateResult stays empty — UPDATE … RETURNING matched no rows.
+    const res = await toggleRiderActive(req("PATCH"), ctx())
+    expect(res.status).toBe(409)
+    const json = await res.json()
+    expect(json.error).toMatch(/reload and try again/i)
   })
 })
 

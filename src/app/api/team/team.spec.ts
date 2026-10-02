@@ -1,3 +1,4 @@
+import { PgDialect } from "drizzle-orm/pg-core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { logAudit } from "@/lib/audit"
 import { PATCH as toggleActive } from "./[id]/active/route"
@@ -7,12 +8,19 @@ import { POST as createTeam, GET as listTeam } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 
+// The lost-update guard is a SQL predicate, so assert on the SQL it renders
+// rather than on the mock (which discards WHERE entirely).
+const dialect = new PgDialect()
+const renderUpdateWhere = (clause: unknown) =>
+  dialect.sqlToQuery(clause as Parameters<PgDialect["sqlToQuery"]>[0])
+
 vi.mock("@/lib/api-auth", () => ({
   requireSession: () => Promise.resolve(sessionState.value),
 }))
 
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
+  logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/auth", () => ({
@@ -68,6 +76,15 @@ const insertPayloads: Record<string, unknown>[] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
 const insertResult: unknown[] = []
+/**
+ * WHERE clauses passed to `db.update()`, in call order.
+ *
+ * Recording them matters: the mock ignores the clause entirely, so a test that
+ * only checks the response would still pass if the lost-update guard were
+ * deleted. Rendering the recorded clause to SQL is what proves the write is
+ * actually conditional (ROADMAP R0.9).
+ */
+const updateWhereClauses: unknown[] = []
 
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
@@ -90,7 +107,10 @@ vi.mock("@/lib/db", () => {
         updatePayloads.push(vals)
         return chain
       },
-      where: () => chain,
+      where: (clause?: unknown) => {
+        updateWhereClauses.push(clause)
+        return chain
+      },
       returning: () => Promise.resolve(updateResult),
     }
     return chain
@@ -121,6 +141,7 @@ beforeEach(() => {
   updatePayloads.length = 0
   insertResult.length = 0
   insertPayloads.length = 0
+  updateWhereClauses.length = 0
   sessionState.value = null
   activationState.issueActivationToken.mockClear()
   activationState.sendActivationEmail.mockClear()
@@ -361,6 +382,41 @@ describe("PATCH /api/team/:id/active", () => {
         },
       }),
     )
+  })
+
+  // The whole point of the fix: the write must be conditional on the state we
+  // read. Asserted on rendered SQL because the mock throws WHERE away — a test
+  // that only looked at the response would still pass with the guard deleted.
+  it("makes the flip a conditional write, not a blind overwrite", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([{ isActive: true }], [{ name: "Amy" }])
+    updateResult.push({ isActive: false })
+    const res = await toggleActive(req("PATCH"), ctx())
+    expect(res.status).toBe(200)
+
+    expect(updateWhereClauses).toHaveLength(1)
+    const { sql, params } = renderUpdateWhere(updateWhereClauses[0])
+    // Identity match …
+    expect(sql).toContain('"profile"."userId" =')
+    // … plus the state we read, which is what makes it compare-and-swap.
+    expect(sql).toContain('"profile"."isActive" =')
+    expect(params).toContain(true)
+    expect(params).toContain("user_1")
+  })
+
+  // A concurrent request flipped the account between our read and our write,
+  // so the CAS matched nothing. Reporting success would claim a change that
+  // never happened and would hide the other request's write.
+  it("409s instead of reporting success when the row moved underneath it", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([{ isActive: true }])
+    // updateResult stays empty — UPDATE … RETURNING matched no rows.
+    const res = await toggleActive(req("PATCH"), ctx())
+    expect(res.status).toBe(409)
+    const json = await res.json()
+    expect(json.error).toMatch(/reload and try again/i)
+    // A conflict must not be audited as though the toggle happened.
+    expect(logAudit).not.toHaveBeenCalled()
   })
 })
 

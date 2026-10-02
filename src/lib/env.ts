@@ -8,6 +8,22 @@
 
 import { parseAllowlist } from "@/lib/ip-allowlist"
 
+/**
+ * Retention defaults — the single source of truth.
+ *
+ * These numbers used to be restated in six places (two cron routes, their doc
+ * comments, `scripts/setup-pg-cron.sql`, `docs/ENV.md` and the comments below),
+ * and the comments here drifted to 90 / 30 while every consumer applied 30 / 10
+ * — so the file that *validates* the variables disagreed with the code that
+ * *uses* them (ROADMAP R0.7).
+ *
+ * Anything that restates a default must be asserted against these constants;
+ * `src/app/__tests__/docs-drift.spec.ts` does that for the SQL and the docs.
+ * The cron routes import them rather than inlining a literal.
+ */
+export const DEFAULT_AUDIT_LOG_RETENTION_DAYS = 30
+export const DEFAULT_EMAIL_LOG_RETENTION_DAYS = 10
+
 type EnvError = { key: string; message: string }
 
 function collect(fn: (errors: EnvError[]) => void): EnvError[] {
@@ -109,8 +125,10 @@ export function validateEnv(): void {
     // Generate with: openssl rand -base64 32
     required(e, "CRON_SECRET", "Secret for authenticating cron job requests")
 
-    // Optional — retention period in days for audit log cleanup (default 90).
-    // Set in environment to override; validated only when present.
+    // Optional — retention period in days for audit log cleanup. The default
+    // is DEFAULT_AUDIT_LOG_RETENTION_DAYS above (the value actually applied by
+    // /api/cron/cleanup-audit-logs). Set in environment to override;
+    // validated only when present.
     if (process.env.AUDIT_LOG_RETENTION_DAYS) {
       const days = parseInt(process.env.AUDIT_LOG_RETENTION_DAYS, 10)
       if (isNaN(days) || days < 1) {
@@ -121,8 +139,10 @@ export function validateEnv(): void {
       }
     }
 
-    // Optional — retention period in days for successful email log cleanup
-    // (default 30). Set in environment to override; validated only when present.
+    // Optional — retention period in days for successful email log cleanup.
+    // The default is DEFAULT_EMAIL_LOG_RETENTION_DAYS above (the value actually
+    // applied by /api/cron/cleanup-email-logs). Set in environment to override;
+    // validated only when present.
     if (process.env.EMAIL_LOG_RETENTION_DAYS) {
       const days = parseInt(process.env.EMAIL_LOG_RETENTION_DAYS, 10)
       if (isNaN(days) || days < 1) {
@@ -144,6 +164,22 @@ export function validateEnv(): void {
         e.push({
           key: "UPLOAD_SWEEP_MIN_AGE_HOURS",
           message: "Must be a positive number (hours).",
+        })
+      }
+    }
+
+    // Optional — where unhandled errors are POSTed (ROADMAP R3.1).
+    //
+    // Deliberately not a vendor SDK: anything that accepts a JSON POST works
+    // (Slack incoming webhook, Grafana OnCall, a self-hosted collector), so
+    // choosing a vendor stays a deployment decision instead of a code change.
+    // Unset — the default — means errors go to stdout only, which is all that
+    // existed before this. Validated only when present.
+    if (process.env.ERROR_WEBHOOK_URL) {
+      if (!/^https?:\/\//.test(process.env.ERROR_WEBHOOK_URL)) {
+        e.push({
+          key: "ERROR_WEBHOOK_URL",
+          message: "Must be an http(s) URL.",
         })
       }
     }

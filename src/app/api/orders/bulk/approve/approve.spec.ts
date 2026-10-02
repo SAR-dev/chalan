@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { logAudit } from "@/lib/audit"
+import { logAudit, logAuditMany } from "@/lib/audit"
 import { PATCH as approve } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -10,6 +10,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
+  logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
 const selectQueue: unknown[][] = []
@@ -200,17 +201,19 @@ describe("PATCH /api/orders/bulk/approve", () => {
       approvedBy: "Admin Amy",
     })
     expect(typeof updatePayloads[0].approvedAt).toBe("string")
-    expect(logAudit).toHaveBeenCalledTimes(1)
-    expect(logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "ORDER_APPROVE",
-        entityType: "order",
-        entityId: "o1",
-        metadata: {
-          diff: { status: { from: "PENDING", to: "APPROVED" } },
-        },
-      }),
-      expect.anything(),
-    )
+    // One batched call for the whole batch (ROADMAP R3.5) — previously one
+    // `logAudit` INSERT per row, each a round trip inside the transaction.
+    expect(logAuditMany).toHaveBeenCalledTimes(1)
+    const [auditRows] = vi.mocked(logAuditMany).mock.calls[0]
+    expect(auditRows).toHaveLength(1)
+    expect(auditRows[0]).toMatchObject({
+      action: "ORDER_APPROVE",
+      entityType: "order",
+      entityId: "o1",
+      metadata: {
+        diff: { status: { from: "PENDING", to: "APPROVED" } },
+      },
+    })
+    expect(vi.mocked(logAuditMany).mock.calls[0][1]).toBeTruthy()
   })
 })

@@ -1,7 +1,7 @@
 "use client"
 
 import { MapPin, PackageCheck } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { PageHeader } from "@/components/page-header"
@@ -39,7 +39,7 @@ export default function RiderPickupQueuePage() {
     dateTo,
     setDateTo,
     mutate: refresh,
-  } = useOrders()
+  } = useOrders({ queue: "pickup" })
   const { merchants } = useMerchants()
   const { pickupLocations } = usePickupLocations()
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
@@ -56,13 +56,9 @@ export default function RiderPickupQueuePage() {
     merchantFn(id)?.businessName ?? "Merchant"
   const pickup = (id: string) => pickupLocations.find((p) => p.id === id)
 
-  const myPickups = useMemo(
-    () =>
-      currentRider
-        ? orders.filter((o) => o.pickupRiderId === currentRider.id)
-        : [],
-    [orders, currentRider],
-  )
+  // Rows come pre-filtered to this queue by the API (`?queue=pickup`), so the
+  // table and the footer's `total` count the same set (ROADMAP R0.2). Filtering
+  // client-side here is what let the footer claim 137 rows over four shown.
 
   const dateFilterLabel =
     dateFrom || dateTo
@@ -142,6 +138,7 @@ export default function RiderPickupQueuePage() {
             href={mapLink}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Open pickup location in maps for order ${o.id}`}
             className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent"
           >
             <MapPin className="size-4" />
@@ -218,7 +215,7 @@ export default function RiderPickupQueuePage() {
             id="rider-pickup"
             searchable
             columns={columns}
-            data={myPickups}
+            data={orders}
             getRowKey={(o) => o.id}
             initialSortId="order"
             loading={isLoading || isRefreshing}

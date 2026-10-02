@@ -11,6 +11,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 // Imports must come after the vi.mock calls (which are hoisted regardless).
+import { applyBulkOrderTransition } from "@/features/orders/transitions"
 import { logAudit } from "@/lib/audit"
 import { PATCH as approve } from "./approve/route"
 import { PATCH as assignPickupRider } from "./assign-pickup-rider/route"
@@ -30,6 +31,12 @@ import { PATCH as settleCod } from "./settle-cod/route"
 // `db.update(x).set(vals).where(eq(...)).returning()` (awaited).
 const dbState = {
   selectQueue: [] as unknown[][],
+  /**
+   * Every `SELECT` the code under test actually issued, for the R3.5 batch
+   * statement-count assertions. The queue alone can only answer "how many were
+   * left over", not "what did this batch cost".
+   */
+  selectCount: 0,
   updateResult: [] as unknown[],
   updatePayloads: [] as Record<string, unknown>[],
   insertResult: [] as unknown[],
@@ -39,7 +46,13 @@ const dbState = {
 vi.mock("@/lib/db", () => {
   const makeSelectChain = () => {
     const chain: Record<string, unknown> = {
-      from: () => chain,
+      from: () => {
+        // Counted here, not in `then`: a statement is a *constructed* query.
+        // A thenable can be awaited more than once, which would inflate the
+        // count and make "does batch size change the cost?" unanswerable.
+        dbState.selectCount += 1
+        return chain
+      },
       where: () => chain,
       innerJoin: () => chain,
       // `resolveRoutePricing` joins delivery_city → delivery_zone to read the
@@ -117,6 +130,22 @@ vi.mock("@/lib/api-auth", () => ({
 // it so a successful transition does not throw after the write commits.
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
+  // The bulk path batches the audit trail into one call (ROADMAP R3.6).
+  logAuditMany: vi.fn(() => Promise.resolve()),
+}))
+
+// Every transition ends by expiring the dashboard stat tiles (ROADMAP R3.7).
+// Mocked rather than left real for two reasons: the real `revalidateTag` throws
+// "static generation store missing" outside a request, and the resulting
+// `logger.warn` reads the clock — which would show up in the batch-stamping
+// test below as extra `toISOString` reads and make it measure the logger rather
+// than the transition.
+const revalidatedTags: string[] = []
+vi.mock("next/cache", () => ({
+  revalidateTag: (tag: string) => {
+    revalidatedTags.push(tag)
+  },
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }))
 
 type Handler = (
@@ -173,7 +202,11 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     status: "PENDING",
     merchantId: "merch_1",
     pickupLocationId: "pl_1",
-    warehouseId: null,
+    // NOT NULL in the schema and written at creation from the pickup hub
+    // (`orders/route.ts` → `warehouseId: hub.id`), so a row without one cannot
+    // exist. Defaulting this fixture to null used to model a state the data
+    // model forbids (ROADMAP R0.12).
+    warehouseId: "wh_1",
     pickupRiderId: null,
     deliveryRiderId: null,
     parcelWeightKg: 2,
@@ -186,11 +219,13 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   dbState.selectQueue = []
+  dbState.selectCount = 0
   dbState.updateResult = []
   dbState.updatePayloads = []
   dbState.insertResult = []
   dbState.insertPayloads = []
   sessionState.value = null
+  revalidatedTags.length = 0
   vi.mocked(logAudit).mockClear()
 })
 
@@ -814,14 +849,25 @@ describe("PATCH /orders/:id/receive", () => {
     })
   })
 
-  it("receives an unassigned pickup with no warehouse yet", async () => {
+  // There is no "no warehouse yet" row to receive: `order.warehouseId` is
+  // NOT NULL and is written at creation from the pickup hub. The scope
+  // predicate and its in-memory twin dropped their `warehouseId is null`
+  // clause for the same reason — a clause that can never match only forced a
+  // bitmap-OR over an index-friendly predicate (ROADMAP R0.12).
+  //
+  // Pinned here so that if the column is ever made nullable (an intake-
+  // candidate flow), the change has to be made consciously in both places.
+  it("has no null-warehouse receive path", async () => {
     sessionState.value = warehouseAdmin("wh_1")
     dbState.selectQueue = [
       [makeOrder({ status: "PICKED_UP", warehouseId: null })],
     ]
     dbState.updateResult = [makeOrder({ status: "IN_WAREHOUSE" })]
-    const { status } = await call(receive)
-    expect(status).toBe(200)
+    const { status, json } = await call(receive)
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "This parcel is held at a different warehouse.",
+    })
   })
 })
 
@@ -1618,5 +1664,261 @@ describe("PATCH /orders/:id/cancel", () => {
     sessionState.value = admin
     const { status } = await call(cancel, { reason: "x".repeat(101) })
     expect(status).toBe(400)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A 100-order bulk transition used to cost ~900 statements in one transaction:
+// the guard re-read the merchant and re-resolved the lane (5 queries) for
+// *every* row, each row then got its own `UPDATE ... WHERE id =`, and each row
+// stamped its own `Date.now()` so those SET payloads could never have been
+// merged even if they had been attempted (ROADMAP R3.5).
+//
+// The invariant that matters: adding more orders in the same merchant and on
+// the same lane must not add statements. Only genuinely new keys (a second
+// merchant, a second lane) may cost more, and only once each.
+// ---------------------------------------------------------------------------
+describe("bulk transition batch cost (ROADMAP R3.5)", () => {
+  /**
+   * Run a bulk `approve` over `n` orders that share one merchant and one lane,
+   * and report the statements it cost.
+   */
+  async function bulkApprove(n: number) {
+    sessionState.value = superAdmin
+    dbState.selectCount = 0
+    dbState.updatePayloads = []
+    dbState.insertPayloads = []
+    const orders = Array.from({ length: n }, (_, i) =>
+      makeOrder({ id: `order_${i}`, deliveryCityId: "city_1" }),
+    )
+    dbState.selectQueue = [
+      // 1. the locked batch
+      orders,
+      // 2. the merchant status
+      [{ status: "ACTIVE" }],
+      // 3-6. resolveRoutePricing four reads for this lane
+      ...pricedLane(),
+    ]
+    dbState.updateResult = orders.map((o) => ({ ...o, status: "APPROVED" }))
+
+    const res = await applyBulkOrderTransition(
+      "approve",
+      orders.map((o) => o.id),
+      {},
+    )
+    expect(res.status).toBe(200)
+    await res.json()
+    return {
+      selects: dbState.selectCount,
+      updates: dbState.updatePayloads.length,
+      historyInserts: dbState.insertPayloads.length,
+    }
+  }
+
+  it("costs the same for 2 orders as for 25", async () => {
+    const small = await bulkApprove(2)
+    const large = await bulkApprove(25)
+    // The whole point: the batch size is not in the statement count. Before the
+    // fix this was ~5 reads + 1 write per order, so 25 rows cost ~150.
+    expect(large.selects).toBe(small.selects)
+    expect(large.selects).toBeLessThan(12)
+  })
+
+  it("writes one UPDATE for the whole batch, not one per order", async () => {
+    const { updates } = await bulkApprove(25)
+    expect(updates).toBe(1)
+  })
+
+  it("stamps every row with the same instant", async () => {
+    // This is what makes the grouping above legal, so it has to be a real
+    // assertion: make the clock *advance* on every read, and require one
+    // UPDATE. If `buildUpdate` read its own `Date.now()`, each row would get a
+    // different `approvedAt`, the SET payloads would all differ, and the batch
+    // would fall back to one UPDATE per order.
+    let tick = 0
+    // Spelled out rather than computed via `new Date(...).toISOString()`, which
+    // is the very method under spy and would recurse.
+    const clock = vi
+      .spyOn(Date.prototype, "toISOString")
+      .mockImplementation(() => `2026-01-01T00:00:0${tick++}.000Z`)
+    try {
+      sessionState.value = superAdmin
+      dbState.selectQueue = [
+        [makeOrder({ id: "order_a" }), makeOrder({ id: "order_b" })],
+        [{ status: "ACTIVE" }],
+      ]
+      dbState.updateResult = [
+        makeOrder({ id: "order_a", status: "APPROVED" }),
+        makeOrder({ id: "order_b", status: "APPROVED" }),
+      ]
+      dbState.updatePayloads = []
+      const res = await applyBulkOrderTransition(
+        "approve",
+        ["order_a", "order_b"],
+        {},
+      )
+      expect(res.status).toBe(200)
+      expect(dbState.updatePayloads).toHaveLength(1)
+      // And both rows carry the batch's single instant, not their own.
+      expect(dbState.updatePayloads[0].approvedAt).toBe(
+        "2026-01-01T00:00:00.000Z",
+      )
+      expect(tick).toBe(1)
+    } finally {
+      clock.mockRestore()
+    }
+  })
+
+  it("expires the dashboard stat tiles after a successful transition", async () => {
+    // ROADMAP R3.7. The cached tiles on /dashboard, /dashboard/riders and
+    // /warehouse/cod-settlement would otherwise keep serving pre-transition
+    // numbers until the 30s TTL ran out. Asserted here because a missing
+    // `refreshStats` call is invisible: the write succeeds, the response is
+    // 200, and only the tile is quietly wrong.
+    sessionState.value = superAdmin
+    dbState.selectQueue = [
+      [makeOrder({ id: "order_a" })],
+      [{ status: "ACTIVE" }],
+    ]
+    dbState.updateResult = [makeOrder({ id: "order_a", status: "APPROVED" })]
+
+    const res = await applyBulkOrderTransition("approve", ["order_a"], {})
+
+    expect(res.status).toBe(200)
+    expect(revalidatedTags).toContain("stat:order")
+  })
+
+  it("leaves the tiles alone when the transition was rejected", async () => {
+    // A guard rejection means nothing was written, so expiring the tiles would
+    // throw away a cache entry that is still correct.
+    sessionState.value = superAdmin
+    // Not APPROVED-able: already APPROVED, so the guard refuses it.
+    dbState.selectQueue = [
+      [makeOrder({ id: "order_a", status: "APPROVED" })],
+      [{ status: "APPROVED" }],
+    ]
+
+    const res = await applyBulkOrderTransition("approve", ["order_a"], {})
+
+    expect(res.status).toBeGreaterThanOrEqual(400)
+    expect(revalidatedTags).toEqual([])
+  })
+
+  it("still writes one status-history row per order", async () => {
+    // The batching must not lose per-row detail: history is append-only and
+    // one row per order is the point of the table.
+    const { historyInserts } = await bulkApprove(5)
+    expect(historyInserts).toBe(1)
+    const payload = dbState.insertPayloads.at(-1) as unknown as {
+      orderId: string
+      toStatus: string
+    }[]
+    expect(payload).toHaveLength(5)
+    expect(payload.every((r) => r.toStatus === "APPROVED")).toBe(true)
+  })
+
+  /**
+   * Run a bulk `approve` over `orders` and report what it cost, asserting that
+   * the queued read results were consumed *exactly* — an exhausted queue is
+   * what makes the absolute count below trustworthy, since a resolver that
+   * bailed out early would otherwise silently read fewer rows. Pass
+   * `drained: false` for a fixture whose queue is deliberately longer than the
+   * code needs (see the two-lane case below).
+   */
+  async function approveBatch(
+    orders: (ReturnType<typeof makeOrder> & {
+      merchantId: string
+      deliveryCityId: string
+    })[],
+    { drained = true }: { drained?: boolean } = {},
+  ) {
+    sessionState.value = superAdmin
+    dbState.selectCount = 0
+    dbState.updatePayloads = []
+
+    // The mock hands out queued results in call order, so this must follow the
+    // guard's real read order: per row, merchant first, then its lane — and a
+    // key already seen issues nothing at all.
+    const queue: unknown[][] = [orders]
+    const seenMerchants = new Set<string>()
+    const seenLanes = new Set<string>()
+    for (const o of orders) {
+      if (!seenMerchants.has(o.merchantId)) {
+        seenMerchants.add(o.merchantId)
+        queue.push([{ status: "ACTIVE" }])
+      }
+      const lane = `${o.warehouseId}|${o.deliveryCityId}`
+      if (!seenLanes.has(lane)) {
+        seenLanes.add(lane)
+        queue.push(...pricedLane())
+      }
+    }
+    dbState.selectQueue = queue
+    dbState.updateResult = orders.map((o) => ({ ...o, status: "APPROVED" }))
+
+    const res = await applyBulkOrderTransition(
+      "approve",
+      orders.map((o) => o.id),
+      {},
+    )
+    expect(res.status).toBe(200)
+    if (drained) expect(dbState.selectQueue).toHaveLength(0)
+    return {
+      selects: dbState.selectCount,
+      updates: dbState.updatePayloads.length,
+    }
+  }
+
+  /** Four orders sharing one lane, spread over the given merchants. */
+  function fourOrdersOn(
+    lanes: string[],
+    merchants: string[],
+  ): (ReturnType<typeof makeOrder> & {
+    merchantId: string
+    deliveryCityId: string
+  })[] {
+    const cell = (i: number) => ({
+      merchantId: merchants[i % merchants.length],
+      deliveryCityId: lanes[Math.floor(i / merchants.length) % lanes.length],
+    })
+    return Array.from({ length: 4 }, (_, i) => ({
+      ...makeOrder({ id: `o_${i}` }),
+      ...cell(i),
+    }))
+  }
+
+  it("reads each merchant in the batch exactly once", async () => {
+    // 1 batch lock + 2 merchant reads + 4 reads for the one shared lane.
+    // Without the memo this was one merchant read *per order* — 4, and it grew
+    // with the batch rather than with the number of distinct merchants.
+    expect(
+      await approveBatch(fourOrdersOn(["city_1"], ["merch_1", "merch_2"])),
+    ).toMatchObject({ selects: 7, updates: 1 })
+    expect(
+      await approveBatch(fourOrdersOn(["city_1"], ["merch_1"])),
+    ).toMatchObject({ selects: 6, updates: 1 })
+  })
+
+  it("resolves each lane in the batch exactly once", async () => {
+    // The guard's lane key is `warehouseId|deliveryCityId`, so a second
+    // *warehouse* is the clean way to get a second key: both origins price out
+    // through the same fixture rows.
+    //
+    // 1 lock + 1 merchant + 2 lanes x 4 reads = 10, and the queue drains
+    // exactly. Without the memo each of the 4 orders resolved its own lane:
+    // 22 statements. This also pins the memo's contract — it must store a
+    // settled value, not the re-runnable query builder, or every cache hit
+    // would issue the query again and desynchronise the reads.
+    type BatchOrder = ReturnType<typeof makeOrder> & {
+      merchantId: string
+      deliveryCityId: string
+    }
+    const orders = fourOrdersOn(["city_1"], ["merch_1"]).map(
+      (o, i): BatchOrder => ({ ...o, warehouseId: i % 2 ? "wh_2" : "wh_1" }),
+    )
+    expect(await approveBatch(orders)).toMatchObject({
+      selects: 10,
+      updates: 1,
+    })
   })
 })

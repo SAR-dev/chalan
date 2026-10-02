@@ -5,7 +5,8 @@
       "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
       "e2e/**/*.{ts,tsx,js,jsx}",
       "env/**/*.{ts,tsx,js,jsx}",
-      "scripts/**/*.{ts,tsx,js,jsx}"
+      "scripts/**/*.{ts,tsx,js,jsx}",
+      "*.{ts,mts,js,mjs,cjs,json}"
     ],
     "ignoreUnknown": true
   },

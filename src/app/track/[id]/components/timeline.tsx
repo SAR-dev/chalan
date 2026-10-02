@@ -9,6 +9,7 @@ import {
   STATUS_RANK,
   STEPS,
   type StepKey,
+  stepDescription,
 } from "../lib"
 
 // ─── timeline (server component, no client hooks) ─────────────────────────────
@@ -167,7 +168,7 @@ export function Timeline({
                   </p>
                 ) : (
                   <p className="text-muted-foreground/50 mt-1 text-xs">
-                    {step.description}
+                    {stepDescription(step, "recipient")}
                   </p>
                 )}
                 {handler && reached && (

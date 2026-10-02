@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { appContent } from "@/config/site"
 import { logAudit } from "@/lib/audit"
 import { SEED_IMAGE_PLACEHOLDER } from "@/lib/db/seed/seed-content"
+import { sendMail } from "@/lib/mailer"
 import { PATCH as approveMerchant } from "./[id]/approve/route"
 import { POST as adjustBalance } from "./[id]/balance/adjust/route"
 import { PATCH as confirmPayment } from "./[id]/balance/payment/[txId]/confirm/route"
@@ -14,6 +15,7 @@ import { PATCH as reactivateMerchant } from "./[id]/reactivate/route"
 import { GET as getMerchant, PATCH as updateMerchant } from "./[id]/route"
 import { PATCH as suspendMerchant } from "./[id]/suspend/route"
 import { POST as sendVerifyEmail } from "./[id]/verify-email/route"
+import { POST as resendVerification } from "./resend-verification/route"
 import { POST as createMerchant, GET as listMerchants } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -26,6 +28,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
+  logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -43,7 +46,7 @@ vi.mock("@/lib/auth", () => ({
 }))
 
 vi.mock("@/lib/mailer", () => ({
-  sendMail: () => Promise.resolve(),
+  sendMail: vi.fn(async () => {}),
   toPlainText: (html: string) => html.replace(/<[^>]+>/g, ""),
 }))
 
@@ -389,59 +392,6 @@ describe("PATCH /api/merchants/:id", () => {
     expect((await res.json()).error).toContain("already in use")
   })
 
-  it("updates branding fields", async () => {
-    sessionState.value = merchantSession
-    updateResult.push({
-      id: "m_1",
-      brandColor: "#10b981",
-      hidePlatformBranding: true,
-    })
-    const res = await updateMerchant(
-      req("PATCH", undefined, {
-        brandColor: "#10b981",
-        hidePlatformBranding: true,
-      }),
-      ctx(),
-    )
-    const json = await res.json()
-    expect(res.status).toBe(200)
-    expect(json).toMatchObject({
-      brandColor: "#10b981",
-      hidePlatformBranding: true,
-    })
-  })
-
-  it("updates only brandColor", async () => {
-    sessionState.value = merchantSession
-    updateResult.push({ id: "m_1", brandColor: "#f97316" })
-    const res = await updateMerchant(
-      req("PATCH", undefined, { brandColor: "#f97316" }),
-      ctx(),
-    )
-    expect(res.status).toBe(200)
-    expect(updatePayloads[0]).toMatchObject({ brandColor: "#f97316" })
-  })
-
-  it("updates only hidePlatformBranding", async () => {
-    sessionState.value = merchantSession
-    updateResult.push({ id: "m_1", hidePlatformBranding: true })
-    const res = await updateMerchant(
-      req("PATCH", undefined, { hidePlatformBranding: true }),
-      ctx(),
-    )
-    expect(res.status).toBe(200)
-    expect(updatePayloads[0]).toMatchObject({ hidePlatformBranding: true })
-  })
-
-  it("rejects invalid hex color", async () => {
-    sessionState.value = merchantSession
-    const res = await updateMerchant(
-      req("PATCH", undefined, { brandColor: "not-a-color" }),
-      ctx(),
-    )
-    expect(res.status).toBe(400)
-  })
-
   it("403 for a moderator (Business Settings is owner-only)", async () => {
     sessionState.value = {
       ...merchantSession,
@@ -449,7 +399,7 @@ describe("PATCH /api/merchants/:id", () => {
       moderatorPermissions: ["/merchant/orders"],
     }
     const res = await updateMerchant(
-      req("PATCH", undefined, { brandColor: "#10b981" }),
+      req("PATCH", undefined, { businessName: "Acme Ltd" }),
       ctx(),
     )
     expect(res.status).toBe(403)
@@ -1355,5 +1305,73 @@ describe("PATCH /api/merchants/:id/nid/verify", () => {
       nidRejectionReason: "Image too blurry",
       nidRejectedBy: "Admin Amy",
     })
+  })
+})
+
+// Public by design — no session, it is how an unverified merchant resends their
+// own activation email from the login page. Its only guards are the body schema
+// and a per-IP budget, and no spec covered it (ROADMAP R1.2).
+describe("POST /api/merchants/resend-verification", () => {
+  const emailReq = (email?: string) =>
+    req(
+      "POST",
+      "http://test.local/api/merchants/resend-verification",
+      email === undefined ? {} : { email },
+    )
+
+  const unverified = {
+    id: "m_1",
+    email: "pending@example.com",
+    ownerName: "Percy Pending",
+    businessName: "Pending Traders",
+    emailVerifiedAt: null,
+  }
+
+  it("400 when the body carries no email", async () => {
+    const res = await resendVerification(emailReq())
+    expect(res.status).toBe(400)
+  })
+
+  it("429 once the per-IP budget is spent", async () => {
+    rateLimited = true
+    const res = await resendVerification(emailReq(unverified.email))
+    expect(res.status).toBe(429)
+  })
+
+  // The response must not differ from a real hit, or the endpoint becomes an
+  // account-existence oracle.
+  it("answers success for an unknown address and sends nothing", async () => {
+    selectQueue.push([])
+    const res = await resendVerification(emailReq("nobody@example.com"))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ success: true })
+    expect(sendMail).not.toHaveBeenCalled()
+    expect(updatePayloads).toHaveLength(0)
+  })
+
+  it("answers success for an already-verified merchant and sends nothing", async () => {
+    selectQueue.push([
+      { ...unverified, emailVerifiedAt: "2026-01-01T00:00:00Z" },
+    ])
+    const res = await resendVerification(emailReq("already@example.com"))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ success: true })
+    expect(sendMail).not.toHaveBeenCalled()
+  })
+
+  it("issues a fresh token and sends for an unverified merchant", async () => {
+    selectQueue.push([unverified])
+    const res = await resendVerification(emailReq(unverified.email))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ success: true })
+
+    // Only the hash is persisted — the raw token exists solely in the email.
+    expect(updatePayloads).toHaveLength(1)
+    expect(updatePayloads[0].emailVerificationToken).toBeTruthy()
+    expect(typeof updatePayloads[0].emailVerificationToken).toBe("string")
+    expect(updatePayloads[0]).toHaveProperty("emailVerificationExpiresAt")
+    // Fire-and-forget: the route replies before SMTP resolves.
+    expect(sendMail).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(sendMail).mock.calls[0][0].to).toBe(unverified.email)
   })
 })

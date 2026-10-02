@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { logAudit } from "@/lib/audit"
+import { logAudit, logAuditMany } from "@/lib/audit"
 import { PATCH as approvePayout } from "./[id]/approve/route"
 import { PATCH as markPayoutPaid } from "./[id]/paid/route"
 import { PATCH as rejectPayout } from "./[id]/reject/route"
@@ -17,6 +17,7 @@ vi.mock("@/lib/api-auth", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(() => Promise.resolve()),
+  logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -454,7 +455,10 @@ describe("PATCH /api/payouts/bulk/approve", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true, count: 2 })
-    expect(logAudit).toHaveBeenCalledTimes(2)
+    // One batched insert for both rows, not one per row (ROADMAP R3.6).
+    expect(logAudit).not.toHaveBeenCalled()
+    expect(logAuditMany).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(logAuditMany).mock.calls[0][0]).toHaveLength(2)
   })
 })
 
@@ -491,7 +495,9 @@ describe("PATCH /api/payouts/bulk/mark-paid", () => {
     // The bulk path now settles exactly like the single one.
     expect(insertPayloads[0]).toMatchObject({ type: "PAYOUT", amount: 89 })
     expect(insertPayloads[1]).toMatchObject({ balance: 89 })
-    expect(logAudit).toHaveBeenCalledWith(
+    // One batched insert (ROADMAP R3.6).
+    expect(logAudit).not.toHaveBeenCalled()
+    expect(vi.mocked(logAuditMany).mock.calls[0][0]).toContainEqual(
       expect.objectContaining({
         action: "PAYOUT_PAID",
         entityId: "pr_1",
@@ -540,7 +546,9 @@ describe("PATCH /api/payouts/bulk/reject", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true, count: 1 })
-    expect(logAudit).toHaveBeenCalledWith(
+    // One batched insert (ROADMAP R3.6).
+    expect(logAudit).not.toHaveBeenCalled()
+    expect(vi.mocked(logAuditMany).mock.calls[0][0]).toContainEqual(
       expect.objectContaining({ action: "PAYOUT_REJECTED" }),
     )
   })

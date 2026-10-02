@@ -843,3 +843,85 @@ suite("ledger reconciliation with a bundle (Phase 9 DoD)", () => {
     expect(settledTotal(ledger)).toBe(3)
   })
 })
+
+// -----------------------------------------------------------------------------
+// Invariants added by the 0003 migration: the `cron_run` heartbeat table
+// (ROADMAP R0.8) and the indexes for R3.8 / R3.9. Every other spec mocks the
+// driver, so only this suite can prove the partial predicates and the upsert
+// semantics actually exist in Postgres.
+// -----------------------------------------------------------------------------
+
+suite("cron heartbeat + new indexes (ROADMAP R0.8, R3.8, R3.9)", () => {
+  it("upserts one row per job instead of one per run", async () => {
+    const job = `itest-cron-${RUN}`
+    track("cron_run", "job", job)
+
+    await client.query(
+      `INSERT INTO cron_run (job, "lastRanAt", "updatedAt", "ok")
+       VALUES ($1, now(), now(), true)`,
+      [job],
+    )
+
+    // The whole design: `drain-email-outbox` fires every minute, so a row per
+    // run would grow without bound. Advance the heartbeat and expect one row.
+    await client.query(
+      `INSERT INTO cron_run (job, "lastRanAt", "updatedAt", "ok")
+       VALUES ($1, now() + interval '1 hour', now(), true)
+       ON CONFLICT (job) DO UPDATE
+         SET "lastRanAt" = EXCLUDED."lastRanAt",
+             "updatedAt" = EXCLUDED."updatedAt"`,
+      [job],
+    )
+
+    const { rows } = await client.query<{ n: number; last: string | null }>(
+      `SELECT count(*)::int AS n, max("lastRanAt") AS last
+         FROM cron_run WHERE job = $1`,
+      [job],
+    )
+    expect(rows[0].n).toBe(1)
+    expect(rows[0].last).toBeTruthy()
+    // The second write moved the heartbeat forward, proving DO UPDATE ran.
+    expect(Date.parse(rows[0].last as string)).toBeGreaterThan(Date.now())
+  })
+
+  it("has every index the migration promised, with the right predicates", async () => {
+    const names = [
+      "cron_run_last_ran_at_idx",
+      "user_created_at_idx",
+      "user_activation_token_idx",
+      "merchant_email_verification_token_idx",
+      "order_package_id_idx",
+      "order_package_tier_id_idx",
+    ]
+    const { rows } = await client.query<{
+      indexname: string
+      indexdef: string
+    }>(
+      `SELECT indexname, indexdef FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = ANY($1)`,
+      [names],
+    )
+    const byName = new Map(rows.map((r) => [r.indexname, r.indexdef]))
+    for (const name of names) {
+      expect(byName.has(name), `missing index ${name}`).toBe(true)
+    }
+
+    // The two token lookups are public endpoints that scan by value, so they
+    // are partial: activated accounts hold NULL and cost nothing to index.
+    expect(byName.get("user_activation_token_idx")).toMatch(/WHERE/i)
+    expect(byName.get("merchant_email_verification_token_idx")).toMatch(
+      /WHERE/i,
+    )
+
+    // …while the FK and sort indexes must cover every row, or a delete or a
+    // page turn would fall back to scanning the table.
+    for (const name of [
+      "order_package_id_idx",
+      "order_package_tier_id_idx",
+      "user_created_at_idx",
+      "cron_run_last_ran_at_idx",
+    ]) {
+      expect(byName.get(name), name).not.toMatch(/WHERE/i)
+    }
+  })
+})

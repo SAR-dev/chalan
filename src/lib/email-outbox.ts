@@ -16,12 +16,32 @@ import { sendMail, toPlainText } from "@/lib/mailer"
 //     one is passed, so state + intent commit together).
 //   - `flushEmailOutbox()` / `drainEmailOutbox()` send due rows through the
 //     existing mailer (which writes the `email_log` delivery record) and delete
-//     the row on success, or mark it FAILED on failure.
+//     the row on success, or requeue it with exponential backoff on failure.
 //
-// There is no retry: a row is attempted once and, if delivery fails, is kept
-// as FAILED in the DB (with the error on `lastError`) so it can be reviewed or
-// manually re-sent. Only the plain-text version of the body is stored.
+// Retrying matters because the mail this carries is activation and
+// password-reset links — losing one to a single transient SMTP blip defeats the
+// point of having an outbox at all. A failing row returns to PENDING with
+// `nextAttemptAt` pushed 2/4/8/16 minutes out, and only parks as FAILED once
+// MAX_OUTBOX_ATTEMPTS is spent, so a permanently bad address still ends up
+// reviewable (with `lastError`) instead of looping forever. Only the
+// plain-text version of the body is stored.
 // =============================================================================
+
+/**
+ * Sends per row before the row is parked as FAILED for manual review.
+ *
+ * Exported so tests assert against this rather than a copy of the number.
+ */
+export const MAX_OUTBOX_ATTEMPTS = 5
+
+/**
+ * Minutes to wait after the 1st, 2nd, 3rd and 4th failed send.
+ *
+ * Exponential: a brief outage recovers in minutes, while a sustained one backs
+ * off instead of hammering the provider. 2 + 4 + 8 + 16 = 30 minutes of retry
+ * before `MAX_OUTBOX_ATTEMPTS` parks the row.
+ */
+const RETRY_BACKOFF_MINUTES = [2, 4, 8, 16]
 
 /** Transaction handle as returned by `db.transaction()`. */
 export type EmailOutboxTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -60,8 +80,11 @@ export async function enqueueEmail(
 /**
  * Send every due outbox row (up to `limit`). Claims rows under
  * `FOR UPDATE SKIP LOCKED`, so concurrent drains never double-send. Returns
- * counts for logging/tests. Rows that fail are marked FAILED in place and are
- * never retried.
+ * counts for logging/tests.
+ *
+ * A row that fails to send goes back to PENDING with a delayed
+ * `nextAttemptAt`; once `MAX_OUTBOX_ATTEMPTS` is spent it is parked as FAILED
+ * (with `lastError`) for review rather than being retried indefinitely.
  */
 export async function drainEmailOutbox({
   limit = 20,
@@ -128,14 +151,32 @@ export async function drainEmailOutbox({
       sent++
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      // Single attempt, no requeue: the row stays so the admin can see the
-      // failure (`email_log` holds the DUR record; this row holds the intent).
+      const attempts = row.attempts + 1
+      const exhausted = attempts >= MAX_OUTBOX_ATTEMPTS
+      // Index by the attempt just made. Unreachable past the table while
+      // `attempts` is capped at MAX_OUTBOX_ATTEMPTS, but keep the longest wait
+      // rather than a negative index if that ever changes.
+      const backoffMinutes =
+        RETRY_BACKOFF_MINUTES[
+          Math.min(attempts, RETRY_BACKOFF_MINUTES.length) - 1
+        ]
+
       await db
         .update(emailOutbox)
         .set({
-          status: "FAILED",
-          attempts: row.attempts + 1,
+          // Requeue instead of parking: this outbox exists precisely so a
+          // delivery hiccup cannot cost someone their activation or
+          // password-reset link. Only an exhausted row stops retrying.
+          status: exhausted ? "FAILED" : "PENDING",
+          attempts,
           lastError: message.slice(0, 500),
+          ...(exhausted
+            ? {}
+            : {
+                nextAttemptAt: new Date(
+                  Date.now() + backoffMinutes * 60_000,
+                ).toISOString(),
+              }),
           updatedAt: new Date().toISOString(),
         })
         .where(eq(emailOutbox.id, row.id))

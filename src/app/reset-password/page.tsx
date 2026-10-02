@@ -4,6 +4,7 @@ import { CheckCircle2, KeyRound, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { FormEvent, Suspense, useState } from "react"
+import { AuthCardBrand } from "@/components/auth-card-brand"
 import { PublicFooter } from "@/components/public-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -68,6 +69,10 @@ function ResetPasswordForm() {
             <div className="w-full max-w-sm">
               <Card className="border-border/70 shadow-sm">
                 <CardHeader>
+                  {/* This branch had no logo at all on mobile - the split
+                      brand panel above is `hidden lg:flex` - so it gets the
+                      same in-card lockup the valid-link branch uses. */}
+                  <AuthCardBrand href="/login" className="mb-3" />
                   <CardTitle className="text-2xl">Invalid link</CardTitle>
                   <CardDescription>
                     This password reset link is invalid or has expired.
@@ -159,20 +164,12 @@ function ResetPasswordForm() {
 
         <section className="flex flex-1 items-center justify-center p-6 sm:p-12">
           <div className="w-full max-w-sm">
-            <Link
-              href="/login"
-              className="mb-8 flex items-center gap-2 lg:hidden"
-            >
-              <div className="flex size-9 items-center justify-center rounded-lg">
-                <BrandIcon className="size-5" />
-              </div>
-              <span className="text-lg font-semibold tracking-tight">
-                {siteConfig.name}
-              </span>
-            </Link>
-
             <Card className="border-border/70 shadow-sm">
               <CardHeader className="flex flex-col gap-1">
+                {/* Mobile brand: inside the card, so a phone shows one framed
+                    box instead of a detached logo above a second frame. Links
+                    back to sign-in, which is where this flow started. */}
+                <AuthCardBrand href="/login" className="mb-3" />
                 <CardTitle className="text-2xl">Reset password</CardTitle>
                 <CardDescription>
                   Enter your new password below.

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
-import { logAudit } from "@/lib/audit"
+import { logAuditMany } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { order, payoutRequest } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
@@ -61,16 +61,14 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     .set({ payoutRequestId: null })
     .where(inArray(order.payoutRequestId, rejectedIds))
 
-  await Promise.all(
-    updated.map((p) =>
-      logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "PAYOUT_REJECTED",
-        entityType: "payout_request",
-        entityId: p.id,
-        description: `Rejected payout request ${p.id}: ${reason.trim()}`,
-      }),
-    ),
+  await logAuditMany(
+    updated.map((p) => ({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: "PAYOUT_REJECTED",
+      entityType: "payout_request",
+      entityId: p.id,
+      description: `Rejected payout request ${p.id}: ${reason.trim()}`,
+    })),
   )
 
   return NextResponse.json({ ok: true, count: updated.length })

@@ -9,7 +9,7 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api-response"
-import { logAudit } from "@/lib/audit"
+import { type LogAuditInput, logAudit, logAuditMany } from "@/lib/audit"
 import { diffEntity } from "@/lib/audit-diff"
 import {
   cancellationChargeAmount,
@@ -17,6 +17,7 @@ import {
   orderChargeReversalAmount,
   toPaisa,
 } from "@/lib/balance-ledger"
+import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
 import {
@@ -47,6 +48,18 @@ import {
 type Session = NonNullable<Awaited<ReturnType<typeof requireSession>>>
 type OrderRow = typeof order.$inferSelect
 
+/**
+ * The transaction handle a `guard` / `buildUpdate` must read through.
+ *
+ * Reads issued on the module-level `db` (or through `dbRead`, which may point
+ * at a replica) run outside the transaction that is about to write — a
+ * different connection, a different snapshot, and under replica lag a
+ * *stale* one. Validation that agrees with itself but disagrees with the row
+ * being locked is exactly how a guard passes and a write lands anyway
+ * (ROADMAP R0.11).
+ */
+export type OrderTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 // A short-circuit error (mapped to a NextResponse) or null to continue.
 type GuardError = { error: string; status: number } | null
 
@@ -54,6 +67,54 @@ interface TransitionContext<Body> {
   order: OrderRow
   session: Session
   body: Body
+  tx: OrderTx
+  /**
+   * The instant this transition is stamped with, supplied by the caller.
+   *
+   * Not read from the clock inside `buildUpdate` on purpose. A bulk call applies
+   * one transition to N orders, and each row stamping its own `Date.now()` made
+   * all N `SET` payloads differ, so they could never collapse into a single
+   * `UPDATE ... WHERE id IN (...)` (ROADMAP R3.5). It is also simply truer: a
+   * batch approved together *was* approved at one instant.
+   */
+  now: string
+  /**
+   * Per-call memo for guard reads, keyed by the lookup's own natural key.
+   *
+   * `approve` re-read the same merchant row and re-resolved the same
+   * origin/destination lane once per order (~5 round trips × 100 orders);
+   * `dispatch` and `assign-pickup-rider` re-read the *same* `riderId` for every
+   * row in the batch. Safe to share because it lives and dies with one
+   * transaction — the rows are already locked `FOR UPDATE` and every read sees
+   * the same snapshot, so a cached row is exactly as fresh as a re-read. It is
+   * never shared across requests.
+   */
+  cache: Map<string, Promise<unknown>>
+}
+
+/**
+ * Read-through memo on `ctx.cache`.
+ *
+ * Normalises through `Promise.resolve().then(load)` rather than storing
+ * `load()`'s return value directly. That matters: a Drizzle query builder is a
+ * *thenable* which re-executes its query on every `await`, so caching the
+ * builder itself would have re-issued the query once per row that hit the cache
+ * — the exact repetition this exists to remove. The cache therefore holds a
+ * settled value, never a re-runnable query.
+ *
+ * Concurrent misses on the same key also collapse, because the promise is put
+ * in the map before the first `await` resolves.
+ */
+function memo<T>(
+  cache: Map<string, Promise<unknown>>,
+  key: string,
+  load: () => Promise<T>,
+): Promise<T> {
+  const hit = cache.get(key)
+  if (hit) return hit as Promise<T>
+  const pending = Promise.resolve().then(load)
+  cache.set(key, pending)
+  return pending
 }
 
 interface TransitionDef<Schema extends z.ZodType | undefined = undefined> {
@@ -78,15 +139,18 @@ function defineTransition<Schema extends z.ZodType | undefined>(
 }
 
 // In-memory twin of buildWarehouseOrderScope() (src/lib/db/order-scope.ts):
-// the same three clauses that decide which rows a WAREHOUSE_ADMIN sees in
-// the list/detail endpoints must decide which rows they may act on.
+// the same clauses that decide which rows a WAREHOUSE_ADMIN sees in the
+// list/detail endpoints must decide which rows they may act on.
 function warehouseOrderInScope(
   o: OrderRow,
   warehouseId: string | null | undefined,
 ): boolean {
   if (!warehouseId) return false
   if (o.warehouseId === warehouseId) return true
-  if (!o.warehouseId && o.status === "PICKED_UP") return true
+  // `!o.warehouseId && status === "PICKED_UP"` used to sit here too. It is
+  // unreachable — `order.warehouseId` is NOT NULL and nothing ever nulls it —
+  // and the intake queue is driven by status, which branch 1 already covers
+  // (ROADMAP R0.12).
   return o.status === "APPROVED" && !o.pickupRiderId
 }
 
@@ -101,15 +165,17 @@ class TransitionError extends Error {
 export const ORDER_TRANSITIONS = {
   approve: defineTransition({
     authorize: (me) => me.role === "SUPER_ADMIN",
-    guard: async ({ order: o }) => {
+    guard: async ({ order: o, tx, cache }) => {
       if (o.status !== "PENDING") {
         return { error: "Only PENDING orders can be approved", status: 400 }
       }
-      const [merchantRow] = await db
-        .select({ status: merchant.status })
-        .from(merchant)
-        .where(eq(merchant.id, o.merchantId))
-        .limit(1)
+      const [merchantRow] = await memo(cache, `merchant:${o.merchantId}`, () =>
+        tx
+          .select({ status: merchant.status })
+          .from(merchant)
+          .where(eq(merchant.id, o.merchantId))
+          .limit(1),
+      )
       // A suspended/closed merchant must not have new orders enter the pipeline
       // (ROADMAP B8). New orders are already blocked at creation; this closes
       // the gap for PENDING orders queued before suspension.
@@ -125,9 +191,12 @@ export const ORDER_TRANSITIONS = {
       // no longer accepts. If the lane cannot be resolved the order is still
       // blocked by creation, so this degrades to not re-checking rather than
       // stranding an already-charged order.
-      const resolved = await resolveRoutePricing(
-        o.warehouseId,
-        o.deliveryCityId,
+      // Four queries per order, all keyed by the lane. Orders in one batch
+      // almost always share a lane, so this collapses to one resolution.
+      const resolved = await memo(
+        cache,
+        `lane:${o.warehouseId}|${o.deliveryCityId}`,
+        () => resolveRoutePricing(o.warehouseId, o.deliveryCityId, tx),
       )
       if (resolved.ok && o.parcelWeightKg > resolved.pricing.maxWeightKg) {
         return {
@@ -137,17 +206,17 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ session }) => ({
+    buildUpdate: ({ session, now }) => ({
       status: "APPROVED",
       approvedBy: session.name,
-      approvedAt: new Date().toISOString(),
+      approvedAt: now,
     }),
   }),
 
   "assign-pickup-rider": defineTransition({
     authorize: (me) => me.role === "WAREHOUSE_ADMIN" && Boolean(me.warehouseId),
     schema: orderAssignPickupRiderSchema,
-    guard: async ({ order: o, session, body }) => {
+    guard: async ({ order: o, session, body, tx, cache }) => {
       if (o.status !== "APPROVED") {
         return {
           error: "Only APPROVED orders can be assigned a pickup rider.",
@@ -160,11 +229,11 @@ export const ORDER_TRANSITIONS = {
           status: 400,
         }
       }
-      const [riderRow] = await db
-        .select()
-        .from(rider)
-        .where(eq(rider.id, body.riderId))
-        .limit(1)
+      // One read for the whole batch: a bulk dispatch names a single riderId,
+      // and re-reading that same row once per order was pure repetition.
+      const [riderRow] = await memo(cache, `rider:${body.riderId}`, () =>
+        tx.select().from(rider).where(eq(rider.id, body.riderId)).limit(1),
+      )
       if (!riderRow || !riderRow.isActive) {
         return { error: "Select an active pickup rider.", status: 400 }
       }
@@ -183,16 +252,16 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ body }) => ({
+    buildUpdate: ({ body, now }) => ({
       pickupRiderId: body.riderId,
-      assignedAt: new Date().toISOString(),
+      assignedAt: now,
     }),
   }),
 
   dispatch: defineTransition({
     authorize: (me) => me.role === "WAREHOUSE_ADMIN" && Boolean(me.warehouseId),
     schema: orderDispatchSchema,
-    guard: async ({ order: o, session, body }) => {
+    guard: async ({ order: o, session, body, tx, cache }) => {
       if (o.status !== "IN_WAREHOUSE") {
         return {
           error: "Only IN_WAREHOUSE parcels can be dispatched.",
@@ -205,11 +274,11 @@ export const ORDER_TRANSITIONS = {
           status: 400,
         }
       }
-      const [riderRow] = await db
-        .select()
-        .from(rider)
-        .where(eq(rider.id, body.riderId))
-        .limit(1)
+      // One read for the whole batch: a bulk dispatch names a single riderId,
+      // and re-reading that same row once per order was pure repetition.
+      const [riderRow] = await memo(cache, `rider:${body.riderId}`, () =>
+        tx.select().from(rider).where(eq(rider.id, body.riderId)).limit(1),
+      )
       if (!riderRow || !riderRow.isActive) {
         return { error: "Select an active delivery rider.", status: 400 }
       }
@@ -227,10 +296,10 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ session, body }) => ({
+    buildUpdate: ({ session, body, now }) => ({
       status: "IN_TRANSIT",
       deliveryRiderId: body.riderId,
-      dispatchedAt: new Date().toISOString(),
+      dispatchedAt: now,
       dispatchedBy: session.name,
     }),
   }),
@@ -247,13 +316,13 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: async ({ order: o, body }) => {
+    buildUpdate: async ({ order: o, body, tx, now }) => {
       const warehouseId = o.pickupLocationId
-        ? await pickupWarehouseId(o.pickupLocationId)
+        ? await pickupWarehouseId(o.pickupLocationId, tx)
         : null
       const update: Record<string, unknown> = {
         status: "PICKED_UP",
-        pickedUpAt: new Date().toISOString(),
+        pickedUpAt: now,
         pickupProofRefs: body.proofRefs,
         warehouseId,
       }
@@ -272,6 +341,7 @@ export const ORDER_TRANSITIONS = {
         const resolved = await resolveRoutePricing(
           o.warehouseId,
           o.deliveryCityId,
+          tx,
         )
 
         if (resolved.ok && body.parcelWeightKg > resolved.pricing.maxWeightKg) {
@@ -330,10 +400,10 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ session }) => ({
+    buildUpdate: ({ session, now }) => ({
       status: "IN_WAREHOUSE",
       warehouseId: session.warehouseId,
-      receivedAtWarehouseAt: new Date().toISOString(),
+      receivedAtWarehouseAt: now,
       receivedByWarehouse: session.name,
     }),
   }),
@@ -352,9 +422,9 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ order: o }) => ({
+    buildUpdate: ({ order: o, now }) => ({
       status: "OUT_FOR_DELIVERY",
-      outForDeliveryAt: new Date().toISOString(),
+      outForDeliveryAt: now,
       deliveryAttempts: (o.deliveryAttempts ?? 0) + 1,
     }),
   }),
@@ -394,11 +464,11 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ order: o, body }) => {
+    buildUpdate: ({ order: o, body, now }) => {
       const collected = body.amountCollected ?? o.productCost
       return {
         status: "DELIVERED",
-        deliveredAt: new Date().toISOString(),
+        deliveredAt: now,
         deliveryProofRef: body.proofRef ?? `proof_${o.id.toLowerCase()}.jpg`,
         amountCollected: collected,
         deliveryShortfallReason: body.shortfallReason?.trim() || null,
@@ -427,9 +497,9 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ body }) => ({
+    buildUpdate: ({ body, now }) => ({
       status: "FAILED_ATTEMPT",
-      failedAttemptAt: new Date().toISOString(),
+      failedAttemptAt: now,
       failureNote: body.note.trim(),
     }),
   }),
@@ -451,8 +521,7 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ order: o, session }) => {
-      const now = new Date().toISOString()
+    buildUpdate: ({ order: o, session, now }) => {
       return {
         status: "OUT_FOR_DELIVERY",
         failureNote: null,
@@ -483,8 +552,7 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ session, body }) => {
-      const now = new Date().toISOString()
+    buildUpdate: ({ session, body, now }) => {
       return {
         status: "RETURNED",
         failedResolvedAt: now,
@@ -515,8 +583,8 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ session }) => ({
-      codSettledAt: new Date().toISOString(),
+    buildUpdate: ({ session, now }) => ({
+      codSettledAt: now,
       codSettledBy: session.name,
     }),
   }),
@@ -567,9 +635,9 @@ export const ORDER_TRANSITIONS = {
       }
       return null
     },
-    buildUpdate: ({ session, body }) => ({
+    buildUpdate: ({ session, body, now }) => ({
       status: "CANCELLED",
-      cancelledAt: new Date().toISOString(),
+      cancelledAt: now,
       cancelledBy: session.name,
       cancelReason: body?.reason?.trim() ?? null,
     }),
@@ -632,8 +700,6 @@ function transitionNote(name: TransitionName, body: unknown): string | null {
   if (name === "return" || name === "cancel") return b.reason?.trim() || null
   return null
 }
-
-type OrderTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /**
  * Writes the fee settlement for a terminal order (returned/cancelled): reverses
@@ -878,6 +944,11 @@ export async function applyOrderTransition(
       order: orderRow,
       session: me,
       body,
+      tx,
+      now: new Date().toISOString(),
+      // A single order has nothing to repeat, but the guards are written once
+      // for both paths — the memo simply never hits here.
+      cache: new Map<string, Promise<unknown>>(),
     } as TransitionContext<never>
 
     const guardError = await def.guard(ctx)
@@ -946,6 +1017,15 @@ export async function applyOrderTransition(
     return NextResponse.json(updated)
   })
 
+  // After the transaction commits, not inside it: a tag expired before the write
+  // lands would let the next read repopulate the cache from pre-write state.
+  // Every status change in the system funnels through this function or
+  // `applyBulkOrderTransition`, so this is the one place the order tiles and the
+  // COD cash figures have to be told (ROADMAP R3.7).
+  if (response.ok) {
+    refreshStats(statTag("order"), statTag("rider"))
+  }
+
   return response
 }
 
@@ -985,6 +1065,12 @@ export async function applyBulkOrderTransition(
 
     const beforeById = new Map(rows.map((row) => [row.id, row]))
 
+    // One instant and one lookup memo for the whole batch (ROADMAP R3.5).
+    // Scoped to this transaction, so the memo is only ever as stale as the
+    // rows already locked `FOR UPDATE` above.
+    const batchNow = new Date().toISOString()
+    const batchCache = new Map<string, Promise<unknown>>()
+
     let firstFail: GuardError = null
     const updates: { id: string; values: Record<string, unknown> }[] = []
     for (const orderRow of rows) {
@@ -992,6 +1078,9 @@ export async function applyBulkOrderTransition(
         order: orderRow,
         session: me,
         body,
+        tx,
+        now: batchNow,
+        cache: batchCache,
       } as TransitionContext<never>
       const guardError = await def.guard(ctx)
       if (guardError) {
@@ -1015,14 +1104,40 @@ export async function applyBulkOrderTransition(
       )
     }
 
-    const updated: OrderRow[] = []
+    // Group rows that resolve to the *same* column values into one
+    // `UPDATE ... WHERE id IN (...)` (ROADMAP R3.5). A bulk approve/dispatch
+    // writes an identical `SET` for every row — the only per-row difference
+    // used to be the freshly-read clock, now pinned to `batchNow` — so a
+    // 100-order batch is one statement instead of 100, and each one was
+    // previously a separate round trip while holding the batch's row locks.
+    //
+    // `buildUpdate` returns object literals with a fixed key order, so the
+    // serialised form is a faithful identity for "same columns, same values".
+    // Groups are keyed on that; a group of one still takes the `id =` path so
+    // the planner sees the same shape it always has for a single order.
+    const groups = new Map<
+      string,
+      { values: Record<string, unknown>; ids: string[] }
+    >()
     for (const { id, values } of updates) {
-      const [row] = await tx
+      const key = JSON.stringify(values)
+      const group = groups.get(key)
+      if (group) group.ids.push(id)
+      else groups.set(key, { values, ids: [id] })
+    }
+
+    const updated: OrderRow[] = []
+    for (const group of groups.values()) {
+      const rows = await tx
         .update(order)
-        .set(values)
-        .where(eq(order.id, id))
+        .set(group.values)
+        .where(
+          group.ids.length === 1
+            ? eq(order.id, group.ids[0])
+            : inArray(order.id, group.ids),
+        )
         .returning()
-      if (row) updated.push(row)
+      updated.push(...rows)
     }
 
     // The same balance-ledger side effects the single-order path applies. This
@@ -1041,22 +1156,22 @@ export async function applyBulkOrderTransition(
       )
     }
 
+    const note = transitionNote(name, body)
+    const auditInputs: LogAuditInput[] = []
+    const historyRows: (typeof orderStatusHistory.$inferInsert)[] = []
+
     for (const row of updated) {
       const before = beforeById.get(row.id) ?? null
       const diff = diffEntity(before, row, ORDER_DIFF_FIELDS)
-      // Audit + history inside the same transaction (ROADMAP P1.4).
-      await logAudit(
-        {
-          actor: { userId: me.userId, name: me.name, role: me.role },
-          action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
-          entityType: "order",
-          entityId: row.id,
-          description: `${TRANSITION_LABELS[name]} order ${row.id} (bulk)`,
-          metadata: diff ? { diff } : null,
-        },
-        tx,
-      )
-      await tx.insert(orderStatusHistory).values({
+      auditInputs.push({
+        actor: { userId: me.userId, name: me.name, role: me.role },
+        action: `ORDER_${name.toUpperCase().replace(/-/g, "_")}`,
+        entityType: "order",
+        entityId: row.id,
+        description: `${TRANSITION_LABELS[name]} order ${row.id} (bulk)`,
+        metadata: diff ? { diff } : null,
+      })
+      historyRows.push({
         orderId: row.id,
         fromStatus: before?.status ?? null,
         toStatus: row.status,
@@ -1064,11 +1179,27 @@ export async function applyBulkOrderTransition(
         actorId: me.userId,
         actorName: me.name,
         actorRole: me.role,
-        note: transitionNote(name, body),
+        note,
       })
     }
+
+    // Two statements for the whole batch instead of two per row, inside the
+    // same transaction (ROADMAP P1.4's atomicity, R3.5's round trips): a
+    // 100-order bulk approve was issuing 100 audit INSERTs + 100 history
+    // INSERTs here alone, holding the batch's row locks open the whole time.
+    await logAuditMany(auditInputs, tx)
+    if (historyRows.length > 0) {
+      await tx.insert(orderStatusHistory).values(historyRows)
+    }
+
     return NextResponse.json({ ok: true, count: updated.length })
   })
+
+  // See `applyOrderTransition`: expired after commit, and only on success, so a
+  // rejected batch does not throw away a cache entry that is still correct.
+  if (response.ok) {
+    refreshStats(statTag("order"), statTag("rider"))
+  }
 
   return response
 }

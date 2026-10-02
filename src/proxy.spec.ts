@@ -162,60 +162,6 @@ describe("admin IP allowlist", () => {
   })
 })
 
-describe("upload rate limiting", () => {
-  it("allows 20 uploads a minute, then 429s", async () => {
-    const { proxy } = await loadProxy({ TRUSTED_PROXY_HOPS: "1" })
-    const headers = { "x-forwarded-for": "198.51.100.7" }
-    for (let i = 0; i < 20; i++) {
-      expect(
-        proxy(req("/api/uploads", { method: "POST", headers })).status,
-        `request ${i + 1}`,
-      ).toBe(200)
-    }
-    expect(proxy(req("/api/uploads", { method: "POST", headers })).status).toBe(
-      429,
-    )
-  })
-
-  it("buckets per IP", async () => {
-    const { proxy } = await loadProxy({ TRUSTED_PROXY_HOPS: "1" })
-    for (let i = 0; i < 20; i++) {
-      proxy(
-        req("/api/uploads", {
-          method: "POST",
-          headers: { "x-forwarded-for": "198.51.100.7" },
-        }),
-      )
-    }
-    const other = proxy(
-      req("/api/uploads", {
-        method: "POST",
-        headers: { "x-forwarded-for": "198.51.100.8" },
-      }),
-    )
-    expect(other.status).toBe(200)
-  })
-
-  it("does not limit when no IP is resolvable", async () => {
-    // No TRUSTED_PROXY_HOPS → forwarding headers are ignored, and an "unknown"
-    // bucket would be a cross-tenant DoS, so the limiter stands down.
-    const { proxy } = await loadProxy()
-    for (let i = 0; i < 30; i++) {
-      expect(proxy(req("/api/uploads", { method: "POST" })).status).toBe(200)
-    }
-  })
-
-  it("only limits POST", async () => {
-    const { proxy } = await loadProxy({ TRUSTED_PROXY_HOPS: "1" })
-    const headers = { "x-forwarded-for": "198.51.100.9" }
-    for (let i = 0; i < 25; i++) {
-      expect(
-        proxy(req("/api/uploads", { method: "GET", headers })).status,
-      ).toBe(200)
-    }
-  })
-})
-
 describe("CSP nonce and request correlation", () => {
   it("sets a nonce'd CSP and forwards the nonce + path", async () => {
     const { proxy } = await loadProxy()

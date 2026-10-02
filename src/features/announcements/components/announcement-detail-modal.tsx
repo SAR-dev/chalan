@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -57,6 +58,10 @@ export function AnnouncementDetailModal({
           <DialogTitle className="pr-6 leading-snug">
             {displayed.title}
           </DialogTitle>
+          <DialogDescription>
+            The full announcement, with when it was published and whether it has
+            been read.
+          </DialogDescription>
         </DialogHeader>
 
         <div

@@ -41,6 +41,25 @@ export interface LogAuditInput {
 /** Transaction handle as returned by `db.transaction()`. */
 export type AuditTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
+function auditValues(input: LogAuditInput) {
+  const metadata = input.actor.impersonatedBy
+    ? {
+        ...(input.metadata ?? {}),
+        impersonatedBy: input.actor.impersonatedBy,
+      }
+    : input.metadata
+  return {
+    actorId: input.actor.userId,
+    actorName: input.actor.name,
+    actorRole: input.actor.role,
+    action: input.action,
+    entityType: input.entityType,
+    entityId: input.entityId ?? null,
+    description: input.description,
+    metadata: metadata ?? null,
+  }
+}
+
 /**
  * Writes one audit-log row.
  *
@@ -57,22 +76,7 @@ export async function logAudit(
   input: LogAuditInput,
   tx?: AuditTx,
 ): Promise<void> {
-  const metadata = input.actor.impersonatedBy
-    ? {
-        ...(input.metadata ?? {}),
-        impersonatedBy: input.actor.impersonatedBy,
-      }
-    : input.metadata
-  const values = {
-    actorId: input.actor.userId,
-    actorName: input.actor.name,
-    actorRole: input.actor.role,
-    action: input.action,
-    entityType: input.entityType,
-    entityId: input.entityId ?? null,
-    description: input.description,
-    metadata: metadata ?? null,
-  }
+  const values = auditValues(input)
 
   if (tx) {
     await tx.insert(auditLog).values(values)
@@ -83,5 +87,37 @@ export async function logAudit(
     await db.insert(auditLog).values(values)
   } catch (err) {
     logger.error("Failed to write audit log entry", { err })
+  }
+}
+
+/**
+ * Writes many audit rows in a single insert.
+ *
+ * A 100-order bulk transition used to issue one INSERT per row from inside the
+ * transaction — 100 round trips holding the batch's locks open — and eight
+ * other bulk endpoints did the same via `Promise.all(logAudit(...))`, which
+ * additionally opened up to 100 pool connections at once (ROADMAP R3.5 and
+ * R3.6). Same atomicity contract as `logAudit`: with `tx` a failure propagates
+ * so the trail and the change stay together; without it, best-effort.
+ */
+export async function logAuditMany(
+  inputs: LogAuditInput[],
+  tx?: AuditTx,
+): Promise<void> {
+  if (inputs.length === 0) return
+  const rows = inputs.map(auditValues)
+
+  if (tx) {
+    await tx.insert(auditLog).values(rows)
+    return
+  }
+
+  try {
+    await db.insert(auditLog).values(rows)
+  } catch (err) {
+    logger.error("Failed to write audit log entries", {
+      err,
+      count: rows.length,
+    })
   }
 }

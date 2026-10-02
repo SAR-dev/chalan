@@ -32,13 +32,9 @@ const footerActionClass =
 export function MobileHeader({
   config,
   businessName,
-  brandColor,
-  hidePlatformBranding = false,
 }: {
   config: SidebarConfig
   businessName?: string
-  brandColor?: string
-  hidePlatformBranding?: boolean
 }) {
   const pathname = usePathname()
   const { currentUser } = useAuth()
@@ -47,15 +43,8 @@ export function MobileHeader({
   const BrandIcon = config.brandIcon
   const navItems = config.items
 
-  const headerStyle = brandColor
-    ? ({ "--sidebar-primary": brandColor } as React.CSSProperties)
-    : undefined
-
   return (
-    <header
-      className="border-border flex h-14 items-center justify-between border-b px-3 sm:px-4 md:hidden"
-      style={headerStyle}
-    >
+    <header className="border-border flex h-14 items-center justify-between border-b px-3 sm:px-4 md:hidden">
       <Link href="/" className="flex min-w-0 items-center gap-2">
         {businessName ? (
           <span className="truncate text-sm font-semibold sm:text-base">
@@ -66,11 +55,9 @@ export function MobileHeader({
             <div className="flex size-8 items-center justify-center rounded-lg">
               <BrandIcon className="size-5" />
             </div>
-            {!hidePlatformBranding && (
-              <span className="text-sm font-semibold sm:text-base">
-                {BRAND_NAME}
-              </span>
-            )}
+            <span className="text-sm font-semibold sm:text-base">
+              {BRAND_NAME}
+            </span>
           </>
         )}
       </Link>
@@ -88,7 +75,7 @@ export function MobileHeader({
             </Button>
           }
         />
-        <SheetContent side="left" className="p-0" style={headerStyle}>
+        <SheetContent side="left" className="p-0">
           {/* Brand */}
           <Link href="/" className="flex h-16 items-center gap-2 px-4">
             {businessName ? (
@@ -98,11 +85,9 @@ export function MobileHeader({
             ) : (
               <>
                 <BrandIcon className="size-4 shrink-0" />
-                {!hidePlatformBranding && (
-                  <SheetTitle className="text-[13px] font-semibold">
-                    {BRAND_NAME}
-                  </SheetTitle>
-                )}
+                <SheetTitle className="text-[13px] font-semibold">
+                  {BRAND_NAME}
+                </SheetTitle>
               </>
             )}
             <span className="bg-sidebar-primary text-sidebar-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
@@ -114,7 +99,10 @@ export function MobileHeader({
           </SheetDescription>
 
           {/* Nav — closes the drawer on navigation */}
-          <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
+          <nav
+            aria-label="Main"
+            className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2"
+          >
             {navItems.map((item, i) => {
               const active = isNavItemActive(item, pathname)
               const Icon = item.icon
@@ -134,6 +122,9 @@ export function MobileHeader({
                     href={item.href}
                     data-testid={`nav-${item.href}`}
                     onClick={() => setOpen(false)}
+                    // Same signal as the desktop sidebar — the drawer is the
+                    // only nav visible on a phone (ROADMAP R2.1).
+                    aria-current={active ? "page" : undefined}
                     className={cn(
                       navLinkClass,
                       active ? navLinkActive : navLinkIdle,

@@ -33,7 +33,9 @@ export function SelectAllHeadCell({
           pinnedEdgeClass,
       )}
       data-sticky-col="__select__"
-      aria-hidden="true"
+      // NOT aria-hidden: this cell wraps the focusable select-all checkbox, so
+      // hiding the subtree left a tab-stop that announced as nothing and made
+      // bulk select unreachable to a screen reader (ROADMAP R2.2).
     >
       <input
         ref={selectAllRef}

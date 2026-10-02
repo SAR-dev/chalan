@@ -3,6 +3,7 @@
 import { ArrowRight, CheckCircle2, Loader2, Mail } from "lucide-react"
 import Link from "next/link"
 import { FormEvent, useState } from "react"
+import { AuthCardBrand } from "@/components/auth-card-brand"
 import { FormErrors } from "@/components/form-errors"
 import { PublicFooter } from "@/components/public-footer"
 import { Button } from "@/components/ui/button"
@@ -182,18 +183,13 @@ export default function RegisterPage() {
         {/* Form panel */}
         <section className="flex flex-1 items-center justify-center p-6 sm:p-12">
           <div className="w-full max-w-md">
-            <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden">
-              <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-lg">
-                <SiteIcon className="size-5" />
-              </div>
-              <span className="text-lg font-semibold tracking-tight">
-                {siteConfig.name}
-              </span>
-            </Link>
-
             {submittedName ? (
               <Card className="border-border/70 shadow-sm">
                 <CardHeader className="flex flex-col gap-3">
+                  {/* Mobile brand: inside the card, so a phone shows one
+                      framed box instead of a detached logo above a second
+                      frame. */}
+                  <AuthCardBrand />
                   <div className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-full">
                     <Mail className="size-6" />
                   </div>
@@ -235,6 +231,7 @@ export default function RegisterPage() {
             ) : (
               <Card className="border-border/70 shadow-sm">
                 <CardHeader className="flex flex-col gap-1">
+                  <AuthCardBrand className="mb-3" />
                   <CardTitle className="text-2xl">
                     Create your merchant account
                   </CardTitle>
@@ -254,6 +251,7 @@ export default function RegisterPage() {
                       <Input
                         id="businessName"
                         data-testid="register-business-name"
+                        error={errors.businessName}
                         placeholder="Threadline Apparel"
                         value={form.businessName}
                         onChange={(e) => update("businessName", e.target.value)}
@@ -282,6 +280,7 @@ export default function RegisterPage() {
                       <Label htmlFor="ownerName">Owner / contact name</Label>
                       <Input
                         id="ownerName"
+                        error={errors.ownerName}
                         placeholder="Imran Kabir"
                         value={form.ownerName}
                         onChange={(e) => update("ownerName", e.target.value)}
@@ -293,6 +292,7 @@ export default function RegisterPage() {
                       <Input
                         id="phone"
                         type="tel"
+                        error={errors.phone}
                         placeholder="+8801712345678"
                         value={form.phone}
                         onChange={(e) => update("phone", e.target.value)}
@@ -303,6 +303,7 @@ export default function RegisterPage() {
                       <Label htmlFor="address">Business address</Label>
                       <Input
                         id="address"
+                        error={errors.address}
                         placeholder="House 14, Road 7, Dhanmondi, Dhaka"
                         value={form.address}
                         onChange={(e) => update("address", e.target.value)}
@@ -316,6 +317,7 @@ export default function RegisterPage() {
                           id="email"
                           data-testid="register-email"
                           type="email"
+                          error={errors.email}
                           placeholder="you@business.com"
                           value={form.email}
                           onChange={(e) => update("email", e.target.value)}
@@ -327,6 +329,7 @@ export default function RegisterPage() {
                         <Input
                           id="password"
                           type="password"
+                          error={errors.password}
                           placeholder="Choose a password"
                           value={form.password}
                           onChange={(e) => update("password", e.target.value)}

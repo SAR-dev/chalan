@@ -21,6 +21,7 @@ import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { CURRENCY_SUFFIX, ORDER_DELIVERY_TYPE_LABELS } from "@/lib/constants"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -110,7 +111,11 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                   {order.id}
                 </p>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  Placed {new Date(order.createdAt).toLocaleString()}
+                  Placed{" "}
+                  {formatDateTime(order.createdAt, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
                 </p>
                 <Link
                   href={`/track/${order.trackingToken ?? order.id}`}

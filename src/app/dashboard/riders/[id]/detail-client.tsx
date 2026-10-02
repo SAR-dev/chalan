@@ -19,6 +19,7 @@ import {
   taskTypeLabel,
   vehicleTypeLabel,
 } from "@/features/riders/dialogs/task-type"
+import { formatDateTime } from "@/lib/format"
 import type { RiderVehicleType } from "@/lib/types"
 
 type RiderData = {
@@ -54,7 +55,7 @@ type RiderData = {
 }
 
 function formatDate(date: Date | string) {
-  return new Date(date).toLocaleDateString(undefined, {
+  return formatDateTime(date, {
     year: "numeric",
     month: "short",
     day: "numeric",

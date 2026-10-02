@@ -7,7 +7,12 @@
 // timeout so a hung dependency cannot hang the healthcheck.
 import { sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { dbRead } from "@/lib/db"
+import {
+  neverRanCronJobs,
+  reportStaleCronJobs,
+  staleCronJobs,
+} from "@/lib/cron-heartbeat"
+import { dbRead, pool } from "@/lib/db"
 import { logger } from "@/lib/logger"
 import { pingRedis, rateLimiterDegraded } from "@/lib/rate-limit"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -34,11 +39,39 @@ export const GET = withErrorHandler(async () => {
   const redis = await pingRedis(PROBE_TIMEOUT_MS)
   const ok = db && redis
 
+  // Cron liveness is reported, but deliberately does NOT fail readiness: if
+  // the scheduler dies the app itself is perfectly serviceable, and taking
+  // every instance out of rotation would turn one background fault into an
+  // outage. `reportStaleCronJobs` logs each lapse once instead of once per
+  // probe (ROADMAP R0.8).
+  let stale: string[] = []
+  let neverRan: string[] = []
+  if (db) {
+    try {
+      const staleJobs = await withTimeout(staleCronJobs(), PROBE_TIMEOUT_MS)
+      reportStaleCronJobs(staleJobs)
+      stale = staleJobs.map((s) => s.job)
+      neverRan = await withTimeout(neverRanCronJobs(), PROBE_TIMEOUT_MS)
+    } catch (err) {
+      logger.debug("cron watchdog skipped", { err })
+    }
+  }
+
   return NextResponse.json(
     {
       ok,
       checks: { db, redis },
       rateLimiter: { degraded: rateLimiterDegraded() },
+      // Pool saturation was invisible before (ROADMAP R3.1): when every
+      // connection is checked out, requests queue behind `waitingCount` and
+      // nothing in the app says so. `waiting > 0` sustained means the pool —
+      // not the database — is the bottleneck.
+      pool: {
+        waiting: pool.waitingCount,
+        total: pool.totalCount,
+        max: pool.options.max,
+      },
+      cron: { stale, neverRan },
     },
     { status: ok ? 200 : 503 },
   )

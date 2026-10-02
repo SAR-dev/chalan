@@ -26,6 +26,7 @@ jobs:
   # check is the real cost here, and splitting it paid that three times over.
   # The failing step is still named in the PR checks list.
   quality:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +77,7 @@ jobs:
           kill "$SERVER_PID"
 
   security:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

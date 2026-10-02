@@ -246,6 +246,12 @@ export const order = pgTable(
     index("order_cod_settled_at_idx").on(t.codSettledAt),
     index("order_payout_request_id_idx").on(t.payoutRequestId),
     index("order_merchant_package_id_idx").on(t.merchantPackageId),
+    // Both FKs are `ON DELETE set null`, so Postgres must check `order` for
+    // references on every package or tier delete — without an index that is a
+    // sequential scan of the largest table in the database. Routine admin edits
+    // (`DELETE /api/packages/:id`, `.../:tierId`) were paying it (ROADMAP R3.8).
+    index("order_package_id_idx").on(t.packageId),
+    index("order_package_tier_id_idx").on(t.packageTierId),
     // Public tracking lookups resolve by token (and the token is unique).
     uniqueIndex("order_tracking_token_unique").on(t.trackingToken),
     index("order_code_trgm_idx").using("gin", sql`${t.id} gin_trgm_ops`),

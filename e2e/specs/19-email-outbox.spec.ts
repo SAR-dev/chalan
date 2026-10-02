@@ -51,7 +51,8 @@ test.describe("S52. Email outbox", () => {
 
       const after = await withDb(async (client) => {
         const row = await client.query(
-          `SELECT status, attempts, "lastError" FROM email_outbox WHERE id = $1`,
+          `SELECT status, attempts, "lastError", "nextAttemptAt"
+             FROM email_outbox WHERE id = $1`,
           [id],
         )
         const logs = await client.query(
@@ -61,22 +62,32 @@ test.describe("S52. Email outbox", () => {
         return {
           status: row.rows[0]?.status as string | undefined,
           attempts: Number(row.rows[0]?.attempts ?? 0),
+          nextAttemptAt: row.rows[0]?.nextAttemptAt as Date | null | undefined,
           logs: Number(logs.rows[0]?.n ?? 0),
         }
       })
 
       // The row is processed exactly once and a delivery record is always
       // written. The outcome depends on the environment: CI has no SMTP, so the
-      // single attempt fails and the row is kept FAILED (never retried); a dev
-      // database may have an active `mail_config` (it is preserved across
-      // reseeds), in which case the send succeeds and the queue row is deleted.
+      // attempt fails; a dev database may have an active `mail_config` (it is
+      // preserved across reseeds), in which case the send succeeds and the
+      // queue row is deleted.
       expect(after.logs).toBe(1)
       if (after.status === undefined) {
         // Delivered — the queue row is removed on success.
         expect(after.attempts).toBe(0)
       } else {
-        expect(after.status).toBe("FAILED")
+        // A failed attempt requeues with backoff instead of parking on the
+        // first failure (ROADMAP R0.6): this outbox exists so a transient SMTP
+        // blip cannot cost someone their activation or password-reset link.
+        // The row only becomes FAILED once the attempts are spent.
+        expect(after.status).toBe("PENDING")
         expect(after.attempts).toBe(1)
+        // …and it must not be claimable again immediately, or a stuck provider
+        // would be hammered every minute.
+        expect(new Date(after.nextAttemptAt ?? 0).getTime()).toBeGreaterThan(
+          Date.now(),
+        )
       }
     } finally {
       await withDb(async (client) => {

@@ -55,10 +55,7 @@ describe("renderEmailHtml", () => {
     // The black-and-white requirement, asserted as an allowlist rather than by
     // checking two specific spots: a new coloured element added anywhere in
     // the tree would otherwise pass every other test here.
-    const html = await renderEmailHtml({
-      ...base,
-      hidePlatformBranding: false,
-    })
+    const html = await renderEmailHtml({ ...base })
     // The lookbehind matters: React emits numeric character references such as
     // `&#8202;` (a hair space), whose `#8202` is not a colour at all.
     const hexes = [...new Set(html.match(/(?<!&)#[0-9a-f]{3,8}/gi) ?? [])].map(
@@ -92,11 +89,13 @@ describe("renderEmailHtml", () => {
     expect(html).toContain("&lt;img")
   })
 
-  it("omits the platform footer and rule when branding is hidden", async () => {
-    const html = await renderEmailHtml({ ...base, hidePlatformBranding: true })
-    expect(html).not.toContain("automated message")
-    // The rule that separated the footer goes with it.
-    expect(html).not.toContain("<hr")
+  it("always carries the platform footer and its rule", async () => {
+    // The branding toggle that used to suppress these is gone, so the footer
+    // is now unconditional — asserted so a future conditional cannot quietly
+    // reintroduce the omission.
+    const html = await renderEmailHtml({ ...base })
+    expect(html).toContain("automated message")
+    expect(html).toContain("<hr")
   })
 
   it("keeps every fact row, including duplicate labels", async () => {

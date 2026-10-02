@@ -2,7 +2,7 @@ import { and, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
-import { logAudit } from "@/lib/audit"
+import { logAuditMany } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { payoutRequest } from "@/lib/db/schema"
 import { settlePayoutAsPaid } from "@/lib/payout-settlement"
@@ -50,16 +50,14 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     return badRequest("No payout requests could be settled.")
   }
 
-  await Promise.all(
-    settled.map((id) =>
-      logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "PAYOUT_PAID",
-        entityType: "payout_request",
-        entityId: id,
-        description: `Marked payout request ${id} as paid`,
-      }),
-    ),
+  await logAuditMany(
+    settled.map((id) => ({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: "PAYOUT_PAID",
+      entityType: "payout_request",
+      entityId: id,
+      description: `Marked payout request ${id} as paid`,
+    })),
   )
 
   return NextResponse.json({ ok: true, count: settled.length })

@@ -487,6 +487,23 @@ export function DataTable<T>({
   // because totalPages changes, which clamps down naturally.
   const currentPage = Math.min(Math.max(1, page), totalPages)
 
+  // In server mode the PARENT owns pagination: the footer hands control to
+  // `onPageChange`, which updated the parent's state and never came back here,
+  // so the footer's own `page` stayed at 1 — the label read "Page 1 of N" on
+  // every server-paginated table and Previous was permanently disabled.
+  // Found by the E2E spec added under ROADMAP R1.3, which is exactly why those
+  // controls had no coverage.
+  //
+  // Advancing the local copy is safe because `visible` returns `data`
+  // untouched when `serverPaginated` (L491) — this state is display-only here.
+  const handlePageChange = React.useCallback(
+    (nextPage: number, nextLimit: number) => {
+      setPage(nextPage)
+      onPageChange?.(nextPage, nextLimit)
+    },
+    [onPageChange],
+  )
+
   const visible = React.useMemo(() => {
     if (serverPaginated) return data
     if (!paginated) return sorted
@@ -663,6 +680,11 @@ export function DataTable<T>({
         {showRefreshOverlay ? (
           <div
             data-testid={id ? `table-refreshing-${id}` : "table-refreshing"}
+            // `role="status"` so the visible "Refreshing…" is announced: the
+            // overlay changes the rows under a screen-reader user with no
+            // other signal (the table's own `aria-busy` below marks the state
+            // but does not speak it) (ROADMAP R2.7).
+            role="status"
             className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center"
           >
             <div className="bg-background flex flex-col items-center gap-2 rounded-lg border px-4 py-3 shadow-sm">
@@ -792,6 +814,24 @@ export function DataTable<T>({
                     key={key}
                     data-testid={id ? `row-${id}-${key}` : undefined}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    // A `cursor-pointer` row driven only by onClick is
+                    // mouse-only (WCAG 2.1.1) — it looks interactive and does
+                    // nothing for a keyboard user. Give it a focus stop and the
+                    // two standard activation keys, centrally, so no page has
+                    // to remember (ROADMAP R2.3).
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onKeyDown={
+                      onRowClick
+                        ? (event) => {
+                            if (event.key !== "Enter" && event.key !== " ") {
+                              return
+                            }
+                            // Space scrolls the page otherwise.
+                            event.preventDefault()
+                            onRowClick(row)
+                          }
+                        : undefined
+                    }
                     className={cn(
                       "group/row",
                       onRowClick ? "cursor-pointer" : undefined,
@@ -860,10 +900,10 @@ export function DataTable<T>({
           displayTotal={displayTotal}
           pageSizeOptions={pageSizeOptions}
           size={size}
-          page={page}
+          page={currentPage}
           totalPages={totalPages}
           currentPage={currentPage}
-          onPageChange={onPageChange}
+          onPageChange={handlePageChange}
           userChangedSize={userChangedSize}
           setSize={setSize}
           setPage={setPage}

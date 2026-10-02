@@ -121,6 +121,19 @@ describe("Reset password page", () => {
         "Token expired",
       )
     })
+
+    // The split brand panel covers `lg` and up, so this lockup is the mobile
+    // one - and it belongs inside the card, not floating above a second frame.
+    it("places the mobile brand inside the card, not above it", async () => {
+      await importPage()
+
+      const brand = screen.getByTestId("auth-card-brand")
+      const card = brand.closest('[data-slot="card"]')
+      expect(card).not.toBeNull()
+      expect(card?.contains(brand)).toBe(true)
+      expect(brand.className).toContain("lg:hidden")
+      expect(brand).toHaveAttribute("href", "/login")
+    })
   })
 
   describe("without token", () => {
@@ -148,6 +161,19 @@ describe("Reset password page", () => {
       mockToken = null
       await importPage()
       expect(screen.queryByLabelText("New password")).not.toBeInTheDocument()
+    })
+
+    // This branch used to render no brand at all on mobile: the split panel
+    // above it is `hidden lg:flex`, and the floating lockup only ever existed
+    // on the valid-token branch. It gets the same in-card lockup now.
+    it("shows the in-card brand even when the link is invalid", async () => {
+      mockToken = null
+      await importPage()
+
+      const brand = screen.getByTestId("auth-card-brand")
+      const card = brand.closest('[data-slot="card"]')
+      expect(card).not.toBeNull()
+      expect(card?.contains(brand)).toBe(true)
     })
   })
 })

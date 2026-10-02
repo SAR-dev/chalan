@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { FormErrors } from "@/components/form-errors"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { pageContent } from "@/config/content"
@@ -24,7 +25,7 @@ import {
   VerificationCard,
 } from "./components/account-alerts"
 import { ParcelCard } from "./components/parcel-card"
-import type { ParcelState } from "./types"
+import type { ParcelField, ParcelState, ParcelValidation } from "./types"
 
 function emptyParcel(pickupLocationId = ""): ParcelState {
   return {
@@ -74,8 +75,12 @@ export default function NewOrderPage() {
 
   const [parcels, setParcels] = useState<ParcelState[]>([emptyParcel()])
   const [submitting, setSubmitting] = useState(false)
-  const [submitAttempted, setSubmitAttempted] = useState(false)
-  const [apiErrors, setApiErrors] = useState<Record<number, string[]>>({})
+  // Snapshots taken on submit, keyed by parcel id — see `ParcelValidation` for
+  // why this is not recomputed while the merchant types.
+  const [validation, setValidation] = useState<
+    Record<string, ParcelValidation>
+  >({})
+  const [serverErrors, setServerErrors] = useState<Record<string, string[]>>({})
 
   // Prefill every parcel's pickup location once, when the merchant's
   // locations finish loading. Runs a single time so a merchant who clears a
@@ -112,10 +117,41 @@ export default function NewOrderPage() {
     setParcels((prev) =>
       prev.length === 1 ? prev : prev.filter((p) => p.id !== id),
     )
+    // The removed parcel's messages would otherwise outlive it in the summary.
+    setValidation((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    setServerErrors((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
   }
 
+  /**
+   * The form-level summary: every message from the last submit, in one list the
+   * merchant hears once instead of hunting for across N cards. Prefixed with the
+   * parcel only when there is more than one, because "Parcel 1: " on a
+   * single-parcel form is noise.
+   */
+  const summaryErrors = useMemo(() => {
+    const summary: Record<string, string> = {}
+    const many = parcels.length > 1
+    parcels.forEach((p, i) => {
+      const prefix = many ? `Parcel ${i + 1}: ` : ""
+      for (const [field, message] of Object.entries(validation[p.id] ?? {})) {
+        summary[`${i}-${field}`] = `${prefix}${message}`
+      }
+    })
+    return summary
+  }, [parcels, validation])
+
   const rows = useMemo(() => {
-    return parcels.map((p, index) => {
+    return parcels.map((p) => {
       const {
         weight,
         productCost,
@@ -140,22 +176,16 @@ export default function NewOrderPage() {
         packageRule,
       })
 
-      const errors: string[] = []
-      if (submitAttempted) {
-        if (!p.pickupLocationId) errors.push("Pickup location is required.")
-        if (!p.recipientName.trim()) errors.push("Recipient name is required.")
-        if (!p.recipientPhone.trim())
-          errors.push("Recipient phone is required.")
-        if (!p.deliveryCityId.trim()) errors.push("Delivery city is required.")
-        if (!p.deliveryAddress.trim())
-          errors.push("Delivery address is required.")
-        if (weight <= 0) errors.push("Weight must be greater than 0.")
-        if (exceedsMax) errors.push(`Exceeds ${maxWeightKg} KG max.`)
-      }
-      if (apiErrors[index]) {
-        errors.push(...apiErrors[index])
-      }
-
+      // Deliberately no field validation here — see `ParcelValidation`. This
+      // memo answers "what does this parcel cost, and what did the server say
+      // about it", and nothing else.
+      //
+      // A parcel with no pickup or no destination city has not been asked a
+      // pricing question yet — `quoteParcel` reports those as "cannot price"
+      // because it cannot, which is a different statement from "this lane has
+      // no rate". Treating the two the same left a blank form showing a red
+      // pricing error and a submit button disabled for no reason.
+      const priced = Boolean(p.pickupLocationId) && Boolean(p.deliveryCityId)
       return {
         parcel: p,
         weight,
@@ -165,32 +195,38 @@ export default function NewOrderPage() {
         codFee,
         exceedsMax,
         maxWeightKg,
-        errors,
-        pricingUnavailable,
-        pricingError: pricingUnavailableReason
-          ? pricingUnavailableMessage(
-              pricingUnavailableReason,
-              fromZone,
-              toZone,
-            )
-          : null,
+        errors: serverErrors[p.id] ?? [],
+        pricingUnavailable: priced && pricingUnavailable,
+        pricingError:
+          priced && pricingUnavailable && pricingUnavailableReason
+            ? pricingUnavailableMessage(
+                pricingUnavailableReason,
+                fromZone,
+                toZone,
+              )
+            : null,
       }
     })
   }, [
     parcels,
-    currentMerchant,
-    submitAttempted,
-    apiErrors,
+    serverErrors,
     pickupLocations,
     deliveryCities,
     zonePricing,
     zones,
+    packageRule,
   ])
 
   const anyExceeds = rows.some((r) => r.exceedsMax)
   // A lane with no configured rate cannot be priced at all — the server rejects
   // it, so block here rather than round-tripping for a 400.
   const anyUnpriced = rows.some((r) => r.pricingUnavailable)
+  // A disabled button with no explanation is a dead end: say what to fix.
+  const blockedReason = anyUnpriced
+    ? "A parcel's route has no delivery rate configured yet, so it cannot be priced."
+    : anyExceeds
+      ? "A parcel is over its route's weight limit."
+      : null
 
   if (!currentMerchant) return null
 
@@ -198,23 +234,44 @@ export default function NewOrderPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setSubmitAttempted(true)
+    // Stale from the previous attempt: whatever the server said last time is
+    // no longer what matters.
+    setServerErrors({})
 
-    const hasErrors = parcels.some((p, i) => {
-      // Unpriced lane, or over the route's own weight limit — either way the
-      // server would reject it, so don't bother submitting.
-      if (rows[i]?.pricingUnavailable || rows[i]?.exceedsMax) return true
-      const weight = Number(p.parcelWeightKg) || 0
-      return (
-        !p.pickupLocationId ||
-        !p.recipientName.trim() ||
-        !p.recipientPhone.trim() ||
-        !p.deliveryCityId.trim() ||
-        !p.deliveryAddress.trim() ||
-        weight <= 0
-      )
+    // Validate once, here, and keep the result until the next submit — see
+    // `ParcelValidation` for why these messages are not derived while typing.
+    const next: Record<string, ParcelValidation> = {}
+    let blocked = false
+    parcels.forEach((p, i) => {
+      const fieldErrors: Partial<Record<ParcelField, string>> = {}
+      const need = (field: ParcelField, label: string, value: string) => {
+        if (value.trim()) return
+        fieldErrors[field] = `${label} is required.`
+        blocked = true
+      }
+      need("pickupLocationId", "Pickup location", p.pickupLocationId)
+      need("recipientName", "Recipient name", p.recipientName)
+      need("recipientPhone", "Recipient phone", p.recipientPhone)
+      need("deliveryCityId", "Delivery city", p.deliveryCityId)
+      need("deliveryAddress", "Delivery address", p.deliveryAddress)
+
+      if ((Number(p.parcelWeightKg) || 0) <= 0) {
+        fieldErrors.parcelWeightKg = "Weight must be greater than 0."
+        blocked = true
+      }
+
+      // Unpriced lane or over the route's own weight limit — either way the
+      // server would reject it, so don't round-trip for a 400. Neither is a
+      // control's fault: the card header already names the lane or the limit.
+      if (rows[i]?.pricingUnavailable || rows[i]?.exceedsMax) blocked = true
+
+      next[p.id] = fieldErrors
     })
-    if (hasErrors) return
+    if (blocked) {
+      setValidation(next)
+      return
+    }
+    setValidation({})
 
     const payload: CreateOrderInput[] = parcels.map((p) => ({
       pickupLocationId: p.pickupLocationId,
@@ -234,7 +291,6 @@ export default function NewOrderPage() {
     }))
 
     setSubmitting(true)
-    setApiErrors({})
     // try/finally: a thrown fetch (offline, gateway error) must not leave the
     // submit button disabled forever.
     try {
@@ -247,15 +303,18 @@ export default function NewOrderPage() {
         return
       }
       if (result.issues) {
-        const mapped: Record<number, string[]> = {}
+        // Keyed by parcel id, not by the index the server sent back: parcels
+        // can be removed between the render and the response.
+        const mapped: Record<string, string[]> = {}
         for (const issue of result.issues) {
           if (issue.path[0] === "orders" && typeof issue.path[1] === "number") {
-            const idx = issue.path[1]
-            mapped[idx] = mapped[idx] ?? []
-            mapped[idx].push(issue.message)
+            const parcel = parcels[issue.path[1]]
+            if (!parcel) continue
+            mapped[parcel.id] = mapped[parcel.id] ?? []
+            mapped[parcel.id].push(issue.message)
           }
         }
-        setApiErrors(mapped)
+        setServerErrors(mapped)
       } else {
         toast.error(result.error ?? "Unable to create orders.")
       }
@@ -302,6 +361,12 @@ export default function NewOrderPage() {
             onSubmit={handleSubmit}
             className="flex flex-col gap-6"
           >
+            <FormErrors
+              errors={
+                Object.keys(summaryErrors).length > 0 ? summaryErrors : null
+              }
+            />
+
             {rows.map((row, index) => (
               <ParcelCard
                 key={row.parcel.id}
@@ -310,30 +375,46 @@ export default function NewOrderPage() {
                 parcelCount={parcels.length}
                 deliveryCities={deliveryCities}
                 myLocations={myLocations}
+                validation={validation[row.parcel.id] ?? null}
                 updateParcel={updateParcel}
                 removeParcel={removeParcel}
               />
             ))}
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button type="button" variant="outline" onClick={addParcel}>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addParcel}
+                data-testid="add-parcel"
+              >
                 <Plus className="size-4" />
                 Add another parcel
               </Button>
-              <Button
-                type="submit"
-                data-testid="submit-order"
-                className="gap-2"
-                disabled={submitting || anyExceeds || anyUnpriced}
-              >
-                {submitting ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <PackageCheck className="size-4" />
-                )}
-                Confirm {parcels.length} order
-                {parcels.length > 1 ? "s" : ""}
-              </Button>
+              <div className="flex flex-col gap-2 sm:items-end">
+                {blockedReason ? (
+                  <p
+                    data-testid="submit-blocked-reason"
+                    className="text-muted-foreground text-sm sm:text-right"
+                  >
+                    {blockedReason}
+                  </p>
+                ) : null}
+                <Button
+                  type="submit"
+                  data-testid="submit-order"
+                  className="gap-2"
+                  disabled={submitting || anyExceeds || anyUnpriced}
+                >
+                  {submitting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <PackageCheck className="size-4" />
+                  )}
+                  Confirm {parcels.length} order
+                  {parcels.length > 1 ? "s" : ""}
+                </Button>
+              </div>
             </div>
           </form>
         </div>

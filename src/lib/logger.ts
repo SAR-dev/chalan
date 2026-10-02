@@ -10,6 +10,8 @@
 //   const reqLogger = logger.child({ requestId, path })
 //   reqLogger.info("payment submitted", { merchantId })
 
+import { redactSecrets } from "@/lib/redact"
+
 export type LogLevel = "debug" | "info" | "warn" | "error"
 
 const LEVELS: Record<LogLevel, number> = {
@@ -45,9 +47,20 @@ export function serializeError(err: unknown): LogFields {
     const out: LogFields = { name: err.name, message: err.message }
     if (err.stack) out.stack = err.stack
     if (err.cause !== undefined) out.cause = serializeError(err.cause)
-    return out
+    // An error message routinely embeds the failing URL — and for an auth or
+    // verify route that URL carries the token (ROADMAP P0.7).
+    return redactFields(out)
   }
-  return { message: String(err) }
+  return { message: redactSecrets(String(err)) }
+}
+
+/** Redact every string leaf. Non-strings pass through untouched. */
+function redactFields(fields: LogFields): LogFields {
+  const out: LogFields = {}
+  for (const [key, value] of Object.entries(fields)) {
+    out[key] = typeof value === "string" ? redactSecrets(value) : value
+  }
+  return out
 }
 
 function emit(
@@ -63,9 +76,14 @@ function emit(
   const record: LogFields = {
     level,
     time: new Date().toISOString(),
-    msg,
-    ...base,
-    ...rest,
+    // Redacted before anything is written. This was already the intent
+    // (ROADMAP P0.7) but `redact.ts` was never called from here, so the
+    // helpers guarded the mailer while the log line itself was raw — and the
+    // log line is what ends up in container stdout, CI output and whatever
+    // aggregates them (ROADMAP R3.1).
+    msg: redactSecrets(msg),
+    ...redactFields(base),
+    ...redactFields(rest),
   }
   if (err !== undefined) record.err = serializeError(err)
 

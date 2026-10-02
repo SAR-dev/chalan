@@ -12,9 +12,11 @@ import {
 // Serves stored uploads with a folder-based access policy (ROADMAP P0.2).
 // Previously every stored file was world-readable, which exposed NID
 // documents. Policy lives in lib/storage/config.ts:
-//   - `logos` is public (merchant branding on the public tracking page).
 //   - `avatars` / `nids` are readable only by their owner or a SUPER_ADMIN.
 //   - everything else requires any authenticated session.
+//   - `PUBLIC_UPLOAD_FOLDERS` is deliberately empty (it held `logos`, which
+//     nothing uploaded to or rendered; removed with the branding feature), so
+//     every stored file now needs a session.
 // Auth is checked BEFORE the file is touched, so an unauthorized caller cannot
 // even probe which paths exist.
 //

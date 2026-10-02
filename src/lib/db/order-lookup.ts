@@ -7,12 +7,20 @@ import { deliveryCity, pickupLocation } from "@/lib/db/schema"
  * city (pickup_location.cityId → delivery_city.warehouseId). Shared by the
  * order-create routes and the picked-up transition so the mapping can never
  * drift. A location with no city or no warehouse maps to null.
+ *
+ * `runner` lets a caller inside a transaction read through `tx` — otherwise
+ * the lookup runs on a different connection (and, for `dbRead`, possibly a
+ * different replica snapshot) than the write it is validating
+ * (ROADMAP R0.11).
  */
+export type LookupRunner = Pick<typeof db, "select">
+
 export async function pickupWarehouseIds(
   pickupLocationIds: readonly string[],
+  runner: LookupRunner = db,
 ): Promise<Map<string, string | null>> {
   if (pickupLocationIds.length === 0) return new Map()
-  const rows = await db
+  const rows = await runner
     .select({ id: pickupLocation.id, warehouseId: deliveryCity.warehouseId })
     .from(pickupLocation)
     .innerJoin(deliveryCity, eq(pickupLocation.cityId, deliveryCity.id))
@@ -22,9 +30,12 @@ export async function pickupWarehouseIds(
 
 export async function pickupWarehouseId(
   pickupLocationId: string,
+  runner?: LookupRunner,
 ): Promise<string | null> {
   return (
-    (await pickupWarehouseIds([pickupLocationId])).get(pickupLocationId) ?? null
+    (await pickupWarehouseIds([pickupLocationId], runner)).get(
+      pickupLocationId,
+    ) ?? null
   )
 }
 

@@ -22,8 +22,6 @@ export function MerchantSidebar() {
       config={config}
       footerSubtitle={currentMerchant?.businessName}
       businessName={currentMerchant?.businessName ?? undefined}
-      brandColor={currentMerchant?.brandColor ?? undefined}
-      hidePlatformBranding={currentMerchant?.hidePlatformBranding ?? false}
     />
   )
 }

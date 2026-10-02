@@ -8,6 +8,7 @@ import {
   unauthorized,
 } from "@/lib/api-response"
 import { IMAGE_EXTENSION, sniffImageType } from "@/lib/image-signature"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { saveFile } from "@/lib/storage"
 import {
   ALLOWED_IMAGE_TYPES,
@@ -33,7 +34,33 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // Multipart framing (boundaries + part headers) rides on top of the file bytes.
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024
 
+/** Anonymous upload budget, per IP, per minute — unchanged from before. */
+const UPLOAD_LIMIT = 20
+const UPLOAD_WINDOW_SECONDS = 60
+
 export const POST = withErrorHandler(async (req: Request) => {
+  // Throttle first: a request we are going to reject should cost as little as
+  // possible to reach this line, and it must happen before the body is read.
+  //
+  // This used to live in `src/proxy.ts` — Next's *middleware* — with its own
+  // in-process Map. Middleware cannot reach the Redis-backed limiter the rest
+  // of the app shares, so in `docker/compose.cluster.yml` each of the four
+  // instances enforced its own 20/min budget: 80 uploads/min/IP against a
+  // 20/min intent, while every other route in the app was correctly shared
+  // (ROADMAP R3.2). Route handlers run on the Node runtime, so the shared
+  // limiter is available here.
+  //
+  // `failClosed` stays off deliberately: with no resolvable IP this would put
+  // every unidentifiable visitor in one bucket, and a single such visitor could
+  // then block uploads for everyone else (cross-tenant DoS).
+  const limited = await rateLimitByIp(
+    req,
+    "upload",
+    UPLOAD_LIMIT,
+    UPLOAD_WINDOW_SECONDS,
+  )
+  if (limited) return limited
+
   // Bound the request BEFORE parsing it: route handlers buffer formData()
   // fully, so an unbounded body is a memory-exhaustion vector.
   const contentLength = Number(req.headers.get("content-length"))

@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { FormEvent, useEffect, useState } from "react"
+import { AuthCardBrand } from "@/components/auth-card-brand"
 import { FormErrors } from "@/components/form-errors"
 import { ImageUpload } from "@/components/image-upload"
 import { PublicFooter } from "@/components/public-footer"
@@ -205,8 +206,10 @@ export default function ApplyRiderPage() {
       <main id="main-content" className="flex min-h-screen flex-col">
         {/* Header */}
         <header className="border-border/70 border-b px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
+          {/* `justify-end` until lg: below lg the logo moves inside the card,
+              leaving the Print button as the header's only child. */}
+          <div className="flex items-center justify-end lg:justify-between">
+            <Link href="/" className="hidden items-center gap-2 lg:flex">
               <SiteIcon className="size-5" />
               <span className="text-lg font-semibold tracking-tight">
                 {siteConfig.name}
@@ -231,6 +234,10 @@ export default function ApplyRiderPage() {
             {submitted ? (
               <Card className="border-border/70 shadow-sm">
                 <CardHeader className="flex flex-col gap-3">
+                  {/* Mobile brand: inside the card, so a phone shows one
+                      framed box instead of a detached logo above a second
+                      frame. */}
+                  <AuthCardBrand />
                   <div className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-full">
                     <CheckCircle2 className="size-6" />
                   </div>
@@ -375,6 +382,7 @@ export default function ApplyRiderPage() {
             ) : (
               <Card className="border-border/70 shadow-sm">
                 <CardHeader className="flex flex-col gap-1">
+                  <AuthCardBrand className="mb-3" />
                   <CardTitle className="text-2xl">Apply as a rider</CardTitle>
                   <CardDescription>
                     Fill in your details. Approval is required before you can
@@ -388,6 +396,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="name"
                         data-testid="rider-name"
+                        error={errors.name}
                         placeholder="Karim Hossain"
                         value={form.name}
                         onChange={(e) => update("name", e.target.value)}
@@ -399,6 +408,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="phone"
                         data-testid="rider-phone"
+                        error={errors.phone}
                         type="tel"
                         placeholder="+8801712345678"
                         value={form.phone}
@@ -411,6 +421,7 @@ export default function ApplyRiderPage() {
                         <Label htmlFor="zone">Service zone</Label>
                         <Input
                           id="zone"
+                          error={errors.zone}
                           placeholder="Dhaka North"
                           value={form.zone}
                           onChange={(e) => update("zone", e.target.value)}
@@ -448,6 +459,7 @@ export default function ApplyRiderPage() {
                       <Label htmlFor="address">Home address</Label>
                       <Input
                         id="address"
+                        error={errors.address}
                         placeholder="House 14, Road 7, Dhanmondi, Dhaka"
                         value={form.address}
                         onChange={(e) => update("address", e.target.value)}
@@ -514,6 +526,7 @@ export default function ApplyRiderPage() {
                           <Input
                             id="vehiclePlate"
                             data-testid="rider-apply-vehicle-plate"
+                            error={errors.vehiclePlate}
                             value={form.vehiclePlate}
                             onChange={(e) =>
                               update("vehiclePlate", e.target.value)
@@ -530,6 +543,7 @@ export default function ApplyRiderPage() {
                         <Label htmlFor="nidNumber">National ID number</Label>
                         <Input
                           id="nidNumber"
+                          error={errors.nidNumber}
                           placeholder="1234567890"
                           value={form.nidNumber}
                           onChange={(e) => update("nidNumber", e.target.value)}
@@ -597,6 +611,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="email"
                         data-testid="rider-email"
+                        error={errors.email}
                         type="email"
                         placeholder="karim@email.com"
                         value={form.email}
@@ -610,6 +625,7 @@ export default function ApplyRiderPage() {
                       <Input
                         id="password"
                         type="password"
+                        error={errors.password}
                         placeholder="Choose a password"
                         value={form.password}
                         onChange={(e) => update("password", e.target.value)}

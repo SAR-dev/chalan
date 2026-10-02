@@ -28,17 +28,17 @@ import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { formatTk } from "@/lib/pricing"
+import { businessDateString, businessToday } from "@/lib/timezone"
 import type { Order } from "@/lib/types"
 
 function isToday(iso?: string | null) {
   if (!iso) return false
   const d = new Date(iso)
-  const now = new Date()
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  )
+  if (Number.isNaN(d.getTime())) return false
+  // Compare business-local calendar days, not the device's (ROADMAP R0.3): a
+  // parcel delivered at 23:30 Dhaka is still "today" for the rider even when
+  // the browser's clock has rolled into another day.
+  return businessDateString(d) === businessToday()
 }
 
 function TaskSection({

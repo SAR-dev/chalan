@@ -2,7 +2,7 @@ import { and, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
-import { logAudit } from "@/lib/audit"
+import { logAuditMany } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { payoutRequest } from "@/lib/db/schema"
 import { idsSchema, parseBody } from "@/lib/validation"
@@ -44,16 +44,14 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     )
     .returning()
 
-  await Promise.all(
-    updated.map((p) =>
-      logAudit({
-        actor: { userId: me.userId, name: me.name, role: me.role },
-        action: "PAYOUT_APPROVED",
-        entityType: "payout_request",
-        entityId: p.id,
-        description: `Approved payout request ${p.id}`,
-      }),
-    ),
+  await logAuditMany(
+    updated.map((p) => ({
+      actor: { userId: me.userId, name: me.name, role: me.role },
+      action: "PAYOUT_APPROVED",
+      entityType: "payout_request",
+      entityId: p.id,
+      description: `Approved payout request ${p.id}`,
+    })),
   )
 
   return NextResponse.json({ ok: true, count: updated.length })
