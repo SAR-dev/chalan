@@ -88,7 +88,9 @@ test.describe("S74. Route planning and auto-assignment", () => {
     await expect(page.locator(warehouse.bulkAutoAssign)).toHaveCount(0)
   })
 
-  test("rider sees the drop order the server sequenced", async ({ page }) => {
+  test("rider sees the drop order, batched by zone, that the server sequenced", async ({
+    page,
+  }) => {
     await login(page, CREDS.deliveryRider)
     await page.goto("/rider/delivery")
     await waitForAppReady(page)
@@ -124,16 +126,52 @@ test.describe("S74. Route planning and auto-assignment", () => {
       )
     }
 
-    // One destination line per stop, and never blank — a rider planning a route
-    // needs every row to say where it goes. Which city it names is asserted in
-    // the route spec: no seeded order carries a `deliveryCityId`, so from here
-    // the honest claim is "a destination is shown", not "the right one".
-    const destinations = await page
-      .locator(rider.runSheetDestinationPrefix)
-      .allInnerTexts()
-    expect(destinations).toHaveLength(sheet.stops.length)
-    for (const destination of destinations) {
-      expect(destination.trim()).not.toBe("")
+    // Every stop names the city the server resolved for it. The fallback text is
+    // asserted against on purpose: a parcel whose order carries no
+    // `deliveryCityId` renders as "Destination not set", which is how a run
+    // sheet quietly degenerates into an unzoned list.
+    const destinations = (
+      await page.locator(rider.runSheetDestinationPrefix).allInnerTexts()
+    ).map((text) => text.trim())
+    expect(destinations).toEqual(
+      sheet.stops.map((s: { cityName: string | null }) => s.cityName),
+    )
+    expect(destinations).not.toContain("Destination not set")
+
+    // Same, for the zone — the field the sheet is grouped by. Rendered zone per
+    // stop, in the server's order.
+    const zones = (
+      await page.locator(rider.runSheetZonePrefix).allInnerTexts()
+    ).map((text) => text.trim())
+    expect(zones).toHaveLength(sheet.stops.length)
+    expect(zones).toEqual(
+      sheet.stops.map((s: { zoneName: string | null }) => s.zoneName),
+    )
+
+    // The run sheet's actual claim: a zone is served in one run. Reading the
+    // zones in sequence and checking no zone comes back after another has been
+    // served is the only assertion that distinguishes "sorted by zone" from
+    // "happens to contain two zones" — which is what the card would look like if
+    // grouping were dropped while the ordering stayed.
+    const served = new Set<string>()
+    let current: string | null = null
+    for (const zone of zones) {
+      if (zone === current) continue
+      expect(
+        served.has(zone),
+        `zone "${zone}" is served in two separate runs`,
+      ).toBe(false)
+      served.add(zone)
+      current = zone
     }
+
+    // More than one zone, so the invariant above was not checked against a
+    // single run that trivially satisfies it. The seeded rider's run spans
+    // several zones, because every seeded order names a real delivery city.
+    expect(served.size).toBeGreaterThan(1)
+    // And the card's own accounting agrees with the planner's: one more area
+    // than crossings, always.
+    expect(served.size).toBe(sheet.zoneCount)
+    expect(served.size - 1).toBe(sheet.zoneHops)
   })
 })

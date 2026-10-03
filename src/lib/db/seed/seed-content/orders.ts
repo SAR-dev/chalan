@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { SEED_COUNTS } from "./credentials"
+import { SEED_DELIVERY_CITIES } from "./delivery-cities"
 import { MERCHANT_IDS } from "./merchants"
 import { SEED_RIDERS } from "./riders"
 import { ADMIN_USER_NAMES } from "./users"
@@ -42,18 +43,13 @@ const ORDER_SEED_STATUSES: (
 // production resolves it per zone pair at creation time.
 export const SEED_CANCELLATION_FEE = 20
 
-const ORDER_SEED_CITIES = [
-  "Dhaka",
-  "Chattogram",
-  "Sylhet",
-  "Khulna",
-  "Rajshahi",
-  "Gazipur",
-  "Narayanganj",
-  "Comilla",
-  "Bogra",
-  "Rangpur",
-]
+// Destination cities, cycled. These are the real `delivery_city` rows, not a
+// parallel list of names: `delivery_city.name` is UNIQUE and is joined against
+// `warehouse.city` by `resolveRoutePricing`, so a name here that does not exist
+// in that table is not a cosmetic difference — it silently breaks lane pricing
+// and leaves the order with no zone. See `seed-content/delivery-cities.ts` for
+// the list this replaced.
+const ORDER_SEED_CITIES = SEED_DELIVERY_CITIES
 
 const RECIPIENT_NAMES = [
   "Rahim Uddin",
@@ -114,6 +110,10 @@ export interface OrderSeedEntry {
   recipientName: string
   recipientPhone: string
   deliveryAddress: string
+  /** `delivery_city.id` — the destination zone the pricing lane and the rider
+   *  run sheet are both derived from. Required by `orderCreateSchema`, so a
+   *  seeded order carries one too. */
+  deliveryCityId: string
   parcelWeightKg: number
   /** What is in the parcel. Null for roughly a third of seeded orders. */
   itemType?: string | null
@@ -218,7 +218,8 @@ function buildSeedOrders(): OrderSeedEntry[] {
       pickupLocationId: merchant.pickupId,
       recipientName,
       recipientPhone: `+8801712${String(10000 + i).slice(0, 5)}`,
-      deliveryAddress: `${100 + i} Seed Road, ${city}`,
+      deliveryAddress: `${100 + i} Seed Road, ${city.name}`,
+      deliveryCityId: city.id,
       parcelWeightKg: weight,
       itemType: i % 3 === 0 ? null : ITEM_TYPES[i % ITEM_TYPES.length],
       deliveryType,

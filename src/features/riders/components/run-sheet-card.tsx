@@ -56,12 +56,23 @@ export function RunSheetCard({ riderId }: { riderId?: string | null }) {
                   >
                     {stop.orderId}
                   </span>
-                  <span
-                    data-testid={`run-sheet-destination-${stop.sequence}`}
-                    className="text-muted-foreground text-xs"
-                  >
-                    {stop.cityName ?? "Destination not set"}
-                    {stop.zoneName ? ` · ${stop.zoneName}` : ""}
+                  <span className="text-muted-foreground text-xs">
+                    <span
+                      data-testid={`run-sheet-destination-${stop.sequence}`}
+                    >
+                      {stop.cityName ?? "Destination not set"}
+                    </span>
+                    {stop.zoneName ? (
+                      <>
+                        {" · "}
+                        {/* Tagged apart from the destination so a spec can read
+                            each stop's zone without parsing the separator out
+                            of the line. */}
+                        <span data-testid={`run-sheet-zone-${stop.sequence}`}>
+                          {stop.zoneName}
+                        </span>
+                      </>
+                    ) : null}
                   </span>
                 </span>
               </li>

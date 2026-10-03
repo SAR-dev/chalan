@@ -122,7 +122,36 @@ describe("RunSheetCard", () => {
     stubSheet(sheet())
     renderCard(<RunSheetCard riderId="RID-000001" />)
 
-    expect(await screen.findByText("Gazipur · Dhaka Metro")).toBeInTheDocument()
+    await screen.findByText("ORD-000002")
+    // City and zone are tagged separately. Asserted by test id rather than off
+    // the joined line, because a spec that reads the zone out of
+    // "Gazipur · Dhaka Metro" is one rename away from silently matching
+    // nothing — and the zone is the field the whole run sheet is built on.
+    expect(screen.getByTestId("run-sheet-destination-2")).toHaveTextContent(
+      "Gazipur",
+    )
+    expect(screen.getByTestId("run-sheet-zone-2")).toHaveTextContent(
+      "Dhaka Metro",
+    )
+  })
+
+  it("keeps a zone's stops contiguous", async () => {
+    // The grouping is the product. Stops 1 and 2 share a zone and the third
+    // does not, so the two Dhaka Metro runs must render with nothing of the
+    // other zone in between.
+    stubSheet(sheet())
+    renderCard(<RunSheetCard riderId="RID-000001" />)
+
+    await screen.findByText("ORD-000002")
+    expect(screen.getByTestId("run-sheet-zone-1")).toHaveTextContent(
+      "Dhaka Metro",
+    )
+    expect(screen.getByTestId("run-sheet-zone-2")).toHaveTextContent(
+      "Dhaka Metro",
+    )
+    expect(screen.getByTestId("run-sheet-zone-3")).toHaveTextContent(
+      "Divisional Cities",
+    )
   })
 
   it("reports how many areas the run crosses", async () => {

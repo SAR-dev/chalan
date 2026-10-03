@@ -325,6 +325,13 @@ export const rider = {
   runSheetDestination: (sequence: number) =>
     `[data-testid='run-sheet-destination-${sequence}']`,
   runSheetDestinationPrefix: "[data-testid^='run-sheet-destination-']",
+  // Zone per stop, tagged apart from the destination so a spec can read the
+  // zone sequence without splitting the rendered line on "·". This is what
+  // makes the grouping assertable: the run sheet's whole claim is that a zone
+  // is served in one run, which only a zone-by-zone reading can check.
+  runSheetZone: (sequence: number) =>
+    `[data-testid='run-sheet-zone-${sequence}']`,
+  runSheetZonePrefix: "[data-testid^='run-sheet-zone-']",
   // Parcel code per stop. Tagged so a spec can compare the rendered order
   // against the API's own sequence — numbering the rows 1..N proves only that
   // the card counts, not that it kept the order it was given.
