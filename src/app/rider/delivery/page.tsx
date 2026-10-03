@@ -16,6 +16,7 @@ import { DeliveryAttemptDialog } from "@/features/orders/dialogs/delivery-attemp
 import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
 import { OutForDeliveryDialog } from "@/features/orders/dialogs/out-for-delivery-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { RunSheetCard } from "@/features/riders/components/run-sheet-card"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
@@ -65,7 +66,7 @@ export default function RiderDeliveryQueuePage() {
   }, [setPage])
 
   // Rows come pre-filtered to this queue by the API (`?queue=delivery`), so the
-  // table and the footer's `total` count the same set (ROADMAP R0.2).
+  // Table and the footer's `total` count the same set.
 
   const dateFilterLabel =
     dateFrom || dateTo
@@ -237,6 +238,8 @@ export default function RiderDeliveryQueuePage() {
         onFromChange={setDateFrom}
         onToChange={setDateTo}
       />
+
+      <RunSheetCard riderId={currentRider?.id} />
 
       <Card>
         <CardContent className="p-0">

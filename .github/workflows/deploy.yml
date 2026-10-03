@@ -2,7 +2,7 @@ name: Deploy
 
 # Gate production on CI: this workflow only runs after the CI workflow
 # completes on `main`, and the job below skips unless CI succeeded
-# (ROADMAP P2.1). A red CI run can no longer reach production.
+#. A red CI run can no longer reach production.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -22,13 +22,13 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Deploy the exact commit CI validated, not the branch tip.
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest"
 import { FormErrors } from "@/components/form-errors"
 import { Input } from "@/components/ui/input"
 
-// Roadmap R2.4. Before this, `FormErrors` was a plain `role="alert"` banner and
+// Before this, `FormErrors` was a plain `role="alert"` banner and
 // no input in the app carried `aria-describedby`: a screen-reader user heard
 // that *something* failed but could not move to the field that failed, and
 // focus stayed wherever the user happened to leave it.

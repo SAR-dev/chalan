@@ -1,5 +1,5 @@
 // Flags orders that have been stuck in an actionable state for too long
-// (ROADMAP B9). Read-only monitoring: the counts are logged so ops can act
+//. Read-only monitoring: the counts are logged so ops can act
 // (approve/cancel a stale PENDING order, return a stale FAILED_ATTEMPT parcel)
 // without a schema flag. Auth: CRON_SECRET bearer token.
 

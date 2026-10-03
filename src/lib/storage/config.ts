@@ -24,7 +24,7 @@ export const UPLOAD_FOLDERS = [
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[number]
 
 // Read policy for stored files (enforced by app/uploads/[...path]/route.ts,
-// ROADMAP P0.2):
+
 //
 //   public     — world-readable. Intentionally empty: the only folder that
 //                ever lived here was `logos`, which nothing uploaded to and

@@ -25,7 +25,7 @@ export type SettlePayoutResult =
 
 /**
  * Marks an APPROVED payout request as PAID and writes the money movement
- * (ROADMAP P0.3). Shared by the single and the bulk admin endpoints so the two
+ *. Shared by the single and the bulk admin endpoints so the two
  * paths can never diverge again:
  *
  *   - locks the request row (`FOR UPDATE`) so concurrent calls cannot double-pay;
@@ -69,7 +69,7 @@ export async function settlePayoutAsPaid(
   const amount = Number(totals?.total ?? 0)
   const paidAt = new Date().toISOString()
   // A payout consumes the merchant's credit, so in the debt convention
-  // (positive = merchant owes) it is a POSITIVE amount (ROADMAP P0.4).
+  // (positive = merchant owes) it is a POSITIVE amount.
   const paid = payoutAmount(amount)
 
   const [after] = await tx

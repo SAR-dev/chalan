@@ -22,6 +22,15 @@ export const CREDS = {
     home: "/merchant",
   },
   rider: { email: "rider1@email.com", password: "12qwaszx", home: "/rider" },
+  // Rider 1 is seeded PICKUP-only (`RIDER_TASK_TYPES` cycles PICKUP, DELIVERY,
+  // BOTH), so it is never given a delivery parcel and its delivery queue — and
+  // therefore its run sheet — is legitimately empty. Rider 2 is the first
+  // DELIVERY-capable seed rider and does get parcels.
+  deliveryRider: {
+    email: "rider2@email.com",
+    password: "12qwaszx",
+    home: "/rider",
+  },
   demoMerchant: {
     email: "demo@kikuya.com",
     password: "12qwaszx",
@@ -97,7 +106,7 @@ export async function login(
  * never goes quiet, so the wait is bounded and best-effort — the web-first
  * assertions that follow are the real gate. This replaces bare
  * `waitForLoadState("networkidle")` calls that could stall for the full default
- * timeout under CI load (ROADMAP P2.4).
+ * Timeout under CI load.
  */
 export async function waitForAppReady(
   page: Page,

@@ -120,4 +120,21 @@ export const columnLabels = {
     created: "Created",
     actions: "",
   },
+  // The two log tables. They were the last DataTables still spelling their
+  // Headers out in the page
+  auditLog: {
+    when: "When",
+    actor: "Actor",
+    role: "Role",
+    action: "Action",
+    entity: "Entity",
+    description: "Description",
+    changes: "Changes",
+  },
+  emailLog: {
+    when: "When",
+    to: "To",
+    subject: "Subject",
+    status: "Status",
+  },
 } as const

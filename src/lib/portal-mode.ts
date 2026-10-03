@@ -1,5 +1,5 @@
 // Portal modes — the three deployment shapes this codebase ships as
-// (ROADMAP 5.4). The server-only `PORTAL_MODE` env var selects which portals
+//. The server-only `PORTAL_MODE` env var selects which portals
 // an instance serves at runtime (no rebuild):
 //
 //   admin  → Super Admin dashboard + warehouse portal   (internal ops)

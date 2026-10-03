@@ -1,5 +1,5 @@
 /**
- * Postgres error classification (ROADMAP P1.1).
+ * Postgres error classification.
  *
  * Unique indexes are the backstop for check-then-write flows: the route still
  * checks first so it can return a friendly message, but two concurrent

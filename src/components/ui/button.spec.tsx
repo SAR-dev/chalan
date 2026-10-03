@@ -6,7 +6,7 @@ import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { Button, buttonVariants } from "@/components/ui/button"
 
-// ROADMAP R2.10 — WCAG 2.5.5 (AAA) wants a 44x44 CSS px target. The dense
+// — WCAG 2.5.5 (AAA) wants a 44x44 CSS px target. The dense
 // variants are 24-36px, so the hit area is expanded with a pseudo-element rather
 // than by making every button visually bigger.
 //

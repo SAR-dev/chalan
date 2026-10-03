@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 
-// ─── S52. Email outbox (ROADMAP P1.5) ───────────────────────────────────────
+// ─── S52. Email outbox ───────────────────────────────────────
 //
 // A domain write commits its email as an `email_outbox` row; if the process
 // dies before delivery, the drain cron still sends it. Here we simulate the
@@ -78,7 +78,7 @@ test.describe("S52. Email outbox", () => {
         expect(after.attempts).toBe(0)
       } else {
         // A failed attempt requeues with backoff instead of parking on the
-        // first failure (ROADMAP R0.6): this outbox exists so a transient SMTP
+        // First failure: this outbox exists so a transient SMTP
         // blip cannot cost someone their activation or password-reset link.
         // The row only becomes FAILED once the attempts are spent.
         expect(after.status).toBe("PENDING")

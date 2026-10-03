@@ -36,7 +36,7 @@ export function Timeline({
   const isCancelled = o.status === "CANCELLED"
 
   type HandlerInfo = { role: string; name: string; detail?: string } | null
-  // Code lookups (minimal) omit rider names/phones entirely (ROADMAP B11).
+  // Code lookups (minimal) omit rider names/phones entirely.
   const stepHandlers: Partial<Record<StepKey, HandlerInfo>> = minimal
     ? {}
     : {

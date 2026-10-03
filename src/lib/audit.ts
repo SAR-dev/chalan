@@ -24,7 +24,7 @@ export interface AuditActor {
   /**
    * Set when an admin is driving someone else's session (Better Auth
    * impersonation, surfaced by `requireSession`). Recorded in the entry's
-   * metadata so the trail shows who is really acting (ROADMAP P0.5).
+   * Metadata so the trail shows who is really acting.
    */
   impersonatedBy?: string | null
 }
@@ -65,7 +65,7 @@ function auditValues(input: LogAuditInput) {
  *
  * Pass `tx` when the entry describes a write that is still open: the row is
  * then committed (or rolled back) together with the state change it describes,
- * so a crash can no longer leave a mutation without a trail (ROADMAP P1.4).
+ * So a crash can no longer leave a mutation without a trail.
  * Inside a transaction a failure DOES propagate — the whole point is that the
  * audit row and the change are atomic.
  *
@@ -96,8 +96,8 @@ export async function logAudit(
  * A 100-order bulk transition used to issue one INSERT per row from inside the
  * transaction — 100 round trips holding the batch's locks open — and eight
  * other bulk endpoints did the same via `Promise.all(logAudit(...))`, which
- * additionally opened up to 100 pool connections at once (ROADMAP R3.5 and
- * R3.6). Same atomicity contract as `logAudit`: with `tx` a failure propagates
+ * additionally opened up to 100 pool connections at once. Same atomicity
+ * contract as `logAudit`: with `tx` a failure propagates
  * so the trail and the change stay together; without it, best-effort.
  */
 export async function logAuditMany(

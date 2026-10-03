@@ -10,7 +10,7 @@ import {
 } from "@/lib/order-timeline"
 import type { OrderStatus } from "@/lib/types"
 
-// ROADMAP R5.2. The public tracking page and the admin order table each kept
+// The public tracking page and the admin order table each kept
 // their own copy of the timeline, and the two `formatStamp`s disagreed about
 // locale and time zone - one order could show different times for one event on
 // two screens. There is now one definition; the second half of this file is

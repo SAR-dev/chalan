@@ -22,7 +22,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // Accepts a single image file (multipart/form-data) and stores it, returning
 // the URL it is served from.
 //
-// Authorization (ROADMAP P0.2):
+// Authorization:
 //   - A signed-in user uploads into their own `{folder}/{userId}/` namespace.
 //   - The only anonymous flow is the rider-application NID upload, which must
 //     present a short-lived signed token from POST /api/uploads/token.
@@ -47,7 +47,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   // of the app shares, so in `docker/compose.cluster.yml` each of the four
   // instances enforced its own 20/min budget: 80 uploads/min/IP against a
   // 20/min intent, while every other route in the app was correctly shared
-  // (ROADMAP R3.2). Route handlers run on the Node runtime, so the shared
+  //. Route handlers run on the Node runtime, so the shared
   // limiter is available here.
   //
   // `failClosed` stays off deliberately: with no resolvable IP this would put

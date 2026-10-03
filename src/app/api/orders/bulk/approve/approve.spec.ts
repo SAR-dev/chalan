@@ -201,7 +201,7 @@ describe("PATCH /api/orders/bulk/approve", () => {
       approvedBy: "Admin Amy",
     })
     expect(typeof updatePayloads[0].approvedAt).toBe("string")
-    // One batched call for the whole batch (ROADMAP R3.5) — previously one
+    // One batched call for the whole batch — previously one
     // `logAudit` INSERT per row, each a round trip inside the transaction.
     expect(logAuditMany).toHaveBeenCalledTimes(1)
     const [auditRows] = vi.mocked(logAuditMany).mock.calls[0]

@@ -88,7 +88,6 @@ export function DataTable<T>({
   searchColumns,
   getSearchValue,
   pageSize,
-  pageSizeOptions,
   initialSortId,
   initialSortDir = "asc",
   emptyMessage = "No records to display.",
@@ -491,7 +490,7 @@ export function DataTable<T>({
   // `onPageChange`, which updated the parent's state and never came back here,
   // so the footer's own `page` stayed at 1 — the label read "Page 1 of N" on
   // every server-paginated table and Previous was permanently disabled.
-  // Found by the E2E spec added under ROADMAP R1.3, which is exactly why those
+  // Found by the E2E spec added for the footer controls, which is exactly why those
   // controls had no coverage.
   //
   // Advancing the local copy is safe because `visible` returns `data`
@@ -683,7 +682,7 @@ export function DataTable<T>({
             // `role="status"` so the visible "Refreshing…" is announced: the
             // overlay changes the rows under a screen-reader user with no
             // other signal (the table's own `aria-busy` below marks the state
-            // but does not speak it) (ROADMAP R2.7).
+            // But does not speak it).
             role="status"
             className="bg-background/60 absolute inset-0 z-10 flex items-center justify-center"
           >
@@ -818,7 +817,7 @@ export function DataTable<T>({
                     // mouse-only (WCAG 2.1.1) — it looks interactive and does
                     // nothing for a keyboard user. Give it a focus stop and the
                     // two standard activation keys, centrally, so no page has
-                    // to remember (ROADMAP R2.3).
+                    // To remember.
                     tabIndex={onRowClick ? 0 : undefined}
                     onKeyDown={
                       onRowClick
@@ -898,14 +897,11 @@ export function DataTable<T>({
           serverTotal={serverTotal}
           sortedLength={sorted.length}
           displayTotal={displayTotal}
-          pageSizeOptions={pageSizeOptions}
           size={size}
           page={currentPage}
           totalPages={totalPages}
           currentPage={currentPage}
           onPageChange={handlePageChange}
-          userChangedSize={userChangedSize}
-          setSize={setSize}
           setPage={setPage}
           refreshing={refreshing}
           setRefreshing={setRefreshing}

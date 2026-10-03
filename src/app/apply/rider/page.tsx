@@ -113,7 +113,7 @@ export default function ApplyRiderPage() {
   }
 
   // NID uploads happen before the applicant has an account, so they need a
-  // short-lived signed upload token (ROADMAP P0.2) — fetched fresh per upload.
+  // Short-lived signed upload token — fetched fresh per upload.
   async function provideUploadToken(): Promise<string | null> {
     try {
       const res = await fetch("/api/uploads/token", { method: "POST" })

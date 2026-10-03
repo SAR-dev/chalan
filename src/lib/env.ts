@@ -15,7 +15,7 @@ import { parseAllowlist } from "@/lib/ip-allowlist"
  * comments, `scripts/setup-pg-cron.sql`, `docs/ENV.md` and the comments below),
  * and the comments here drifted to 90 / 30 while every consumer applied 30 / 10
  * — so the file that *validates* the variables disagreed with the code that
- * *uses* them (ROADMAP R0.7).
+ * *uses* them.
  *
  * Anything that restates a default must be asserted against these constants;
  * `src/app/__tests__/docs-drift.spec.ts` does that for the SQL and the docs.
@@ -168,7 +168,7 @@ export function validateEnv(): void {
       }
     }
 
-    // Optional — where unhandled errors are POSTed (ROADMAP R3.1).
+    // Optional — where unhandled errors are POSTed.
     //
     // Deliberately not a vendor SDK: anything that accepts a JSON POST works
     // (Slack incoming webhook, Grafana OnCall, a self-hosted collector), so
@@ -227,7 +227,7 @@ export function validateEnv(): void {
     }
 
     // Optional — how many trusted reverse-proxy hops sit in front of the app
-    // (ROADMAP P0.6). Forwarding headers are ignored unless this is set. A
+    //. Forwarding headers are ignored unless this is set. A
     // non-numeric or negative value would silently disable client-IP trust, so
     // fail boot rather than quietly changing the security posture.
     if (process.env.TRUSTED_PROXY_HOPS) {
@@ -245,7 +245,7 @@ export function validateEnv(): void {
     // Unset/empty = optional (admins and merchants/riders may still opt in).
     oneOf(e, "ADMIN_2FA_REQUIRED", ["0", "1"], "0")
 
-    // Optional - which portals this deployment serves (ROADMAP 5.4):
+    // Optional - which portals this deployment serves:
     // "admin" = dashboard + warehouse, "public" = merchant + rider,
     // "all" = everything (default). Server-only (never NEXT_PUBLIC); read at
     // runtime by proxy/api-auth, so changing it needs a restart.

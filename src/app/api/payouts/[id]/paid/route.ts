@@ -29,7 +29,7 @@ export const PATCH = withErrorHandler(
 
     const { id } = await params
 
-    // Shared settlement (ROADMAP P0.3): locks the request row, recomputes the
+    // Shared settlement: locks the request row, recomputes the
     // amount from the linked orders, writes the ledger + balance exactly once.
     const committed: { result: SettlePayoutResult | null } = { result: null }
     const response = await db.transaction(async (tx) => {

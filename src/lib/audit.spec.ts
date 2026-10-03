@@ -72,7 +72,7 @@ describe("logAudit", () => {
   })
 
   it("writes through the transaction handle when one is given", async () => {
-    // ROADMAP P1.1/P1.4: the entry must commit with the change it describes.
+    // The entry must commit with the change it describes.
     const { logAudit } = await import("@/lib/audit")
     const txValues: Record<string, unknown>[] = []
     const tx = {

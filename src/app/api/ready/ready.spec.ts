@@ -14,7 +14,7 @@ vi.mock("@/lib/db", () => ({
         ? Promise.resolve({ rows: [{ ok: 1 }] })
         : Promise.reject(new Error("db down")),
   },
-  // Readiness also reports pool saturation (ROADMAP R3.1).
+  // Readiness also reports pool saturation.
   pool: { waitingCount: 0, totalCount: 3, options: { max: 20 } },
 }))
 
@@ -46,7 +46,7 @@ describe("GET /api/ready", () => {
     })
   })
 
-  // Pool saturation was invisible before (ROADMAP R3.1): once every connection
+  // Pool saturation was invisible before: once every connection
   // is checked out, requests queue behind it and nothing in the app said so —
   // so a pool bottleneck was indistinguishable from a slow database.
   it("reports pool saturation without affecting readiness", async () => {
@@ -63,9 +63,9 @@ describe("GET /api/ready", () => {
       ok: false,
       checks: { db: false },
     })
-    // The failure is logged with the error (ROADMAP P2.2). Look the record up
+    // The failure is logged with the error. Look the record up
     // rather than taking the last line: the per-request access log writes its
-    // own line after this one (ROADMAP R3.1), and a 503 is itself a 5xx.
+    // Own line after this one, and a 503 is itself a 5xx.
     const records: Record<string, unknown>[] = errSpy.mock.calls.map(
       (call: unknown[]) =>
         JSON.parse(String(call[0])) as Record<string, unknown>,

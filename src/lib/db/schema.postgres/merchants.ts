@@ -39,7 +39,7 @@ export const merchant = pgTable(
     // NOTE: deliberately no per-merchant weight limit. The maximum parcel weight
     // belongs to the lane — `zone_pricing.maxWeightKg` — so one zone pair means
     // one limit and a merchant cannot disagree with it. See `order-pricing.ts`.
-    // Moderator quota (ROADMAP 5.2): how many ACTIVE+PENDING staff logins the
+    // Moderator quota: how many ACTIVE+PENDING staff logins the
     // owner may hold. SUPER_ADMIN-managed (0 = moderators disabled).
     maxModerators: integer("maxModerators").notNull().default(3),
     // Email verification — set when merchant verifies their email.
@@ -77,8 +77,8 @@ export const merchant = pgTable(
     uniqueIndex("merchant_email_unique").on(t.email),
     index("merchant_email_verified_at_idx").on(t.emailVerifiedAt),
     // `GET /api/auth/verify-email` is unauthenticated and resolves the merchant
-    // by this token, so it seq-scanned `merchant` on every visit (ROADMAP
-    // R3.9). Partial — verified merchants hold NULL and cost nothing.
+    // by this token, so it seq-scanned `merchant` on every visit.
+    // Partial - verified merchants hold NULL and cost nothing.
     index("merchant_email_verification_token_idx")
       .on(t.emailVerificationToken)
       .where(sql`${t.emailVerificationToken} is not null`),
@@ -92,7 +92,6 @@ export const merchant = pgTable(
     // Serves the roster's `ORDER BY businessName ASC` — a trigram GIN can
     // answer a search but cannot satisfy a sort, so riders' and warehouses'
     // merchant rosters were sorting the whole table on every page load
-    // (ROADMAP R3.11).
     index("merchant_business_name_idx").on(t.businessName),
     index("merchant_owner_name_trgm_idx").using(
       "gin",
@@ -100,7 +99,7 @@ export const merchant = pgTable(
     ),
     index("merchant_email_trgm_idx").using("gin", sql`${t.email} gin_trgm_ops`),
     index("merchant_phone_trgm_idx").using("gin", sql`${t.phone} gin_trgm_ops`),
-    // NID search uses ILIKE (ROADMAP P1.6).
+    // NID search uses ILIKE.
     index("merchant_nid_number_trgm_idx").using(
       "gin",
       sql`${t.nidNumber} gin_trgm_ops`,

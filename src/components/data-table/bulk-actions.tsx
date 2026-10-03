@@ -35,7 +35,7 @@ export function SelectAllHeadCell({
       data-sticky-col="__select__"
       // NOT aria-hidden: this cell wraps the focusable select-all checkbox, so
       // hiding the subtree left a tab-stop that announced as nothing and made
-      // bulk select unreachable to a screen reader (ROADMAP R2.2).
+      // Bulk select unreachable to a screen reader.
     >
       <input
         ref={selectAllRef}
@@ -43,6 +43,7 @@ export function SelectAllHeadCell({
         checked={allVisibleSelected && visibleLength > 0}
         onChange={handleSelectAll}
         className="size-4 cursor-pointer"
+        data-testid="select-all"
         aria-label={
           allVisibleSelected ? "Deselect all rows" : "Select all rows"
         }
@@ -81,6 +82,7 @@ export function SelectRowCell({
         checked={isSelected}
         onChange={onToggle}
         className="size-4 cursor-pointer"
+        data-testid="select-row"
         aria-label="Select row"
         onClick={(e) => e.stopPropagation()}
       />
@@ -113,6 +115,7 @@ export function BulkActionsBar<T>({
               size="sm"
               disabled={action.disabled || bulkLoading}
               onClick={() => handleBulkAction(action)}
+              data-testid={action.testId}
             >
               {action.icon}
               {action.label}

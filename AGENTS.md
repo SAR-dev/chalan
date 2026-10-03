@@ -129,6 +129,7 @@ e2e/specs/03-onboarding.spec.ts    # Merchant onboarding
 e2e/specs/04-tracking-identity.spec.ts # Merchant sidebar identity + tracking token
 e2e/specs/05-two-factor.spec.ts    # 2FA for admins
 e2e/specs/06-support.spec.ts       # Support tickets
+e2e/specs/07-dispatch-planning.spec.ts # Auto-assign + rider run sheet
 e2e/selectors.ts                    # Centralized data-testid selectors
 ```
 
@@ -172,7 +173,7 @@ describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique (a removed scenario leaves its serial
 unused rather than renumbering every later file). The summary below is
 asserted by `src/app/__tests__/docs-drift.spec.ts`, which fails on either a
-duplicate serial or stale counts: **currently S1-S73 across 32 files / 125
+duplicate serial or stale counts: **currently S1-S74 across 33 files / 128
 tests**.
 
 ## Coding Patterns

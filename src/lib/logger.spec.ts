@@ -67,7 +67,6 @@ describe("logger", () => {
   // `redact.ts` existed but was never called from here, so the helpers
   // guarded the mailer while the log line itself was raw — and the log line is
   // what reaches container stdout, CI output and whatever aggregates them
-  // (ROADMAP R3.1).
   describe("redaction (ROADMAP P0.7)", () => {
     it("redacts a credential in the message", () => {
       logger.info("reset https://app.test/reset?token=SUPERSECRET123")

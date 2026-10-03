@@ -18,7 +18,7 @@ test.describe("S56. Merchant sidebar identity", () => {
   })
 })
 
-// ─── S43. Public tracking token (P0.1) ──────────────────────────────────────
+// ─── S43. Public tracking token ──────────────────────────────────────
 test.describe("S43. Public tracking token", () => {
   /**
    * Pick any seeded order that is still actionable (the receiver note is

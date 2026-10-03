@@ -42,7 +42,6 @@ export const PATCH = withErrorHandler(
     }
 
     // Rider + audit + rejection-email outbox row commit together
-    // (ROADMAP P1.4/P1.5).
     const updated = await db.transaction(async (tx) => {
       const [row] = await tx
         .update(rider)

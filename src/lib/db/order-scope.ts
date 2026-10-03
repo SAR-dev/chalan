@@ -20,7 +20,7 @@ import { order } from "@/lib/db/schema"
  * (`INCOMING` = `PICKED_UP`, see `src/app/warehouse/intake-client.tsx`), which
  * branch 1 already covers — so the clause only made the planner consider an
  * impossible case and forced a bitmap-OR over an otherwise index-friendly
- * predicate (ROADMAP R0.12).
+ * Predicate.
  */
 export function buildWarehouseOrderScope(warehouseId: string): SQL | undefined {
   return or(

@@ -42,7 +42,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     return NextResponse.json({ success: true })
   }
 
-  // Only the hash is stored (ROADMAP P0.7); the raw token lives in the email.
+  // Only the hash is stored; the raw token lives in the email.
   const { raw: token, hash, expiresAt } = issueVerifyToken()
 
   await db

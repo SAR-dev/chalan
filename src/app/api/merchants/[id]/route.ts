@@ -81,7 +81,7 @@ export const PATCH = withErrorHandler(
     }
 
     // Sensitive surface (Business Settings): moderators never pass -
-    // Business Settings is not a grantable nav section (ROADMAP 5.2).
+    // Business Settings is not a grantable nav section.
     if (isOwner && !hasNavPermission(me, "/merchant/settings")) {
       return forbidden("Business settings are owner-only.")
     }
@@ -125,7 +125,7 @@ export const PATCH = withErrorHandler(
     }
 
     // A merchant email change must also update the owner's auth user, or the
-    // account can no longer sign in with the new address (ROADMAP P1.4c). The
+    // Account can no longer sign in with the new address. The
     // two writes and the audits share one transaction; a duplicate email
     // (`merchant_email_unique` / `user_email_unique`) is a 409, not a 500.
     const newEmail = profileParsed.success
@@ -182,7 +182,7 @@ export const PATCH = withErrorHandler(
           }
         }
 
-        // Moderator quota is admin-only and always audited (ROADMAP 5.2).
+        // Moderator quota is admin-only and always audited.
         if (quotaParsed.success) {
           await logAudit(
             {

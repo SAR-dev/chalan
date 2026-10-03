@@ -78,7 +78,7 @@ export default async function WarehouseSettlementPage() {
   const limit = 20
 
   // `order.warehouseId` is NOT NULL, so no "incoming candidate" can sit outside
-  // this warehouse (ROADMAP R0.12).
+  // This warehouse.
   const warehouseScope = eq(order.warehouseId, me.warehouseId)
   const statusFilter = eq(order.status, "DELIVERED")
 

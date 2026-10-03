@@ -37,7 +37,7 @@ vi.mock("@/lib/rate-limit", () => ({
 
 // Partially mocked: `verifyUploadToken` is stubbed for the upload tests, but
 // `createUploadToken` stays real so `POST /api/uploads/token` exercises the
-// genuine HMAC + TTL path (ROADMAP R1.2).
+// Genuine HMAC + TTL path.
 vi.mock("@/lib/upload-token", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/upload-token")>()
   return {
@@ -108,7 +108,11 @@ function req(
   return new Request("http://test.local/api/uploads", {
     method: "POST",
     headers,
-    body,
+    // `new Uint8Array(...)` rather than the Buffer: `Buffer` is
+    // `Buffer<ArrayBufferLike>`, which includes the SharedArrayBuffer-backed
+    // case, and `BodyInit` only accepts views over a plain ArrayBuffer. A copy
+    // is free here — this is a multipart body built per request in a test.
+    body: new Uint8Array(body),
   })
 }
 
@@ -214,7 +218,7 @@ describe("POST /api/uploads", () => {
 // Public by design — the rider-application NID upload happens before the
 // applicant has an account, so this endpoint is on the route-auth-guard
 // allowlist and its rate limit is the ONLY thing bounding anonymous use.
-// No spec covered it (ROADMAP R1.2).
+// No spec covered it.
 describe("POST /api/uploads/token", () => {
   // The token is HMAC-signed with BETTER_AUTH_SECRET and `createUploadToken`
   // throws without it — the same setup `upload-token.spec.ts` uses.
@@ -247,7 +251,7 @@ describe("POST /api/uploads/token", () => {
 // The upload budget used to be enforced in `src/proxy.ts` with its own
 // in-process Map. Middleware cannot reach the Redis-backed limiter the rest of
 // the app shares, so four instances each applied 20/min against a 20/min
-// intent — 80 uploads/min/IP (ROADMAP R3.2). It lives here now, where the
+// Intent — 80 uploads/min/IP. It lives here now, where the
 // shared limiter is reachable.
 describe("upload rate limiting (ROADMAP R3.2)", () => {
   const uploadReq = () =>

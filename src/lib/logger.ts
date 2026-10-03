@@ -1,4 +1,4 @@
-// Structured JSON logger (ROADMAP P2.2).
+// Structured JSON logger.
 //
 // Every line is a single JSON object so container stdout/stderr can be parsed
 // by any log aggregator. Replaces ad-hoc `console.*` in the request/error path
@@ -48,7 +48,7 @@ export function serializeError(err: unknown): LogFields {
     if (err.stack) out.stack = err.stack
     if (err.cause !== undefined) out.cause = serializeError(err.cause)
     // An error message routinely embeds the failing URL — and for an auth or
-    // verify route that URL carries the token (ROADMAP P0.7).
+    // Verify route that URL carries the token.
     return redactFields(out)
   }
   return { message: redactSecrets(String(err)) }
@@ -77,10 +77,10 @@ function emit(
     level,
     time: new Date().toISOString(),
     // Redacted before anything is written. This was already the intent
-    // (ROADMAP P0.7) but `redact.ts` was never called from here, so the
+    // But `redact.ts` was never called from here, so the
     // helpers guarded the mailer while the log line itself was raw — and the
     // log line is what ends up in container stdout, CI output and whatever
-    // aggregates them (ROADMAP R3.1).
+    // Aggregates them.
     msg: redactSecrets(msg),
     ...redactFields(base),
     ...redactFields(rest),

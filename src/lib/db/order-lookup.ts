@@ -11,7 +11,6 @@ import { deliveryCity, pickupLocation } from "@/lib/db/schema"
  * `runner` lets a caller inside a transaction read through `tx` — otherwise
  * the lookup runs on a different connection (and, for `dbRead`, possibly a
  * different replica snapshot) than the write it is validating
- * (ROADMAP R0.11).
  */
 export type LookupRunner = Pick<typeof db, "select">
 

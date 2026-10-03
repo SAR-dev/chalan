@@ -120,7 +120,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!me) return unauthorized()
 
   // Opening a ticket is the Support surface — a merchant moderator needs the
-  // grant (ROADMAP 5.2 hard server checks).
+  // Grant.
   if (me.role === "MERCHANT" && !hasNavPermission(me, "/merchant/support")) {
     return forbidden("You don't have access to Support.")
   }

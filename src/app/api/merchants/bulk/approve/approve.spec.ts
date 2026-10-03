@@ -165,7 +165,7 @@ describe("PATCH /api/merchants/bulk/approve", () => {
       approvedBy: "Admin Amy",
     })
     expect(typeof updatePayloads[0].approvedAt).toBe("string")
-    // One batched insert instead of one per row (ROADMAP R3.6) — the payload
+    // One batched insert instead of one per row — the payload
     // contract is unchanged, it just arrives as an array.
     expect(logAudit).not.toHaveBeenCalled()
     expect(logAuditMany).toHaveBeenCalledTimes(1)

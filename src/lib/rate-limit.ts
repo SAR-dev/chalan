@@ -71,7 +71,7 @@ let warnedNoRedisInProduction = false
 /**
  * Whether the limiter is running in its degraded (per-process) mode.
  * Surfaced by the health endpoint so a multi-instance deploy cannot silently
- * run with per-instance limits (ROADMAP P0.6).
+ * Run with per-instance limits.
  */
 export function rateLimiterDegraded(): boolean {
   if (!process.env.REDIS_URL) {
@@ -113,7 +113,7 @@ function getRedis(): Redis | null {
 }
 
 /**
- * Readiness probe (ROADMAP P2.3): PING the configured Redis. Returns `true`
+ * Readiness probe: PING the configured Redis. Returns `true`
  * when no Redis is configured (it is optional for single-instance deploys) and
  * `false` when a configured Redis cannot answer within `timeoutMs`.
  */

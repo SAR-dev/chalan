@@ -68,7 +68,7 @@ export default function MerchantOverviewPage() {
   const { orders, isLoading, isRefreshing, mutate: refreshOrders } = useOrders()
   const { analytics, isLoading: analyticsLoading } = useOrderAnalytics()
   // Headline figures are aggregated server-side over the whole account
-  // (ROADMAP R0.1). `orders` above is a single page of rows, so deriving money
+  //. `orders` above is a single page of rows, so deriving money
   // totals from it showed a merchant with 400 delivered orders the earnings of
   // their newest 20 — with nothing on screen to reveal the truncation.
   const { summary, refresh: refreshSummary } = useOrderSummary()

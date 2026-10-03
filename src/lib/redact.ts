@@ -1,5 +1,5 @@
 // =============================================================================
-// Secret redaction for anything that leaves the process as text (ROADMAP P0.7).
+// Secret redaction for anything that leaves the process as text.
 //
 // Password-reset links, activation links and 2FA codes are emailed as plain
 // URLs. The mailer used to `console.log` the whole rendered body, so every live

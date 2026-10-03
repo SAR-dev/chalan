@@ -61,7 +61,7 @@ export const PATCH = withErrorHandler(
     // Everything below happens in one transaction: the target read, the quota
     // re-check (under a row lock) and the conditional update. Two admins
     // re-activating the last free slot concurrently used to both pass the
-    // count-then-write check (ROADMAP P1.1).
+    // Count-then-write check.
     const outcome = await db.transaction(async (tx) => {
       const selectTarget = () =>
         tx

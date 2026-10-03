@@ -8,7 +8,7 @@ const KEY = "/api/orders/summary"
 
 /**
  * Headline figures for the merchant overview, aggregated server-side over the
- * merchant's whole account (ROADMAP R0.1).
+ * Merchant's whole account.
  *
  * Deliberately separate from `useOrders()`: that hook returns a single page of
  * rows, and deriving money totals from it is exactly the bug this replaces —

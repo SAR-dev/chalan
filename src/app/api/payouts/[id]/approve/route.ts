@@ -57,7 +57,7 @@ export const PATCH = withErrorHandler(
         return badRequest("Only PENDING requests can be approved.")
       }
 
-      // A payout must actually reference orders (ROADMAP P0.3): the old create
+      // A payout must actually reference orders: the old create
       // race could produce a request carrying an amount with nothing behind it.
       // Recompute from the linked orders so the stored amount is always honest.
       const [totals] = await tx

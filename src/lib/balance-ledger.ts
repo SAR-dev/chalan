@@ -1,5 +1,5 @@
 /**
- * Merchant balance ledger — accounting spec (ROADMAP P0.4).
+ * Merchant balance ledger — accounting spec.
  *
  * `merchant_balance.balance` is the running total of **what the merchant owes
  * the platform**: positive = the merchant owes, negative = the merchant is in

@@ -123,7 +123,7 @@ export function MobileHeader({
                     data-testid={`nav-${item.href}`}
                     onClick={() => setOpen(false)}
                     // Same signal as the desktop sidebar — the drawer is the
-                    // only nav visible on a phone (ROADMAP R2.1).
+                    // Only nav visible on a phone.
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       navLinkClass,

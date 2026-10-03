@@ -28,9 +28,8 @@ export function OrderDetailsDialog({
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Order details</DialogTitle>
-          {/* A title alone leaves focus landing on a name with no context —
-              and no accessible description of what the dialog holds
-              (ROADMAP R2.8). */}
+          {/* A title alone leaves focus landing on a name with no context -
+              and no accessible description of what the dialog holds. */}
           <DialogDescription>
             Status, parcel contents and delivery history for this order.
           </DialogDescription>

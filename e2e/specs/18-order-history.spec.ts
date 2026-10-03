@@ -4,7 +4,7 @@ import { type APIRequestContext, expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS } from "../helpers"
 
-// ─── S51. Order status history (ROADMAP P1.4) ───────────────────────────────
+// ─── S51. Order status history ───────────────────────────────
 //
 // Every lifecycle transition writes an append-only `order_status_history` row
 // in the same transaction. A `reattempt` clears the failure fields on the

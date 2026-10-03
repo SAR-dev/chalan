@@ -32,7 +32,7 @@ export const register = {
   email: "[data-testid='register-email']",
 }
 
-// ─── Two-factor authentication (H4) ─────────────────────────────────────────
+// ─── Two-factor authentication ─────────────────────────────────────────
 export const twoFactor = {
   status: "[data-testid='two-factor-status']",
   policy: "[data-testid='two-factor-policy']",
@@ -135,7 +135,7 @@ export const orders = {
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
   // Status tabs, tagged by value. `dashboard/orders` opens on PENDING, which
   // holds only 8 of the 100 seeded orders, so anything asserting pagination
-  // must switch to ALL first (ROADMAP R1.3). The previous `tab-${name}` value
+  // Must switch to ALL first. The previous `tab-${name}` value
   // matched nothing in `src/`.
   tab: (name: string) => `[data-testid='orders-tab-${name}']`,
   // CSV bulk import — the page and its testids.
@@ -239,13 +239,51 @@ export const users = {
 // ─── Warehouse ───────────────────────────────────────────────────────────────
 export const warehouse = {
   intakeTable: "[data-testid='warehouse-intake']",
-  dispatchTable: "[data-testid='warehouse-dispatch']",
+  // The dispatch desk reuses one DataTable across four tabs and derives its id
+  // from the tab, so the testid changes with the tab. There was a single
+  // `dispatchTable` entry here pointing at `[data-testid='warehouse-dispatch']`,
+  // which no component emits — two tables, one per tab the specs use.
+  dispatchPickupTable: "[data-testid='table-warehouse-dispatch-pickup']",
+  dispatchDeliveryTable: "[data-testid='table-warehouse-dispatch-delivery']",
+  tabPickup: "[data-testid='tab-pickup']",
+  tabDelivery: "[data-testid='tab-delivery']",
   exceptionsTable: "[data-testid='warehouse-exceptions']",
   settlementTable: "[data-testid='warehouse-settlement']",
   receiveButton: "[data-testid='receive-parcel']",
   dispatchButton: "[data-testid='dispatch-parcel']",
   settleButton: "[data-testid='settle-cod']",
   bulkSettle: "[data-testid='bulk-settle']",
+  // Row selection on the dispatch desk. The desk is the only page that has to
+  // pick rows before it can do anything, so the selection controls are
+  // addressed from here rather than from a shared "table" bucket. Both testids
+  // come from the DataTable itself, which is why they are un-namespaced.
+  selectAll: "[data-testid='select-all']",
+  selectRow: "[data-testid='select-row']",
+  bulkAssignDeliveryRider: "[data-testid='bulk-assign-delivery-rider']",
+  bulkAutoAssign: "[data-testid='bulk-auto-assign']",
+}
+
+// ─── Auto-assign (warehouse dispatch) ─────────────────────────────────────────
+// The dialog previews a proposal; the confirm button dispatches it. Everything
+// asserted here is a state the dialog can be in, because "the dialog opened" on
+// its own says nothing about whether it produced a plan. The dialog frame itself
+// is the shared `dialog.formDialog`.
+export const autoAssign = {
+  loading: "[data-testid='auto-assign-loading']",
+  error: "[data-testid='auto-assign-error']",
+  empty: "[data-testid='auto-assign-empty']",
+  unassigned: "[data-testid='auto-assign-unassigned']",
+  confirm: "[data-testid='auto-assign-confirm']",
+  // The per-rider blocks. The `:not` matters: the parcel tally inside each block
+  // shares the prefix, so a bare prefix match counts one block as two and a
+  // "did this spread across more than one rider?" assertion passes on a plan that
+  // gave everything to a single rider.
+  riderBlockPrefix:
+    "[data-testid^='auto-assign-rider-']:not([data-testid$='-count'])",
+  // The parcel tally each rider's block ends with. Tagged so a spec can add the
+  // tallies up instead of reading them out of the badge's wording.
+  riderCountPrefix:
+    "[data-testid^='auto-assign-rider-'][data-testid$='-count']",
 }
 
 // ─── Rider cash holdings (warehouse) ─────────────────────────────────────────
@@ -276,6 +314,28 @@ export const rider = {
   startDeliveryButton: "[data-testid='start-delivery']",
   recordDeliveryButton: "[data-testid='record-delivery']",
   cashToSubmit: "[data-testid='cash-to-submit']",
+  // The suggested run order above the delivery queue. Stop rows are keyed by
+  // their sequence number, because the sequence is the thing under test — a
+  // row selected by parcel code would pass even if the order were scrambled.
+  runSheet: "[data-testid='run-sheet']",
+  runSheetStopPrefix: "[data-testid^='run-sheet-stop-']",
+  // Destination per stop (city and, when the order carries one, its zone).
+  // Tagged separately from the row so a spec can read every stop's destination
+  // in order without depending on the row's internal markup.
+  runSheetDestination: (sequence: number) =>
+    `[data-testid='run-sheet-destination-${sequence}']`,
+  runSheetDestinationPrefix: "[data-testid^='run-sheet-destination-']",
+  // Zone per stop, tagged apart from the destination so a spec can read the
+  // zone sequence without splitting the rendered line on "·". This is what
+  // makes the grouping assertable: the run sheet's whole claim is that a zone
+  // is served in one run, which only a zone-by-zone reading can check.
+  runSheetZone: (sequence: number) =>
+    `[data-testid='run-sheet-zone-${sequence}']`,
+  runSheetZonePrefix: "[data-testid^='run-sheet-zone-']",
+  // Parcel code per stop. Tagged so a spec can compare the rendered order
+  // against the API's own sequence — numbering the rows 1..N proves only that
+  // the card counts, not that it kept the order it was given.
+  runSheetParcelPrefix: "[data-testid^='run-sheet-parcel-']",
 }
 
 // ─── Payouts ─────────────────────────────────────────────────────────────────
@@ -376,7 +436,7 @@ export const settings = {
   savePolicy: "[data-testid='save-policy']",
 }
 
-// --- Public tracking (P0.1 token-gated receiver note) ---
+// --- Public tracking (token-gated receiver note) ---
 export const tracking = {
   noteInput: "[data-testid='receiver-note-input']",
   noteLocked: "[data-testid='receiver-note-locked']",
@@ -463,13 +523,12 @@ export const dialog = {
 }
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
-// Tagged per table id (ROADMAP R1.3): these four controls sit under every list
+// Tagged per table id: these four controls sit under every list
 // page and carried no testid at all, which is why server-side pagination — the
 // most-used interaction in the app — had zero E2E coverage.
 export const pagination = {
   prev: (tableId: string) => `[data-testid='table-prev-${tableId}']`,
   next: (tableId: string) => `[data-testid='table-next-${tableId}']`,
-  pageSize: (tableId: string) => `[data-testid='table-page-size-${tableId}']`,
   csv: (tableId: string) => `[data-testid='table-csv-${tableId}']`,
   /** "Page X of Y" — the only thing that proves a page change landed. */
   pageLabel: (tableId: string) => `[data-testid='table-page-label-${tableId}']`,

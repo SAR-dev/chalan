@@ -236,9 +236,9 @@ export function OrderDetail({
           />
         </section>
 
-        {/* Code lookups (minimal) hide shipment details and the merchant note —
-            status + area only (ROADMAP B11). The PII-free locked note hint
-            stays so the recipient still learns how to leave a note. */}
+        {/* Code lookups (minimal) hide shipment details and the merchant note -
+            status and area only. The PII-free locked note hint stays so the
+            recipient still learns how to leave a note. */}
         <aside className="space-y-4">
           {!minimal && (
             <section className="border-border bg-card rounded-2xl border p-5 shadow-sm">
@@ -290,9 +290,9 @@ export function OrderDetail({
             </section>
           )}
 
-          {/* Receiver note widget — lets the recipient leave a delivery
-              instruction. The write capability requires the tracking token
-              (P0.1), so it is only handed to the client when the page was
+          {/* Receiver note widget - lets the recipient leave a delivery
+              instruction. The write capability requires the tracking token,
+              so it is only handed to the client when the page was
               opened via the token link. */}
           <ReceiverNoteWidget
             orderId={o.id}

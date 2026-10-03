@@ -51,7 +51,7 @@ describe("UPLOAD_FOLDERS", () => {
     expect(UPLOAD_FOLDERS).toContain("pickups")
     expect(UPLOAD_FOLDERS).toContain("nids")
     // Removed with the branding feature: nothing uploaded to it and nothing
-    // rendered it (ROADMAP branding removal).
+    // Rendered it.
     expect(UPLOAD_FOLDERS).not.toContain("logos")
     // …which leaves nothing world-readable, by design.
     expect(PUBLIC_UPLOAD_FOLDERS).toEqual([])

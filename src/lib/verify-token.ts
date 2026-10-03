@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto"
 
 // =============================================================================
-// Merchant email-verification tokens (ROADMAP P0.7).
+// Merchant email-verification tokens.
 //
 // The token used to be stored in plaintext in `merchant.emailVerificationToken`
 // and compared directly, so anyone with read access to the table (a dump, a

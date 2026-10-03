@@ -3,7 +3,7 @@ import "dotenv/config"
 import { type APIRequestContext, expect, test } from "@playwright/test"
 import { CREDS } from "../helpers"
 
-// ─── S53. Typed counts (ROADMAP P1.6) ───────────────────────────────────────
+// ─── S53. Typed counts ───────────────────────────────────────
 //
 // `count(*)` is a Postgres bigint, which node-postgres returns as a JS string
 // even though `sql<number>` claims a number. Every list endpoint must cast

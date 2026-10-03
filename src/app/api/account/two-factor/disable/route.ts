@@ -23,7 +23,7 @@ function isApiError(err: unknown): boolean {
 
 /**
  * Better Auth's own `/two-factor/disable` endpoint re-prompts for the account
- * password. Per ROADMAP H4 the disable action instead demands a *current*
+ * password. The disable action instead demands a *current*
  * second factor, so this route verifies one through the plugin's server API
  * (TOTP first, then a recovery code) and only then removes the enrolment.
  */

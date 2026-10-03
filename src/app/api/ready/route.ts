@@ -1,4 +1,4 @@
-// Readiness probe (ROADMAP P2.3). Unlike /api/health (liveness — 200 as soon as
+// Readiness probe. Unlike /api/health (liveness — 200 as soon as
 // the process serves requests), this checks the dependencies a request needs:
 //   - Postgres: `SELECT 1` on the primary pool,
 //   - Redis: PING (only when REDIS_URL is configured; optional otherwise).
@@ -43,7 +43,7 @@ export const GET = withErrorHandler(async () => {
   // the scheduler dies the app itself is perfectly serviceable, and taking
   // every instance out of rotation would turn one background fault into an
   // outage. `reportStaleCronJobs` logs each lapse once instead of once per
-  // probe (ROADMAP R0.8).
+  // Probe.
   let stale: string[] = []
   let neverRan: string[] = []
   if (db) {
@@ -62,7 +62,7 @@ export const GET = withErrorHandler(async () => {
       ok,
       checks: { db, redis },
       rateLimiter: { degraded: rateLimiterDegraded() },
-      // Pool saturation was invisible before (ROADMAP R3.1): when every
+      // Pool saturation was invisible before: when every
       // connection is checked out, requests queue behind `waitingCount` and
       // nothing in the app says so. `waiting > 0` sustained means the pool —
       // not the database — is the bottleneck.

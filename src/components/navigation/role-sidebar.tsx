@@ -87,7 +87,6 @@ export function RoleSidebar({
                 data-testid={`nav-${item.href}`}
                 // The active item is signalled by a tonal fill alone; a
                 // screen reader gets no sense of place without this
-                // (ROADMAP R2.1).
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   navLinkClass,

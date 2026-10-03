@@ -63,7 +63,7 @@ export function useOrders({
    * Restrict a RIDER's results to one queue (`pickup` | `delivery`).
    *
    * The API used to return both queues and leave the page to filter, so the
-   * reported `total` counted rows the table never rendered (ROADMAP R0.2).
+   * Reported `total` counted rows the table never rendered.
    */
   queue?: "pickup" | "delivery"
 } = {}) {
@@ -92,7 +92,7 @@ export function useOrders({
     !filters.dateFrom &&
     !filters.dateTo &&
     // A queue-filtered query is never the default one: `initialData` would be
-    // the unfiltered list (ROADMAP R0.2).
+    // The unfiltered list.
     !queue &&
     filters.page === 1
 

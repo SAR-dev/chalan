@@ -29,9 +29,9 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -42,9 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -80,8 +80,8 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       # No `pnpm install` here on purpose: `pnpm audit` resolves the tree from
       # pnpm-lock.yaml and queries the registry, and the dependency-review
       # action diffs the lockfile against the base ref. Neither needs
@@ -92,10 +92,10 @@ jobs:
       # fails the job with "Path Validation Error: Path(s) specified in the
       # action for caching do(es) not exist". The cache and the install have to
       # travel together — ci-workflow.spec.ts enforces that across every job.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-      # Advisory gate (H1): blocks on any high/critical vulnerability in the
+      # Advisory gate: blocks on any high/critical vulnerability in the
       # dependency tree. Moderate/low findings are printed but do not block.
       # Fixes: bump the package or add an override in pnpm-workspace.yaml.
       - name: Audit dependencies (fail on high/critical)
@@ -107,15 +107,15 @@ jobs:
       - name: Dependency review (PRs)
         if: github.event_name == 'pull_request'
         continue-on-error: true
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
 
   coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -155,15 +155,15 @@ jobs:
       BETTER_AUTH_SECRET: ci-better-auth-secret-000000000000
       INTEGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/delivery
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Real-DB invariants that the mocked unit suite cannot prove (P1.1 unique
-      # indexes, P1.2 ledger + advisory lock, P1.3 business timezone).
+      # Real-DB invariants that the mocked unit suite cannot prove (unique
+      # indexes, ledger + advisory lock, business timezone).
       - run: pnpm db:migrate
       - run: pnpm test:integration
 
@@ -202,9 +202,9 @@ jobs:
   #       LOCAL_UPLOADS_DIR: ./.uploads
   #       TZ: Asia/Dhaka
   #     steps:
-  #       - uses: actions/checkout@v4
-  #       - uses: pnpm/action-setup@v4
-  #       - uses: actions/setup-node@v4
+  #       - uses: actions/checkout@v7
+  #       - uses: pnpm/action-setup@v6
+  #       - uses: actions/setup-node@v7
   #         with:
   #           node-version: 24
   #           cache: pnpm

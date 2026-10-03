@@ -3,11 +3,11 @@ import "dotenv/config"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 
-// ─── S48. Money is stored as exact decimal (ROADMAP P0.8) ────────────────────
+// ─── S48. Money is stored as exact decimal ────────────────────
 //
 // Every money column used to be `double precision`: a binary float where 0.1 is
 // really 0.1000000000000000055511151231257827…, so a ledger of such values
-// drifts and can never be audited exactly. P0.4 rounds at each write boundary,
+// drifts and can never be audited exactly. Rounding happens at each write boundary,
 // but only the storage type makes the audit exact. Weights and percentages
 // deliberately stay floating — they are measurements, not money.
 
@@ -107,7 +107,7 @@ test.describe("S48. Money is stored as exact decimal", () => {
 
   test("the ledger reconciles exactly, not approximately", async () => {
     // With numeric storage both sides are compared by PostgreSQL itself, so
-    // the P0.4 invariant is an exact equality rather than a float tolerance.
+    // the invariant is an exact equality rather than a float tolerance.
     const rows = await withDb(async (client) => {
       const res = await client.query<{
         merchantId: string

@@ -48,7 +48,7 @@ beforeEach(() => {
   mockDeleteFile.mockReset()
   mockDeleteFile.mockResolvedValue(undefined)
   // The route reads the referenced set twice: once to find candidates, once
-  // right before deleting (ROADMAP 5.6 no-stale-snapshot rail).
+  // Right before deleting.
   mockSelect.mockReset()
   mockSelect.mockImplementation((fields: { value: unknown }) => ({
     from: async () => {

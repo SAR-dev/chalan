@@ -35,7 +35,7 @@ function isToday(iso?: string | null) {
   if (!iso) return false
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return false
-  // Compare business-local calendar days, not the device's (ROADMAP R0.3): a
+  // Compare business-local calendar days, not the device's: a
   // parcel delivered at 23:30 Dhaka is still "today" for the rider even when
   // the browser's clock has rolled into another day.
   return businessDateString(d) === businessToday()

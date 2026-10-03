@@ -14,7 +14,7 @@ import {
 } from "./migration-ledger"
 
 // =============================================================================
-// Database migration runner (ROADMAP P1.2)
+// Database migration runner
 //
 // Wraps drizzle's own migrator instead of hand-rolling SQL execution:
 //

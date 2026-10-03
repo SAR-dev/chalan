@@ -4,7 +4,7 @@ import { type APIRequestContext, expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS } from "../helpers"
 
-// ─── S45. Payout settlement (ROADMAP P0.3) ──────────────────────────────────
+// ─── S45. Payout settlement ──────────────────────────────────
 
 async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   if (!process.env.DATABASE_URL) {
@@ -96,7 +96,7 @@ test.describe("S45. Payout settlement", () => {
       return {
         id: row.id,
         merchantId: row.merchantId,
-        // numeric(14,2) comes back from the driver as a string (P0.8).
+        // Numeric(14,2) comes back from the driver as a string.
         amount: Number(row.amount),
         balance: Number(balance.rows[0]?.balance ?? 0),
         payoutRows: Number(ledger.rows[0]?.count ?? 0),
@@ -104,7 +104,7 @@ test.describe("S45. Payout settlement", () => {
       }
     })
 
-    // The seeded payout owns its orders (seed links them, P0.3).
+    // The seeded payout owns its orders (the seed links them).
     expect(before.linkedOrders).toBeGreaterThan(0)
 
     const res = await request.patch("/api/payouts/bulk/mark-paid", {
@@ -162,7 +162,7 @@ test.describe("S45. Payout settlement", () => {
       )
       return res.rows as {
         merchantId: string
-        // numeric columns arrive as strings from the driver (P0.8).
+        // Numeric columns arrive as strings from the driver.
         balance: string
         ledger_sum: string
       }[]

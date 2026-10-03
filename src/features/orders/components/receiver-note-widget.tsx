@@ -16,7 +16,7 @@ interface Props {
   isTerminal: boolean
   /**
    * The order's tracking token — present only when the page was opened via the
-   * token link. It authorizes the public write (ROADMAP P0.1); when absent the
+   * Token link. It authorizes the public write; when absent the
    * widget renders a read-only hint instead of the form.
    */
   trackingToken?: string | null

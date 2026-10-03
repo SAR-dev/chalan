@@ -2643,6 +2643,56 @@ auth, money, roles or the order lifecycle.
 
 ---
 
+## Dependency security
+
+The CI `security` job gates on `pnpm audit --audit-level=high` — the **whole**
+dependency tree, prod and dev. Local equivalent:
+
+```bash
+pnpm audit --audit-level=high
+```
+
+Do not silence a red audit by switching the gate to `pnpm audit --prod`. `--prod`
+reports **0 high** on this tree, so it hides the entire dev side — which is
+exactly how a high advisory shipped unnoticed while the `overrides:` comment in
+`pnpm-workspace.yaml` still claimed the gate was green.
+
+### Fixing an advisory
+
+Check that a fix actually exists before reaching for an override:
+
+```bash
+npm view <package> version
+```
+
+If one exists, pin it in `overrides:` in `pnpm-workspace.yaml` (pnpm 11 no longer
+reads `pnpm.overrides` from `package.json`) rather than adding a direct
+dependency you do not otherwise need.
+
+If **no** fix exists, the only options are to drop the dependent or to record an
+explicit exception in `auditConfig.ignoreGhsas`. Keep that list as short as
+possible — every entry is a permanent hole in the gate, and a long list means the
+gate is decorative. Each entry needs a comment saying why it is unreachable, and
+`dependency-security.spec.ts` fails if a new one appears without one.
+
+### Why `braces` is excepted
+
+`braces@3.0.3` carries GHSA-vfj7-8cjw-p6xm (high — DoS through deeply nested
+glob patterns). The advisory lists "patched >= 3.0.4", but **3.0.3 is still the
+latest published release**, and neither `micromatch` (4.0.8, latest) nor
+`fast-glob` (3.3.3, latest) drops the dependency — so there is no version to move
+to and no override that could work.
+
+It is reachable only through the **shadcn CLI**, and the CLI never runs in CI or
+in `next build`. The dependency is kept for a different reason: `globals.css`
+imports `shadcn/tailwind.css`, so `pnpm build` fails outright without the
+package. Note this before "fixing" it by deleting `shadcn` from
+`devDependencies` — that breaks the build, it does not clear the advisory. The
+components under `src/components/ui/` are committed code, not generated at
+install time.
+
+Remove the exception as soon as `braces` 3.0.4 ships.
+
 ## Verification checklist
 
 Run all five before opening a PR — they must pass with zero errors:

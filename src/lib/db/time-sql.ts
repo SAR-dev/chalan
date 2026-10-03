@@ -3,7 +3,7 @@ import { BUSINESS_TIMEZONE } from "@/lib/timezone"
 
 /**
  * `date(column AT TIME ZONE 'Asia/Dhaka')` — the business-local day of a
- * `timestamptz` column (ROADMAP P1.3).
+ * `timestamptz` column.
  *
  * Grouping on `date(created_at)` used the DB session timezone, which defaults
  * to UTC, so a Dhaka evening order landed in the next day's bucket. The

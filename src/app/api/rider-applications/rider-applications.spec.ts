@@ -259,7 +259,7 @@ describe("POST /api/rider-applications", () => {
   })
 
   it("returns 400 and removes the auth user when the unique index rejects a duplicate email", async () => {
-    // P1.1: the pre-check above can pass for two simultaneous applications;
+    // The pre-check above can pass for two simultaneous applications;
     // `rider_email_uniq` is what actually stops the second one.
     selectQueue.push([{ id: "wh_1" }])
     selectQueue.push([])

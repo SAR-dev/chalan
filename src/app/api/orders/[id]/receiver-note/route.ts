@@ -10,7 +10,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Public endpoint — no session required. The tracking page lets the recipient
 // leave a note on their own parcel before it is delivered. Authorization is the
-// order's high-entropy **tracking token** (ROADMAP P0.1): the sequential order
+// Order's high-entropy **tracking token**: the sequential order
 // id is guessable, so it must never be enough to write. Locked once the order
 // reaches a terminal status (DELIVERED / RETURNED / CANCELLED).
 export const PATCH = withErrorHandler(

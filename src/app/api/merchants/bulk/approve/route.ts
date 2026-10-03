@@ -30,7 +30,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   const pendingIds = pendings.map((m) => m.id)
   // The status predicate is repeated on the write: between the read above and
   // this update a merchant may have been suspended or reactivated, and the
-  // write must not resurrect it (ROADMAP P1.1).
+  // Write must not resurrect it.
   const updated = await db
     .update(merchant)
     .set({

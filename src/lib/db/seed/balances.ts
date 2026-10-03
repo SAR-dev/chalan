@@ -53,7 +53,7 @@ export async function seedBalances() {
       id: `BTE-${o.id}`,
       merchantId: o.merchantId,
       type: "ORDER_EARNINGS" as const,
-      // Gross COD collected on the merchant's behalf (ROADMAP P0.4) — the
+      // Gross COD collected on the merchant's behalf — the
       // ORDER_CHARGE row above nets it down to the merchant's earnings.
       amount: codCollectedAmount(o.productCost),
       status: "SETTLED" as const,

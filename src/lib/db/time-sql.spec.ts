@@ -6,7 +6,7 @@ import { businessDate } from "./time-sql"
 describe("businessDate", () => {
   it("renders an explicit Dhaka conversion cast to text", () => {
     const query = new PgDialect().sqlToQuery(businessDate(order.createdAt))
-    // Explicit zone, not the session timezone (ROADMAP P1.3).
+    // Explicit zone, not the session timezone.
     expect(query.sql).toContain("AT TIME ZONE 'Asia/Dhaka'")
     // Text so node-postgres does not parse it into a JS Date.
     expect(query.sql).toContain("::text")

@@ -34,7 +34,7 @@ vi.mock("@/lib/db", () => {
   }
   return {
     db: dbMock,
-    // Session resolution reads through the read pool (ROADMAP R0.11).
+    // Session resolution reads through the read pool.
     dbRead: dbMock,
   }
 })
@@ -122,7 +122,7 @@ describe("requireSession", () => {
     }
   })
 
-  // --- ROADMAP P0.5: policy gates that used to be browser-only ---------------
+  // --- Policy gates that used to be browser-only ---------------
   describe("server-side policy gates", () => {
     it("returns null for a banned user", async () => {
       sessionResult = { user: { id: "u6" } }

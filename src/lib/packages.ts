@@ -60,7 +60,7 @@ export function nextTierForCount<T extends { orderCount: number }>(
  *   the zone fee — a package can only ever reduce what the merchant pays.
  * - `PERCENT_OFF` reduces the fee by the percentage.
  *
- * The result is clamped to `[0, zoneFee]` and rounded to paisa (ROADMAP P0.4)
+ * The result is clamped to `[0, zoneFee]` and rounded to paisa
  * so the stored fee carries no float noise.
  */
 export function applyPackageRule(

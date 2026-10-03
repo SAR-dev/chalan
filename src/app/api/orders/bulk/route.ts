@@ -158,7 +158,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     if (c.zoneId && c.zoneName) zoneNameById[c.zoneId] = c.zoneName
   }
 
-  // Fetch only the pricing rows whose origin zone is relevant (ROADMAP P3):
+  // Fetch only the pricing rows whose origin zone is relevant:
   // `allZoneIds` is the union of the origin and destination zones, and the
   // lookup below always matches `fromZoneId` against an origin zone.
   const allZoneIds = [
@@ -268,7 +268,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       // guard above, which returns before this transaction starts.
       const pricing = pricingFor(input) as PricingInput
 
-      // Money is stored to paisa (ROADMAP P0.4) — never carry sub-paisa noise.
+      // Money is stored to paisa — never carry sub-paisa noise.
       const productCost = toPaisa(input.productCost)
       const { total: zoneDeliveryFee } = calcDeliveryCharge(
         pricing,

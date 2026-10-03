@@ -34,7 +34,7 @@ const updatePayloads: Record<string, unknown>[] = []
 /**
  * WHERE clauses passed to `db.update()`, in call order. The mock discards them,
  * so rendering the recorded clause to SQL is the only way to prove the toggle's
- * lost-update guard is really in the query (ROADMAP R0.9).
+ * Lost-update guard is really in the query.
  */
 const updateWhereClauses: unknown[] = []
 

@@ -5,7 +5,7 @@ import vm from "node:vm"
 import { describe, expect, it } from "vitest"
 
 // `public/sw.js` is a security boundary, not a build artefact: it decides what
-// HTML survives on a shared device (ROADMAP R0.4). It is plain JS outside the
+// HTML survives on a shared device. It is plain JS outside the
 // src/ tree, so nothing else in the suite ever executes it — this loads the
 // real file in a sandbox and drives its listeners directly.
 //

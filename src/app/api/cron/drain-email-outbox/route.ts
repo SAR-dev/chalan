@@ -1,4 +1,4 @@
-// Drains the transactional email outbox (ROADMAP P1.5).
+// Drains the transactional email outbox.
 //
 // Domain writes persist an `email_outbox` row in the same transaction as the
 // change; the request also tries to flush immediately, but a crash or a frozen

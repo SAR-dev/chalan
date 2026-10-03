@@ -2,7 +2,7 @@ import { revalidateTag, unstable_cache } from "next/cache"
 import { logger, serializeError } from "@/lib/logger"
 
 /**
- * Roadmap R3.7 — shared caching for dashboard stat tiles.
+ * — shared caching for dashboard stat tiles.
  *
  * Before this module every stat tile was recomputed from scratch on each
  * render. This wraps the ones that are *displayed totals* (as opposed to
@@ -20,9 +20,9 @@ import { logger, serializeError } from "@/lib/logger"
  *    with no tags, and `refreshStats` is the single way writes expire them, so
  *    the TTL is a backstop rather than the only mechanism.
  *
- * Pagination totals are deliberately *not* cached — see the note in
- * `ROADMAP.md`. They are expected to move the moment the user acts, they depend
- * on the whole active filter set, and they drive a visible page count.
+ * Pagination totals are deliberately *not* cached: they must move the moment
+ * the user acts, they depend on the whole active filter set, and they drive a
+ * visible page count.
  */
 
 /** How long a stat tile may be reused before it is recomputed. */

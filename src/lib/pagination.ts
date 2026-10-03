@@ -96,7 +96,7 @@ export function parseStatusFilter(
  * inclusive: `from` is the first millisecond of the `from` day and `to` is the
  * last millisecond of the `to` day, both converted to UTC. Parsing a `to` of
  * `2025-01-15` on a UTC server used to end at 23:59:59.999Z — 05:59 into the
- * next Dhaka day — so "today" leaked into tomorrow (ROADMAP P1.3).
+ * Next Dhaka day — so "today" leaked into tomorrow.
  *
  * Returns `null` when either parameter is absent or invalid.
  */

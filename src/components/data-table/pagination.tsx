@@ -17,14 +17,11 @@ interface TableFooterProps<T> {
   serverTotal?: number
   sortedLength: number
   displayTotal: number
-  pageSizeOptions?: number[]
   size: number
   page: number
   totalPages: number
   currentPage: number
   onPageChange?: (page: number, limit: number) => void
-  userChangedSize: { current: boolean }
-  setSize: (size: number) => void
   setPage: (page: number) => void
   refreshing: boolean
   setRefreshing: (refreshing: boolean) => void
@@ -43,14 +40,11 @@ export function TableFooter<T>({
   serverTotal,
   sortedLength,
   displayTotal,
-  pageSizeOptions,
   size,
   page,
   totalPages,
   currentPage,
   onPageChange,
-  userChangedSize,
-  setSize,
   setPage,
   refreshing,
   setRefreshing,
@@ -69,39 +63,13 @@ export function TableFooter<T>({
               {from}–{to} of{" "}
               {serverPaginated ? (serverTotal ?? 0) : sortedLength}
             </span>
-            {pageSizeOptions && pageSizeOptions.length > 0 ? (
-              <label className="flex items-center gap-1.5">
-                <span className="sr-only">Rows per page</span>
-                <select
-                  data-testid={id ? `table-page-size-${id}` : undefined}
-                  value={size}
-                  onChange={(e) => {
-                    const newSize = Number(e.target.value)
-                    if (serverPaginated && onPageChange) {
-                      onPageChange(1, newSize)
-                    } else {
-                      userChangedSize.current = true
-                      setSize(newSize)
-                      setPage(1)
-                    }
-                  }}
-                  className="border-input bg-background text-foreground h-8 rounded-md border px-2 text-sm"
-                >
-                  {pageSizeOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt} / page
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
             <span
               data-testid={id ? `table-page-label-${id}` : undefined}
               className="text-muted-foreground tabular-nums"
             >
               Page {page} of {totalPages}
             </span>
-            {/* `gap-3`, not `gap-1`: the R2.10 hit-area expander grows each 32px button
+            {/* `gap-3`, not `gap-1`: the hit-area expander grows each 32px button
              * to 44px, i.e. 6px past each edge. At 4px apart the two expanders
              * overlap, and the later one paints on top — so a click aimed at the
              * right edge of "Previous page" would advance the page instead of

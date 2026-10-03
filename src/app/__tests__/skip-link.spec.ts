@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-// Guards the skip-link target (ROADMAP P4.4): the root layout renders a single
+// Guards the skip-link target: the root layout renders a single
 // "Skip to main content" link, so every page must expose a `<main>` carrying
 // `id="main-content"` or the link would jump nowhere.
 

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 // =============================================================================
-// Migration ledger helpers (ROADMAP P1.2)
+// Migration ledger helpers
 //
 // The runner (`migrate.ts`) uses drizzle's own migrator, which records each
 // migration by the SHA-256 of its file content. Older deployments were tracked

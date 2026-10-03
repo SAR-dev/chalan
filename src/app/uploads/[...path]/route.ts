@@ -9,7 +9,7 @@ import {
   type UploadFolder,
 } from "@/lib/storage/config"
 
-// Serves stored uploads with a folder-based access policy (ROADMAP P0.2).
+// Serves stored uploads with a folder-based access policy.
 // Previously every stored file was world-readable, which exposed NID
 // documents. Policy lives in lib/storage/config.ts:
 //   - `avatars` / `nids` are readable only by their owner or a SUPER_ADMIN.

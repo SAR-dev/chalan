@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-// Guards the P2.5 cron invariants: the upload sweep must actually delete (not
+// Guards the cron invariants: the upload sweep must actually delete (not
 // ship in dry-run), the monolith must schedule the jobs, and the pg_cron init
 // script must mount from the right path.
 
@@ -74,7 +74,7 @@ describe("cron configuration (ROADMAP P2.5)", () => {
 // Docker is what production actually runs (.github/workflows/deploy.yml), so a
 // cron route that nobody schedules there is a job that simply never executes —
 // which is how `stale-orders`, the only alerting job in the app, shipped with
-// no production schedule at all (ROADMAP R0.5).
+// No production schedule at all.
 describe("every cron route runs in production (ROADMAP R0.5)", () => {
   const routes = cronRoutes()
 

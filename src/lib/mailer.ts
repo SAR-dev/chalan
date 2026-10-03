@@ -124,7 +124,7 @@ export function toPlainText(html: string): string {
 // Inserts one row into `email_log` for a resolved send attempt (success or
 // failure). Never throws — logging must not mask the original mail outcome.
 //
-// ROADMAP P0.7: the row used to store the *entire* HTML body, unbounded. It is
+// The row used to store the *entire* HTML body, unbounded. It is
 // now truncated to MAX_LOGGED_BODY characters. Only the plain-text version is
 // stored (no HTML) — that is what the admin Email Logs page needs to show what
 // was sent and what a manual re-send uses. Single-use link parameters are kept
@@ -172,10 +172,10 @@ export async function sendMail(payload: MailPayload): Promise<void> {
   }
 
   // Log the plain-text version for debugging — redacted and truncated, because
-  // it carries password-reset/activation links (ROADMAP P0.7). Writing those to
+  // It carries password-reset/activation links. Writing those to
   // stdout put live tokens in container logs, CI output and log aggregators.
   //
-  // ROADMAP P4.4: redaction alone still shipped customer message content (and
+  // Redaction alone still shipped customer message content (and
   // names, addresses, order details) into stdout on *every* send. The body is
   // now opt-in via `LOG_EMAIL_BODY=1`; by default only the envelope is logged.
   // The full body remains available in the admin-only `email_log` table.

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import { DISPLAY_LOCALE, formatDateTime, formatMoney } from "@/lib/format"
 import { BUSINESS_TIMEZONE } from "@/lib/timezone"
 
-// ROADMAP R3.3: ~29 `toLocale*` call sites across 25 files, none of which
+// ~29 `toLocale*` call sites across 25 files, none of which
 // passed a `timeZone`, so every rendered date was whatever zone the renderer
 // happened to run in — server for the public track page, browser everywhere
 // else, and *three* different settings for the same timeline.

@@ -1,5 +1,5 @@
 /**
- * Business timezone (ROADMAP P1.3).
+ * Business timezone.
  *
  * The business runs in Asia/Dhaka (UTC+6), but containers and the database
  * default to UTC, so "today", date-range filters and day-bucketed reports were
@@ -125,7 +125,7 @@ export function addBusinessDays(date: string, days: number): string {
  * through `businessRangeBound`, so the Dhaka boundary is applied exactly once,
  * server-side, and the browser's own zone never enters the calculation. An
  * instant computed here would land on the *device's* midnight — up to six hours
- * off (ROADMAP R0.3), which is enough for "Today" to include or drop orders at
+ * Off, which is enough for "Today" to include or drop orders at
  * the edges and disagree with the totals shown above the same table.
  *
  * Mirrors `DateRangePicker.applyPreset`, which already worked this way.

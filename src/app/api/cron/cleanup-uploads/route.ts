@@ -1,4 +1,4 @@
-// Finds and deletes orphaned uploads (ROADMAP 5.6) — files in storage that
+// Finds and deletes orphaned uploads — files in storage that
 // no image column references AND that are older than the grace period.
 //
 // The grace period (UPLOAD_SWEEP_MIN_AGE_HOURS, default 48) is mandatory:

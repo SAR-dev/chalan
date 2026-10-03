@@ -163,7 +163,7 @@ export async function changeEmailTemplate(data: {
 }
 
 // ---------------------------------------------------------------------------
-// Staff account activation (ROADMAP 5.2)
+// Staff account activation
 // ---------------------------------------------------------------------------
 
 export interface ActivationEmailData {

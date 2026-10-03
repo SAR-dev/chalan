@@ -30,6 +30,10 @@ export interface DataTableBulkAction<T> {
   icon?: React.ReactNode
   variant?: "default" | "destructive" | "outline" | "secondary"
   disabled?: boolean
+  /** Rendered as `data-testid` on the button. Bulk action labels are UI copy and
+   *  change with the wording; a test that anchors on the label breaks the next
+   *  time someone rewords it. */
+  testId?: string
   onClick: (selectedRows: T[], clearSelection: () => void) => void
 }
 
@@ -75,8 +79,6 @@ export interface DataTableProps<T> {
    * unset/unauthenticated. An explicit prop always wins over the account
    * default. Clamped to 1-250 regardless of source. */
   pageSize?: number
-  /** Selectable page sizes shown in the footer. */
-  pageSizeOptions?: number[]
   /** Column id to sort by initially. */
   initialSortId?: string
   initialSortDir?: SortDir

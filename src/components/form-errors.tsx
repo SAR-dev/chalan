@@ -13,7 +13,7 @@ interface FormErrorsProps {
  * Form-level error banner that displays all validation error messages.
  * Pass the output of `validateFormData()` from `@/lib/validation`.
  *
- * It is also the focus target on a failed submit (ROADMAP R2.4). The field
+ * It is also the focus target on a failed submit. The field
  * messages are already labelled ("Business name: Required"), so landing here
  * tells a keyboard or screen-reader user both *that* validation failed and
  * *which* fields — and it does so for every form that renders this component,

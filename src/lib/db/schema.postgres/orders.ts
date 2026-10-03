@@ -85,7 +85,7 @@ export const order = pgTable(
     // authorize the public receiver-note write. The sequential `id` stays the
     // human/parcel code; the token is the secret that grants write access.
     trackingToken: text("trackingToken"),
-    // Optional client-supplied idempotency key (ROADMAP B13) — a retried create
+    // Optional client-supplied idempotency key — a retried create
     // returns the original order instead of charging twice.
     idempotencyKey: text("idempotencyKey"),
     merchantId: text("merchantId")
@@ -240,7 +240,7 @@ export const order = pgTable(
     ),
     // Also serves plain `WHERE status = …` (status is the leading column).
     index("order_status_created_at_idx").on(t.status, t.createdAt),
-    // A merchant cannot reuse an idempotency key (ROADMAP B13); NULL keys are
+    // A merchant cannot reuse an idempotency key; NULL keys are
     // distinct, so orders without a key are unconstrained.
     uniqueIndex("order_idempotency_uniq").on(t.merchantId, t.idempotencyKey),
     index("order_cod_settled_at_idx").on(t.codSettledAt),
@@ -249,7 +249,7 @@ export const order = pgTable(
     // Both FKs are `ON DELETE set null`, so Postgres must check `order` for
     // references on every package or tier delete — without an index that is a
     // sequential scan of the largest table in the database. Routine admin edits
-    // (`DELETE /api/packages/:id`, `.../:tierId`) were paying it (ROADMAP R3.8).
+    // (`DELETE /api/packages/:id`, `.../:tierId`) were paying it.
     index("order_package_id_idx").on(t.packageId),
     index("order_package_tier_id_idx").on(t.packageTierId),
     // Public tracking lookups resolve by token (and the token is unique).
@@ -267,7 +267,7 @@ export const order = pgTable(
 )
 
 // =============================================================================
-// Order status history (ROADMAP P1.4)
+// Order status history
 //
 // Append-only trail of every lifecycle transition. The order row keeps only
 // the current status, so without this a `reattempt` erased the prior failure

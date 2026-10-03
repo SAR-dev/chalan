@@ -57,7 +57,7 @@ export default function RiderPickupQueuePage() {
   const pickup = (id: string) => pickupLocations.find((p) => p.id === id)
 
   // Rows come pre-filtered to this queue by the API (`?queue=pickup`), so the
-  // table and the footer's `total` count the same set (ROADMAP R0.2). Filtering
+  // Table and the footer's `total` count the same set. Filtering
   // client-side here is what let the footer claim 137 rows over four shown.
 
   const dateFilterLabel =

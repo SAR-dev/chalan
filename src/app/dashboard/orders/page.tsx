@@ -12,7 +12,7 @@ import { OrdersPageClient } from "./orders-client"
  *
  * These were two full passes over `order` — an unpredicated `count(*)` plus a
  * `GROUP BY status` — re-derived on every render and then superseded by SWR's
- * refetch of `/api/orders`, which runs a third count (ROADMAP R3.7). Both now
+ * Refetch of `/api/orders`, which runs a third count. Both now
  * come from one `FILTER` aggregate, the same technique
  * `src/app/api/orders/counts/route.ts` already uses.
  *

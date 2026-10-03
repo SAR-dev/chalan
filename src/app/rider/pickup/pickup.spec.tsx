@@ -64,7 +64,7 @@ async function importPage() {
 describe("Rider pickup queue", () => {
   // Splitting the queues is the API's job now: it returns only this rider's
   // pickup rows for `?queue=pickup`, so the footer's `total` counts exactly
-  // what the table shows (ROADMAP R0.2). The page used to filter a union of
+  // What the table shows. The page used to filter a union of
   // both queues client-side while reporting the union's total.
   it("asks the API for the pickup queue", async () => {
     mockOrdersState = createMockOrders({

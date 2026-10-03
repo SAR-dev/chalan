@@ -1,5 +1,5 @@
 // =============================================================================
-// Two-factor authentication helpers (ROADMAP H4).
+// Two-factor authentication helpers.
 //
 // Pure, client-safe logic shared by the dashboard / warehouse shells (the
 // enforcement gate), the account settings 2FA card, and their specs. Server

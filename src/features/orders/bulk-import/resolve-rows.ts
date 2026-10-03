@@ -105,7 +105,7 @@ function findLookup(lookups: ResolveLookup[], name: string): string | null {
 }
 
 function csvImportTag(): string {
-  // Business-local date (ROADMAP R0.3), so a batch imported just before Dhaka
+  // Business-local date, so a batch imported just before Dhaka
   // midnight is tagged with Dhaka's date rather than the browser's.
   return `[CSV import ${businessToday()}]`
 }

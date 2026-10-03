@@ -51,7 +51,7 @@ export const POST = withErrorHandler(
       return badRequest(MAIL_NOT_CONFIGURED_MESSAGE)
     }
 
-    // Token re-issue + outbox row commit together (ROADMAP P1.5).
+    // Token re-issue + outbox row commit together.
     await db.transaction(async (tx) => {
       const rawToken = await issueActivationToken(id, tx)
       await sendActivationEmail(

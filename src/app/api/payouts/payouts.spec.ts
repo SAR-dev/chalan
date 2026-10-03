@@ -195,7 +195,7 @@ describe("POST /api/payouts", () => {
     sessionState.value = merchantSession
     selectQueue.push(
       [{ id: "o1", merchantEarnings: 89 }],
-      [{ balance: -100 }], // merchant is in credit by 100 (ROADMAP B1)
+      [{ balance: -100 }], // merchant is in credit by 100
     )
     insertResult.push({ id: "pr_new", status: "PENDING" })
     const res = await createPayout(req("POST", undefined, validBody))
@@ -455,7 +455,7 @@ describe("PATCH /api/payouts/bulk/approve", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true, count: 2 })
-    // One batched insert for both rows, not one per row (ROADMAP R3.6).
+    // One batched insert for both rows, not one per row.
     expect(logAudit).not.toHaveBeenCalled()
     expect(logAuditMany).toHaveBeenCalledTimes(1)
     expect(vi.mocked(logAuditMany).mock.calls[0][0]).toHaveLength(2)
@@ -495,7 +495,7 @@ describe("PATCH /api/payouts/bulk/mark-paid", () => {
     // The bulk path now settles exactly like the single one.
     expect(insertPayloads[0]).toMatchObject({ type: "PAYOUT", amount: 89 })
     expect(insertPayloads[1]).toMatchObject({ balance: 89 })
-    // One batched insert (ROADMAP R3.6).
+    // One batched insert.
     expect(logAudit).not.toHaveBeenCalled()
     expect(vi.mocked(logAuditMany).mock.calls[0][0]).toContainEqual(
       expect.objectContaining({
@@ -546,7 +546,7 @@ describe("PATCH /api/payouts/bulk/reject", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true, count: 1 })
-    // One batched insert (ROADMAP R3.6).
+    // One batched insert.
     expect(logAudit).not.toHaveBeenCalled()
     expect(vi.mocked(logAuditMany).mock.calls[0][0]).toContainEqual(
       expect.objectContaining({ action: "PAYOUT_REJECTED" }),

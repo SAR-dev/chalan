@@ -58,7 +58,7 @@ async function importPage() {
 describe("Rider delivery queue", () => {
   // Splitting the queues is the API's job now: it returns only this rider's
   // delivery rows for `?queue=delivery`, so the footer's `total` counts exactly
-  // what the table shows (ROADMAP R0.2). The page used to filter a union of
+  // What the table shows. The page used to filter a union of
   // both queues client-side while still reporting the union's total —
   // "Showing 1-20 of 137" over four rows, with page 2 showing a different
   // subset, so a rider could think a queue was cleared when it was not.

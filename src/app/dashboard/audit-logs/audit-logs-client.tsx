@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header"
 import { RoleBadge } from "@/components/role-badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { pageContent } from "@/config/content"
+import { columnLabels } from "@/config/table-column-labels"
 import { AuditDiffCell } from "@/features/audit-logs/components/audit-diff"
 import { useAuditLogs } from "@/features/audit-logs/hooks/use-audit-logs"
 import { formatDateTime } from "@/lib/format"
@@ -47,7 +48,7 @@ export function AuditLogsClient({
   const columns: DataTableColumn<AuditLog>[] = [
     {
       id: "createdAt",
-      header: "When",
+      header: columnLabels.auditLog.when,
       sortable: true,
       sortValue: (l) => l.createdAt,
       cell: (l) => (
@@ -58,21 +59,21 @@ export function AuditLogsClient({
     },
     {
       id: "actor",
-      header: "Actor",
+      header: columnLabels.auditLog.actor,
       sortable: true,
       sortValue: (l) => l.actorName,
       cell: (l) => <span className="font-medium">{l.actorName}</span>,
     },
     {
       id: "actorRole",
-      header: "Role",
+      header: columnLabels.auditLog.role,
       sortable: true,
       sortValue: (l) => l.actorRole,
       cell: (l) => <RoleBadge role={l.actorRole} />,
     },
     {
       id: "action",
-      header: "Action",
+      header: columnLabels.auditLog.action,
       sortable: true,
       sortValue: (l) => l.action,
       cell: (l) => (
@@ -83,7 +84,7 @@ export function AuditLogsClient({
     },
     {
       id: "entity",
-      header: "Entity",
+      header: columnLabels.auditLog.entity,
       sortable: true,
       sortValue: (l) => l.entityType,
       headClassName: "hidden sm:table-cell",
@@ -94,13 +95,13 @@ export function AuditLogsClient({
     },
     {
       id: "description",
-      header: "Description",
+      header: columnLabels.auditLog.description,
       sortValue: (l) => l.description,
       cell: (l) => <span className="text-sm">{l.description}</span>,
     },
     {
       id: "changes",
-      header: "Changes",
+      header: columnLabels.auditLog.changes,
       cell: (l) => <AuditDiffCell metadata={l.metadata} />,
     },
   ]
@@ -135,7 +136,12 @@ export function AuditLogsClient({
             getRowKey={(l) => l.id}
             initialSortId="createdAt"
             initialSortDir="desc"
-            emptyMessage={isLoading ? "Loading…" : "No audit log entries yet."}
+            // No loading branch: `DataTable` shows skeleton rows while the
+            // first load is in flight (and a refresh overlay once rows exist),
+            // so this string is only ever rendered for an empty result set.
+            // The `isLoading ? "Loading…" : …` it used to carry was a branch
+            // Nothing could reach.
+            emptyMessage="No audit log entries yet."
             serverSortId={sortId}
             serverSortDir={sortDir}
             onSortChange={onSortChange}

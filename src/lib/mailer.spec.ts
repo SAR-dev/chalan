@@ -159,7 +159,7 @@ describe("sendMail", () => {
     )
   })
 
-  // ROADMAP P0.7 — a live token in stdout is a live token in the log
+  // — a live token in stdout is a live token in the log
   // aggregator, in `docker logs`, and in CI output.
   it("omits the body from the console log unless LOG_EMAIL_BODY=1", async () => {
     mockSendMail.mockResolvedValueOnce({ messageId: "789" })
@@ -179,7 +179,7 @@ describe("sendMail", () => {
     }
     const records = logs.map((line) => JSON.parse(line))
     const sending = records.find((r) => r.msg === "Sending email")
-    // Envelope only: P4.4 moved the body behind an opt-in flag.
+    // Envelope only: the body sits behind an opt-in flag.
     expect(sending).toMatchObject({
       level: "info",
       to: "leak@test.com",

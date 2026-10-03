@@ -72,7 +72,7 @@ export function ImageZoom({
         >
           {/* The popup's `aria-label` names it, but a dialog without a Title
               has no programmatic heading — screen readers announce the region
-              without saying what it is (ROADMAP R2.8). Visually hidden: the
+              without saying what it is. Visually hidden: the
               image's own `alt` is what a sighted-plus-AT user reads out. */}
           <DialogTitle className="sr-only">{alt || "Image viewer"}</DialogTitle>
           {/* Close on backdrop click */}

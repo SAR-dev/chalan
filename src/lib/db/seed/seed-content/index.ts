@@ -4,6 +4,7 @@
 export * from "./announcements"
 export * from "./audit-logs"
 export * from "./credentials"
+export * from "./delivery-cities"
 export * from "./email-logs"
 export * from "./login-credentials"
 export * from "./merchants"

@@ -11,7 +11,7 @@ import { isAdminRole } from "@/lib/two-factor"
 import { parseBody, profileUpdateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
-// 2FA state for the signed-in user (ROADMAP H4). `twoFactorEnabled` is read
+// 2FA state for the signed-in user. `twoFactorEnabled` is read
 // straight from the `user` table — never from the Better Auth session, which
 // can serve a cached user row for up to cookie-cache maxAge after enrolment
 // changed. `twoFactorRequired` is deployment policy: the ADMIN_2FA_REQUIRED
@@ -71,7 +71,7 @@ function serializeUser(
     emailVerifiedAt: merchantEmailVerifiedAt ?? null,
     twoFactorEnabled: twoFactor?.twoFactorEnabled ?? false,
     twoFactorRequired: twoFactor?.twoFactorRequired ?? false,
-    // Portal-mode gate (ROADMAP 5.4): false when this role is outside the
+    // Portal-mode gate: false when this role is outside the
     // deployment's PORTAL_MODE. Deliberately NOT a 403 — the client needs the
     // payload to explain and sign the user out cleanly; APIs 401 via
     // requireSession().

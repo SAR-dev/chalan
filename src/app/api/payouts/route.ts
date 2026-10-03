@@ -196,7 +196,6 @@ export const POST = withErrorHandler(async (req: Request) => {
     return forbidden("Only merchants can request payouts")
   }
   // Payout requests are the Finance surface — moderators need the grant
-  // (ROADMAP 5.2 hard server checks).
   if (!hasNavPermission(me, "/merchant/finance")) {
     return forbidden("You don't have access to Finance.")
   }
@@ -209,12 +208,12 @@ export const POST = withErrorHandler(async (req: Request) => {
   const { payoutMethod, payoutDetails } = parsed.data
 
   // Read + lock the eligible orders INSIDE the transaction and link exactly
-  // those rows (ROADMAP P0.3). Two concurrent requests now serialize on the
+  // Those rows. Two concurrent requests now serialize on the
   // row locks: the second sees `payoutRequestId` already set and finds no
   // eligible orders, so no orphan request carrying an amount but no orders can
   // be created.
   //
-  // The request is also capped at the merchant's available credit (ROADMAP B1):
+  // The request is also capped at the merchant's available credit:
   // a merchant who owes the platform (positive balance from cancelled orders,
   // COD fees, or shortfalls) can never be paid cash beyond their credit.
   const result = await db.transaction(async (tx) => {

@@ -140,7 +140,7 @@ describe("Merchant queue - total derived from the status groups (ROADMAP R3.7)",
   it("runs no bare aggregate at all", async () => {
     const { bareCountCalls } = await renderPage(PAGE, MERCHANT_GROUPS)
 
-    // The scan R3.7 removed. `GROUP BY status` already visits every row, so a
+    // The removed scan: `GROUP BY status` already visits every row, so a
     // second full pass over `merchant` on every render bought nothing.
     expect(bareCountCalls).toBe(0)
   })

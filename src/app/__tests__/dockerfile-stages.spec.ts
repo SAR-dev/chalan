@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-// Guards the P4.4 cleanup: `deps-prod` (a second, prod-only `pnpm install`)
+// Guards the image-stage cleanup: `deps-prod` (a second, prod-only `pnpm install`)
 // was never referenced by any `COPY --from=`, so it only doubled the install
 // work on every image build. Multi-stage Dockerfiles accumulate these, so the
 // check is mechanical: every declared stage must be consumed.

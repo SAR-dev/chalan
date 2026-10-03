@@ -33,7 +33,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   }
   const where = conditions.length ? and(...conditions) : undefined
 
-  // `body` / `textBody` are deliberately NOT selected here (ROADMAP P3): they
+  // `body` / `textBody` are deliberately NOT selected here: they
   // are the bulk of the row payload and only the detail view needs them, so
   // every page of the list used to ship a full email preview per row. They are
   // fetched on demand from `GET /api/email-logs/[id]`.

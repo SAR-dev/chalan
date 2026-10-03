@@ -57,7 +57,7 @@ export const POST = withErrorHandler(
       return badRequest(MAIL_NOT_CONFIGURED_MESSAGE)
     }
 
-    // Only the hash is stored (ROADMAP P0.7); the raw token lives in the email.
+    // Only the hash is stored; the raw token lives in the email.
     const { raw: token, hash, expiresAt } = issueVerifyToken()
 
     await db

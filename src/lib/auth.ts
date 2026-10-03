@@ -33,7 +33,7 @@ export async function handlePasswordReset({
     userName: user.name,
     resetUrl,
   })
-  // Persist then attempt delivery (ROADMAP P1.5): the row survives a frozen
+  // Persist then attempt delivery: the row survives a frozen
   // invocation and is delivered by the outbox flush/cron. No retries — a send
   // failure is recorded in `email_log` and the outbox row is marked FAILED
   // (kept for review). A failure here must not fail the auth flow (same
@@ -46,7 +46,7 @@ export async function handlePasswordReset({
   }
 }
 
-// ROADMAP 5.3 — Better Auth's change-email flow calls this with the NEW
+// — Better Auth's change-email flow calls this with the NEW
 // address already merged into `user.email`, so the confirmation link is
 // delivered to the address being switched to (the old one keeps working
 // until the link is clicked). Fire-and-forget like handlePasswordReset —
@@ -74,13 +74,13 @@ export async function handleEmailChangeVerification({
 }
 
 export const auth = betterAuth({
-  // twoFactor(): TOTP + recovery codes for admin roles (ROADMAP H4). Enrollment
+  // TwoFactor(): TOTP + recovery codes for admin roles. Enrollment
   // is opt-in; enforcement is a separate platform-config toggle (default OFF).
   plugins: [admin(), twoFactor({ issuer: siteConfig.name })],
   baseURL,
   emailAndPassword: {
     enabled: true,
-    // Public self-signup is closed (ROADMAP P0.7): every account in this system
+    // Public self-signup is closed: every account in this system
     // is created server-side (merchant application, admin/owner invites) and
     // gets a profile row in the same flow. Leaving `disableSignUp` unset meant
     // `POST /api/auth/sign-up/email` happily created a password-only user with
@@ -89,7 +89,7 @@ export const auth = betterAuth({
     autoSignIn: true,
     sendResetPassword: handlePasswordReset,
   },
-  // ROADMAP 5.3 — change your own login email. `changeEmail.enabled` turns on
+  // — change your own login email. `changeEmail.enabled` turns on
   // POST /change-email (session-only, no password re-entry required); the
   // one-time confirmation link goes to the NEW address via
   // emailVerification.sendVerificationEmail. Better Auth's optional two-step
@@ -116,7 +116,7 @@ export const auth = betterAuth({
       // Sign-in was capped at 100/min, which is no limit at all next to the
       // global 10 — credential stuffing had a 10x budget. Keep a generous
       // development value so local testing is not throttled, and match the
-      // global production cap in production (ROADMAP P0.6).
+      // Global production cap in production.
       "/sign-in/*": {
         window: 60,
         max: process.env.NODE_ENV === "production" ? 10 : 100,

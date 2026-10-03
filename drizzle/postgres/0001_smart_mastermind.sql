@@ -73,6 +73,8 @@ CREATE TABLE "user" (
 	"twoFactorEnabled" boolean DEFAULT false,
 	"activationToken" text,
 	"activationTokenExpiresAt" timestamp with time zone,
+	"termsAcceptedAt" timestamp with time zone,
+	"termsVersion" text,
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
@@ -174,8 +176,6 @@ CREATE TABLE "merchant" (
 	"nidRejectedAt" timestamp with time zone,
 	"nidRejectedBy" text,
 	"nidRejectionReason" text,
-	"brandColor" text,
-	"hidePlatformBranding" boolean DEFAULT false NOT NULL,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -356,6 +356,15 @@ CREATE TABLE "audit_log" (
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "cron_run" (
+	"job" text PRIMARY KEY NOT NULL,
+	"lastRanAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"durationMs" integer,
+	"ok" boolean DEFAULT true NOT NULL,
+	"lastError" text,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "email_log" (
 	"id" text PRIMARY KEY NOT NULL,
 	"to" text NOT NULL,
@@ -510,6 +519,8 @@ CREATE INDEX "two_factor_user_id_idx" ON "twoFactor" USING btree ("userId");--> 
 CREATE INDEX "two_factor_secret_idx" ON "twoFactor" USING btree ("secret");--> statement-breakpoint
 CREATE INDEX "user_name_trgm_idx" ON "user" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "user_email_trgm_idx" ON "user" USING gin ("email" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "user_created_at_idx" ON "user" USING btree ("createdAt");--> statement-breakpoint
+CREATE INDEX "user_activation_token_idx" ON "user" USING btree ("activationToken") WHERE "user"."activationToken" is not null;--> statement-breakpoint
 CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");--> statement-breakpoint
 CREATE INDEX "balance_tx_status_idx" ON "balance_transaction" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "balance_tx_type_idx" ON "balance_transaction" USING btree ("type");--> statement-breakpoint
@@ -526,10 +537,12 @@ CREATE INDEX "merchant_status_created_at_idx" ON "merchant" USING btree ("status
 CREATE INDEX "merchant_created_at_idx" ON "merchant" USING btree ("createdAt");--> statement-breakpoint
 CREATE UNIQUE INDEX "merchant_email_unique" ON "merchant" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "merchant_email_verified_at_idx" ON "merchant" USING btree ("emailVerifiedAt");--> statement-breakpoint
+CREATE INDEX "merchant_email_verification_token_idx" ON "merchant" USING btree ("emailVerificationToken") WHERE "merchant"."emailVerificationToken" is not null;--> statement-breakpoint
 CREATE INDEX "merchant_nid_submitted_at_idx" ON "merchant" USING btree ("nidSubmittedAt");--> statement-breakpoint
 CREATE INDEX "merchant_nid_verified_at_idx" ON "merchant" USING btree ("nidVerifiedAt");--> statement-breakpoint
 CREATE INDEX "merchant_nid_rejected_at_idx" ON "merchant" USING btree ("nidRejectedAt");--> statement-breakpoint
 CREATE INDEX "merchant_business_name_trgm_idx" ON "merchant" USING gin ("businessName" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "merchant_business_name_idx" ON "merchant" USING btree ("businessName");--> statement-breakpoint
 CREATE INDEX "merchant_owner_name_trgm_idx" ON "merchant" USING gin ("ownerName" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "merchant_email_trgm_idx" ON "merchant" USING gin ("email" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "merchant_phone_trgm_idx" ON "merchant" USING gin ("phone" gin_trgm_ops);--> statement-breakpoint
@@ -550,6 +563,8 @@ CREATE UNIQUE INDEX "order_idempotency_uniq" ON "order" USING btree ("merchantId
 CREATE INDEX "order_cod_settled_at_idx" ON "order" USING btree ("codSettledAt");--> statement-breakpoint
 CREATE INDEX "order_payout_request_id_idx" ON "order" USING btree ("payoutRequestId");--> statement-breakpoint
 CREATE INDEX "order_merchant_package_id_idx" ON "order" USING btree ("merchantPackageId");--> statement-breakpoint
+CREATE INDEX "order_package_id_idx" ON "order" USING btree ("packageId");--> statement-breakpoint
+CREATE INDEX "order_package_tier_id_idx" ON "order" USING btree ("packageTierId");--> statement-breakpoint
 CREATE UNIQUE INDEX "order_tracking_token_unique" ON "order" USING btree ("trackingToken");--> statement-breakpoint
 CREATE INDEX "order_code_trgm_idx" ON "order" USING gin ("id" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "order_recipient_name_trgm_idx" ON "order" USING gin ("recipientName" gin_trgm_ops);--> statement-breakpoint
@@ -580,6 +595,7 @@ CREATE INDEX "audit_log_actor_name_trgm_idx" ON "audit_log" USING gin ("actorNam
 CREATE INDEX "audit_log_action_trgm_idx" ON "audit_log" USING gin ("action" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "audit_log_entity_type_trgm_idx" ON "audit_log" USING gin ("entityType" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "audit_log_description_trgm_idx" ON "audit_log" USING gin ("description" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "cron_run_last_ran_at_idx" ON "cron_run" USING btree ("lastRanAt");--> statement-breakpoint
 CREATE INDEX "email_log_status_idx" ON "email_log" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "email_log_created_at_idx" ON "email_log" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "email_log_to_trgm_idx" ON "email_log" USING gin ("to" gin_trgm_ops);--> statement-breakpoint

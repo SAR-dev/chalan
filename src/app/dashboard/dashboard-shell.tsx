@@ -30,7 +30,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
 
-  // ROADMAP H4 — while "require 2FA for admins" is on, admins without an
+  // — while "require 2FA for admins" is on, admins without an
   // enrolment are parked on their account page until they set one up.
   const twoFactorSetupPath = currentUser
     ? twoFactorEnforcementPath({
@@ -60,7 +60,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   ) {
     return (
       // Auth-init placeholder: without a live region a screen reader lands on
-      // a blank region with no indication anything is happening (ROADMAP R2.7).
+      // A blank region with no indication anything is happening.
       <div
         role="status"
         className="bg-background flex min-h-screen items-center justify-center"

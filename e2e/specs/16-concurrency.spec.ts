@@ -4,7 +4,7 @@ import { type APIRequestContext, expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS } from "../helpers"
 
-// ─── S49. Concurrency guards (ROADMAP P1.1) ─────────────────────────────────
+// ─── S49. Concurrency guards ─────────────────────────────────
 //
 // Each flow below used to be a check-then-write: two simultaneous requests
 // both passed the check and both wrote. These tests fire the two requests at

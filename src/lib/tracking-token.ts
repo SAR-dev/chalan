@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto"
 
 /**
- * Public tracking token (ROADMAP P0.1).
+ * Public tracking token.
  *
  * Orders are identified internally by a **sequential** code (`ORD-100001E`),
  * which is guessable and therefore unsafe as the authorization for public

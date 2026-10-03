@@ -3,7 +3,7 @@ import "dotenv/config"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 
-// ─── S46. Server-side session gates (ROADMAP P0.5) ──────────────────────────
+// ─── S46. Server-side session gates ──────────────────────────
 //
 // The 2FA-policy and merchant-email-verification rules used to be enforced in
 // the browser only, so any authenticated session could call the APIs directly.
@@ -66,7 +66,7 @@ test.describe("S46. Server-side session gates", () => {
     expect(me.ok()).toBeTruthy()
     expect((await me.json()).emailVerifiedAt).toBeFalsy()
 
-    // Every business API is closed to this session (P0.5).
+    // Every business API is closed to this session.
     for (const url of ["/api/orders", "/api/pickup-locations", "/api/team"]) {
       const res = await request.get(url)
       expect(

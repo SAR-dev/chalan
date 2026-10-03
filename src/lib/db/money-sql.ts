@@ -3,7 +3,7 @@ import { type SQL, type SQLChunk, sql } from "drizzle-orm"
 // =============================================================================
 // Money aggregates in raw SQL
 //
-// Since ROADMAP P0.8 every money column is `numeric(14,2)`. PostgreSQL returns
+// Every money column is stored as `numeric(14,2)`. PostgreSQL returns
 // `numeric` — and therefore `sum(numeric)` — to node-postgres as a *string*, so
 // a `sql<number>` fragment over such a column was quietly typed as a number
 // while holding text at runtime ("750" + 50 === "75050"). These helpers keep the

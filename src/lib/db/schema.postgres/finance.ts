@@ -81,7 +81,7 @@ export const balanceTransaction = pgTable(
       t.merchantId,
       t.createdAt,
     ),
-    // P1.1: a merchant may have at most ONE payment awaiting confirmation.
+    // A merchant may have at most ONE payment awaiting confirmation.
     // The route used to check-then-insert outside a transaction, so two
     // double-clicks could both pass the check and both reserve `pendingBalance`.
     // This index is the hard guarantee; the route only turns the violation

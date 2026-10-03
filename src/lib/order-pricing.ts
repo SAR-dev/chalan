@@ -69,7 +69,7 @@ export async function resolveRoutePricing(
    * Inside a transaction the caller passes `tx`, so the lane is validated
    * against the same snapshot the write uses. Left at `dbRead`, the resolver
    * reads through the replica — under lag a guard can approve against pricing
-   * the write then commits alongside (ROADMAP R0.11).
+   * The write then commits alongside.
    *
    * Typed structurally as "anything with `select`" so both the pool-backed
    * handle and a `PgTransaction` fit: the transaction's `$client` differs from

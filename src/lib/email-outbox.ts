@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger"
 import { sendMail, toPlainText } from "@/lib/mailer"
 
 // =============================================================================
-// Transactional email outbox (ROADMAP P1.5)
+// Transactional email outbox
 //
 // Fire-and-forget `sendMail(...)` calls lose the send when a serverless
 // invocation freezes or the process dies after the domain write commits.

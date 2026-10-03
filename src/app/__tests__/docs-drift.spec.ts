@@ -6,7 +6,7 @@ import {
   DEFAULT_EMAIL_LOG_RETENTION_DAYS,
 } from "@/lib/env"
 
-// Guards the P2.6 docs/env reconciliation against regressions.
+// Guards the docs/env reconciliation against regressions.
 
 function read(...parts: string[]): string {
   return readFileSync(join(process.cwd(), ...parts), "utf-8")
@@ -45,7 +45,7 @@ describe("docs / env drift (ROADMAP P2.6)", () => {
  * import the constants: the pg_cron SQL (runs inside Postgres) and the env
  * reference table. If either disagrees with `src/lib/env.ts`, cleanup jobs
  * silently delete on a different schedule than the routes do — which is how the
- * comments drifted to 90 / 30 while the code applied 30 / 10 (ROADMAP R0.7).
+ * Comments drifted to 90 / 30 while the code applied 30 / 10.
  */
 describe("retention defaults (ROADMAP R0.7)", () => {
   /** The `coalesce(..., N)` fallback guarding `app.<setting>` in pg_cron SQL. */
@@ -104,7 +104,7 @@ describe("retention defaults (ROADMAP R0.7)", () => {
 /**
  * E2E serials are a documented invariant ("unique, no gaps or duplicates"), and
  * AGENTS.md had drifted to S65/104 while the suite was already at S71/129 —
- * with a duplicate S68 nobody noticed (ROADMAP R1.4). Structural facts are
+ * With a duplicate S68 nobody noticed. Structural facts are
  * asserted rather than exact totals: file and test counts churn with every new
  * spec, but a duplicate serial or a gap is always a mistake.
  */

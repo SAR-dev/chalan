@@ -7,7 +7,7 @@ import { enqueueEmail } from "@/lib/email-outbox"
 import { accountActivationTemplate } from "@/lib/mail-templates"
 
 // =============================================================================
-// Account activation (ROADMAP 5.2)
+// Account activation
 //
 // Staff accounts (merchant moderators + warehouse admins) are created by an
 // admin/owner with a temporary password and start PENDING: login is rejected
@@ -56,7 +56,7 @@ export function generateActivationToken(): {
 export async function issueActivationToken(
   userId: string,
   // Pass the caller's transaction so the token is committed with the profile
-  // write it belongs to (ROADMAP P1.1/P1.4).
+  // Write it belongs to.
   tx?: ActivationTx,
 ): Promise<string> {
   const { raw, hash, expiresAt } = generateActivationToken()
@@ -100,7 +100,7 @@ export function activationUrl(rawToken: string, siteUrl?: string): string {
   return `${base}/activate?token=${encodeURIComponent(rawToken)}`
 }
 
-/** Persist the activation email to the outbox (ROADMAP P1.5). Pass the
+/** Persist the activation email to the outbox. Pass the
  *  caller's transaction so the invite and its email commit together; the
  *  caller flushes the outbox after commit. */
 export async function sendActivationEmail(
@@ -133,7 +133,7 @@ export async function sendActivationEmail(
  * doesn't count against itself.
  *
  * Pass `tx` to read inside the caller's transaction — required whenever the
- * count protects a write (ROADMAP P1.1).
+ * Count protects a write.
  */
 export async function countModeratorSlots(
   merchantId: string,
