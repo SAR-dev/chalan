@@ -16,6 +16,8 @@ export const SEED_CLEAN_TABLES = [
   "payout_request",
   "balance_transaction",
   "merchant_balance",
+  // Per-user read markers FK both announcement and user — truncate first.
+  "announcement_read",
   "profile",
   "verification",
   "session",

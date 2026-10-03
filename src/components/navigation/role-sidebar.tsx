@@ -1,17 +1,11 @@
 "use client"
 
-import { LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
-import { ThemeToggle } from "@/components/theme-toggle"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { SignOutConfirmDialog } from "@/features/account/dialogs/sign-out-confirm-dialog"
-import { useAuth } from "@/features/account/hooks/use-auth"
 import { BRAND_NAME } from "@/lib/constants"
-import { isNavItemActive, type SidebarConfig } from "@/lib/nav-config"
-import { cn, initials } from "@/lib/utils"
+import type { SidebarConfig } from "@/lib/nav-config"
+import { isNavItemActive, sidebarVisibleItems } from "@/lib/nav-config"
+import { cn } from "@/lib/utils"
 
 // Claude-style nav link: quiet by default, soft neutral fill on hover,
 // and a gentle tonal fill (not a saturated brand color) when active.
@@ -21,23 +15,23 @@ const navLinkActive = "bg-sidebar-accent text-sidebar-accent-foreground"
 const navLinkIdle =
   "text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
 
+/**
+ * The desktop sidebar: brand + nav, and nothing else.
+ *
+ * Identity, theme, and sign out moved to TopNav's avatar → RightNav panel
+ * (see navigation/top-nav.tsx), so this column no longer renders a footer —
+ * it exists to answer "where am I in the app", and every breakpoint now gets
+ * the account actions from the same single place.
+ */
 export function RoleSidebar({
   config,
-  footerSubtitle,
-  fallbackName,
-  fallbackInitials = "?",
   businessName,
 }: {
   config: SidebarConfig
-  footerSubtitle?: string | null
-  fallbackName?: string
-  fallbackInitials?: string
   businessName?: string
 }) {
   const pathname = usePathname()
-  const { currentUser } = useAuth()
   const BrandIcon = config.brandIcon
-  const [signOutOpen, setSignOutOpen] = useState(false)
 
   return (
     <aside
@@ -65,15 +59,18 @@ export function RoleSidebar({
         </span>
       </Link>
 
-      {/* Nav — no rules, no boxes, just rhythm and spacing */}
+      {/* Nav — no rules, no boxes, just rhythm and spacing. Utility items
+          (Help/Inbox, and Support for the self-service roles) live in the
+          RightNav panel instead; filter BEFORE the group-header logic so
+          headers are derived from what is actually rendered. */}
       <nav
         aria-label="Main"
         className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2"
       >
-        {config.items.map((item, i) => {
+        {sidebarVisibleItems(config.items).map((item, i, visible) => {
           const active = isNavItemActive(item, pathname)
           const Icon = item.icon
-          const prevGroup = i > 0 ? config.items[i - 1].group : undefined
+          const prevGroup = i > 0 ? visible[i - 1].group : undefined
           const showGroupHeader = item.group && item.group !== prevGroup
           return (
             <div key={item.href}>
@@ -100,49 +97,6 @@ export function RoleSidebar({
           )
         })}
       </nav>
-
-      {/* Footer — separated by spacing/tone, not a hard border line */}
-      <div className="px-3 pt-2 pb-3">
-        <div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2">
-          <Avatar className="size-7">
-            {currentUser?.image ? (
-              <AvatarImage
-                src={currentUser.image || "/placeholder.svg"}
-                alt={currentUser.name}
-              />
-            ) : null}
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-[11px] font-medium">
-              {currentUser ? initials(currentUser.name) : fallbackInitials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-[13px] font-medium">
-              {currentUser?.name ?? fallbackName}
-            </p>
-            <p className="text-sidebar-foreground/50 truncate text-[11px]">
-              {footerSubtitle ?? currentUser?.email}
-            </p>
-          </div>
-        </div>
-        <ThemeToggle
-          className="mt-0.5 w-full justify-start gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-          showLabel={true}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          // Opens the confirmation rather than signing out directly — an
-          // accidental click in the sidebar footer used to end the session
-          // with no way back but retyping credentials.
-          onClick={() => setSignOutOpen(true)}
-          data-testid="logout"
-          className="mt-0.5 w-full justify-start gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-        >
-          <LogOut className="size-4" />
-          Sign out
-        </Button>
-      </div>
-      <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </aside>
   )
 }

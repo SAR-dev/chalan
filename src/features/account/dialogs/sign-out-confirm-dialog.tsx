@@ -14,11 +14,16 @@ interface SignOutConfirmDialogProps {
  * The confirmation step between clicking Sign out and the session actually
  * ending.
  *
- * One shared instance rather than one per navigation surface: the desktop
- * sidebar and the mobile header both need it, and AGENTS.md puts every modal
- * in its own file. Each caller owns only its `open` state — the loading state
- * and the sign-out call live here so the two surfaces cannot drift apart (one
- * confirming silently, say, while the other asks).
+ * One shared instance rather than one per navigation surface: it is mounted
+ * by the TopNav's RightNav panel (the single home of Sign out at every
+ * breakpoint), and AGENTS.md puts every modal in its own file. Each caller
+ * owns only its `open` state — the loading state and the sign-out call live
+ * here so two surfaces cannot drift apart (one confirming silently, say,
+ * while the other asks).
+ *
+ * It must be mounted OUTSIDE the RightNav `<Sheet>`: closing the sheet
+ * unmounts its children, and the confirmation has to outlive the panel it
+ * was opened from.
  *
  * Cancel closes the dialog without calling `logout()` at all, which is what
  * keeps "abort" a genuinely side-effect-free path rather than a sign-out that

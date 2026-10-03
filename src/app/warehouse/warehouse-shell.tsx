@@ -4,10 +4,10 @@ import { Loader2 } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { DataErrorBanner } from "@/components/data-error-banner"
-import { MobileHeader } from "@/components/navigation/mobile-header"
+import { TopNav } from "@/components/navigation/top-nav"
 import { WarehouseSidebar } from "@/components/navigation/warehouse-sidebar"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
-import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
+import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { loginPathWithNext } from "@/lib/auth-redirect"
 import { WAREHOUSE_SIDEBAR } from "@/lib/nav-config"
 import { twoFactorEnforcementPath } from "@/lib/two-factor"
@@ -25,6 +25,9 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
+  // The warehouse name moved here from the sidebar footer — TopNav shows it
+  // as the RightNav panel's subtitle.
+  const { currentWarehouse } = useWarehouses()
 
   // — same gate as the dashboard shell, against the warehouse
   // account page (/warehouse/account).
@@ -71,13 +74,12 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
     <div className="bg-background flex min-h-screen">
       <WarehouseSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileHeader config={WAREHOUSE_SIDEBAR} />
+        <TopNav config={WAREHOUSE_SIDEBAR} subtitle={currentWarehouse?.name} />
         <main
           id="main-content"
           className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
         >
           <div className="mx-auto w-full max-w-7xl">
-            <AnnouncementBanner />
             <DataErrorBanner keys={WAREHOUSE_KEYS} />
             {children}
           </div>

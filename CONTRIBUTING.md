@@ -57,7 +57,9 @@ src/app/
   api/team/route.ts                   GET list, POST create (staff accounts)
   api/team/[id]/active/route.ts       PATCH — toggle active
   api/team/[id]/warehouse/route.ts    PATCH — reassign warehouse
-  api/announcements/active/route.ts   GET active announcements for current role
+  api/announcements/active/route.ts   GET active announcements for current role (each with readAt)
+  api/announcements/[id]/read/route.ts  POST — mark one announcement read (per user, idempotent)
+  api/announcements/read-all/route.ts   POST — mark every live announcement read (per user)
   api/audit-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/[id]/route.ts        GET detail (bodies), PATCH mark failed email as sent
@@ -73,6 +75,9 @@ src/app/
   privacy/page.tsx                    public privacy policy (rendered from src/content/privacy.md)
   track/page.tsx                      public order tracking search form
   track/[id]/page.tsx                 public order tracking detail page
+  announcements/[id]/page.tsx         shared announcement detail page (authenticated,
+                                       role-gated server-side; markdown body, marks read
+                                       on open) + layout.tsx chrome (AuthProvider + TopNav)
   uploads/[...path]/route.ts          local storage file serving
   manifest.ts                         PWA web app manifest (served at /manifest.webmanifest)
   pwa-icon/[size]/route.tsx           PWA icons — 192/512 PNG generated from the brand SVG
@@ -103,7 +108,13 @@ src/components/                          generic, feature-agnostic UI only
   service-worker-register.tsx          PWA service worker registration (production only)
   charts/                            recharts wrappers (area-chart.tsx, bar-chart.tsx, pie-chart.tsx)
   ui/                                shadcn-style primitives (button, dialog, switch, skeleton, progress, etc.)
-  navigation/                        sidebar components per role
+  navigation/                        app chrome per role: role-sidebar.tsx (brand + nav only),
+                                     top-nav.tsx (all breakpoints: menu search, announcements
+                                     bell, theme, avatar — absorbs the old mobile-header.tsx),
+                                     right-nav.tsx (avatar → account slide-over: identity,
+                                     Help & resources links, theme, sign out),
+                                     command-palette.tsx (menu search,
+                                     ⌘K/Ctrl+K), sidebar wrappers per role
 src/proxy.ts                             edge proxy — role isolation + upload rate limiting + per-request CSP nonce (merged from middleware.ts)
 src/lib/
   auth.ts, auth-client.ts            Better Auth server + client config
@@ -113,10 +124,19 @@ src/lib/
   api-auth.ts                        requireSession() — single JOIN across session + user + profile
   api-response.ts                    standardized error responses (unauthorized, forbidden, notFound, etc.)
   audit.ts                           logAudit() — the only audit_log writer
+  announcements.ts                   shared announcement queries (live + role-targeted predicate,
+                                     per-user readAt join) — one definition for the API route,
+                                     inbox pages, and detail page
+  markdown.ts                        stripMarkdown() — one-line plain-text excerpts for previews
   pagination.ts                      PaginatedResponse<T>, parsePagination(), parseStatusFilter(), parseSort(), applySort(), parseDateRange()
   rate-limit.ts                      sliding-window rate limiter + getClientIp()
   csv.ts                             CSV generation and download helpers
-  nav-config.ts                      sidebar entries per role
+  nav-config.ts                      sidebar entries per role + inboxPathForRole() /
+                                     navConfigForUser() helpers. Items may carry
+                                     `placement: "rightnav"` (Help, Inbox, and Support
+                                     for the self-service roles): they stay in `items`
+                                     for grants/guard/palette but render in RightNav —
+                                     see sidebarVisibleItems()/rightNavItems()
   constants.ts, pricing.ts           cross-cutting domain logic (status/role arrays, label/tone maps)
   mailer.ts, mail-templates.ts       transactional email (+ email_log history)
   utils.ts                           general utilities (cn helper, etc.)
@@ -177,8 +197,9 @@ src/features/
   audit-logs/      hooks/use-audit-logs.ts — read-only, Admin/Super Admin only
   email-logs/      hooks/use-email-logs.ts — read-mostly, Admin/Super Admin only
   announcements/
-    components/    announcement-banner.tsx, announcement-detail-modal.tsx, etc.
-    dialogs/       create-announcement-dialog.tsx, edit-announcement-dialog.tsx
+    components/    announcement-bell.tsx, announcements-inbox.tsx, etc.
+    dialogs/       create-announcement-dialog.tsx, edit-announcement-dialog.tsx,
+                   markdown-editor.tsx (shared Write/Preview control)
     hooks/         use-announcements.ts, use-active-announcements.ts
 ```
 
@@ -928,42 +949,47 @@ on the `merchant` table). This ensures backward compatibility.
 
 ---
 
-## 3.75. Announcement banner (`src/features/announcements/components/announcement-banner.tsx`)
+## 3.75. Announcement bell (`src/features/announcements/components/announcement-bell.tsx`)
 
-Renders a dismissible banner at the top of the content area showing unread live
-announcements on app load. Consumed by all four role shells
-(`dashboard-shell`, `merchant-shell`, `rider-shell`, `warehouse-shell`) where
-it sits above `<DataErrorBanner />` inside the `max-w-*` content wrapper.
+An icon-with-unread-badge dropdown in the TopNav (`src/components/navigation/top-nav.tsx`),
+which is mounted once per role shell — it replaced the old page-top
+`AnnouncementBanner` and the `AnnouncementDetailModal`.
 
 ```tsx
-// In any role shell, inside the content wrapper:
-<AnnouncementBanner />
-<DataErrorBanner keys={...} />
+// Inside TopNav's right-hand action group (mounted once per shell):
+<AnnouncementBell />
 ```
 
 Behaviour:
 
-- Reads from `useActiveAnnouncements()` — no additional API call or hook needed.
-- Renders `null` when there are no unread items; no empty space or flicker.
-- Shows one announcement at a time. When there are multiple unread items,
-  `‹ N / total ›` navigation lets the user cycle through them.
-- **Dismiss (×)** calls `markRead(id)`, which persists to localStorage via the
-  existing hook so the item won't reappear across sessions.
-- **Shows title only** in the banner. Clicking the title opens
-  `AnnouncementDetailModal` and marks the item read — the full content is
-  revealed only inside the modal.
-- Uses `role="status" aria-live="polite"` so screen readers announce it without
-  interrupting the current focus.
+- Reads from `useActiveAnnouncements()` — no additional API call or hook needed;
+  the single SWR key is fetched once per session because the bell mounts once.
+- Shows an unread badge (`9+` cap). The count derives from `readAt` on each row
+  — **read state is server-side** (`announcement_read` table, per-user rows),
+  so it follows the account across devices. The old `ann_read:<userId>`
+  localStorage key is gone; do not reintroduce client-side read state.
+- The dropdown lists live announcements; clicking a row navigates to
+  **`/announcements/<id>`** (the shared detail page, outside the role segments).
+  The detail page performs the mark-read — the bell never writes on its own.
+- **Mark all read** is the one bulk action the bell owns
+  (`POST /api/announcements/read-all`).
+- **Open inbox** links to the reader's own inbox
+  (`inboxPathForRole(role)` in `src/lib/nav-config.ts`).
 
 Rules:
 
-- The banner is placed in the **shell**, not in individual pages — it must appear
-  on every screen within a role without any per-page wiring.
+- The bell lives in **TopNav**, not in individual pages — it appears on every
+  screen within a role (and on `/announcements/[id]`) without per-page wiring.
 - Do not add a second `useActiveAnnouncements()` call in page components; the
-  shell already triggers the SWR fetch and caches it for the whole session.
-- The sidebar inbox link (labelled **Inbox**) and this banner share the same
-  hook and the same localStorage read-set — dismissing from the banner is
-  reflected immediately in the inbox list and unread count.
+  TopNav already triggers the SWR fetch and caches it for the whole session.
+- The sidebar inbox link, the bell, and both inbox pages share the same hook
+  and the same server read-set — marking read anywhere is reflected everywhere
+  on the next mutate.
+- Detail rendering is `<Markdown>` (react-markdown + remark-gfm, same as
+  `/terms`): announcements are authored as markdown in the create/edit dialogs
+  (`markdown-editor.tsx` Write/Preview tabs) and listed with
+  `stripMarkdown()` excerpts (`src/lib/markdown.ts`). Never show raw markdown
+  source in a one-line preview, and never render announcement HTML directly.
 
 ## 3.9. DataTable loading skeleton
 

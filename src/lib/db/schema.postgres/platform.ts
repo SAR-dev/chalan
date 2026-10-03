@@ -8,7 +8,9 @@ import {
   jsonb,
   pgTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
+import { user } from "./auth"
 import { emailLogStatuses, emailOutboxStatuses, profileRoles } from "./enums"
 import { ts } from "./helpers"
 
@@ -140,6 +142,38 @@ export const announcement = pgTable(
       "gin",
       sql`${t.title} gin_trgm_ops`,
     ),
+  ],
+)
+
+// =============================================================================
+// Announcement read state
+//
+// Per-user "I've seen this" marker — the server-side replacement for the old
+// `ann_read:<userId>` localStorage key, so unread state follows the account
+// across devices. One row per (announcement, user); the unique index is the
+// hard guarantee that concurrent mark-read requests can't double-insert. Rows
+// cascade on both FKs, so deleting an announcement or a user leaves nothing
+// behind. Self-service writes (a user marking their own reads) are
+// deliberately not audited.
+// =============================================================================
+
+export const announcementRead = pgTable(
+  "announcement_read",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    announcementId: text("announcementId")
+      .notNull()
+      .references(() => announcement.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    readAt: ts("readAt").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("announcement_read_unique").on(t.announcementId, t.userId),
+    index("announcement_read_user_idx").on(t.userId),
   ],
 )
 

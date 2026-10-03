@@ -8,7 +8,9 @@ import {
   merchantGrantableNavItems,
   merchantVisibleNavItems,
   RIDER_SIDEBAR,
+  rightNavItems,
   SUPER_ADMIN_SIDEBAR,
+  sidebarVisibleItems,
   WAREHOUSE_SIDEBAR,
 } from "./nav-config"
 import type { Role } from "./types"
@@ -200,6 +202,90 @@ describe("sidebar grouping", () => {
       expect(groups.has("System")).toBe(true)
     },
   )
+
+  // RoleSidebar and the mobile drawer render sidebarVisibleItems(), not the
+  // raw array — contiguity has to hold on what is actually rendered, or a
+  // rightnav-placed item could split a group and double its header.
+  it.each(sidebars)(
+    "%s: the rendered (non-rightnav) view keeps groups contiguous",
+    (_name, config) => {
+      const seen = new Set<string>()
+      let current: string | undefined
+      for (const item of sidebarVisibleItems(config.items)) {
+        if (item.group !== current) {
+          expect(
+            seen.has(item.group ?? ""),
+            `${item.group} is not contiguous after the rightnav filter`,
+          ).toBe(false)
+          if (current) seen.add(current)
+          current = item.group
+        }
+      }
+    },
+  )
+})
+
+// The placement split: utility links (Help/Inbox, plus Support for the
+// self-service roles) leave the sidebar for the RightNav account panel. The
+// items stay in `items` — grants, the route guard, and the command palette
+// read the raw array — so these two helpers are the only rendering contract.
+describe("rightnav placement", () => {
+  it.each([
+    ["SUPER_ADMIN", SUPER_ADMIN_SIDEBAR],
+    ["MERCHANT", MERCHANT_SIDEBAR],
+    ["WAREHOUSE", WAREHOUSE_SIDEBAR],
+    ["RIDER", RIDER_SIDEBAR],
+  ] as const)("%s: Help and Inbox move to the rightnav", (_name, config) => {
+    const moved = rightNavItems(config.items).map((i) => i.label)
+    expect(moved).toContain("Help")
+    expect(moved).toContain("Inbox")
+    // …and are gone from the sidebar view.
+    const sidebarLabels = sidebarVisibleItems(config.items).map((i) => i.label)
+    expect(sidebarLabels).not.toContain("Help")
+    expect(sidebarLabels).not.toContain("Inbox")
+  })
+
+  it("Support moves for self-service roles but stays a sidebar queue for admins", () => {
+    for (const config of [MERCHANT_SIDEBAR, WAREHOUSE_SIDEBAR, RIDER_SIDEBAR]) {
+      expect(rightNavItems(config.items).map((i) => i.label)).toContain(
+        "Support",
+      )
+      expect(
+        sidebarVisibleItems(config.items).map((i) => i.label),
+      ).not.toContain("Support")
+    }
+    // The admin view is an operational ticket queue they work daily, not a
+    // "get help" link — it stays one click away in the sidebar.
+    expect(
+      sidebarVisibleItems(SUPER_ADMIN_SIDEBAR.items).map((i) => i.label),
+    ).toContain("Support")
+    expect(
+      rightNavItems(SUPER_ADMIN_SIDEBAR.items).map((i) => i.label),
+    ).not.toContain("Support")
+  })
+
+  it("the split never loses or duplicates an item", () => {
+    for (const config of [
+      SUPER_ADMIN_SIDEBAR,
+      MERCHANT_SIDEBAR,
+      WAREHOUSE_SIDEBAR,
+      RIDER_SIDEBAR,
+    ]) {
+      const total = config.items.length
+      expect(
+        sidebarVisibleItems(config.items).length +
+          rightNavItems(config.items).length,
+      ).toBe(total)
+    }
+  })
+
+  it("placement changes rendering only — grantable hrefs are untouched", () => {
+    // merchantGrantableNavItems reads the raw array, so moving Support/Inbox
+    // to the rightnav must not revoke an existing moderator grant.
+    const grantable = merchantGrantableNavItems().map((i) => i.href)
+    expect(grantable).toContain("/merchant/support")
+    expect(grantable).toContain("/merchant/announcements")
+  })
 })
 
 describe("isNavItemActive", () => {

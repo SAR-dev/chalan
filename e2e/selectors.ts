@@ -10,9 +10,9 @@ export const auth = {
   loginSubmit: "[data-testid='login-submit']",
   loginError: "[data-testid='login-error']",
   registerForm: "[data-testid='register-form']",
+  // Lives in the RightNav panel now: open topnav.userMenu first.
   logout: "[data-testid='logout']",
   mobileMenu: "[data-testid='mobile-menu']",
-  mobileLogout: "[data-testid='mobile-logout']",
   accountSecurityTab: "[data-testid='account-tab-security']",
   accountTwoFactorTab: "[data-testid='account-tab-two-factor']",
 }
@@ -68,6 +68,33 @@ export const nav = {
     `[data-testid='sidebar'] a:has-text("${label}")`,
   mobileMenu: "[data-testid='mobile-menu']",
   userMenu: "[data-testid='user-menu']",
+}
+
+// ─── TopNav (header) + RightNav (account panel) ─────────────────────────────
+export const topnav = {
+  root: "[data-testid='topnav']",
+  // Avatar button — opens the RightNav slide-over.
+  userMenu: "[data-testid='user-menu']",
+  searchTrigger: "[data-testid='topnav-search']",
+  paletteInput: "[data-testid='palette-input']",
+  paletteEmpty: "[data-testid='palette-empty']",
+  paletteItem: (href: string) => `[data-testid='palette-item-${href}']`,
+  rightnav: "[data-testid='rightnav']",
+  rightnavName: "[data-testid='rightnav-name']",
+  rightnavAccount: "[data-testid='rightnav-account']",
+}
+
+// ─── Announcements (bell + inbox + detail page) ──────────────────────────────
+export const announcements = {
+  bell: "[data-testid='announcement-bell']",
+  badge: "[data-testid='announcement-badge']",
+  list: "[data-testid='announcement-list']",
+  item: (id: string) => `[data-testid='announcement-item-${id}']`,
+  markAll: "[data-testid='announcement-mark-all']",
+  openInbox: "[data-testid='announcement-open-inbox']",
+  inboxRow: (id: string) => `[data-testid='inbox-row-${id}']`,
+  body: "[data-testid='announcement-body']",
+  back: "[data-testid='announcement-back']",
 }
 
 // ─── Public pricing (city-to-city rate card) ─────────────────────────────────

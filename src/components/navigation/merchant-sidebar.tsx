@@ -20,7 +20,6 @@ export function MerchantSidebar() {
   return (
     <RoleSidebar
       config={config}
-      footerSubtitle={currentMerchant?.businessName}
       businessName={currentMerchant?.businessName ?? undefined}
     />
   )

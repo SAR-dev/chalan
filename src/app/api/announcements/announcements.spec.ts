@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { POST as markRead } from "./[id]/read/route"
 import {
   DELETE as deleteAnnouncement,
   PATCH as updateAnnouncement,
 } from "./[id]/route"
 import { GET as activeAnnouncements } from "./active/route"
 import { DELETE as bulkDeleteAnnouncements } from "./bulk/route"
+import { POST as markAllRead } from "./read-all/route"
 import { POST as createAnnouncement, GET as listAnnouncements } from "./route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -30,6 +32,8 @@ vi.mock("@/lib/db", () => {
       limit: () => chain,
       offset: () => chain,
       orderBy: () => chain,
+      leftJoin: () => chain,
+      innerJoin: () => chain,
       $dynamic: () => chain,
       then: (onFulfilled: (v: unknown) => unknown) =>
         Promise.resolve(selectQueue.shift() ?? []).then(onFulfilled),
@@ -47,7 +51,10 @@ vi.mock("@/lib/db", () => {
   const makeInsertChain = () => {
     const chain: Record<string, unknown> = {
       values: () => chain,
+      onConflictDoNothing: () => chain,
       returning: () => Promise.resolve(insertResult),
+      then: (onFulfilled: (v: unknown) => unknown) =>
+        Promise.resolve(insertResult).then(onFulfilled),
     }
     return chain
   }
@@ -165,6 +172,74 @@ describe("GET /api/announcements/active", () => {
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toHaveLength(1)
+  })
+
+  it("carries readAt per row so the client never touches localStorage", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([
+      { id: "ann_1", title: "Read one", readAt: "2025-06-01T00:00:00Z" },
+      { id: "ann_2", title: "Unread one", readAt: null },
+    ])
+    const res = await activeAnnouncements()
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.map((r: { readAt: string | null }) => r.readAt)).toEqual([
+      "2025-06-01T00:00:00Z",
+      null,
+    ])
+  })
+})
+
+describe("POST /api/announcements/:id/read", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await markRead(req("POST"), ctx())
+    expect(res.status).toBe(401)
+  })
+
+  it("404s when the announcement is not targeted at the caller's role", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([]) // role-containment where clause matched nothing
+    const res = await markRead(req("POST"), ctx())
+    expect(res.status).toBe(404)
+  })
+
+  it("inserts the read row and returns ok (idempotent on repeat)", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([{ id: "ann_1" }])
+    const res = await markRead(req("POST"), ctx())
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true })
+  })
+})
+
+describe("POST /api/announcements/read-all", () => {
+  it("401 when unauthenticated", async () => {
+    const res = await markAllRead()
+    expect(res.status).toBe(401)
+  })
+
+  it("no-ops with count 0 when nothing is live", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([]) // getActiveAnnouncements → no live rows
+    const res = await markAllRead()
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true, count: 0 })
+  })
+
+  it("marks every live announcement read and reports the count", async () => {
+    sessionState.value = merchantSession
+    selectQueue.push([
+      { id: "ann_1", readAt: "2025-06-01T00:00:00Z" }, // already read
+      { id: "ann_2", readAt: null }, // first read now
+      { id: "ann_3", readAt: null },
+    ])
+    selectQueue.push([{ count: 3 }]) // post-insert count of read rows
+    const res = await markAllRead()
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({ ok: true, count: 3 })
   })
 })
 

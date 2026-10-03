@@ -4,10 +4,10 @@ import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { DataErrorBanner } from "@/components/data-error-banner"
-import { MobileHeader } from "@/components/navigation/mobile-header"
 import { RiderSidebar } from "@/components/navigation/rider-sidebar"
+import { TopNav } from "@/components/navigation/top-nav"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
-import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
+import { useRiders } from "@/features/riders/hooks/use-riders"
 import { loginPathWithNext } from "@/lib/auth-redirect"
 import { RIDER_SIDEBAR } from "@/lib/nav-config"
 
@@ -23,6 +23,9 @@ const RIDER_KEYS = [
 export function RiderShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { currentUser, isReady } = useAuth()
+  // The rider's zone moved here from the sidebar footer — TopNav shows it as
+  // the RightNav panel's subtitle.
+  const { currentRider } = useRiders()
 
   useEffect(() => {
     if (!isReady) return
@@ -53,13 +56,12 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
     <div className="bg-background flex min-h-screen">
       <RiderSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileHeader config={RIDER_SIDEBAR} />
+        <TopNav config={RIDER_SIDEBAR} subtitle={currentRider?.zone} />
         <main
           id="main-content"
           className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
         >
           <div className="mx-auto w-full max-w-7xl">
-            <AnnouncementBanner />
             <DataErrorBanner keys={RIDER_KEYS} />
             {children}
           </div>

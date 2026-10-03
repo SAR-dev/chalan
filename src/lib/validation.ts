@@ -640,7 +640,12 @@ export const warehouseAssignSchema = z.object({
 
 export const announcementCreateSchema = z.object({
   title: requiredString("Title"),
-  content: requiredString("Content"),
+  // Markdown body — capped so a single announcement can't bloat the row or
+  // the active-list response (which ships up to 50 of them in one payload).
+  content: requiredString("Content").max(
+    20_000,
+    "Content must be 20000 characters or fewer",
+  ),
   publishedAt: z.string().datetime({ offset: true }).nullish(),
   expiresAt: z.string().datetime({ offset: true }).nullish(),
   isActive: z.boolean().optional(),
@@ -654,7 +659,9 @@ export const announcementCreateSchema = z.object({
 export const announcementUpdateSchema = z
   .object({
     title: requiredString("Title").optional(),
-    content: requiredString("Content").optional(),
+    content: requiredString("Content")
+      .max(20_000, "Content must be 20000 characters or fewer")
+      .optional(),
     publishedAt: z.string().datetime({ offset: true }).nullish(),
     expiresAt: z.string().datetime({ offset: true }).nullish(),
     isActive: z.boolean().optional(),

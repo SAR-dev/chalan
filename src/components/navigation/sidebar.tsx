@@ -7,11 +7,5 @@ import { dashboardSidebarForRole } from "@/lib/nav-config"
 export function Sidebar() {
   const { currentUser } = useAuth()
 
-  return (
-    <RoleSidebar
-      config={dashboardSidebarForRole(currentUser?.role)}
-      fallbackName="Super Admin"
-      fallbackInitials="SA"
-    />
-  )
+  return <RoleSidebar config={dashboardSidebarForRole(currentUser?.role)} />
 }

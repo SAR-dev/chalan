@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
+import { MarkdownEditor } from "@/features/announcements/dialogs/markdown-editor"
 import { useAnnouncements } from "@/features/announcements/hooks/use-announcements"
 import { ANNOUNCEMENT_TARGET_ROLE_LABELS } from "@/lib/constants"
 import {
@@ -125,16 +125,13 @@ export function CreateAnnouncementDialog() {
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="ann-content">Content</Label>
-          <Textarea
-            id="ann-content"
-            value={form.content}
-            onChange={(e) => update("content", e.target.value)}
-            placeholder="Write the announcement body here…"
-            className="min-h-32"
-          />
-        </div>
+        <MarkdownEditor
+          id="ann-content"
+          label="Content"
+          value={form.content}
+          onChange={(v) => update("content", v)}
+          placeholder="Write the announcement body here…"
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">

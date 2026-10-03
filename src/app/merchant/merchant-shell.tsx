@@ -13,10 +13,9 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useMemo } from "react"
 import { DataErrorBanner } from "@/components/data-error-banner"
 import { MerchantSidebar } from "@/components/navigation/merchant-sidebar"
-import { MobileHeader } from "@/components/navigation/mobile-header"
+import { TopNav } from "@/components/navigation/top-nav"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/account/hooks/use-auth"
-import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { loginPathWithNext } from "@/lib/auth-redirect"
@@ -182,7 +181,7 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
   const { currentMerchant, isLoading: isMerchantLoading } = useMerchants()
   const { pickupLocations, isLoading: isPickupLocationsLoading } =
     usePickupLocations()
-  // Filtered nav for MobileHeader (moderators see granted items only). Hooks
+  // Filtered nav for TopNav (moderators see granted items only). Hooks
   // must stay above the early returns below — React error #310 otherwise.
   const navConfig = useMemo(
     () => ({
@@ -245,8 +244,9 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
     >
       <MerchantSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileHeader
+        <TopNav
           config={navConfig}
+          subtitle={currentMerchant?.businessName ?? null}
           businessName={currentMerchant?.businessName ?? undefined}
         />
         <main
@@ -254,7 +254,6 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
           className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
         >
           <div className="mx-auto w-full max-w-6xl">
-            <AnnouncementBanner />
             {!isMerchantLoading && currentMerchant && (
               <MerchantNidAlert merchant={currentMerchant} />
             )}

@@ -1,14 +1,17 @@
 "use client"
 
 import { Bell, BellOff, CheckCheck, Megaphone } from "lucide-react"
-import { useState } from "react"
+import Link from "next/link"
+import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { AnnouncementDetailModal } from "@/features/announcements/components/announcement-detail-modal"
-import { useActiveAnnouncements } from "@/features/announcements/hooks/use-active-announcements"
+import {
+  type ActiveAnnouncement,
+  useActiveAnnouncements,
+} from "@/features/announcements/hooks/use-active-announcements"
 import { formatDateTime } from "@/lib/format"
-import type { Announcement } from "@/lib/types"
+import { stripMarkdown } from "@/lib/markdown"
 
 export function AnnouncementsInboxClient({
   title,
@@ -17,28 +20,21 @@ export function AnnouncementsInboxClient({
 }: {
   title: string
   description: string
-  initialAnnouncements: Announcement[]
+  initialAnnouncements: ActiveAnnouncement[]
 }) {
-  const {
-    announcements,
-    readIds,
-    unreadCount,
-    markRead,
-    markAllRead,
-    isLoading,
-  } = useActiveAnnouncements({ initialData: initialAnnouncements })
+  const { announcements, readIds, unreadCount, markAllRead, isLoading } =
+    useActiveAnnouncements({ initialData: initialAnnouncements })
 
-  const [selected, setSelected] = useState<Announcement | null>(null)
-
-  function open(a: Announcement) {
-    setSelected(a)
+  async function handleMarkAllRead() {
+    const result = await markAllRead()
+    if (!result.ok) toast.error(result.error ?? "Could not mark all as read.")
   }
 
   return (
     <>
       <PageHeader title={title} description={description}>
         {unreadCount > 0 && (
-          <Button variant="outline" size="sm" onClick={markAllRead}>
+          <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
             <CheckCheck className="size-4" />
             Mark all read
           </Button>
@@ -70,11 +66,11 @@ export function AnnouncementsInboxClient({
           {announcements.map((a) => {
             const isRead = readIds.has(a.id)
             return (
-              <button
+              <Link
                 key={a.id}
-                type="button"
-                onClick={() => open(a)}
-                className={`group w-full rounded-lg border text-left transition-colors ${
+                href={`/announcements/${a.id}`}
+                data-testid={`inbox-row-${a.id}`}
+                className={`group block w-full rounded-lg border text-left transition-colors ${
                   isRead
                     ? "bg-card border-border hover:bg-muted/50"
                     : "bg-card border-primary/30 hover:bg-muted/50"
@@ -110,7 +106,7 @@ export function AnnouncementsInboxClient({
                       )}
                     </div>
                     <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
-                      {a.content}
+                      {stripMarkdown(a.content)}
                     </p>
                   </div>
 
@@ -118,18 +114,11 @@ export function AnnouncementsInboxClient({
                     className={`mt-0.5 size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 ${isRead ? "text-muted-foreground" : "text-primary"}`}
                   />
                 </div>
-              </button>
+              </Link>
             )
           })}
         </div>
       )}
-
-      <AnnouncementDetailModal
-        announcement={selected}
-        readIds={readIds}
-        onMarkRead={markRead}
-        onClose={() => setSelected(null)}
-      />
     </>
   )
 }
