@@ -73,7 +73,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -90,11 +90,11 @@
     "drizzle-kit": "^0.31.10",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "lint-staged": "^17.0.7",
+    "lint-staged": "^17.6.0",
     "postcss": "8.5.28",
-    "shadcn": "^4.8.0",
+    "shadcn": "^4.21.0",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.15",
     "typescript": "5.7.3",
     "vitest": "^4.1.9"
   },
