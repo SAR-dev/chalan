@@ -4,10 +4,9 @@ import { Loader2 } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { DataErrorBanner } from "@/components/data-error-banner"
-import { MobileHeader } from "@/components/navigation/mobile-header"
 import { Sidebar } from "@/components/navigation/sidebar"
+import { TopNav } from "@/components/navigation/top-nav"
 import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
-import { AnnouncementBanner } from "@/features/announcements/components/announcement-banner"
 import { loginPathWithNext } from "@/lib/auth-redirect"
 import { dashboardSidebarForRole } from "@/lib/nav-config"
 import { twoFactorEnforcementPath } from "@/lib/two-factor"
@@ -75,13 +74,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="bg-background flex min-h-screen">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileHeader config={dashboardSidebarForRole(currentUser.role)} />
+        <TopNav config={dashboardSidebarForRole(currentUser.role)} />
         <main
           id="main-content"
           className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"
         >
           <div className="mx-auto w-full max-w-7xl">
-            <AnnouncementBanner />
             <DataErrorBanner keys={DASHBOARD_KEYS} />
             {children}
           </div>

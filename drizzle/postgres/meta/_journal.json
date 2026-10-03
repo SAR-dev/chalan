@@ -15,6 +15,13 @@
       "when": 1791002458364,
       "tag": "0001_smart_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791044088053,
+      "tag": "0002_same_wasp",
+      "breakpoints": true
     }
   ]
 }

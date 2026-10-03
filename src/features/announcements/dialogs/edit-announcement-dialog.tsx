@@ -7,7 +7,7 @@ import { FormErrors } from "@/components/form-errors"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
+import { MarkdownEditor } from "@/features/announcements/dialogs/markdown-editor"
 import { useAnnouncements } from "@/features/announcements/hooks/use-announcements"
 import { ANNOUNCEMENT_TARGET_ROLE_LABELS } from "@/lib/constants"
 import type { Announcement } from "@/lib/types"
@@ -140,15 +140,12 @@ export function EditAnnouncementDialog({ announcement, onClose }: Props) {
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="edit-ann-content">Content</Label>
-          <Textarea
-            id="edit-ann-content"
-            value={form.content}
-            onChange={(e) => update("content", e.target.value)}
-            className="min-h-32"
-          />
-        </div>
+        <MarkdownEditor
+          id="edit-ann-content"
+          label="Content"
+          value={form.content}
+          onChange={(v) => update("content", v)}
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">

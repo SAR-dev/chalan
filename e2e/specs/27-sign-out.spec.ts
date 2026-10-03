@@ -1,8 +1,19 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { auth, orders, signOut } from "../selectors"
+import { auth, orders, signOut, topnav } from "../selectors"
 
 const DASHBOARD = "/dashboard/orders"
+
+/**
+ * Sign out lives in the RightNav panel behind the TopNav avatar — one home
+ * for it at every breakpoint, so every flow here starts the same way: open
+ * the panel, then click Sign out.
+ */
+async function openRightNavAndSignOut(page: import("@playwright/test").Page) {
+  await page.locator(topnav.userMenu).click()
+  await expect(page.locator(topnav.rightnav)).toBeVisible()
+  await page.locator(auth.logout).click()
+}
 
 test.describe("S68. Sign-out confirmation", () => {
   test("clicking Sign out asks first instead of ending the session", async ({
@@ -12,7 +23,7 @@ test.describe("S68. Sign-out confirmation", () => {
     await page.goto(DASHBOARD)
     await waitForAppReady(page)
 
-    await page.locator(auth.logout).click()
+    await openRightNavAndSignOut(page)
     await expect(page.locator(signOut.dialog)).toBeVisible()
 
     // The dialog is what stops the click: had sign-out been direct, the page
@@ -28,7 +39,7 @@ test.describe("S68. Sign-out confirmation", () => {
     await page.goto(DASHBOARD)
     await waitForAppReady(page)
 
-    await page.locator(auth.logout).click()
+    await openRightNavAndSignOut(page)
     await expect(page.locator(signOut.dialog)).toBeVisible()
     await page.locator(signOut.cancel).click()
     await expect(page.locator(signOut.dialog)).toHaveCount(0)
@@ -60,7 +71,7 @@ test.describe("S68. Sign-out confirmation", () => {
 
     await page.goto(DASHBOARD)
     await waitForAppReady(page)
-    await page.locator(auth.logout).click()
+    await openRightNavAndSignOut(page)
 
     const confirm = page.locator(signOut.confirm)
     await expect(confirm).toBeVisible()
@@ -81,15 +92,16 @@ test.describe("S68. Sign-out confirmation", () => {
 test.describe("S72. Sign-out confirmation - mobile", () => {
   test.use({ viewport: { width: 375, height: 812 } })
 
-  test("the mobile menu asks before signing out", async ({ page }) => {
+  test("the account panel asks before signing out", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto(DASHBOARD)
     await waitForAppReady(page)
 
-    await page.locator(auth.mobileMenu).click()
-    await page.locator(auth.mobileLogout).click()
+    // Same RightNav panel as desktop — the avatar is in the TopNav at every
+    // breakpoint, and the old mobile drawer's own sign-out button is gone.
+    await openRightNavAndSignOut(page)
 
-    // The confirmation lives outside <Sheet>, so closing the menu must not
+    // The confirmation lives outside <Sheet>, so closing the panel must not
     // take the dialog with it — this assertion is what proves it didn't.
     await expect(page.locator(signOut.dialog)).toBeVisible()
 

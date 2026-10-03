@@ -41,6 +41,29 @@ export interface SidebarNavItem {
    * exact path or a path prefix), e.g. New Order covering the import page. */
   activePaths?: string[]
   group?: string
+  /** Where the item is RENDERED. Omitted = "sidebar" (desktop sidebar + the
+   * TopNav's mobile drawer). "rightnav" = the account slide-over opened from
+   * the TopNav avatar — used for utility links (Help, Inbox, and Support for
+   * the self-service roles) that aren't part of a role's daily workflow.
+   *
+   * Deliberately a rendering concern only: the item stays in `items`, which is
+   * what the merchant moderator grant model, the shell route guard, and the
+   * command palette read — moving an item here must never change who can
+   * reach the page. */
+  placement?: "sidebar" | "rightnav"
+}
+
+/** The role's working nav: everything not relegated to the RightNav panel.
+ * Filtering preserves order, so group contiguity (see nav-config.spec.ts)
+ * still holds on the result. */
+export function sidebarVisibleItems(items: SidebarNavItem[]): SidebarNavItem[] {
+  return items.filter((item) => item.placement !== "rightnav")
+}
+
+/** Items rendered in the RightNav account panel (identity → resources →
+ * account → theme → sign out), in config order. */
+export function rightNavItems(items: SidebarNavItem[]): SidebarNavItem[] {
+  return items.filter((item) => item.placement === "rightnav")
 }
 
 /** Whether a nav item should render as active for the current pathname. */
@@ -197,6 +220,7 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       label: "Inbox",
       icon: Bell,
       group: "System",
+      placement: "rightnav",
     },
     {
       href: "/dashboard/support",
@@ -204,7 +228,13 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       icon: LifeBuoy,
       group: "System",
     },
-    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
+    {
+      href: "/help",
+      label: "Help",
+      icon: CircleHelp,
+      group: "System",
+      placement: "rightnav",
+    },
     {
       href: "/dashboard/settings",
       label: "Settings",
@@ -237,6 +267,46 @@ export function homeForRole(role: Role): string {
   if (role === "RIDER") return "/rider"
   if (role === "WAREHOUSE_ADMIN") return "/warehouse"
   return "/dashboard"
+}
+
+/**
+ * Each role's announcements inbox — the destination of the bell's "Open
+ * inbox" link and the detail page's back link. Mirrors the nav items above;
+ * the dashboard route is `announcements-inbox` (the sibling of the admin's
+ * `announcements` management page), while the other three roles' inbox is
+ * simply `/announcements`.
+ */
+export function inboxPathForRole(role: Role): string {
+  if (role === "MERCHANT") return "/merchant/announcements"
+  if (role === "RIDER") return "/rider/announcements"
+  if (role === "WAREHOUSE_ADMIN") return "/warehouse/announcements"
+  return "/dashboard/announcements-inbox"
+}
+
+/**
+ * The sidebar/top-nav config for any signed-in user, including the merchant
+ * moderator grant filter. The four role shells each build this themselves
+ * (they also have per-role subtitles); this exists for shared surfaces
+ * outside the role segments — today, /announcements/[id] — where there is no
+ * shell to do it.
+ */
+export function navConfigForUser(
+  user: NavPermissionSubject | null | undefined,
+): SidebarConfig {
+  switch (user?.role) {
+    case "MERCHANT":
+      return { ...MERCHANT_SIDEBAR, items: merchantVisibleNavItems(user) }
+    case "WAREHOUSE_ADMIN":
+      return WAREHOUSE_SIDEBAR
+    case "RIDER":
+      return RIDER_SIDEBAR
+    default:
+      // Dashboard (and any future/unknown role): the dashboard config. Its
+      // role argument is unused today (every console role shares one layout),
+      // and the subject's free-text role isn't the schema's Role union, so
+      // nothing is passed rather than casting a string into the union.
+      return dashboardSidebarForRole(undefined)
+  }
 }
 
 export const MERCHANT_SIDEBAR: SidebarConfig = {
@@ -305,6 +375,7 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
       icon: Megaphone,
       exact: true,
       group: "System",
+      placement: "rightnav",
     },
     {
       href: "/merchant/support",
@@ -312,8 +383,15 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
       icon: LifeBuoy,
       exact: true,
       group: "System",
+      placement: "rightnav",
     },
-    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
+    {
+      href: "/help",
+      label: "Help",
+      icon: CircleHelp,
+      group: "System",
+      placement: "rightnav",
+    },
     {
       href: "/merchant/account",
       label: "Account",
@@ -454,6 +532,7 @@ export const WAREHOUSE_SIDEBAR: SidebarConfig = {
       icon: Megaphone,
       exact: true,
       group: "System",
+      placement: "rightnav",
     },
     {
       href: "/warehouse/support",
@@ -461,8 +540,15 @@ export const WAREHOUSE_SIDEBAR: SidebarConfig = {
       icon: LifeBuoy,
       exact: true,
       group: "System",
+      placement: "rightnav",
     },
-    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
+    {
+      href: "/help",
+      label: "Help",
+      icon: CircleHelp,
+      group: "System",
+      placement: "rightnav",
+    },
     {
       href: "/warehouse/account",
       label: "Account",
@@ -508,6 +594,7 @@ export const RIDER_SIDEBAR: SidebarConfig = {
       icon: Megaphone,
       exact: true,
       group: "System",
+      placement: "rightnav",
     },
     {
       href: "/rider/support",
@@ -515,8 +602,15 @@ export const RIDER_SIDEBAR: SidebarConfig = {
       icon: LifeBuoy,
       exact: true,
       group: "System",
+      placement: "rightnav",
     },
-    { href: "/help", label: "Help", icon: CircleHelp, group: "System" },
+    {
+      href: "/help",
+      label: "Help",
+      icon: CircleHelp,
+      group: "System",
+      placement: "rightnav",
+    },
     {
       href: "/rider/account",
       label: "Account",

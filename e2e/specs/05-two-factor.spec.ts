@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test"
 import { totpSecretFromUri } from "@/lib/two-factor"
 import { CREDS, type E2ECredential, login, waitForAppReady } from "../helpers"
-import { auth, signOut, twoFactor } from "../selectors"
+import { auth, signOut, topnav, twoFactor } from "../selectors"
 import { totp } from "../totp"
 
 const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider|welcome)/
@@ -105,8 +105,10 @@ test.describe("S37. Two-factor authentication", () => {
     await expect(page.locator(twoFactor.status)).toHaveText("Enabled")
 
     // ── Sign out ──────────────────────────────────────────────────────────
-    // Sign out is confirmed first, so the click opens a dialog rather than
-    // ending the session — the redirect only follows the confirm.
+    // Sign out lives in the RightNav panel behind the TopNav avatar. It is
+    // confirmed first, so the click opens a dialog rather than ending the
+    // session — the redirect only follows the confirm.
+    await page.locator(topnav.userMenu).click()
     await page.locator(auth.logout).click()
     await expect(page.locator(signOut.confirm)).toBeVisible()
     await page.locator(signOut.confirm).click()
