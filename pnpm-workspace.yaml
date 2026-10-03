@@ -18,18 +18,26 @@ onlyBuiltDependencies:
 # Security overrides — transitive deps pinned past their advisory fixes
 # (kept here because pnpm 11 no longer reads `pnpm.overrides` from package.json).
 #
-# Gate: `pnpm audit --audit-level=high` in CI (H1) — the WHOLE tree, prod and
-# dev. Do not "fix" a red audit by switching it to `--prod`: that reports 0 high
-# here and hides the dev tree entirely, which is exactly how a high advisory in
-# a build-time dependency shipped unnoticed while this comment claimed the gate
-# was green.
+# Gate: `pnpm audit --audit-level=high` in CI — the WHOLE tree, prod and dev.
+# Do not "fix" a red audit by switching it to `--prod`: that reports 0 high here
+# and hides the dev tree entirely.
 #
-# If an advisory has no published fix, an override cannot help — check
-# `npm view <pkg> version` before reaching for one. `braces` is the case in
-# point: GHSA-vfj7-8cjw-p6xm (high, DoS via deeply nested glob patterns) says
-# "patched >= 3.0.4", but 3.0.3 is still the latest release, so the only real
-# remedy was to drop the dependent (`shadcn`, now run via `pnpm dlx`) — see
-# "Dependency security" in CONTRIBUTING.md.
+# `auditConfig.ignoreGhsas` is the escape hatch for advisories with NO published
+# fix, so no override can help. Keep the list empty otherwise — each entry is a
+# permanent hole in this gate, and a wide list means the gate is decorative.
+# See "Dependency security" in CONTRIBUTING.md.
+auditConfig:
+  ignoreGhsas:
+    # GHSA-vfj7-8cjw-p6xm — high, DoS in `braces` via deeply nested glob
+    # patterns. The advisory says "patched >= 3.0.4" but 3.0.3 is still the
+    # latest published release, and no newer `micromatch` (4.0.8) or
+    # `fast-glob` (3.3.3) drops the dependency, so there is no version to move
+    # to. It is reachable only through `shadcn`'s CLI (ts-morph/fast-glob ->
+    # micromatch), which never runs in CI or `next build` — `shadcn` is a
+    # devDependency only because `globals.css` imports `shadcn/tailwind.css`.
+    # Remove this line as soon as braces 3.0.4 ships.
+    - GHSA-vfj7-8cjw-p6xm
+
 overrides:
   brace-expansion@>=3.0.0: "^5.0.12"
   js-yaml: "^4.3.2"

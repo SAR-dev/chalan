@@ -108,7 +108,11 @@ function req(
   return new Request("http://test.local/api/uploads", {
     method: "POST",
     headers,
-    body,
+    // `new Uint8Array(...)` rather than the Buffer: `Buffer` is
+    // `Buffer<ArrayBufferLike>`, which includes the SharedArrayBuffer-backed
+    // case, and `BodyInit` only accepts views over a plain ArrayBuffer. A copy
+    // is free here — this is a multipart body built per request in a test.
+    body: new Uint8Array(body),
   })
 }
 

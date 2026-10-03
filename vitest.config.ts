@@ -46,7 +46,17 @@ export default defineConfig({
       exclude: [
         "src/**/*.spec.{ts,tsx}",
         "src/**/__tests__/**",
-        "src/lib/db/schema*",
+        // Both entries need to be spelled out, and the nested one needs `/**`.
+        // A bare `src/lib/db/schema*` reads like it covers the schema modules but
+        // it is a sibling-only pattern: it matches `schema.ts` and nothing else,
+        // and 0 of the 12 files in `schema.postgres/` slipped into the report.
+        // That went unnoticed until @vitest/coverage-v8 5 began attributing the
+        // arrow functions in those declarative table definitions, which pulled
+        // `src/lib/**` function coverage from 88.78% down to 80% against an 85%
+        // floor. Schema modules are declarations, not logic — there is nothing
+        // to unit-test in them.
+        "src/lib/db/schema.ts",
+        "src/lib/db/schema.postgres/**",
         // Declarative fixture data, not logic. Counting ~60 untested seed files
         // in the denominator made the headline number incomparable and let a
         // real regression in src/lib hide behind the dilution.
