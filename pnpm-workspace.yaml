@@ -17,7 +17,19 @@ onlyBuiltDependencies:
 
 # Security overrides — transitive deps pinned past their advisory fixes
 # (kept here because pnpm 11 no longer reads `pnpm.overrides` from package.json).
-# Gate: `pnpm audit --prod --audit-level=high` in CI (H1).
+#
+# Gate: `pnpm audit --audit-level=high` in CI (H1) — the WHOLE tree, prod and
+# dev. Do not "fix" a red audit by switching it to `--prod`: that reports 0 high
+# here and hides the dev tree entirely, which is exactly how a high advisory in
+# a build-time dependency shipped unnoticed while this comment claimed the gate
+# was green.
+#
+# If an advisory has no published fix, an override cannot help — check
+# `npm view <pkg> version` before reaching for one. `braces` is the case in
+# point: GHSA-vfj7-8cjw-p6xm (high, DoS via deeply nested glob patterns) says
+# "patched >= 3.0.4", but 3.0.3 is still the latest release, so the only real
+# remedy was to drop the dependent (`shadcn`, now run via `pnpm dlx`) — see
+# "Dependency security" in CONTRIBUTING.md.
 overrides:
   brace-expansion@>=3.0.0: "^5.0.12"
   js-yaml: "^4.3.2"
