@@ -9,6 +9,10 @@ let mockUser: ReturnType<typeof makeUser> | null
 vi.mock("@/features/account/hooks/use-auth", () => ({
   useAuth: () => ({ currentUser: mockUser }),
 }))
+vi.mock("next/navigation", () => ({
+  // The page navigates to the create/edit pages from here.
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}))
 vi.mock("@/features/announcements/hooks/use-announcements", () => ({
   useAnnouncements: () => ({ announcements: [], total: 0, isLoading: false }),
 }))

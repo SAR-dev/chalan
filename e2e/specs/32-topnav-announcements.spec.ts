@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test"
-import { CREDS, login, waitForAppReady } from "../helpers"
-import { announcements, auth, nav, signOut, topnav } from "../selectors"
+import { CREDS, login, toast, waitForAppReady } from "../helpers"
+import {
+  announcementForm,
+  announcements,
+  auth,
+  nav,
+  signOut,
+  topnav,
+} from "../selectors"
 
 // ─── S75. TopNav & RightNav ─────────────────────────────────────────────────
 //
@@ -65,22 +72,35 @@ test.describe("S75. TopNav & RightNav", () => {
     await expect(page.locator(topnav.rightnavAccount)).toBeVisible()
 
     // Help & resources: the utility items the sidebar skipped (placement:
-    // "rightnav") render here — Help and Inbox for every role. Admin keeps
-    // Support in its sidebar (it is a ticket queue, not a help link).
+    // "rightnav") render here — Help for every role. Admin keeps Support in
+    // its sidebar (it is a ticket queue, not a help link), and its feed nav
+    // entry is retired (the manage page owns the slot; the bell links to the
+    // feed directly).
     await expect(
       panel.locator("[aria-label='Help and resources']"),
     ).toBeVisible()
     await expect(panel.locator("[data-testid='rightnav-/help']")).toBeVisible()
     await expect(
-      panel.locator("[data-testid='rightnav-/dashboard/announcements-inbox']"),
-    ).toBeVisible()
-    await expect(
       panel.locator("[data-testid='rightnav-/dashboard/support']"),
     ).toHaveCount(0)
-    // …and the sidebar no longer lists them.
+    await expect(
+      panel.locator("[data-testid='rightnav-/dashboard/announcements-inbox']"),
+    ).toHaveCount(0)
+    // …and the sidebar holds neither Help nor the retired feed entry…
     await expect(
       page.locator(nav.sidebar).locator("[data-testid='nav-/help']"),
     ).toHaveCount(0)
+    await expect(
+      page
+        .locator(nav.sidebar)
+        .locator("[data-testid='nav-/dashboard/announcements-inbox']"),
+    ).toHaveCount(0)
+    // …but does hold the manage page.
+    await expect(
+      page
+        .locator(nav.sidebar)
+        .locator("[data-testid='nav-/dashboard/announcements']"),
+    ).toBeVisible()
   })
 
   test("RightNav sign out goes through the confirmation (links stay inert)", async ({
@@ -119,28 +139,29 @@ test.describe("S75. TopNav & RightNav", () => {
   })
 })
 
-// ─── S76. Announcements (bell, detail page, markdown) ───────────────────────
+// ─── S76. Announcements (badge, feed, detail page, markdown) ─────────────────
 //
-// Read state moved from localStorage to the announcement_read table. The
-// reload assertion below is the cross-device proof: after a full page reload
-// (new storage, same account) the badge must still be cleared — impossible
-// with the old per-browser key.
+// Announcements are a board, not a notification feed: the badge counts
+// announcements published since `profile.announcementsSeenAt`, visiting the
+// feed stamps that watermark, and nothing is ever hidden by having "seen" it.
+// The reload assertions are the cross-device proof — server state, not a
+// per-browser localStorage key.
 
 test.describe("S76. Announcements", () => {
-  test("reading an announcement clears the badge across a reload (server-side state)", async ({
+  test("visiting the feed drains the badge, and it stays drained across a reload", async ({
     page,
   }) => {
     await login(page, CREDS.superAdmin)
 
-    // Deterministic setup: mark everything live as read, then create one
-    // fresh announcement. The badge now has exactly one contributor — this
-    // test's own row — so neither earlier specs nor the seed can perturb it.
-    const markAll = await page.request.post("/api/announcements/read-all")
-    expect(markAll.ok()).toBeTruthy()
+    // Clean watermark, then one fresh announcement: the badge has exactly one
+    // contributor — this test's own row — so neither earlier specs nor the
+    // seed can perturb the count.
+    const seen = await page.request.post("/api/announcements/seen")
+    expect(seen.ok()).toBeTruthy()
     const created = await page.request.post("/api/announcements", {
       data: {
-        title: "E2E unread proof",
-        content: "Read state must survive a reload.",
+        title: "E2E new-post proof",
+        content: "The badge counts posts since your last feed visit.",
         targetRoles: ["SUPER_ADMIN"],
         // publishedAt (not null) is what makes it live: without it the row is
         // a draft and never reaches the bell.
@@ -155,37 +176,39 @@ test.describe("S76. Announcements", () => {
 
     const bell = page.locator(announcements.bell)
     await expect(bell).toBeVisible()
-    // The only unread row is the one just created → badge reads exactly 1.
+    // The only post-watermark row is the one just created → badge reads 1.
     await expect(page.locator(announcements.badge)).toHaveText("1")
 
-    // Open it from the bell; the detail page marks it read.
+    // The bell is a plain link to the feed (no tray) — and the feed stamps
+    // the watermark on mount, so the badge drains while we watch it.
     await bell.click()
-    await expect(page.locator(announcements.list)).toBeVisible()
-    await page.locator(announcements.item(ann.id)).click()
-    await page.waitForURL(new RegExp(`/announcements/${ann.id}`))
-    await waitForAppReady(page)
-    await expect(page.locator(announcements.body)).toBeVisible()
-    await expect(page.locator(announcements.back)).toBeVisible()
+    await page.waitForURL(/\/dashboard\/announcements-inbox/)
+    await expect(page.locator(announcements.inboxRow(ann.id))).toBeVisible()
+    await expect(page.locator(announcements.badge)).toHaveCount(0)
 
-    // Cross-reload: with localStorage this reset on a new browser profile; with
-    // announcement_read the server remembers, so the badge must stay gone.
+    // Cross-reload: with localStorage this reset on a new browser profile;
+    // the watermark lives on the profile row, so it must stay drained.
     await page.goto("/dashboard/orders")
+    await waitForAppReady(page)
+    await expect(page.locator(announcements.badge)).toHaveCount(0)
+    await page.reload()
     await waitForAppReady(page)
     await expect(page.locator(announcements.badge)).toHaveCount(0)
 
     await page.request.delete(`/api/announcements/${ann.id}`)
   })
 
-  test("mark all read empties the badge", async ({ page }) => {
+  test("NEW pill marks what is new, then clears on the next visit", async ({
+    page,
+  }) => {
     await login(page, CREDS.superAdmin)
 
-    // Fresh unread row so the Mark all read control is guaranteed to show.
-    const markAllFirst = await page.request.post("/api/announcements/read-all")
-    expect(markAllFirst.ok()).toBeTruthy()
+    const seen = await page.request.post("/api/announcements/seen")
+    expect(seen.ok()).toBeTruthy()
     const created = await page.request.post("/api/announcements", {
       data: {
-        title: "E2E mark-all target",
-        content: "Cleared in one action.",
+        title: "E2E new pill",
+        content: "Pinned for this visit only.",
         targetRoles: ["SUPER_ADMIN"],
         publishedAt: new Date().toISOString(),
       },
@@ -193,34 +216,34 @@ test.describe("S76. Announcements", () => {
     expect(created.ok()).toBeTruthy()
     const ann = (await created.json()) as { id: string }
 
-    await page.goto("/dashboard/orders")
+    // First visit: the pill survives the stamp (pinned at arrival), so the
+    // reader can still see what was new after the badge drains.
+    await page.goto("/dashboard/announcements-inbox")
     await waitForAppReady(page)
-
-    await expect(page.locator(announcements.badge)).toHaveText("1")
-    const bell = page.locator(announcements.bell)
-    await bell.click()
-    await expect(page.locator(announcements.list)).toBeVisible()
-
-    const markAll = page.locator(announcements.markAll)
-    await expect(markAll).toBeVisible()
-    await markAll.click()
+    await expect(page.locator(announcements.newPill(ann.id))).toBeVisible()
     await expect(page.locator(announcements.badge)).toHaveCount(0)
 
-    await page.keyboard.press("Escape")
+    // Second visit: the watermark predates the row now, so no pill — "new"
+    // means "new since your last look", exactly once.
+    await page.goto("/dashboard/orders")
+    await page.goto("/dashboard/announcements-inbox")
+    await waitForAppReady(page)
+    await expect(page.locator(announcements.newPill(ann.id))).toHaveCount(0)
+
     await page.request.delete(`/api/announcements/${ann.id}`)
   })
 
-  test("detail page marks the announcement read server-side (POST fires once)", async ({
+  test("the feed stamps once; the detail page never writes", async ({
     page,
   }) => {
     await login(page, CREDS.superAdmin)
 
-    // Fresh + unread: tests 1–2 already marked every seeded row read, so a
-    // seeded pick here would (correctly) fire no POST at all.
+    const seen = await page.request.post("/api/announcements/seen")
+    expect(seen.ok()).toBeTruthy()
     const created = await page.request.post("/api/announcements", {
       data: {
-        title: "E2E single-post proof",
-        content: "Exactly one mark-read POST on open.",
+        title: "E2E write-surface proof",
+        content: "Exactly one watermark write, none from the detail page.",
         targetRoles: ["SUPER_ADMIN"],
         publishedAt: new Date().toISOString(),
       },
@@ -228,36 +251,29 @@ test.describe("S76. Announcements", () => {
     expect(created.ok()).toBeTruthy()
     const fresh = (await created.json()) as { id: string }
 
-    // Watch for the single mark-read POST when the page mounts.
-    const readPosts: string[] = []
+    // Count every announcement-scoped POST the browser issues.
+    const posts: string[] = []
     page.on("request", (req) => {
-      if (
-        req.method() === "POST" &&
-        /\/api\/announcements\/[^/]+\/read$/.test(req.url())
-      ) {
-        readPosts.push(req.url())
+      if (req.method() === "POST" && /\/api\/announcements\//.test(req.url())) {
+        posts.push(req.url())
       }
     })
 
-    await page.goto(`/announcements/${fresh.id}`)
+    await page.goto("/dashboard/announcements-inbox")
     await waitForAppReady(page)
-    await expect(page.locator(announcements.body)).toBeVisible()
-
-    // Unread on the server when we arrived, so exactly one POST fires —
-    // StrictMode's double effect is guarded by the postedRef.
+    await expect(page.locator(announcements.inboxRow(fresh.id))).toBeVisible()
     await expect
-      .poll(() => readPosts.length, { timeout: 10_000 })
-      .toBeGreaterThanOrEqual(1)
-    expect(readPosts.length).toBe(1)
+      .poll(() => posts.filter((u) => u.includes("/seen")).length, {
+        timeout: 10_000,
+      })
+      .toBe(1)
 
-    // Re-fetch: this id must now carry readAt on the server.
-    const after = await page.request.get("/api/announcements/active")
-    const afterRows = (await after.json()) as Array<{
-      id: string
-      readAt: string | null
-    }>
-    const target = afterRows.find((r) => r.id === fresh.id)
-    expect(target?.readAt).toBeTruthy()
+    // The detail page renders content without any consumption tracking —
+    // viewing one announcement must not advance the feed watermark.
+    await page.goto(`/announcements/${fresh.id}`)
+    await expect(page.locator(announcements.body)).toBeVisible()
+    await waitForAppReady(page)
+    expect(posts.filter((u) => u.includes("/announcements/"))).toHaveLength(1)
 
     await page.request.delete(`/api/announcements/${fresh.id}`)
   })
@@ -293,7 +309,7 @@ test.describe("S76. Announcements", () => {
     await page.request.delete(`/api/announcements/${ann.id}`)
   })
 
-  test("inbox rows link to the detail page", async ({ page }) => {
+  test("feed rows link to the detail page", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/announcements-inbox")
     await waitForAppReady(page)
@@ -306,8 +322,80 @@ test.describe("S76. Announcements", () => {
     await row.click()
     await page.waitForURL(new RegExp(`/announcements/${annId}`))
     await expect(page.locator(announcements.body)).toBeVisible()
-    // Back returns to the inbox, not a closed modal.
+    // "Go back" = one history entry: we came from the feed, so we land back
+    // on the feed (not a fixed href — the same button covers whatever led
+    // here). Wait for the feed URL, not /announcements/, which the detail
+    // page itself matches.
     await page.locator(announcements.back).click()
-    await page.waitForURL(/announcements/)
+    await page.waitForURL(/\/dashboard\/announcements-inbox/)
+    await expect(page.locator(announcements.inboxRow(annId))).toBeVisible()
+  })
+
+  test("admin creates an announcement on the new page and edits it on the edit page", async ({
+    page,
+  }) => {
+    await login(page, CREDS.superAdmin)
+    await page.goto("/dashboard/announcements")
+    await waitForAppReady(page)
+
+    // ── Create ─────────────────────────────────────────────────────────────
+    await page.locator(announcementForm.newLink).click()
+    await page.waitForURL(/\/dashboard\/announcements\/new/)
+    await expect(page.locator(announcementForm.title)).toBeVisible()
+
+    const stamp = Date.now()
+    const title = `E2E page-created ${stamp}`
+    await page.locator(announcementForm.title).fill(title)
+    await page
+      .locator(announcementForm.content)
+      .fill("## Made on the page\n\n- via the create page, not a dialog")
+    // Left as a draft (no publish date) on purpose: the manage list shows
+    // drafts, so the flow needs no datetime-local gymnastics.
+    await page.locator(announcementForm.role("SUPER_ADMIN")).click()
+    await page.locator(announcementForm.submit).click()
+
+    await page.waitForURL(/\/dashboard\/announcements$/)
+    await expect(toast(page, /created/i)).toBeVisible()
+
+    // ── Edit ───────────────────────────────────────────────────────────────
+    // Resolve the fresh row's id through the API, then drive the list UI:
+    // search narrows the server-paginated table to the one row.
+    const list = await page.request.get(
+      `/api/announcements?q=${encodeURIComponent(title)}`,
+    )
+    expect(list.ok()).toBeTruthy()
+    const rows = (await list.json()) as { data: Array<{ id: string }> }
+    const created = rows.data[0]
+    expect(created, "created announcement should be listed").toBeTruthy()
+    const id = created!.id
+
+    await page.locator(announcementForm.search).fill(title)
+    const row = page.locator(
+      `[data-testid='row-dashboard-announcements-${id}']`,
+    )
+    await expect(row).toBeVisible()
+
+    await page.locator(announcementForm.rowActions(id)).click()
+    await page.locator(announcementForm.editItem).click()
+    await page.waitForURL(new RegExp(`/dashboard/announcements/${id}/edit`))
+    // The form arrives prefilled, not empty.
+    await expect(page.locator(announcementForm.title)).toHaveValue(title)
+
+    const newTitle = `${title} (edited)`
+    await page.locator(announcementForm.title).fill(newTitle)
+    await page.locator(announcementForm.submit).click()
+
+    await page.waitForURL(/\/dashboard\/announcements$/)
+    await expect(toast(page, /updated/i)).toBeVisible()
+    // Fresh page load resets the search box — narrow again, then the row
+    // must carry the edited title.
+    await page.locator(announcementForm.search).fill("(edited)")
+    await expect(
+      page.locator(`[data-testid='row-dashboard-announcements-${id}']`),
+    ).toContainText("(edited)")
+
+    // ── Cleanup ────────────────────────────────────────────────────────────
+    const del = await page.request.delete(`/api/announcements/${id}`)
+    expect(del.ok()).toBeTruthy()
   })
 })

@@ -84,17 +84,29 @@ export const topnav = {
   rightnavAccount: "[data-testid='rightnav-account']",
 }
 
-// ─── Announcements (bell + inbox + detail page) ──────────────────────────────
+// ─── Announcements (bell link + feed + detail page) ──────────────────────────
 export const announcements = {
   bell: "[data-testid='announcement-bell']",
   badge: "[data-testid='announcement-badge']",
-  list: "[data-testid='announcement-list']",
-  item: (id: string) => `[data-testid='announcement-item-${id}']`,
-  markAll: "[data-testid='announcement-mark-all']",
-  openInbox: "[data-testid='announcement-open-inbox']",
+  // Feed rows + the "published since your last visit" pill.
   inboxRow: (id: string) => `[data-testid='inbox-row-${id}']`,
+  newPill: (id: string) => `[data-testid='inbox-new-${id}']`,
   body: "[data-testid='announcement-body']",
   back: "[data-testid='announcement-back']",
+}
+
+// ─── Announcement create/edit pages (replaced the dialogs) ──────────────────
+export const announcementForm = {
+  newLink: "[data-testid='announcements-new']",
+  search: "[data-testid='table-search-dashboard-announcements']",
+  title: "[data-testid='ann-title']",
+  content: "[data-testid='ann-content']",
+  contentPreview: "[data-testid='ann-content-preview']",
+  role: (role: string) => `[data-testid='ann-role-${role}']`,
+  submit: "[data-testid='ann-submit']",
+  cancel: "[data-testid='ann-cancel']",
+  rowActions: (id: string) => `[data-testid='ann-actions-${id}']`,
+  editItem: "[data-testid='ann-edit-item']",
 }
 
 // ─── Public pricing (city-to-city rate card) ─────────────────────────────────

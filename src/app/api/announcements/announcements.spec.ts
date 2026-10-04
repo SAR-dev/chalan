@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { POST as markRead } from "./[id]/read/route"
 import {
   DELETE as deleteAnnouncement,
   PATCH as updateAnnouncement,
 } from "./[id]/route"
 import { GET as activeAnnouncements } from "./active/route"
 import { DELETE as bulkDeleteAnnouncements } from "./bulk/route"
-import { POST as markAllRead } from "./read-all/route"
 import { POST as createAnnouncement, GET as listAnnouncements } from "./route"
+import { POST as markSeen } from "./seen/route"
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
 
@@ -174,72 +173,47 @@ describe("GET /api/announcements/active", () => {
     expect(json).toHaveLength(1)
   })
 
-  it("carries readAt per row so the client never touches localStorage", async () => {
-    sessionState.value = merchantSession
+  it("flags everything new when the reader has never visited the feed", async () => {
+    sessionState.value = { ...merchantSession, announcementsSeenAt: null }
     selectQueue.push([
-      { id: "ann_1", title: "Read one", readAt: "2025-06-01T00:00:00Z" },
-      { id: "ann_2", title: "Unread one", readAt: null },
+      { id: "ann_1", title: "Old post", publishedAt: "2025-01-01T00:00:00Z" },
+      { id: "ann_2", title: "New post", publishedAt: "2025-06-01T00:00:00Z" },
     ])
     const res = await activeAnnouncements()
-    const json = await res.json()
-    expect(res.status).toBe(200)
-    expect(json.map((r: { readAt: string | null }) => r.readAt)).toEqual([
-      "2025-06-01T00:00:00Z",
-      null,
+    const json = (await res.json()) as Array<{ id: string; isNew: boolean }>
+    expect(json.map((r) => r.isNew)).toEqual([true, true])
+  })
+
+  it("flags only rows published after the last feed visit", async () => {
+    // Watermark between the two publishedAt values: first row predates the
+    // visit (seen), second one is newer (new).
+    sessionState.value = {
+      ...merchantSession,
+      announcementsSeenAt: "2025-03-01T00:00:00Z",
+    }
+    selectQueue.push([
+      { id: "ann_1", title: "Seen", publishedAt: "2025-01-01T00:00:00Z" },
+      { id: "ann_2", title: "New", publishedAt: "2025-06-01T00:00:00Z" },
     ])
+    const res = await activeAnnouncements()
+    const json = (await res.json()) as Array<{ id: string; isNew: boolean }>
+    expect(json.map((r) => r.isNew)).toEqual([false, true])
   })
 })
 
-describe("POST /api/announcements/:id/read", () => {
+describe("POST /api/announcements/seen", () => {
   it("401 when unauthenticated", async () => {
-    const res = await markRead(req("POST"), ctx())
+    const res = await markSeen()
     expect(res.status).toBe(401)
   })
 
-  it("404s when the announcement is not targeted at the caller's role", async () => {
+  it("advances the watermark and returns ok", async () => {
     sessionState.value = merchantSession
-    selectQueue.push([]) // role-containment where clause matched nothing
-    const res = await markRead(req("POST"), ctx())
-    expect(res.status).toBe(404)
-  })
-
-  it("inserts the read row and returns ok (idempotent on repeat)", async () => {
-    sessionState.value = merchantSession
-    selectQueue.push([{ id: "ann_1" }])
-    const res = await markRead(req("POST"), ctx())
+    const res = await markSeen()
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ ok: true })
-  })
-})
-
-describe("POST /api/announcements/read-all", () => {
-  it("401 when unauthenticated", async () => {
-    const res = await markAllRead()
-    expect(res.status).toBe(401)
-  })
-
-  it("no-ops with count 0 when nothing is live", async () => {
-    sessionState.value = merchantSession
-    selectQueue.push([]) // getActiveAnnouncements → no live rows
-    const res = await markAllRead()
-    const json = await res.json()
-    expect(res.status).toBe(200)
-    expect(json).toMatchObject({ ok: true, count: 0 })
-  })
-
-  it("marks every live announcement read and reports the count", async () => {
-    sessionState.value = merchantSession
-    selectQueue.push([
-      { id: "ann_1", readAt: "2025-06-01T00:00:00Z" }, // already read
-      { id: "ann_2", readAt: null }, // first read now
-      { id: "ann_3", readAt: null },
-    ])
-    selectQueue.push([{ count: 3 }]) // post-insert count of read rows
-    const res = await markAllRead()
-    const json = await res.json()
-    expect(res.status).toBe(200)
-    expect(json).toMatchObject({ ok: true, count: 3 })
+    expect(json.seenAt).toBeTruthy()
   })
 })
 

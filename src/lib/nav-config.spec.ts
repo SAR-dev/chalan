@@ -68,7 +68,6 @@ describe("SUPER_ADMIN_SIDEBAR", () => {
     expect(labels).toContain("Warehouses")
     expect(labels).toContain("Payouts")
     expect(labels).toContain("Announcements")
-    expect(labels).toContain("Inbox")
     expect(labels).toContain("Audit Logs")
     expect(labels).toContain("Email Logs")
     expect(labels).toContain("Settings")
@@ -99,7 +98,7 @@ describe("MERCHANT_SIDEBAR", () => {
     expect(labels).toContain("Pricing")
     expect(labels).toContain("Business Settings")
     expect(labels).toContain("Verification")
-    expect(labels).toContain("Inbox")
+    expect(labels).toContain("Announcements")
   })
 
   it("every item has an href starting with /merchant (or /help)", () => {
@@ -119,7 +118,7 @@ describe("WAREHOUSE_SIDEBAR", () => {
     expect(labels).toContain("Exceptions")
     expect(labels).toContain("COD Settlement")
     expect(labels).toContain("Rider Cash")
-    expect(labels).toContain("Inbox")
+    expect(labels).toContain("Announcements")
     expect(labels).toContain("Account")
   })
 
@@ -139,7 +138,7 @@ describe("RIDER_SIDEBAR", () => {
     // Documented in the rider guide but had no sidebar entry; reachable only by
     // typing the URL until it was added here.
     expect(labels).toContain("Earnings")
-    expect(labels).toContain("Inbox")
+    expect(labels).toContain("Announcements")
     expect(labels).toContain("Account")
   })
 
@@ -225,24 +224,26 @@ describe("sidebar grouping", () => {
   )
 })
 
-// The placement split: utility links (Help/Inbox, plus Support for the
-// self-service roles) leave the sidebar for the RightNav account panel. The
-// items stay in `items` — grants, the route guard, and the command palette
-// read the raw array — so these two helpers are the only rendering contract.
+// The placement split: utility links (Help, and Support for the self-service
+// roles) leave the sidebar for the RightNav account panel. The announcements
+// feed is deliberately NOT one of them — it is a board you read, not a
+// utility, so it stays in the sidebar (and the TopNav bell links to it
+// directly). The items stay in `items` either way — grants, the route guard,
+// and the command palette read the raw array — so these two helpers are the
+// only rendering contract.
 describe("rightnav placement", () => {
   it.each([
     ["SUPER_ADMIN", SUPER_ADMIN_SIDEBAR],
     ["MERCHANT", MERCHANT_SIDEBAR],
     ["WAREHOUSE", WAREHOUSE_SIDEBAR],
     ["RIDER", RIDER_SIDEBAR],
-  ] as const)("%s: Help and Inbox move to the rightnav", (_name, config) => {
+  ] as const)("%s: Help moves to the rightnav", (_name, config) => {
     const moved = rightNavItems(config.items).map((i) => i.label)
     expect(moved).toContain("Help")
-    expect(moved).toContain("Inbox")
-    // …and are gone from the sidebar view.
-    const sidebarLabels = sidebarVisibleItems(config.items).map((i) => i.label)
-    expect(sidebarLabels).not.toContain("Help")
-    expect(sidebarLabels).not.toContain("Inbox")
+    // …and is gone from the sidebar view.
+    expect(sidebarVisibleItems(config.items).map((i) => i.label)).not.toContain(
+      "Help",
+    )
   })
 
   it("Support moves for self-service roles but stays a sidebar queue for admins", () => {
@@ -264,6 +265,26 @@ describe("rightnav placement", () => {
     ).not.toContain("Support")
   })
 
+  it("the announcements feed stays a sidebar destination, never a rightnav link", () => {
+    // It is a board you read, not a utility — and admin's feed entry is
+    // retired outright (the manage page owns the slot; the bell links to the
+    // feed directly).
+    for (const config of [MERCHANT_SIDEBAR, WAREHOUSE_SIDEBAR, RIDER_SIDEBAR]) {
+      const sidebarLabels = sidebarVisibleItems(config.items).map(
+        (i) => i.label,
+      )
+      expect(sidebarLabels).toContain("Announcements")
+      expect(rightNavItems(config.items).map((i) => i.label)).not.toContain(
+        "Announcements",
+      )
+    }
+    const adminLabels = SUPER_ADMIN_SIDEBAR.items.map((i) => i.label)
+    expect(adminLabels).toContain("Announcements") // the manage page
+    expect(SUPER_ADMIN_SIDEBAR.items.map((i) => i.href)).not.toContain(
+      "/dashboard/announcements-inbox",
+    ) // feed entry retired
+  })
+
   it("the split never loses or duplicates an item", () => {
     for (const config of [
       SUPER_ADMIN_SIDEBAR,
@@ -280,8 +301,10 @@ describe("rightnav placement", () => {
   })
 
   it("placement changes rendering only — grantable hrefs are untouched", () => {
-    // merchantGrantableNavItems reads the raw array, so moving Support/Inbox
-    // to the rightnav must not revoke an existing moderator grant.
+    // merchantGrantableNavItems reads the raw array, so moving Support to
+    // the rightnav must not revoke an existing moderator grant — and the
+    // announcements feed grant stays too, even though admin retired its own
+    // feed entry (merchant's is unaffected).
     const grantable = merchantGrantableNavItems().map((i) => i.href)
     expect(grantable).toContain("/merchant/support")
     expect(grantable).toContain("/merchant/announcements")

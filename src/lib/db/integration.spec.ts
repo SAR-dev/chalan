@@ -74,38 +74,8 @@ async function insertRider(email: string, suffix: string): Promise<string> {
 }
 
 /**
- * A minimal Better Auth user row. Only `id`/`name`/`email` are NOT NULL, so
- * this stays as thin as the table allows.
+ * A delivery city — `pickup_location.cityId` is NOT NULL and restrict-FKed.
  */
-async function insertUser(suffix: string): Promise<string> {
-  const id = `itest-user-${RUN}-${suffix}`
-  await client.query(
-    `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3) RETURNING id`,
-    [id, `itest user ${suffix}`, `itest.user.${RUN}.${suffix}@example.com`],
-  )
-  track("user", "id", id)
-  return id
-}
-
-/** A live announcement targeted at SUPER_ADMIN, for read-state invariants. */
-async function insertAnnouncement(suffix: string): Promise<string> {
-  const id = `itest-ann-${RUN}-${suffix}`
-  await client.query(
-    `INSERT INTO announcement (id, title, content, "targetRoles", "createdBy", "publishedAt")
-     VALUES ($1, $2, $3, $4::jsonb, $5, now()) RETURNING id`,
-    [
-      id,
-      `itest announcement ${RUN} ${suffix}`,
-      "n/a",
-      JSON.stringify(["SUPER_ADMIN"]),
-      "integration-test",
-    ],
-  )
-  track("announcement", "id", id)
-  return id
-}
-
-/** A delivery city — `pickup_location.cityId` is NOT NULL and restrict-FKed. */
 async function insertCity(
   suffix: string,
   zoneId: string,
@@ -421,93 +391,32 @@ suite("unique indexes (P1.1)", () => {
     await insertRider("", "blank-1")
     await expect(insertRider("", "blank-2")).resolves.toBeDefined()
   })
-
-  it("rejects a second read row for the same announcement and user", async () => {
-    const user = await insertUser("annread")
-    const ann = await insertAnnouncement("annread")
-
-    const insert = async () => {
-      const id = `itest-annread-${RUN}-${randomUUID().slice(0, 8)}`
-      await client.query(
-        `INSERT INTO announcement_read (id, "announcementId", "userId")
-         VALUES ($1, $2, $3)`,
-        [id, ann, user],
-      )
-      track("announcement_read", "id", id)
-    }
-
-    await insert()
-    await expect(insert()).rejects.toMatchObject({
-      code: UNIQUE_VIOLATION,
-    })
-  })
-
-  it("marks the same announcement read for two different users", async () => {
-    const ann = await insertAnnouncement("multi")
-    const a = await insertUser("annread-a")
-    const b = await insertUser("annread-b")
-
-    for (const [suffix, user] of [
-      ["a", a],
-      ["b", b],
-    ] as const) {
-      const id = `itest-annread-${RUN}-${suffix}`
-      await client.query(
-        `INSERT INTO announcement_read (id, "announcementId", "userId")
-         VALUES ($1, $2, $3)`,
-        [id, ann, user],
-      )
-      track("announcement_read", "id", id)
-    }
-    const { rows } = await client.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM announcement_read WHERE "announcementId" = $1`,
-      [ann],
-    )
-    expect(rows[0].n).toBe("2")
-  })
 })
 
-suite("announcement read cascade", () => {
-  it("removes read rows when the announcement is deleted", async () => {
-    const user = await insertUser("cascade")
-    const ann = await insertAnnouncement("cascade")
-    const readId = `itest-annread-${RUN}-cascade`
+suite("announcement watermark (profile)", () => {
+  it("a profile can be created without setting announcementsSeenAt", async () => {
+    // Better Auth and the registration flow know nothing about this column:
+    // if it ever became NOT NULL without a default, every signup would break.
+    // The watermark is per-user board state, not identity — default null
+    // ("never visited") is the load-bearing part.
+    const userId = `itest-wm-${RUN}`
     await client.query(
-      `INSERT INTO announcement_read (id, "announcementId", "userId")
-       VALUES ($1, $2, $3)`,
-      [readId, ann, user],
+      `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
+      [userId, `itest watermark ${RUN}`, `itest.wm.${RUN}@example.com`],
     )
-    track("announcement_read", "id", readId)
-
-    await client.query(`DELETE FROM announcement WHERE id = $1`, [ann])
-
-    const { rows } = await client.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM announcement_read WHERE id = $1`,
-      [readId],
-    )
-    // Cascade, not restrict: deleting an announcement is a normal admin action
-    // (the audit trail keeps the record), so it must not be blocked by reads.
-    expect(rows[0].n).toBe("0")
-  })
-
-  it("removes read rows when the user is deleted", async () => {
-    const user = await insertUser("cascade-user")
-    const ann = await insertAnnouncement("cascade-user")
-    const readId = `itest-annread-${RUN}-cascade-user`
+    track("user", "id", userId)
     await client.query(
-      `INSERT INTO announcement_read (id, "announcementId", "userId")
-       VALUES ($1, $2, $3)`,
-      [readId, ann, user],
+      `INSERT INTO profile ("userId", role) VALUES ($1, 'MERCHANT')`,
+      [userId],
     )
-    track("announcement_read", "id", readId)
+    track("profile", "userId", userId)
 
-    await client.query(`DELETE FROM "user" WHERE id = $1`, [user])
-
-    const { rows } = await client.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM announcement_read WHERE id = $1`,
-      [readId],
+    const { rows } = await client.query<{ seenAt: string | null }>(
+      `SELECT "announcementsSeenAt"::text AS "seenAt" FROM profile WHERE "userId" = $1`,
+      [userId],
     )
-    expect(rows[0].n).toBe("0")
+    expect(rows).toHaveLength(1)
+    expect(rows[0].seenAt).toBeNull()
   })
 })
 

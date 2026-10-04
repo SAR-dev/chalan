@@ -101,6 +101,7 @@ export const GET = withErrorHandler(async () => {
       isModerator: profile.isModerator,
       moderatorPermissions: profile.moderatorPermissions,
       activatedAt: profile.activatedAt,
+      announcementsSeenAt: profile.announcementsSeenAt,
       createdAt: profile.createdAt,
     })
     .from(profile)
@@ -197,6 +198,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
         isModerator: profile.isModerator,
         moderatorPermissions: profile.moderatorPermissions,
         activatedAt: profile.activatedAt,
+        announcementsSeenAt: profile.announcementsSeenAt,
         createdAt: profile.createdAt,
       })
       .from(profile)

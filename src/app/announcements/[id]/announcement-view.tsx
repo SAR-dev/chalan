@@ -1,47 +1,39 @@
 "use client"
 
 import { ArrowLeft } from "lucide-react"
-import Link from "next/link"
-import { useEffect, useRef } from "react"
-import { mutate as globalMutate } from "swr"
+import { useRouter } from "next/navigation"
 import { Markdown } from "@/components/markdown"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import type { AnnouncementWithRead } from "@/lib/announcements"
 import { formatDateTime } from "@/lib/format"
-
-const ACTIVE_KEY = "/api/announcements/active"
+import type { Announcement } from "@/lib/types"
 
 /**
- * The announcement body plus the one-time mark-read. This is the shared,
- * role-agnostic chrome for /announcements/[id] — no sidebar, so the header is
- * just brand-adjacent navigation (back to the reader's own inbox).
+ * The announcement body. This is the shared, role-agnostic chrome for
+ * /announcements/[id] — no sidebar, so the header is just brand-adjacent
+ * navigation back out of the page.
+ *
+ * Deliberately does NOT write anything on mount: viewing one announcement
+ * must not advance the feed watermark (that would mark everything else as
+ * seen too). Only visiting the feed stamps — see useAnnouncementFeed.
  */
 export function AnnouncementView({
   announcement,
   inboxHref,
 }: {
-  announcement: AnnouncementWithRead
+  announcement: Announcement
   inboxHref: string
 }) {
-  // Mark read on mount when unread. A ref guards StrictMode's double effect
-  // (dev runs effects twice) so the endpoint is not posted twice for one view.
-  const postedRef = useRef(false)
+  const router = useRouter()
 
-  useEffect(() => {
-    if (announcement.readAt || postedRef.current) return
-    postedRef.current = true
-
-    // Fire-and-forget: reading the page must not wait on, or fail with, the
-    // write. The badge on the inbox/bell clears via the cache revalidation.
-    fetch(`/api/announcements/${announcement.id}/read`, { method: "POST" })
-      .then((res) => (res.ok ? globalMutate(ACTIVE_KEY) : undefined))
-      .catch(() => {
-        // A failed mark-read is invisible here (the page already shows the
-        // content) — the next successful read attempt just posts again.
-        postedRef.current = false
-      })
-  }, [announcement.readAt, announcement.id])
+  function goBack() {
+    // "Go back" = one entry in this tab's history: the feed if we came from
+    // it, the bell, a share chat — whatever actually led here. A directly
+    // opened tab (typed URL, fresh link) has no previous entry, so fall back
+    // to the reader's feed rather than leaving a dead button.
+    if (window.history.length > 1) router.back()
+    else router.push(inboxHref)
+  }
 
   return (
     <main
@@ -51,13 +43,12 @@ export function AnnouncementView({
       <Button
         variant="ghost"
         size="sm"
-        render={<Link href={inboxHref} />}
-        nativeButton={false}
+        onClick={goBack}
         data-testid="announcement-back"
         className="mb-4 -ml-2.5"
       >
         <ArrowLeft className="size-4" />
-        Back to inbox
+        Go back
       </Button>
 
       <PageHeader

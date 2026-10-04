@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   Banknote,
   BarChart3,
-  Bell,
   Bike,
   CircleHelp,
   FileText,
@@ -43,8 +42,10 @@ export interface SidebarNavItem {
   group?: string
   /** Where the item is RENDERED. Omitted = "sidebar" (desktop sidebar + the
    * TopNav's mobile drawer). "rightnav" = the account slide-over opened from
-   * the TopNav avatar — used for utility links (Help, Inbox, and Support for
-   * the self-service roles) that aren't part of a role's daily workflow.
+   * the TopNav avatar — used for utility links (Help, and Support for the
+   * self-service roles) that aren't part of a role's daily workflow. The
+   * announcements feed is deliberately a sidebar destination: it is a board
+   * you read, not a utility (and the TopNav bell links to it directly).
    *
    * Deliberately a rendering concern only: the item stays in `items`, which is
    * what the merchant moderator grant model, the shell route guard, and the
@@ -216,13 +217,9 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       group: "System",
     },
     {
-      href: "/dashboard/announcements-inbox",
-      label: "Inbox",
-      icon: Bell,
-      group: "System",
-      placement: "rightnav",
-    },
-    {
+      // Admin's own feed entry was retired: the manage page above already
+      // owns the sidebar slot, and the feed stays reachable through the
+      // TopNav bell (announcementsPathForRole) and detail back-links.
       href: "/dashboard/support",
       label: "Support",
       icon: LifeBuoy,
@@ -270,13 +267,13 @@ export function homeForRole(role: Role): string {
 }
 
 /**
- * Each role's announcements inbox — the destination of the bell's "Open
- * inbox" link and the detail page's back link. Mirrors the nav items above;
- * the dashboard route is `announcements-inbox` (the sibling of the admin's
- * `announcements` management page), while the other three roles' inbox is
+ * Each role's announcements feed — the destination of the TopNav bell link
+ * and the detail page's back link. Mirrors the nav items above; the
+ * dashboard route is `announcements-inbox` (the sibling of the admin's
+ * `announcements` management page), while the other three roles' feed is
  * simply `/announcements`.
  */
-export function inboxPathForRole(role: Role): string {
+export function announcementsPathForRole(role: Role): string {
   if (role === "MERCHANT") return "/merchant/announcements"
   if (role === "RIDER") return "/rider/announcements"
   if (role === "WAREHOUSE_ADMIN") return "/warehouse/announcements"
@@ -371,11 +368,10 @@ export const MERCHANT_SIDEBAR: SidebarConfig = {
     },
     {
       href: "/merchant/announcements",
-      label: "Inbox",
+      label: "Announcements",
       icon: Megaphone,
       exact: true,
       group: "System",
-      placement: "rightnav",
     },
     {
       href: "/merchant/support",
@@ -528,11 +524,10 @@ export const WAREHOUSE_SIDEBAR: SidebarConfig = {
     },
     {
       href: "/warehouse/announcements",
-      label: "Inbox",
+      label: "Announcements",
       icon: Megaphone,
       exact: true,
       group: "System",
-      placement: "rightnav",
     },
     {
       href: "/warehouse/support",
@@ -590,11 +585,10 @@ export const RIDER_SIDEBAR: SidebarConfig = {
     },
     {
       href: "/rider/announcements",
-      label: "Inbox",
+      label: "Announcements",
       icon: Megaphone,
       exact: true,
       group: "System",
-      placement: "rightnav",
     },
     {
       href: "/rider/support",
