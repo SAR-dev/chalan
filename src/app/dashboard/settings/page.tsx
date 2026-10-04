@@ -34,12 +34,14 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { pageContent } from "@/config/content"
+import { useAuth } from "@/features/account/hooks/use-auth"
 import { CreateMailConfigDialog } from "@/features/platform-config/dialogs/create-mail-config-dialog"
 import {
   type MailConfigRecord,
   useMailConfigs,
 } from "@/features/platform-config/hooks/use-mail-configs"
 import { usePlatformConfig } from "@/features/platform-config/hooks/use-platform-config"
+import { isValidEmail } from "@/lib/validation"
 
 const emptyForm = {
   label: "",
@@ -54,6 +56,7 @@ const emptyForm = {
 
 export default function DashboardSettingsPage() {
   const { config, isLoading, updatePlatformConfig } = usePlatformConfig()
+  const { currentUser } = useAuth()
 
   // Delivery, COD and cancellation *rates* are per-lane `zone_pricing` rows and
   // are edited on the zone rate card, not here. The only platform-wide policy
@@ -74,6 +77,10 @@ export default function DashboardSettingsPage() {
   } = useMailConfigs()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  // Recipient for "Send test email". null = untouched, so the default tracks
+  // the signed-in admin while an explicit edit (including clearing) sticks.
+  const [testTo, setTestTo] = useState<string | null>(null)
+  const testRecipient = testTo ?? currentUser?.email ?? ""
   const [mailSaving, setMailSaving] = useState(false)
   const [mailTesting, setMailTesting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<MailConfigRecord | null>(
@@ -115,11 +122,15 @@ export default function DashboardSettingsPage() {
   }
 
   async function handleTestMail() {
+    if (!isValidEmail(testRecipient)) {
+      toast.error("Enter a valid recipient email address.")
+      return
+    }
     setMailTesting(true)
     try {
-      const result = await testMailConfig(form)
+      const result = await testMailConfig({ ...form, to: testRecipient })
       if (result.ok) {
-        toast.success("Test email sent — check your inbox.")
+        toast.success(`Test email sent to ${testRecipient}.`)
       } else {
         toast.error(result.error ?? "Failed to send test email.")
       }
@@ -360,6 +371,8 @@ export default function DashboardSettingsPage() {
         onFormChange={setForm}
         onSubmit={handleCreateMail}
         onTest={handleTestMail}
+        testTo={testRecipient}
+        onTestToChange={setTestTo}
         saving={mailSaving}
         testing={mailTesting}
       />

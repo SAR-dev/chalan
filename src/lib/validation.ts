@@ -131,6 +131,14 @@ export function isValidBdPhone(phone: string): boolean {
   return BD_PHONE_REGEX.test(normalized)
 }
 
+/** Email shape check for client-side gating — e.g. enabling the "Send test
+ * email" button before a recipient is typed. The server re-validates every
+ * address with its own schema; this only decides whether a button may be
+ * pressed. */
+export function isValidEmail(value: string): boolean {
+  return z.email().safeParse(value).success
+}
+
 export function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/[\s-]/g, "")
   if (cleaned.startsWith("+880")) return `0${cleaned.slice(4)}`
