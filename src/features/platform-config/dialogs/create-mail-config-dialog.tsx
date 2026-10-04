@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { isValidEmail } from "@/lib/validation"
 
 interface MailConfigForm {
   label: string
@@ -32,6 +33,10 @@ interface CreateMailConfigDialogProps {
   onFormChange: (form: MailConfigForm) => void
   onSubmit: () => void
   onTest: () => void
+  /** Recipient for the test send — owned by the page (defaults to the
+   * signed-in admin); the config form itself never stores it. */
+  testTo: string
+  onTestToChange: (value: string) => void
   saving?: boolean
   testing?: boolean
 }
@@ -43,11 +48,19 @@ export function CreateMailConfigDialog({
   onFormChange,
   onSubmit,
   onTest,
+  testTo,
+  onTestToChange,
   saving,
   testing,
 }: CreateMailConfigDialogProps) {
+  const recipientValid = isValidEmail(testTo)
   const testDisabled =
-    testing || !form.host || !form.user || !form.pass || !form.fromEmail
+    testing ||
+    !form.host ||
+    !form.user ||
+    !form.pass ||
+    !form.fromEmail ||
+    !recipientValid
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,6 +119,9 @@ export function CreateMailConfigDialog({
                   onFormChange({ ...form, user: e.target.value })
                 }
               />
+              <p className="text-muted-foreground text-xs">
+                Usually your full email address.
+              </p>
             </div>
             <div className="flex flex-col gap-2">
               <Label>Password</Label>
@@ -140,6 +156,29 @@ export function CreateMailConfigDialog({
               />
             </div>
           </div>
+        </div>
+        {/* Recipient lives outside the config grid on purpose: it is a
+            property of the test send, not of the stored config. */}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="mail-config-test-to">Send test to</Label>
+          <Input
+            id="mail-config-test-to"
+            data-testid="mail-config-test-to"
+            type="email"
+            placeholder="you@example.com"
+            value={testTo}
+            onChange={(e) => onTestToChange(e.target.value)}
+            error={
+              testTo.length > 0 && !recipientValid
+                ? "Enter a valid email address."
+                : undefined
+            }
+          />
+          <p className="text-muted-foreground text-xs">
+            {recipientValid
+              ? "The test message is delivered here — it is not stored with the config."
+              : "A test email needs a valid recipient address."}
+          </p>
         </div>
         <DialogFooter>
           <Button

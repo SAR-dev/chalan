@@ -1486,11 +1486,14 @@ The Add Mail Config dialog ("Send test email" button) hits
 `POST /api/admin/mail-config/test` (Super Admin only). It calls
 `sendTestMail()` from `src/lib/mailer.ts`, which builds a throwaway transporter
 from the *unsaved* form values — never reading the DB — so the admin can verify
-host/user/password before committing. Unlike `sendMail()`, `sendTestMail()`
+host/user/password before committing. The dialog's **Send test to** field names
+the recipient (prefilled with the signed-in admin's address); it belongs to the
+test send, never to the stored config. Unlike `sendMail()`, `sendTestMail()`
 does **not** write an `email_log` row (it is a pre-save diagnostic, and the
-unsaved credentials must not appear in the delivery history). SMTP failures
+unsaved credentials must not appear in the delivery history). SMTP *responses*
 surface verbatim (e.g. nodemailer's `535 … Username and Password not accepted`)
-as a 400 so the admin can correct the form.
+as a 400 so the admin can correct the form; connection failures stay generic —
+their message would leak internal host:port (pinned by `mail-config.spec.ts`).
 
 ---
 

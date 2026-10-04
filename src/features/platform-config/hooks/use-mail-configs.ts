@@ -94,6 +94,8 @@ export function useMailConfigs() {
       pass: string
       fromEmail: string
       fromName: string
+      /** Recipient — omitted by the server only if unset (falls back to fromEmail). */
+      to?: string
     }): Promise<{ ok: boolean; error?: string }> => {
       const res = await fetch(`${KEY}/test`, {
         method: "POST",

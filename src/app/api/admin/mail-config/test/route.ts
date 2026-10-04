@@ -31,9 +31,25 @@ export const POST = withErrorHandler(async (req: Request) => {
     const result = await sendTestMail(config, to ?? config.fromEmail)
     return NextResponse.json({ ok: true, messageId: result.messageId })
   } catch (err) {
-    // Log the real SMTP error, but do not echo it: connection failures can
-    // leak internal hostnames/addresses back to the caller.
     logger.error("Test mail failed", { err, host: config.host })
+
+    // Split by where the failure happened (CONTRIBUTING §6):
+    //  - The remote server's OWN response (535 "Username and Password not
+    //    accepted", 530 "Must issue a STARTTLS command" …) is safe to return
+    //    and is exactly what the admin needs to correct the form. Its words,
+    //    not ours — nothing internal is in it.
+    //  - Connection/DNS/timeout failures are NOT: their message embeds our
+    //    side's host:port and resolved addresses, so those keep the generic
+    //    text (pinned by mail-config.spec.ts) and the detail stays in the
+    //    server log.
+    const responseCode = (err as { responseCode?: unknown }).responseCode
+    if (typeof responseCode === "number" && err instanceof Error) {
+      // Collapse the multi-line SMTP response (Gmail appends "Learn more at"
+      // URLs on their own lines) and cap it so a hostile server can't flood
+      // the toast.
+      const detail = err.message.replace(/\s+/g, " ").slice(0, 300)
+      return NextResponse.json({ error: detail }, { status: 400 })
+    }
     return NextResponse.json(
       { error: "Could not send the test email. Check the server logs." },
       { status: 400 },

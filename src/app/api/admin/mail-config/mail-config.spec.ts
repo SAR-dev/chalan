@@ -308,19 +308,43 @@ describe("POST /api/admin/mail-config/test", () => {
     )
   })
 
-  it("returns a generic 400 instead of echoing the SMTP error", async () => {
+  it("keeps connection failures generic — their message embeds internal hosts", async () => {
     sessionState.value = admin
     mockSendTestMail.mockRejectedValue(
-      new Error("Invalid login: 535 5.7.8 Username and Password not accepted"),
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.5:587"), {
+        code: "ECONNREFUSED",
+      }),
     )
     const res = await testMail(req("POST", undefined, validTestBody))
     const json = await res.json()
     expect(res.status).toBe(400)
-    // Connection failures can leak internal hostnames/addresses, so the detail
-    // is logged rather than returned.
+    // Our side's host:port must not travel back to the caller — only the log.
     expect(json.error).toBe(
       "Could not send the test email. Check the server logs.",
     )
+    expect(json.error).not.toContain("10.0.0.5")
+  })
+
+  it("surfaces the SMTP server's own response so the admin can fix the credentials", async () => {
+    sessionState.value = admin
+    // Shape nodemailer gives an EAUTH failure: the remote's words (safe to
+    // return — nothing internal is in them) plus a responseCode discriminator.
+    mockSendTestMail.mockRejectedValue(
+      Object.assign(
+        new Error(
+          "535 5.7.8 Username and Password not accepted. Learn more at https://support.google.com/mail/answer/60738",
+        ),
+        { responseCode: 535 },
+      ),
+    )
+    const res = await testMail(req("POST", undefined, validTestBody))
+    const json = await res.json()
+    expect(res.status).toBe(400)
+    // Verbatim per CONTRIBUTING §6: without this the admin cannot tell an
+    // app-password problem from a wrong host.
+    expect(json.error).toContain("535 5.7.8 Username and Password not accepted")
+    // Multi-line SMTP responses are collapsed so one toast stays readable.
+    expect(json.error).not.toContain("\n")
   })
 })
 
