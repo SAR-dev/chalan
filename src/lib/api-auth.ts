@@ -38,6 +38,9 @@ const loadSession = cache(async (lenient: boolean) => {
       riderId: profile.riderId,
       isModerator: profile.isModerator,
       moderatorPermissions: profile.moderatorPermissions,
+      // When the user last visited the announcements feed — the badge's
+      // "new since" watermark (see src/lib/announcements.ts).
+      announcementsSeenAt: profile.announcementsSeenAt,
       createdAt: profile.createdAt,
       name: user.name,
       banned: user.banned,

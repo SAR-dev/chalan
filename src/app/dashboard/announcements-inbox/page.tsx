@@ -11,11 +11,11 @@ export default async function DashboardAnnouncementsInboxPage() {
   if (!me) redirect(await loginRedirectPath())
 
   // Same helper as GET /api/announcements/active, so the server-rendered
-  // first paint already carries `readAt` — no flash of "unread" before the
+  // first paint already carries `isNew` — no flash of "new" before the
   // client hook revalidates.
   const forMe = await getActiveAnnouncements(dbRead, {
-    userId: me.userId,
     role: me.role,
+    seenAt: me.announcementsSeenAt,
   })
 
   return (

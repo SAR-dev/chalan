@@ -78,8 +78,18 @@ export const pageContent = {
       description:
         "Create and manage platform-wide announcements targeted at specific roles.",
     },
+    announcementsNew: {
+      title: "New announcement",
+      description:
+        "Compose a markdown announcement and choose which roles see it.",
+    },
+    announcementsEdit: {
+      title: "Edit announcement",
+      description:
+        "Update the content, schedule, or audience of an existing announcement.",
+    },
     announcementsInbox: {
-      title: "Inbox",
+      title: "Announcements",
       description: "Active platform announcements targeted at your role.",
     },
     packages: {
@@ -130,7 +140,7 @@ export const pageContent = {
         "Match collected cash against delivered orders. The platform keeps delivery charge and security money; COD amount becomes payable to the merchant.",
     },
     announcements: {
-      title: "Inbox",
+      title: "Announcements",
       description: teamDescription,
     },
     support: {
@@ -156,7 +166,7 @@ export const pageContent = {
         "Take dispatched parcels out for delivery and record each outcome on the spot.",
     },
     announcements: {
-      title: "Inbox",
+      title: "Announcements",
       description: teamDescription,
     },
     support: {
@@ -209,7 +219,7 @@ export const pageContent = {
         "Review your delivery rates, COD fees, and use the calculator to preview charges.",
     },
     announcements: {
-      title: "Inbox",
+      title: "Announcements",
       description: "Active platform announcements.",
     },
     support: {

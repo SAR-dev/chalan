@@ -4,7 +4,7 @@ import { getAnnouncementForUser } from "@/lib/announcements"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
 import { loginRedirectPath } from "@/lib/login-redirect"
-import { inboxPathForRole } from "@/lib/nav-config"
+import { announcementsPathForRole } from "@/lib/nav-config"
 import { AnnouncementView } from "./announcement-view"
 
 // Shared detail page for all four roles. It deliberately lives OUTSIDE the
@@ -30,7 +30,6 @@ export default async function AnnouncementDetailPage({ params }: Props) {
   // guessed id must not leak that an announcement exists.
   const announcement = await getAnnouncementForUser(dbRead, {
     id,
-    userId: me.userId,
     role: me.role,
   })
   if (!announcement) notFound()
@@ -38,7 +37,7 @@ export default async function AnnouncementDetailPage({ params }: Props) {
   return (
     <AnnouncementView
       announcement={announcement}
-      inboxHref={inboxPathForRole(me.role)}
+      inboxHref={announcementsPathForRole(me.role)}
     />
   )
 }

@@ -6,14 +6,12 @@ import { dbRead } from "@/lib/db"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 // Returns announcements that are currently live for the caller's role, each
-// carrying `readAt` (null = unread). "Live" and role targeting are defined
-// once in src/lib/announcements.ts so this list can never disagree with the
-// detail page or the inbox.
+// flagged `isNew` (published after their last feed visit). "Live" and role
+// targeting are defined once in src/lib/announcements.ts so this list can
+// never disagree with the detail page or the inbox.
 //
 // Bounded by MAX_ACTIVE_ANNOUNCEMENTS rather than paginated — active
 // announcements are small in number, but the query must still be bounded.
-// Read/unread state is server-side (`announcement_read`), so it follows the
-// account across devices.
 const MAX_ACTIVE_ANNOUNCEMENTS = 50
 
 export const GET = withErrorHandler(async () => {
@@ -21,8 +19,8 @@ export const GET = withErrorHandler(async () => {
   if (!me) return unauthorized()
 
   const rows = await getActiveAnnouncements(dbRead, {
-    userId: me.userId,
     role: me.role,
+    seenAt: me.announcementsSeenAt,
     limit: MAX_ACTIVE_ANNOUNCEMENTS,
   })
 

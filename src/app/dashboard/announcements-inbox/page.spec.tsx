@@ -7,6 +7,12 @@ import { pageContent } from "@/config/content"
 
 vi.mock("@/features/announcements/hooks/use-active-announcements", () => ({
   useActiveAnnouncements: () => ({ announcements: [] }),
+  useAnnouncementFeed: () => ({
+    announcements: [],
+    isNew: () => false,
+    isLoading: false,
+    error: undefined,
+  }),
 }))
 
 async function importPage() {
@@ -21,8 +27,10 @@ async function importPage() {
 }
 
 describe("Dashboard announcements-inbox page", () => {
-  it("renders announcements inbox", async () => {
+  it("renders the announcements feed", async () => {
     await importPage()
-    expect(screen.getByRole("heading", { name: /inbox/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { name: /announcements/i }),
+    ).toBeInTheDocument()
   })
 })

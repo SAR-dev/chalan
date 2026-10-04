@@ -5,9 +5,11 @@ import {
   Megaphone,
   MoreHorizontal,
   Pencil,
+  Plus,
   Trash2,
   X,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -28,8 +30,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementStatusBadge } from "@/features/announcements/components/announcement-status-badge"
-import { CreateAnnouncementDialog } from "@/features/announcements/dialogs/create-announcement-dialog"
-import { EditAnnouncementDialog } from "@/features/announcements/dialogs/edit-announcement-dialog"
 import { useAnnouncements } from "@/features/announcements/hooks/use-announcements"
 import { ANNOUNCEMENT_TARGET_ROLE_LABELS } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
@@ -38,6 +38,7 @@ import type { Announcement } from "@/lib/types"
 type TabFilter = "ALL" | "ACTIVE" | "INACTIVE"
 
 export default function AnnouncementsPage() {
+  const router = useRouter()
   const { currentUser } = useAuth()
   const {
     announcements,
@@ -64,7 +65,6 @@ export default function AnnouncementsPage() {
   const [tab, setTab] = useState<TabFilter>("ALL")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
-  const [editing, setEditing] = useState<Announcement | null>(null)
   const [deleting, setDeleting] = useState<Announcement | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -223,7 +223,11 @@ export default function AnnouncementsPage() {
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="ghost" size="icon">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid={`ann-actions-${a.id}`}
+                >
                   <MoreHorizontal className="size-4" />
                   <span className="sr-only">Actions</span>
                 </Button>
@@ -232,7 +236,12 @@ export default function AnnouncementsPage() {
             <DropdownMenuContent align="end" className="w-48">
               {canManage ? (
                 <>
-                  <DropdownMenuItem onClick={() => setEditing(a)}>
+                  <DropdownMenuItem
+                    data-testid="ann-edit-item"
+                    onClick={() =>
+                      router.push(`/dashboard/announcements/${a.id}/edit`)
+                    }
+                  >
                     <Pencil className="size-4" />
                     Edit
                   </DropdownMenuItem>
@@ -261,7 +270,15 @@ export default function AnnouncementsPage() {
         title={pageContent.dashboard.announcements.title}
         description={pageContent.dashboard.announcements.description}
       >
-        {canManage && <CreateAnnouncementDialog />}
+        {canManage && (
+          <Button
+            data-testid="announcements-new"
+            onClick={() => router.push("/dashboard/announcements/new")}
+          >
+            <Plus className="size-4" />
+            New announcement
+          </Button>
+        )}
       </PageHeader>
 
       <Card>
@@ -323,11 +340,6 @@ export default function AnnouncementsPage() {
           />
         </CardContent>
       </Card>
-
-      <EditAnnouncementDialog
-        announcement={editing}
-        onClose={() => setEditing(null)}
-      />
 
       {/* Delete confirm */}
       <FormDialog

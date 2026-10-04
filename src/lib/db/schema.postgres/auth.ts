@@ -182,6 +182,12 @@ export const profile = pgTable(
     // explicit `pageSize` prop. Clamped to 1-250 at the validation layer
     // (lib/validation.ts) and again defensively in components/data-table.tsx.
     tableRowsPerPage: integer("tableRowsPerPage").notNull().default(20),
+    // When the user last looked at the announcements feed. The badge counts
+    // live announcements published after this - "new since you last visited
+    // the board", not per-item read receipts (announcements are broadcasts;
+    // per-item state would rebuild the notification model that belongs to
+    // R4.1). Null = never visited, so everything live counts as new.
+    announcementsSeenAt: ts("announcementsSeenAt"),
     // Domain entity references. Only the field matching the user's role is
     // expected to be populated. FKs with `ON DELETE SET NULL` so removing the
     // domain row unlinks the account instead of leaving a dangling id

@@ -57,9 +57,8 @@ src/app/
   api/team/route.ts                   GET list, POST create (staff accounts)
   api/team/[id]/active/route.ts       PATCH — toggle active
   api/team/[id]/warehouse/route.ts    PATCH — reassign warehouse
-  api/announcements/active/route.ts   GET active announcements for current role (each with readAt)
-  api/announcements/[id]/read/route.ts  POST — mark one announcement read (per user, idempotent)
-  api/announcements/read-all/route.ts   POST — mark every live announcement read (per user)
+  api/announcements/active/route.ts   GET active announcements for current role (each with isNew)
+  api/announcements/seen/route.ts     POST - stamp the reader's feed watermark (badge drains)
   api/audit-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/route.ts             GET list (Admin/Super Admin only)
   api/email-logs/[id]/route.ts        GET detail (bodies), PATCH mark failed email as sent
@@ -76,8 +75,12 @@ src/app/
   track/page.tsx                      public order tracking search form
   track/[id]/page.tsx                 public order tracking detail page
   announcements/[id]/page.tsx         shared announcement detail page (authenticated,
-                                       role-gated server-side; markdown body, marks read
-                                       on open) + layout.tsx chrome (AuthProvider + TopNav)
+                                       role-gated server-side; markdown body, "Go back"
+                                       = one history entry; writes nothing on open)
+                                       + layout.tsx chrome (AuthProvider + TopNav)
+  dashboard/announcements/new/page.tsx        create page (SUPER_ADMIN gate, form in
+                                       features/announcements/components/announcement-form.tsx)
+  dashboard/announcements/[id]/edit/page.tsx  edit page (same gate + form, prefilled)
   uploads/[...path]/route.ts          local storage file serving
   manifest.ts                         PWA web app manifest (served at /manifest.webmanifest)
   pwa-icon/[size]/route.tsx           PWA icons — 192/512 PNG generated from the brand SVG
@@ -124,16 +127,18 @@ src/lib/
   api-auth.ts                        requireSession() — single JOIN across session + user + profile
   api-response.ts                    standardized error responses (unauthorized, forbidden, notFound, etc.)
   audit.ts                           logAudit() — the only audit_log writer
-  announcements.ts                   shared announcement queries (live + role-targeted predicate,
-                                     per-user readAt join) — one definition for the API route,
-                                     inbox pages, and detail page
+  announcements.ts                   shared announcement queries (live + role-targeted
+                                     predicate, isNew against the reader's
+                                     `profile.announcementsSeenAt` watermark) — one
+                                     definition for the API route, feed pages,
+                                     and detail page
   markdown.ts                        stripMarkdown() — one-line plain-text excerpts for previews
   pagination.ts                      PaginatedResponse<T>, parsePagination(), parseStatusFilter(), parseSort(), applySort(), parseDateRange()
   rate-limit.ts                      sliding-window rate limiter + getClientIp()
   csv.ts                             CSV generation and download helpers
-  nav-config.ts                      sidebar entries per role + inboxPathForRole() /
+  nav-config.ts                      sidebar entries per role + announcementsPathForRole() /
                                      navConfigForUser() helpers. Items may carry
-                                     `placement: "rightnav"` (Help, Inbox, and Support
+                                     `placement: "rightnav"` (Help, and Support
                                      for the self-service roles): they stay in `items`
                                      for grants/guard/palette but render in RightNav —
                                      see sidebarVisibleItems()/rightNavItems()
@@ -197,10 +202,12 @@ src/features/
   audit-logs/      hooks/use-audit-logs.ts — read-only, Admin/Super Admin only
   email-logs/      hooks/use-email-logs.ts — read-mostly, Admin/Super Admin only
   announcements/
-    components/    announcement-bell.tsx, announcements-inbox.tsx, etc.
-    dialogs/       create-announcement-dialog.tsx, edit-announcement-dialog.tsx,
-                   markdown-editor.tsx (shared Write/Preview control)
+    components/    announcement-bell.tsx, announcement-form.tsx (the create/edit
+                   page form), announcements-inbox.tsx, markdown-editor.tsx
+                   (Write/Preview control), announcement-status-badge.tsx
     hooks/         use-announcements.ts, use-active-announcements.ts
+    (no dialogs/ — create and edit are pages under
+     dashboard/announcements/{new,[id]/edit}, not modals)
 ```
 
 Not every feature needs all three subdirectories — a simple read-only resource
@@ -951,30 +958,35 @@ on the `merchant` table). This ensures backward compatibility.
 
 ## 3.75. Announcement bell (`src/features/announcements/components/announcement-bell.tsx`)
 
-An icon-with-unread-badge dropdown in the TopNav (`src/components/navigation/top-nav.tsx`),
-which is mounted once per role shell — it replaced the old page-top
-`AnnouncementBanner` and the `AnnouncementDetailModal`.
+A link-with-badge in the TopNav (`src/components/navigation/top-nav.tsx`),
+mounted once per role shell — it replaced the old page-top `AnnouncementBanner`
+and the `AnnouncementDetailModal`.
 
 ```tsx
 // Inside TopNav's right-hand action group (mounted once per shell):
 <AnnouncementBell />
 ```
 
+**Announcements are a board, not a notification feed.** The bell is a plain
+link to the feed — no dropdown tray, no per-item list, no "mark all read":
+those are notification mechanics and they belong to R4.1, which will host its
+tray when real notifications exist.
+
 Behaviour:
 
-- Reads from `useActiveAnnouncements()` — no additional API call or hook needed;
-  the single SWR key is fetched once per session because the bell mounts once.
-- Shows an unread badge (`9+` cap). The count derives from `readAt` on each row
-  — **read state is server-side** (`announcement_read` table, per-user rows),
-  so it follows the account across devices. The old `ann_read:<userId>`
-  localStorage key is gone; do not reintroduce client-side read state.
-- The dropdown lists live announcements; clicking a row navigates to
-  **`/announcements/<id>`** (the shared detail page, outside the role segments).
-  The detail page performs the mark-read — the bell never writes on its own.
-- **Mark all read** is the one bulk action the bell owns
-  (`POST /api/announcements/read-all`).
-- **Open inbox** links to the reader's own inbox
-  (`inboxPathForRole(role)` in `src/lib/nav-config.ts`).
+- Reads from `useActiveAnnouncements()` — no additional API call or hook
+  needed; the single SWR key is fetched once per session because the bell
+  mounts once.
+- Shows a "new" badge (`9+` cap). The count is `isNew` on each row: published
+  after `profile.announcementsSeenAt`, the reader's last feed visit. One
+  watermark column — **never** per-item read rows, never localStorage; the
+  `announcement_read` table and the mark-read endpoints were built and removed
+  (tombstone in `schema.postgres/platform.ts`).
+- Clicking navigates to the reader's feed
+  (`announcementsPathForRole(role)` in `src/lib/nav-config.ts`).
+- The **feed** (`useAnnouncementFeed`) stamps the watermark on mount, which
+  drains the badge; rows published since the last visit carry a NEW pill for
+  that visit only. The bell itself never writes.
 
 Rules:
 
@@ -982,14 +994,20 @@ Rules:
   screen within a role (and on `/announcements/[id]`) without per-page wiring.
 - Do not add a second `useActiveAnnouncements()` call in page components; the
   TopNav already triggers the SWR fetch and caches it for the whole session.
-- The sidebar inbox link, the bell, and both inbox pages share the same hook
-  and the same server read-set — marking read anywhere is reflected everywhere
-  on the next mutate.
+- The sidebar Announcements link, the bell, and both feed pages share the same
+  hook and the same watermark — visiting the feed anywhere drains the badge
+  everywhere on the next mutate.
+- The detail page (`/announcements/[id]`) writes **nothing** on open: viewing
+  one announcement must not advance the watermark (it would mark everything
+  else as seen too). Only visiting the feed stamps.
+- Do not rebuild the tray: if R4.1 lands in-app notifications, the tray
+  hosts *those* and the announcement link keeps its current shape.
 - Detail rendering is `<Markdown>` (react-markdown + remark-gfm, same as
-  `/terms`): announcements are authored as markdown in the create/edit dialogs
-  (`markdown-editor.tsx` Write/Preview tabs) and listed with
-  `stripMarkdown()` excerpts (`src/lib/markdown.ts`). Never show raw markdown
-  source in a one-line preview, and never render announcement HTML directly.
+  `/terms`): announcements are authored as markdown on the create/edit pages
+  (`markdown-editor.tsx` Write/Preview tabs in `announcement-form.tsx`) and
+  listed with `stripMarkdown()` excerpts (`src/lib/markdown.ts`). Never show
+  raw markdown source in a one-line preview, and never render announcement
+  HTML directly.
 
 ## 3.9. DataTable loading skeleton
 

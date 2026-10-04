@@ -7,13 +7,13 @@ import { Textarea } from "@/components/ui/textarea"
 
 /**
  * Markdown source editor with a live preview, shared by the create and edit
- * announcement dialogs (siblings — the control lives here so the two dialogs
- * can't drift apart).
+ * announcement pages (same control the dialogs used — the preview is the same
+ * `<Markdown>` renderer readers see on the detail page, so what the admin
+ * sees is what ships).
  *
- * The preview is the same `<Markdown>` renderer readers see on the detail
- * page, so what the admin sees is what ships. Errors are NOT rendered here:
- * they stay frozen on submit (see CONTRIBUTING "Form validation error
- * display") — live per-keystroke validation would steal focus mid-edit.
+ * Errors are NOT rendered here: they stay frozen on submit (see CONTRIBUTING
+ * "Form validation error display") — live per-keystroke validation would
+ * steal focus mid-edit.
  */
 export function MarkdownEditor({
   id,
@@ -43,20 +43,21 @@ export function MarkdownEditor({
         <TabsContent value="write">
           <Textarea
             id={id}
+            data-testid={id}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={
               placeholder ??
               "Markdown supported: **bold**, *italic*, # headings, - lists, [links](https://…)."
             }
-            className="min-h-32 font-mono text-sm"
+            className="min-h-40 font-mono text-sm"
           />
         </TabsContent>
         <TabsContent value="preview">
           {/* Min-height matches the textarea so switching tabs doesn't jump. */}
           <div
             data-testid={`${id}-preview`}
-            className="border-input min-h-32 rounded-md border px-3 py-2"
+            className="border-input min-h-40 rounded-md border px-3 py-2"
           >
             {value.trim() ? (
               <Markdown content={value} />
