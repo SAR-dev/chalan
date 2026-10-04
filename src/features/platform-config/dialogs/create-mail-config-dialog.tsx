@@ -159,7 +159,7 @@ export function CreateMailConfigDialog({
         </div>
         {/* Recipient lives outside the config grid on purpose: it is a
             property of the test send, not of the stored config. */}
-        <div className="flex flex-col gap-2 py-2">
+        <div className="flex flex-col gap-2 p-2 mb-2 border border-dashed rounded">
           <Label htmlFor="mail-config-test-to">Send test to</Label>
           <Input
             id="mail-config-test-to"
@@ -174,7 +174,7 @@ export function CreateMailConfigDialog({
                 : undefined
             }
           />
-          <p className="text-muted-foreground text-xs">
+          <p className="text-primary text-xs">
             {recipientValid
               ? "The test message is delivered here — it is not stored with the config."
               : "A test email needs a valid recipient address."}
