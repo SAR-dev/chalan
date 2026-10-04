@@ -159,7 +159,7 @@ export function CreateMailConfigDialog({
         </div>
         {/* Recipient lives outside the config grid on purpose: it is a
             property of the test send, not of the stored config. */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 py-2">
           <Label htmlFor="mail-config-test-to">Send test to</Label>
           <Input
             id="mail-config-test-to"
