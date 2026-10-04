@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { Field } from "@/components/field"
 import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -136,8 +137,7 @@ export function AnnouncementForm({
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           <FormErrors errors={Object.keys(errors).length > 0 ? errors : null} />
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="ann-title">Title</Label>
+          <Field label="Title" htmlFor="ann-title">
             <Input
               id="ann-title"
               data-testid="ann-title"
@@ -146,7 +146,7 @@ export function AnnouncementForm({
               placeholder="e.g. System maintenance on Sunday"
               autoFocus
             />
-          </div>
+          </Field>
 
           <MarkdownEditor
             id="ann-content"
@@ -156,8 +156,12 @@ export function AnnouncementForm({
           />
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="ann-published-at">Publish date (optional)</Label>
+            <Field
+              label="Publish date"
+              subLabel="(optional)"
+              htmlFor="ann-published-at"
+              hint="Leave blank to save as draft."
+            >
               <Input
                 id="ann-published-at"
                 data-testid="ann-published-at"
@@ -165,12 +169,13 @@ export function AnnouncementForm({
                 value={form.publishedAt}
                 onChange={(e) => update("publishedAt", e.target.value)}
               />
-              <p className="text-muted-foreground text-xs">
-                Leave blank to save as draft.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="ann-expires-at">Expiry date (optional)</Label>
+            </Field>
+            <Field
+              label="Expiry date"
+              subLabel="(optional)"
+              htmlFor="ann-expires-at"
+              hint="Leave blank for no expiry."
+            >
               <Input
                 id="ann-expires-at"
                 data-testid="ann-expires-at"
@@ -178,10 +183,7 @@ export function AnnouncementForm({
                 value={form.expiresAt}
                 onChange={(e) => update("expiresAt", e.target.value)}
               />
-              <p className="text-muted-foreground text-xs">
-                Leave blank for no expiry.
-              </p>
-            </div>
+            </Field>
           </div>
 
           <div className="flex flex-col gap-2">

@@ -92,26 +92,26 @@ describe("Merchant new order page", () => {
     ).toBeTruthy()
   })
 
-  it("groups the fields into labelled sections", async () => {
+  it("groups each parcel under its own heading, pickup first", async () => {
     const { container } = await importPage()
 
-    const legends = [...container.querySelectorAll("legend")].map(
-      (el) => el.textContent,
-    )
-    expect(legends).toEqual([
-      "Pickup",
-      "Recipient",
-      "Delivery",
-      "Parcel details",
-      "Payment & notes",
-    ])
+    // One card per parcel, titled "Parcel N" — the grouping unit since the
+    // layout moved from fieldset/legend sections to rows (commit 9c5a1f1).
+    const titles = [
+      ...container.querySelectorAll("[data-slot='card-title']"),
+    ].map((el) => el.textContent)
+    expect(titles[0]).toBe("Parcel 1")
 
-    // Pickup owns its own section, ahead of the rest — grouping them together
-    // would put the answer the form needs first behind another heading.
-    const fieldsets = [...container.querySelectorAll("fieldset")]
-    expect(
-      fieldsets[0].querySelector("[data-testid='pickup-location']"),
-    ).not.toBeNull()
+    // Pickup still leads: the delivery fee sits in the card header, so the
+    // location that drives it must come before everything it prices —
+    // the invariant the old fieldset order carried.
+    const labels = [...container.querySelectorAll("label")].map(
+      (el) => el.textContent ?? "",
+    )
+    const pickupIdx = labels.findIndex((t) => t.includes("Pickup location"))
+    const recipientIdx = labels.findIndex((t) => t.includes("Recipient name"))
+    expect(pickupIdx).toBeGreaterThanOrEqual(0)
+    expect(recipientIdx).toBeGreaterThan(pickupIdx)
   })
 
   it("reports a failed submit once in the summary and once under the field", async () => {

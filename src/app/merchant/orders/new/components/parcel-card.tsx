@@ -1,6 +1,7 @@
 "use client"
 
 import { Trash2 } from "lucide-react"
+import { Field } from "@/components/field"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -10,7 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -22,7 +22,6 @@ import type { DeliveryCityOption } from "@/features/platform-config/hooks/use-de
 import { ORDER_DELIVERY_TYPE_LABELS } from "@/lib/constants"
 import { formatTk } from "@/lib/pricing"
 import type { DeliveryType } from "@/lib/types"
-import { cn } from "@/lib/utils"
 import type {
   ParcelField,
   ParcelRow,
@@ -50,45 +49,6 @@ interface ParcelCardProps {
     value: ParcelState[K],
   ) => void
   removeParcel: (id: string) => void
-}
-
-/**
- * Groups a field as label + control + hint, the way every other form in the
- * app lays one out.
- *
- * `Input` renders its own message when given `error`, because that also wires
- * `aria-invalid`/`aria-describedby` — so `hint` is for explanatory text and
- * `error` here is only for controls that have no such prop (`Select`).
- */
-function Field({
-  label,
-  htmlFor,
-  hint,
-  error,
-  className,
-  children,
-}: {
-  label: string
-  htmlFor: string
-  hint?: string
-  error?: string
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {hint ? (
-        <span className="text-muted-foreground text-xs">{hint}</span>
-      ) : null}
-      {error ? (
-        <p className="text-destructive text-xs" data-slot="field-error">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  )
 }
 
 export function ParcelCard({
@@ -330,7 +290,11 @@ export function ParcelCard({
           </Field>
 
           {/* Row 3 */}
-          <Field label="Delivery map link (optional)" htmlFor={`map-${p.id}`}>
+          <Field
+            label="Delivery map link"
+            subLabel="(optional)"
+            htmlFor={`map-${p.id}`}
+          >
             <Input
               id={`map-${p.id}`}
               data-testid="delivery-map"
@@ -343,7 +307,8 @@ export function ParcelCard({
             />
           </Field>
           <Field
-            label="Item type (optional)"
+            label="Item type"
+            subLabel="(optional)"
             htmlFor={`item-type-${p.id}`}
             hint="Shown to the rider. Doesn't affect the fee."
           >
@@ -357,7 +322,8 @@ export function ParcelCard({
             />
           </Field>
           <Field
-            label="Note (optional)"
+            label="Note"
+            subLabel="(optional)"
             htmlFor={`note-${p.id}`}
             className="lg:col-span-2"
           >
