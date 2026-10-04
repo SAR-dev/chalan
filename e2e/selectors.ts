@@ -100,7 +100,8 @@ export const announcementForm = {
   newLink: "[data-testid='announcements-new']",
   search: "[data-testid='table-search-dashboard-announcements']",
   title: "[data-testid='ann-title']",
-  content: "[data-testid='ann-content']",
+  // The testid sits on CodeMirror's root; fill() needs the contenteditable.
+  content: "[data-testid='ann-content'] .cm-content",
   contentPreview: "[data-testid='ann-content-preview']",
   role: (role: string) => `[data-testid='ann-role-${role}']`,
   submit: "[data-testid='ann-submit']",

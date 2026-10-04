@@ -42,8 +42,11 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1145.0",
     "@base-ui/react": "^1.8.0",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/view": "^6.43.13",
     "@paralleldrive/cuid2": "^3.3.0",
     "@react-email/render": "^2.1.0",
+    "@uiw/react-codemirror": "^4.25.12",
     "@vercel/analytics": "2.0.1",
     "better-auth": "^1.7.7",
     "class-variance-authority": "^0.7.1",

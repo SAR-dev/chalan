@@ -204,7 +204,8 @@ src/features/
   announcements/
     components/    announcement-bell.tsx, announcement-form.tsx (the create/edit
                    page form), announcements-inbox.tsx, markdown-editor.tsx
-                   (Write/Preview control), announcement-status-badge.tsx
+                   (Write = CodeMirror 6 source with toolbar + Ctrl/Cmd+B·I,
+                   Preview = the app's Markdown renderer), announcement-status-badge.tsx
     hooks/         use-announcements.ts, use-active-announcements.ts
     (no dialogs/ — create and edit are pages under
      dashboard/announcements/{new,[id]/edit}, not modals)
@@ -1004,10 +1005,11 @@ Rules:
   hosts *those* and the announcement link keeps its current shape.
 - Detail rendering is `<Markdown>` (react-markdown + remark-gfm, same as
   `/terms`): announcements are authored as markdown on the create/edit pages
-  (`markdown-editor.tsx` Write/Preview tabs in `announcement-form.tsx`) and
-  listed with `stripMarkdown()` excerpts (`src/lib/markdown.ts`). Never show
-  raw markdown source in a one-line preview, and never render announcement
-  HTML directly.
+  (`markdown-editor.tsx` — Write pane is CodeMirror 6 with a formatting
+  toolbar and Ctrl/Cmd+B·I, Preview renders through the app's `Markdown`, so
+  preview == what readers get) and listed with `stripMarkdown()` excerpts
+  (`src/lib/markdown.ts`). Never show raw markdown source in a one-line
+  preview, and never render announcement HTML directly.
 
 ## 3.9. DataTable loading skeleton
 
