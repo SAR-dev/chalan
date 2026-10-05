@@ -147,7 +147,7 @@ describe("portalPageAllowed", () => {
     expect(portalPageAllowed("/dashboard", "public")).toBe(false)
     expect(portalPageAllowed("/dashboard/orders", "public")).toBe(false)
     expect(portalPageAllowed("/warehouse", "public")).toBe(false)
-    expect(portalPageAllowed("/warehouse/intake", "public")).toBe(false)
+    expect(portalPageAllowed("/warehouse/ongoing", "public")).toBe(false)
 
     expect(portalPageAllowed("/merchant/orders", "public")).toBe(true)
     expect(portalPageAllowed("/rider", "public")).toBe(true)

@@ -74,11 +74,11 @@ export const statCardLabels = {
     },
   },
   warehouse: {
-    intake: {
-      incoming: { label: "Incoming" },
-      received: { label: "Received" },
-      heldInWarehouse: { label: "In the warehouse" },
-    },
+    // The `intake` and `dispatch` groups are gone with their pages. What is
+    // left in `orders` and `exceptions` is partly orphaned too — `delivered`,
+    // `returned` and `totalExceptions` lost their only reader when those tiles
+    // moved or were dropped — but they are cheap to keep and re-reading them
+    // is likelier than editing this file blind.
     orders: {
       pendingApproval: { label: "Waiting for approval" },
       approved: { label: "Approved" },
@@ -86,12 +86,6 @@ export const statCardLabels = {
       inProgress: { label: "In progress" },
       delivered: { label: "Delivered" },
       exceptions: { label: "Exceptions" },
-    },
-    dispatch: {
-      readyForPickup: { label: "Ready for pickup" },
-      inPickup: { label: "In pickup" },
-      readyToDispatch: { label: "Ready to send out" },
-      dispatched: { label: "Dispatched" },
     },
     exceptions: {
       needsAction: { label: "Needs attention" },

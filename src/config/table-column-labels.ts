@@ -30,6 +30,8 @@ export const columnLabels = {
     pickupLocation: "Pickup Location",
     pickupLabel: "Pickup location",
     pickupAddress: "Pickup address",
+    pickupCity: "Pickup city",
+    rider: "Rider",
     tracking: "Tracking",
     recipient: "Recipient",
     pickup: "Pickup",
@@ -41,6 +43,7 @@ export const columnLabels = {
     returnReason: "Return reason",
     resolvedBy: "Resolved by",
     deliveryAttempts: "Delivery attempts",
+    closedAt: "Closed",
   },
   merchant: {
     business: "Business",

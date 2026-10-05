@@ -279,32 +279,91 @@ export const users = {
 
 // ─── Warehouse ───────────────────────────────────────────────────────────────
 export const warehouse = {
-  intakeTable: "[data-testid='warehouse-intake']",
-  // The dispatch desk reuses one DataTable across four tabs and derives its id
-  // from the tab, so the testid changes with the tab. There was a single
-  // `dispatchTable` entry here pointing at `[data-testid='warehouse-dispatch']`,
-  // which no component emits — two tables, one per tab the specs use.
-  dispatchPickupTable: "[data-testid='table-warehouse-dispatch-pickup']",
-  dispatchDeliveryTable: "[data-testid='table-warehouse-dispatch-delivery']",
-  tabPickup: "[data-testid='tab-pickup']",
-  tabDelivery: "[data-testid='tab-delivery']",
-  exceptionsTable: "[data-testid='warehouse-exceptions']",
-  settlementTable: "[data-testid='warehouse-settlement']",
-  receiveButton: "[data-testid='receive-parcel']",
-  dispatchButton: "[data-testid='dispatch-parcel']",
+  // `DataTable` derives its testid from the table's `id` prop as `table-<id>`, so
+  // these carry the prefix rather than repeating the id verbatim.
+  exceptionsTable: "[data-testid='table-warehouse-exceptions']",
+  settlementTable: "[data-testid='table-warehouse-settlement']",
   settleButton: "[data-testid='settle-cod']",
   bulkSettle: "[data-testid='bulk-settle']",
-  // Row selection on the dispatch desk. The desk is the only page that has to
-  // pick rows before it can do anything, so the selection controls are
-  // addressed from here rather than from a shared "table" bucket. Both testids
-  // come from the DataTable itself, which is why they are un-namespaced.
-  selectAll: "[data-testid='select-all']",
-  selectRow: "[data-testid='select-row']",
-  bulkAssignDeliveryRider: "[data-testid='bulk-assign-delivery-rider']",
-  bulkAutoAssign: "[data-testid='bulk-auto-assign']",
 }
 
-// ─── Auto-assign (warehouse dispatch) ─────────────────────────────────────────
+// ─── Ongoing board (warehouse kanban) ────────────────────────────────────────
+// The board has no table and no selection: a card's column is derived from its
+// state, and the one bulk action it has (auto-assign) acts on everything sitting
+// in the warehouse. Column and card ids are suffixed, so every assertion is a
+// prefix match refined by the concrete status or rider the spec cares about.
+export const ongoing = {
+  board: "[data-testid='kanban-board']",
+  groupBy: "[data-testid='kanban-groupby']",
+  groupByStatus: "[data-testid='kanban-groupby-status']",
+  groupByRiders: "[data-testid='kanban-groupby-riders']",
+  columnPrefix: "[data-testid^='kanban-column-']",
+  /** A lane by id — a status in the status view, a rider id or `UNASSIGNED`. */
+  column: (id: string) => `[data-testid='kanban-column-${id}']`,
+  /** The five status lanes, as one selector, for "did every lane render?". */
+  statusColumnPrefix:
+    "[data-testid^='kanban-column-APPROVED']," +
+    "[data-testid^='kanban-column-PICKED_UP']," +
+    "[data-testid^='kanban-column-IN_WAREHOUSE']," +
+    "[data-testid^='kanban-column-IN_TRANSIT']," +
+    "[data-testid^='kanban-column-OUT_FOR_DELIVERY']",
+  unassignedColumn: "[data-testid='kanban-column-UNASSIGNED']",
+  columnCountPrefix: "[data-testid^='kanban-count-']",
+  columnCount: (id: string) => `[data-testid='kanban-count-${id}']`,
+  // The In-warehouse lane specifically. Auto-assign plans over exactly this set,
+  // so a spec comparing a plan's totals to the board has to read this count and
+  // not the first column's.
+  heldColumn: "[data-testid='kanban-column-IN_WAREHOUSE']",
+  heldColumnCount: "[data-testid='kanban-count-IN_WAREHOUSE']",
+  // Deliberately `kanban-` and not `kanban-card-`: the card's details trigger is
+  // `kanban-open-<id>`, so a `kanban-card-` prefix matches the card wrapper and
+  // nothing inside it. Had the trigger been `kanban-card-open-<id>` every card
+  // would have counted twice and "each parcel appears exactly once" — the
+  // property the rider grouping exists to guarantee — would have gone unasserted.
+  cardPrefix: "[data-testid^='kanban-card-']",
+  cardOpenPrefix: "[data-testid^='kanban-open-']",
+  assignPickupPrefix: "[data-testid^='kanban-assign-pickup-']",
+  receivePrefix: "[data-testid^='kanban-receive-']",
+  dispatchPrefix: "[data-testid^='kanban-dispatch-']",
+  // A selector that must never match anything. Cancel lives on the approval
+  // queue and in the admin portal; putting it on a board card would undo the
+  // PENDING-only approval split (TODO.md decision #9).
+  cancelPrefix: "[data-testid^='kanban-cancel-']",
+  empty: "[data-testid='kanban-empty']",
+  // Distinct from `empty`: there ARE parcels, the filter just hides all of them.
+  noMatches: "[data-testid='kanban-no-matches']",
+  truncated: "[data-testid='kanban-truncated']",
+  // Order-id box plus the three dropdowns. `…-option-<id>` addresses one entry
+  // in an open dropdown; the trigger itself is the filter, not an option.
+  query: "[data-testid='kanban-filter-query']",
+  riderFilter: "[data-testid='kanban-filter-rider']",
+  pickupCityFilter: "[data-testid='kanban-filter-pickup-city']",
+  deliveryCityFilter: "[data-testid='kanban-filter-delivery-city']",
+  // Real options, by prefix: the synthetic "All …" entry carries no id, so a
+  // prefix locator counts only genuine riders/cities. Addressed this way rather
+  // than `getByRole("option")` — options are taggable, so the taggable path wins.
+  riderOptionPrefix: "[data-testid^='kanban-filter-rider-option-']",
+  pickupCityOptionPrefix: "[data-testid^='kanban-filter-pickup-city-option-']",
+  deliveryCityOptionPrefix:
+    "[data-testid^='kanban-filter-delivery-city-option-']",
+  filterClear: "[data-testid='kanban-filter-clear']",
+  // The board's only toolbar-level action; opens the shared auto-assign dialog
+  // over every IN_WAREHOUSE card.
+  autoAssign: "[data-testid='bulk-auto-assign']",
+  details: "[data-testid='order-details-drawer']",
+}
+
+// ─── Completed orders (warehouse) ────────────────────────────────────────────
+// Read-only, so the only things worth addressing are the tabs and the table.
+export const completed = {
+  table: "[data-testid='table-warehouse-completed']",
+  tabAll: "[data-testid='completed-tab-ALL']",
+  tabDelivered: "[data-testid='completed-tab-DELIVERED']",
+  tabCancelled: "[data-testid='completed-tab-CANCELLED']",
+  tabReturned: "[data-testid='completed-tab-RETURNED']",
+}
+
+// ─── Auto-assign (warehouse board) ───────────────────────────────────────────
 // The dialog previews a proposal; the confirm button dispatches it. Everything
 // asserted here is a state the dialog can be in, because "the dialog opened" on
 // its own says nothing about whether it produced a plan. The dialog frame itself

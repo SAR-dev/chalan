@@ -125,6 +125,10 @@ export type PickupLocation = Loosen<typeof pickupLocation.$inferSelect>
 export type Rider = Loosen<typeof rider.$inferSelect>
 export type Order = Loosen<typeof order.$inferSelect> & {
   deliveryCity?: string | null
+  /** Join-derived, like `deliveryCity`: the pickup location's own city
+   *  (pickup_location.cityId → delivery_city.id). Needed to filter a board by
+   *  where a parcel came from, which `pickupLocationId` alone cannot answer. */
+  pickupCityId?: string | null
   merchantPhone?: string | null
   pickupLocationMapLink?: string | null
   deliveryMapLink?: string | null

@@ -471,26 +471,34 @@ export function hasNavPermission(
 export const WAREHOUSE_SIDEBAR: SidebarConfig = {
   brandIcon: SiteIcon,
   roleLabel: "Warehouse",
-  // Work-first: the intake queue is the landing page, then the rest of the hub
-  // floor, then money, then system. Landing page ungrouped, like Overview.
+  // Work-first: the overview is the landing page, then the hub floor in the
+  // order a parcel moves through it (approve → work it → review it closed),
+  // then money, then system. Landing page ungrouped, like the admin Overview.
   items: [
     {
       href: "/warehouse",
-      label: "Intake queue",
-      icon: PackagePlus,
+      label: "Overview",
+      icon: LayoutDashboard,
       exact: true,
     },
     {
-      href: "/warehouse/dispatch",
-      label: "Dispatch desk",
+      href: "/warehouse/orders",
+      label: "Order approval",
+      icon: ShieldCheck,
+      exact: true,
+      group: "Floor",
+    },
+    {
+      href: "/warehouse/ongoing",
+      label: "Ongoing",
       icon: Truck,
       exact: true,
       group: "Floor",
     },
     {
-      href: "/warehouse/orders",
-      label: "Order progress",
-      icon: Package,
+      href: "/warehouse/completed",
+      label: "Completed",
+      icon: PackageCheck,
       exact: true,
       group: "Floor",
     },

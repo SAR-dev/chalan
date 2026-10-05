@@ -37,11 +37,13 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 let mockUser: ReturnType<typeof makeUser> | null
 let mockWarehouse: ReturnType<typeof makeWarehouse> | null
 let mockOrdersState: MockOrdersState
+let mockSetStatuses: (statuses?: string[]) => void
 
 beforeEach(() => {
   resetIds()
   mockUser = makeUser({ role: "WAREHOUSE_ADMIN", warehouseId: "wh_1" })
   mockWarehouse = makeWarehouse()
+  mockSetStatuses = vi.fn()
   mockOrdersState = createMockOrders()
 })
 
@@ -52,8 +54,8 @@ async function importPage() {
   )
 }
 
-describe("Warehouse exceptions — section 5", () => {
-  it("NEEDS_ACTION tab filters by warehouse and FAILED_ATTEMPT status", async () => {
+describe("Warehouse exceptions", () => {
+  it("lists FAILED_ATTEMPT parcels for this warehouse only", async () => {
     mockOrdersState = createMockOrders({
       orders: [
         makeOrder({
@@ -73,32 +75,49 @@ describe("Warehouse exceptions — section 5", () => {
     await importPage()
     expect(screen.getByText("ORD-0001")).toBeInTheDocument()
     expect(screen.queryByText("ORD-0002")).not.toBeInTheDocument()
+    // RETURNED is terminal and lives on Completed now (decision #1).
     expect(screen.queryByText("ORD-0003")).not.toBeInTheDocument()
   })
 
-  it("RESOLVED tab filters by warehouse and RETURNED status", async () => {
+  it("forces the status filter to FAILED_ATTEMPT", async () => {
     mockOrdersState = createMockOrders({
-      orders: [
-        makeOrder({
-          status: "RETURNED",
-          warehouseId: "wh_1",
-        }),
-        makeOrder({
-          status: "RETURNED",
-          warehouseId: "wh_2",
-        }),
-        makeOrder({
-          status: "FAILED_ATTEMPT",
-          warehouseId: "wh_1",
-        }),
-      ],
+      orders: [makeOrder({ status: "FAILED_ATTEMPT", warehouseId: "wh_1" })],
+      setStatuses: mockSetStatuses,
     })
     await importPage()
-    const user = userEvent.setup()
-    await user.click(screen.getByRole("tab", { name: /returned/i }))
-    expect(screen.getByText("ORD-0001")).toBeInTheDocument()
-    expect(screen.queryByText("ORD-0002")).not.toBeInTheDocument()
-    expect(screen.queryByText("ORD-0003")).not.toBeInTheDocument()
+    expect(mockSetStatuses).toHaveBeenCalledWith(["FAILED_ATTEMPT"])
+  })
+
+  it("has no tab bar", async () => {
+    // Decision #11: one status means one tab is a tab that does nothing.
+    mockOrdersState = createMockOrders({
+      orders: [makeOrder({ status: "FAILED_ATTEMPT", warehouseId: "wh_1" })],
+    })
+    await importPage()
+    expect(screen.queryAllByRole("tab")).toHaveLength(0)
+    expect(screen.queryByRole("tab", { name: /returned/i })).toBeNull()
+  })
+
+  it("has no return-reason or resolved-by columns", async () => {
+    // They moved to Completed's Returned tab; leaving them here would render a
+    // column of dashes for every row.
+    mockOrdersState = createMockOrders({
+      orders: [makeOrder({ status: "FAILED_ATTEMPT", warehouseId: "wh_1" })],
+    })
+    await importPage()
+    expect(screen.queryByText("Return reason")).not.toBeInTheDocument()
+    expect(screen.queryByText("Resolved by")).not.toBeInTheDocument()
+  })
+
+  it("shows a single needs-attention count", async () => {
+    mockOrdersState = createMockOrders({
+      orders: [],
+      warehouseFailedOrders: 4,
+    })
+    await importPage()
+    expect(screen.getByText("Needs attention")).toBeInTheDocument()
+    expect(screen.getByText("4")).toBeInTheDocument()
+    expect(screen.queryByText("Total exceptions")).not.toBeInTheDocument()
   })
 
   it('shows "Resolve" for FAILED_ATTEMPT orders in the assigned warehouse', async () => {
@@ -123,18 +142,16 @@ describe("Warehouse exceptions — section 5", () => {
     ).not.toBeInTheDocument()
   })
 
-  it('hides "Resolve" on RESOLVED tab', async () => {
+  it("offers Resolve as the single action", async () => {
     mockOrdersState = createMockOrders({
-      orders: [makeOrder({ status: "RETURNED", warehouseId: "wh_1" })],
+      orders: [makeOrder({ status: "FAILED_ATTEMPT", warehouseId: "wh_1" })],
     })
     await importPage()
     const user = userEvent.setup()
-    await user.click(screen.getByRole("tab", { name: /returned/i }))
     await user.click(screen.getByRole("button", { name: /actions/i }))
-    await screen.findByRole("menuitem", { name: /no actions/i })
     expect(
-      screen.queryByRole("menuitem", { name: /resolve/i }),
-    ).not.toBeInTheDocument()
+      await screen.findByRole("menuitem", { name: /resolve/i }),
+    ).toBeInTheDocument()
   })
 
   it("shows empty message when no exceptions", async () => {
@@ -169,14 +186,6 @@ describe("Warehouse exceptions — section 5", () => {
     // marked busy rather than blanking to skeletons.
     expect(screen.getByText("ORD-0001")).toBeInTheDocument()
     expect(screen.getByText("Refreshing…")).toBeInTheDocument()
-  })
-
-  it("shows RESOLVED tab empty message", async () => {
-    mockOrdersState = createMockOrders({ orders: [] })
-    await importPage()
-    const user = userEvent.setup()
-    await user.click(screen.getByRole("tab", { name: /returned/i }))
-    expect(screen.getByText(/nothing returned/i)).toBeInTheDocument()
   })
 
   it("opens Resolve dialog and submits with default REATTEMPT", async () => {

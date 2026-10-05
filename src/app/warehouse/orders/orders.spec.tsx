@@ -12,6 +12,7 @@ import {
   renderPage,
   resetIds,
 } from "@/app/__tests__/test-utils"
+import { statCardLabels } from "@/config/stat-card-labels"
 
 vi.mock("@/features/account/hooks/use-auth", () => ({
   useAuth: () => ({ currentUser: mockUser }),
@@ -29,6 +30,7 @@ vi.mock("@/features/riders/hooks/use-riders", () => ({
   useRiders: () => ({ riders: [] }),
 }))
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
 vi.mock("@/features/orders/hooks/use-orders", () => ({
   useOrders: () => mockOrdersState,
 }))
@@ -37,29 +39,69 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 let mockUser: ReturnType<typeof makeUser> | null
 let mockWarehouse: ReturnType<typeof makeWarehouse> | null
 let mockOrdersState: MockOrdersState
+let mockSetStatuses: (statuses?: string[]) => void
 
 beforeEach(() => {
   resetIds()
   mockUser = makeUser({ role: "WAREHOUSE_ADMIN", warehouseId: "wh_1" })
   mockWarehouse = makeWarehouse()
-  mockOrdersState = createMockOrders()
+  mockSetStatuses = vi.fn()
+  // `setStatuses` is the queue's filter control, so the spec observes it
+  // directly rather than inferring the filter from rendered rows.
+  mockOrdersState = mockOrders({})
 })
+
+/** Build the hook's state with the observed `setStatuses` still attached. */
+function mockOrders(overrides: Parameters<typeof createMockOrders>[0]) {
+  return createMockOrders({ ...overrides, setStatuses: mockSetStatuses })
+}
 
 async function importPage() {
   const { WarehouseOrdersPageClient } = await import("./orders-client")
   renderPage(<WarehouseOrdersPageClient initialData={[]} initialTotal={0} />)
 }
 
-describe("Warehouse orders — section 8", () => {
+describe("Warehouse order approval", () => {
+  it("wires the queue to PENDING only", async () => {
+    mockOrdersState = mockOrders({
+      orders: [makeOrder({ status: "PENDING" })],
+    })
+    await importPage()
+    // The status filter is what makes this page an approval queue rather than
+    // an order list, so assert the wiring rather than the rendered rows.
+    expect(mockSetStatuses).toHaveBeenCalledWith(["PENDING"])
+  })
+
+  it("offers no status tabs", async () => {
+    // Every other status has a page of its own (decision #2), so a tab here
+    // would be a second place to look for the same parcel.
+    mockOrdersState = mockOrders({
+      orders: [makeOrder({ status: "PENDING" })],
+    })
+    await importPage()
+    expect(screen.queryAllByRole("tab")).toHaveLength(0)
+  })
+
+  it("shows no stat cards", async () => {
+    // The overview owns the counts; a second copy here could disagree with it.
+    mockOrdersState = mockOrders({
+      orders: [makeOrder({ status: "PENDING" })],
+    })
+    await importPage()
+    expect(
+      screen.queryByText(statCardLabels.warehouse.orders.pendingApproval.label),
+    ).not.toBeInTheDocument()
+  })
+
   it("shows all status-matching orders without additional warehouse scoping", async () => {
-    mockOrdersState = createMockOrders({
+    mockOrdersState = mockOrders({
       orders: [
         makeOrder({
-          status: "APPROVED",
+          status: "PENDING",
           warehouseId: "wh_1",
         }),
         makeOrder({
-          status: "APPROVED",
+          status: "PENDING",
           warehouseId: "wh_2",
         }),
       ],
@@ -70,7 +112,7 @@ describe("Warehouse orders — section 8", () => {
   })
 
   it('shows "Cancel order" for cancellable statuses', async () => {
-    mockOrdersState = createMockOrders({
+    mockOrdersState = mockOrders({
       orders: [makeOrder({ status: "PENDING" })],
     })
     await importPage()
@@ -80,7 +122,7 @@ describe("Warehouse orders — section 8", () => {
   })
 
   it('hides "Cancel order" for non-cancellable statuses', async () => {
-    mockOrdersState = createMockOrders({
+    mockOrdersState = mockOrders({
       orders: [makeOrder({ status: "DELIVERED" })],
     })
     await importPage()
@@ -92,7 +134,7 @@ describe("Warehouse orders — section 8", () => {
   })
 
   it("keeps rows on screen while refreshing", async () => {
-    mockOrdersState = createMockOrders({
+    mockOrdersState = mockOrders({
       orders: [makeOrder({ status: "PENDING" })],
       isLoading: true,
     })
@@ -104,14 +146,16 @@ describe("Warehouse orders — section 8", () => {
   })
 
   it("shows empty message", async () => {
-    mockOrdersState = createMockOrders({ orders: [] })
+    mockOrdersState = mockOrders({ orders: [] })
     await importPage()
-    expect(screen.getByText(/no orders to show/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/no orders are waiting for approval/i),
+    ).toBeInTheDocument()
   })
 
   it("opens Cancel dialog and submits", async () => {
     const cancelFn = vi.fn(() => Promise.resolve({ ok: true }))
-    mockOrdersState = createMockOrders({
+    mockOrdersState = mockOrders({
       orders: [makeOrder({ status: "PENDING" })],
       cancelOrder: cancelFn,
     })
@@ -128,7 +172,7 @@ describe("Warehouse orders — section 8", () => {
 
   it("shows error toast when cancel fails", async () => {
     const { toast } = await import("sonner")
-    mockOrdersState = createMockOrders({
+    mockOrdersState = mockOrders({
       orders: [makeOrder({ status: "PENDING" })],
       cancelOrder: vi.fn(() =>
         Promise.resolve({ ok: false, error: "Cancel error" }),

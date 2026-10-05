@@ -9,6 +9,12 @@ interface SearchInputProps {
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  /**
+   * Test hook. Optional so existing call sites are untouched; set it wherever
+   * the box is the only way to reach a view (a board or a filter bar rather
+   * than a table), so a spec never has to match on the placeholder text.
+   */
+  testId?: string
 }
 
 export function SearchInput({
@@ -16,12 +22,15 @@ export function SearchInput({
   onChange,
   placeholder = "Search...",
   className,
+  testId,
 }: SearchInputProps) {
   return (
     <div className={cn("relative w-full sm:max-w-xs", className)}>
       <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
       <Input
         placeholder={placeholder}
+        aria-label={placeholder}
+        data-testid={testId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="pl-9"

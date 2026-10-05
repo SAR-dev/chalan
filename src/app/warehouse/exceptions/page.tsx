@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, desc, eq, sql } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { requireSession } from "@/lib/api-auth"
 import { dbRead } from "@/lib/db"
@@ -27,8 +27,6 @@ const ORDER_COLUMNS = {
   warehouseId: order.warehouseId,
   deliveryRiderId: order.deliveryRiderId,
   deliveryAttempts: order.deliveryAttempts,
-  failedResolvedBy: order.failedResolvedBy,
-  returnReason: order.returnReason,
 }
 
 export default async function WarehouseExceptionsPage() {
@@ -42,7 +40,9 @@ export default async function WarehouseExceptionsPage() {
   // `order.warehouseId` is NOT NULL, so no "incoming candidate" can sit outside
   // This warehouse.
   const warehouseScope = eq(order.warehouseId, me.warehouseId)
-  const statusFilter = inArray(order.status, ["FAILED_ATTEMPT", "RETURNED"])
+  // FAILED_ATTEMPT only: the one status with a next action. RETURNED moved to
+  // the Completed page — see TODO.md decision #1.
+  const statusFilter = eq(order.status, "FAILED_ATTEMPT")
 
   const [[{ total }], rows] = await Promise.all([
     dbRead

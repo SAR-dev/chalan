@@ -61,7 +61,7 @@ describe("twoFactorEnforcementPath", () => {
       twoFactorEnforcementPath({
         ...admin,
         role: "WAREHOUSE_ADMIN",
-        pathname: "/warehouse/dispatch",
+        pathname: "/warehouse/ongoing",
       }),
     ).toBe("/warehouse/account?setup=2fa")
   })
