@@ -3,9 +3,11 @@
 import {
   Ban,
   Boxes,
+  Check,
   CheckCircle2,
   Clock,
   MoreHorizontal,
+  ShieldCheck,
   Truck,
   X,
 } from "lucide-react"
@@ -20,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -30,22 +33,34 @@ import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import {
   codFeeColumn,
   collectibleColumn,
+  createdAtColumn,
   deliveryAddressColumn,
   deliveryFeeColumn,
   deliveryRiderWithPhoneColumn,
+  deliveryTypeColumn,
   merchantColumn,
+  merchantNoteColumn,
   orderCodeColumn,
+  parcelWeightColumn,
   pickupRiderWithPhoneColumn,
   recipientNameColumn,
+  recipientPhoneColumn,
   statusColumn,
 } from "@/features/orders/components/order-table-columns"
+import { ApproveOrderDialog } from "@/features/orders/dialogs/approve-order-dialog"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import type { Order, OrderStatus } from "@/lib/types"
 
-type FilterTab = "ALL" | "IN_PROGRESS" | "DELIVERED" | "EXCEPTIONS"
+type FilterTab =
+  | "ALL"
+  | "PENDING"
+  | "APPROVED"
+  | "IN_PROGRESS"
+  | "DELIVERED"
+  | "EXCEPTIONS"
 
 const EXCEPTION_STATUSES: OrderStatus[] = ["FAILED_ATTEMPT", "RETURNED"]
 const IN_PROGRESS_STATUSES: OrderStatus[] = [
@@ -57,6 +72,11 @@ const IN_PROGRESS_STATUSES: OrderStatus[] = [
 
 const TAB_STATUSES: Record<FilterTab, OrderStatus[] | undefined> = {
   ALL: undefined,
+  // The approval workflow tabs — parity with the admin orders table: the
+  // warehouse approves the orders it will physically handle, so it needs the
+  // same "waiting / already cleared" split to find them.
+  PENDING: ["PENDING"],
+  APPROVED: ["APPROVED"],
   IN_PROGRESS: ["PICKED_UP", "IN_WAREHOUSE", "IN_TRANSIT", "OUT_FOR_DELIVERY"],
   DELIVERED: ["DELIVERED"],
   EXCEPTIONS: ["FAILED_ATTEMPT", "RETURNED"],
@@ -85,6 +105,7 @@ export function WarehouseOrdersPageClient({
     setStatuses,
     isLoading,
     isRefreshing,
+    bulkApproveOrders,
     bulkCancelOrders,
     mutate: refresh,
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
@@ -95,6 +116,21 @@ export function WarehouseOrdersPageClient({
   const [bulkBusy, setBulkBusy] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [approveTarget, setApproveTarget] = useState<Order | null>(null)
+  const [approveOpen, setApproveOpen] = useState(false)
+
+  async function handleBulkApprove(ids: string[]) {
+    setBulkBusy(true)
+    const res = await bulkApproveOrders(ids)
+    if (res.ok) {
+      toast.success(
+        `${ids.length} order${ids.length === 1 ? "" : "s"} approved.`,
+      )
+    } else {
+      toast.error(res.error ?? "Could not approve orders.")
+    }
+    setBulkBusy(false)
+  }
 
   async function handleBulkCancel(ids: string[]) {
     setBulkBusy(true)
@@ -137,18 +173,34 @@ export function WarehouseOrdersPageClient({
     () => allOrders.filter((o) => o.status === "IN_WAREHOUSE"),
     [allOrders],
   )
+  // Approval-workflow counts for the stat cards — derived from the same
+  // scoped `allOrders` list as the other four cards (client-side, no extra
+  // round trip; the list is already the warehouse's own).
+  const pendingApproval = useMemo(
+    () => allOrders.filter((o) => o.status === "PENDING"),
+    [allOrders],
+  )
+  const approvedCount = useMemo(
+    () => allOrders.filter((o) => o.status === "APPROVED"),
+    [allOrders],
+  )
 
   const columns: DataTableColumn<Order>[] = [
     orderCodeColumn(),
     merchantColumn(merchantName),
     recipientNameColumn(),
+    recipientPhoneColumn(),
+    parcelWeightColumn(),
     pickupRiderWithPhoneColumn(riderName, riderPhone),
     deliveryAddressColumn(),
+    deliveryTypeColumn(),
     collectibleColumn(),
     deliveryFeeColumn(),
     codFeeColumn(),
+    merchantNoteColumn(),
     statusColumn(),
     deliveryRiderWithPhoneColumn(riderName, riderPhone),
+    createdAtColumn(),
     {
       id: "actions",
       sticky: true,
@@ -156,6 +208,7 @@ export function WarehouseOrdersPageClient({
       align: "right",
       headClassName: "w-12",
       cell: (o) => {
+        const canApprove = o.status === "PENDING"
         const canCancel = [
           "PENDING",
           "APPROVED",
@@ -168,13 +221,34 @@ export function WarehouseOrdersPageClient({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    // Same id pattern as the admin orders table — the menu is
+                    // per-row, so an unqualified "Actions" is ambiguous on any
+                    // list with more than one order.
+                    data-testid={`order-actions-${o.id}`}
+                  >
                     <MoreHorizontal className="size-4" />
                     <span className="sr-only">Actions</span>
                   </Button>
                 }
               />
               <DropdownMenuContent align="end" className="w-48">
+                {canApprove && (
+                  <DropdownMenuItem
+                    data-testid={`order-review-${o.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setApproveTarget(o)
+                      setApproveOpen(true)
+                    }}
+                  >
+                    <ShieldCheck className="size-4" />
+                    Review order
+                  </DropdownMenuItem>
+                )}
+                {canApprove && canCancel && <DropdownMenuSeparator />}
                 {canCancel ? (
                   <DropdownMenuItem
                     variant="destructive"
@@ -210,13 +284,25 @@ export function WarehouseOrdersPageClient({
       />
 
       <StatCardList
-        columns={4}
+        columns={3}
         items={[
+          {
+            label: statCardLabels.warehouse.orders.pendingApproval.label,
+            value: pendingApproval.length,
+            icon: ShieldCheck,
+            tone: "bg-chart-3/15 text-chart-3",
+          },
+          {
+            label: statCardLabels.warehouse.orders.approved.label,
+            value: approvedCount.length,
+            icon: CheckCircle2,
+            tone: "bg-chart-1/15 text-chart-1",
+          },
           {
             label: statCardLabels.warehouse.orders.heldInWarehouse.label,
             value: inWarehouse.length,
             icon: Boxes,
-            tone: "bg-chart-1/15 text-chart-1",
+            tone: "bg-chart-2/15 text-chart-2",
           },
           {
             label: statCardLabels.warehouse.orders.inProgress.label,
@@ -247,11 +333,45 @@ export function WarehouseOrdersPageClient({
             searchable
             toolbarLeft={
               <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-                <TabsList>
-                  <TabsTrigger value="ALL">All</TabsTrigger>
-                  <TabsTrigger value="IN_PROGRESS">In progress</TabsTrigger>
-                  <TabsTrigger value="DELIVERED">Delivered</TabsTrigger>
-                  <TabsTrigger value="EXCEPTIONS">Exceptions</TabsTrigger>
+                {/* Six tabs overflow a phone width — scroll instead of
+                    clipping the later ones. */}
+                <TabsList className="max-w-full overflow-x-auto">
+                  <TabsTrigger
+                    value="ALL"
+                    data-testid="warehouse-orders-tab-ALL"
+                  >
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="PENDING"
+                    data-testid="warehouse-orders-tab-PENDING"
+                  >
+                    Pending approval
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="APPROVED"
+                    data-testid="warehouse-orders-tab-APPROVED"
+                  >
+                    Approved
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="IN_PROGRESS"
+                    data-testid="warehouse-orders-tab-IN_PROGRESS"
+                  >
+                    In progress
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="DELIVERED"
+                    data-testid="warehouse-orders-tab-DELIVERED"
+                  >
+                    Delivered
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="EXCEPTIONS"
+                    data-testid="warehouse-orders-tab-EXCEPTIONS"
+                  >
+                    Exceptions
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             }
@@ -273,6 +393,20 @@ export function WarehouseOrdersPageClient({
             selectedKeys={selectedOrders}
             onSelectionChange={setSelectedOrders}
             bulkActions={[
+              {
+                label: "Approve",
+                icon: <Check className="size-4" />,
+                disabled: bulkBusy,
+                onClick: async (rows, clear) => {
+                  // Same filter as the admin table: only PENDING rows go to
+                  // the endpoint, so a mixed selection approves what it can
+                  // rather than failing the whole batch.
+                  await handleBulkApprove(
+                    rows.filter((o) => o.status === "PENDING").map((o) => o.id),
+                  )
+                  clear()
+                },
+              },
               {
                 label: "Cancel",
                 variant: "destructive",
@@ -299,6 +433,15 @@ export function WarehouseOrdersPageClient({
           />
         </CardContent>
       </Card>
+
+      <ApproveOrderDialog
+        order={approveTarget}
+        open={approveOpen}
+        onOpenChange={(open) => {
+          setApproveOpen(open)
+          if (!open) setApproveTarget(null)
+        }}
+      />
 
       <CancelOrderDialog
         order={cancelTarget}

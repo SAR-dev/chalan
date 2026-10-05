@@ -173,7 +173,7 @@ describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique (a removed scenario leaves its serial
 unused rather than renumbering every later file). The summary below is
 asserted by `src/app/__tests__/docs-drift.spec.ts`, which fails on either a
-duplicate serial or stale counts: **currently S1-S76 across 34 files / 139
+duplicate serial or stale counts: **currently S1-S77 across 35 files / 140
 tests**.
 
 ## Coding Patterns

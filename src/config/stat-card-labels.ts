@@ -80,6 +80,8 @@ export const statCardLabels = {
       heldInWarehouse: { label: "In the warehouse" },
     },
     orders: {
+      pendingApproval: { label: "Waiting for approval" },
+      approved: { label: "Approved" },
       heldInWarehouse: { label: "In the warehouse" },
       inProgress: { label: "In progress" },
       delivered: { label: "Delivered" },

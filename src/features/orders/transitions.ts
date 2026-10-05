@@ -162,8 +162,26 @@ class TransitionError extends Error {
 
 export const ORDER_TRANSITIONS = {
   approve: defineTransition({
-    authorize: (me) => me.role === "SUPER_ADMIN",
-    guard: async ({ order: o, tx, cache }) => {
+    // Widened beyond the super admin: the warehouse hub approves the orders it
+    // will physically handle. The business guards below are role-independent,
+    // so only the scope rule changes with the role (see the guard).
+    authorize: (me) =>
+      me.role === "SUPER_ADMIN" ||
+      (me.role === "WAREHOUSE_ADMIN" && Boolean(me.warehouseId)),
+    guard: async ({ order: o, session, tx, cache }) => {
+      // The role check used to be the only scope boundary, so widening it
+      // requires an explicit ownership rule: a warehouse admin may approve
+      // only their own hub's orders — otherwise any warehouse could clear
+      // another's PENDING queue. Super admin sees every hub.
+      if (
+        session.role === "WAREHOUSE_ADMIN" &&
+        o.warehouseId !== session.warehouseId
+      ) {
+        return {
+          error: "This order belongs to a different warehouse.",
+          status: 403,
+        }
+      }
       if (o.status !== "PENDING") {
         return { error: "Only PENDING orders can be approved", status: 400 }
       }

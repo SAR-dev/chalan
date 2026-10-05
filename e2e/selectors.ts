@@ -173,6 +173,7 @@ export const orders = {
   // DataTable prefixes its toolbar field with the table id.
   searchInput: "[data-testid='table-search-dashboard-orders']",
   merchantOrdersSearch: "[data-testid='table-search-merchant-orders']",
+  warehouseOrdersSearch: "[data-testid='table-search-warehouse-orders']",
   // Status tabs, tagged by value. `dashboard/orders` opens on PENDING, which
   // holds only 8 of the 100 seeded orders, so anything asserting pagination
   // Must switch to ALL first. The previous `tab-${name}` value
