@@ -54,13 +54,7 @@ import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import type { Order, OrderStatus } from "@/lib/types"
 
-type FilterTab =
-  | "ALL"
-  | "PENDING"
-  | "APPROVED"
-  | "IN_PROGRESS"
-  | "DELIVERED"
-  | "EXCEPTIONS"
+type FilterTab = "PENDING" | "APPROVED" | "ALL"
 
 const EXCEPTION_STATUSES: OrderStatus[] = ["FAILED_ATTEMPT", "RETURNED"]
 const IN_PROGRESS_STATUSES: OrderStatus[] = [
@@ -70,16 +64,14 @@ const IN_PROGRESS_STATUSES: OrderStatus[] = [
   "OUT_FOR_DELIVERY",
 ]
 
+// Tab set, labels, order and default are the admin orders page's, verbatim —
+// the two views are meant to be the same feature (approve is now a shared
+// action too). The status arrays above still power the stat cards; only the
+// *filters* mirror the admin trio.
 const TAB_STATUSES: Record<FilterTab, OrderStatus[] | undefined> = {
-  ALL: undefined,
-  // The approval workflow tabs — parity with the admin orders table: the
-  // warehouse approves the orders it will physically handle, so it needs the
-  // same "waiting / already cleared" split to find them.
   PENDING: ["PENDING"],
   APPROVED: ["APPROVED"],
-  IN_PROGRESS: ["PICKED_UP", "IN_WAREHOUSE", "IN_TRANSIT", "OUT_FOR_DELIVERY"],
-  DELIVERED: ["DELIVERED"],
-  EXCEPTIONS: ["FAILED_ATTEMPT", "RETURNED"],
+  ALL: undefined,
 }
 
 export function WarehouseOrdersPageClient({
@@ -111,7 +103,8 @@ export function WarehouseOrdersPageClient({
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
-  const [tab, setTab] = useState<FilterTab>("ALL")
+  // Same default as the admin orders page: the approval queue first.
+  const [tab, setTab] = useState<FilterTab>("PENDING")
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
@@ -333,44 +326,20 @@ export function WarehouseOrdersPageClient({
             searchable
             toolbarLeft={
               <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-                {/* Six tabs overflow a phone width — scroll instead of
-                    clipping the later ones. */}
-                <TabsList className="max-w-full overflow-x-auto">
-                  <TabsTrigger
-                    value="ALL"
-                    data-testid="warehouse-orders-tab-ALL"
-                  >
-                    All
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="PENDING"
-                    data-testid="warehouse-orders-tab-PENDING"
-                  >
-                    Pending approval
+                {/* Labels, order and `orders-tab-*` testids mirror the admin
+                    orders page — same feature, same selectors. */}
+                <TabsList>
+                  <TabsTrigger value="PENDING" data-testid="orders-tab-PENDING">
+                    Pending
                   </TabsTrigger>
                   <TabsTrigger
                     value="APPROVED"
-                    data-testid="warehouse-orders-tab-APPROVED"
+                    data-testid="orders-tab-APPROVED"
                   >
                     Approved
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="IN_PROGRESS"
-                    data-testid="warehouse-orders-tab-IN_PROGRESS"
-                  >
-                    In progress
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="DELIVERED"
-                    data-testid="warehouse-orders-tab-DELIVERED"
-                  >
-                    Delivered
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="EXCEPTIONS"
-                    data-testid="warehouse-orders-tab-EXCEPTIONS"
-                  >
-                    Exceptions
+                  <TabsTrigger value="ALL" data-testid="orders-tab-ALL">
+                    All
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
