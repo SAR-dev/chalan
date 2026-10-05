@@ -34,6 +34,7 @@ import { ApproveOrderDialog } from "@/features/orders/dialogs/approve-order-dial
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
 import { businessPresetRange } from "@/lib/timezone"
 import type { Order } from "@/lib/types"
 
@@ -263,13 +264,7 @@ export function OrdersPageClient({
       headClassName: "w-12",
       cell: (o) => {
         const canApprove = o.status === "PENDING"
-        const canCancel = [
-          "PENDING",
-          "APPROVED",
-          "PICKED_UP",
-          "IN_WAREHOUSE",
-          "IN_TRANSIT",
-        ].includes(o.status)
+        const canCancel = CANCELLABLE_ORDER_STATUSES.includes(o.status)
         return (
           <div className="flex justify-end">
             <DropdownMenu>
@@ -435,13 +430,7 @@ export function OrdersPageClient({
                   await handleBulkCancel(
                     rows
                       .filter((o) =>
-                        [
-                          "PENDING",
-                          "APPROVED",
-                          "PICKED_UP",
-                          "IN_WAREHOUSE",
-                          "IN_TRANSIT",
-                        ].includes(o.status),
+                        CANCELLABLE_ORDER_STATUSES.includes(o.status),
                       )
                       .map((o) => o.id),
                   )

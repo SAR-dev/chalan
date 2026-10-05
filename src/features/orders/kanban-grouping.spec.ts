@@ -94,6 +94,7 @@ describe("groupOngoingByRider", () => {
   it("places every card in exactly one column", () => {
     const rows = [
       makeOrder({ status: "APPROVED", pickupRiderId: "rider_1" }),
+      makeOrder({ status: "OUT_FOR_PICKUP", pickupRiderId: "rider_1" }),
       makeOrder({ status: "PICKED_UP", pickupRiderId: "rider_2" }),
       makeOrder({ status: "IN_WAREHOUSE", deliveryRiderId: "rider_1" }),
       makeOrder({ status: "IN_TRANSIT", deliveryRiderId: "rider_2" }),

@@ -23,6 +23,7 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { DeliveryAttemptDialog } from "@/features/orders/dialogs/delivery-attempt-dialog"
 import { OutForDeliveryDialog } from "@/features/orders/dialogs/out-for-delivery-dialog"
+import { OutForPickupDialog } from "@/features/orders/dialogs/out-for-pickup-dialog"
 import { PickupConfirmDialog } from "@/features/orders/dialogs/pickup-confirm-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
@@ -88,6 +89,8 @@ export default function RiderTodoPage() {
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false)
   const [startTarget, setStartTarget] = useState<Order | null>(null)
   const [startDialogOpen, setStartDialogOpen] = useState(false)
+  const [startPickupTarget, setStartPickupTarget] = useState<Order | null>(null)
+  const [startPickupDialogOpen, setStartPickupDialogOpen] = useState(false)
 
   const merchant = (id: string) => merchants.find((m) => m.id === id)
   const merchantName = (id: string) => merchant(id)?.businessName ?? "Merchant"
@@ -108,7 +111,12 @@ export default function RiderTodoPage() {
     [orders, currentRider],
   )
 
-  const toPickup = myPickups.filter((o) => o.status === "APPROVED")
+  // Both pre-collection states belong in the queue: APPROVED is waiting to be
+  // started, OUT_FOR_PICKUP is started and waiting to be completed. Filtering
+  // on APPROVED alone would drop a parcel the moment the rider taps the button.
+  const toPickup = myPickups.filter((o) =>
+    ["APPROVED", "OUT_FOR_PICKUP"].includes(o.status),
+  )
   const toDeliver = myDeliveries.filter((o) =>
     ["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(o.status),
   )
@@ -152,6 +160,11 @@ export default function RiderTodoPage() {
   function openStartDelivery(order: Order) {
     setStartTarget(order)
     setStartDialogOpen(true)
+  }
+
+  function openStartPickup(order: Order) {
+    setStartPickupTarget(order)
+    setStartPickupDialogOpen(true)
   }
 
   return (
@@ -251,10 +264,28 @@ export default function RiderTodoPage() {
                       >
                         <MapPin className="size-4" />
                       </Button>
-                      <Button size="sm" onClick={() => openPickup(o)}>
-                        <PackageCheck className="size-4" />
-                        Picked up
-                      </Button>
+                      {o.status === "APPROVED" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => openStartPickup(o)}
+                          data-testid={`rider-start-pickup-${o.id}`}
+                        >
+                          <Navigation className="size-4" />
+                          Out for pickup
+                        </Button>
+                      ) : (
+                        // Reachable only at OUT_FOR_PICKUP: the `picked-up`
+                        // transition refuses anything else, so offering the
+                        // button any earlier would just produce a 400 toast.
+                        <Button
+                          size="sm"
+                          onClick={() => openPickup(o)}
+                          data-testid={`rider-picked-up-${o.id}`}
+                        >
+                          <PackageCheck className="size-4" />
+                          Picked up
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )
@@ -393,6 +424,12 @@ export default function RiderTodoPage() {
         }
         open={pickupDialogOpen}
         onOpenChange={setPickupDialogOpen}
+      />
+
+      <OutForPickupDialog
+        order={startPickupTarget}
+        open={startPickupDialogOpen}
+        onOpenChange={setStartPickupDialogOpen}
       />
 
       <OutForDeliveryDialog

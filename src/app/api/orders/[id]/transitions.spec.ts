@@ -20,6 +20,7 @@ import { PATCH as delivered } from "./delivered/route"
 import { PATCH as dispatch } from "./dispatch/route"
 import { PATCH as failed } from "./failed/route"
 import { PATCH as outForDelivery } from "./out-for-delivery/route"
+import { PATCH as outForPickup } from "./out-for-pickup/route"
 import { PATCH as pickedUp } from "./picked-up/route"
 import { PATCH as reattempt } from "./reattempt/route"
 import { PATCH as receive } from "./receive/route"
@@ -564,6 +565,65 @@ describe("PATCH /orders/:id/dispatch", () => {
 })
 
 // ---------------------------------------------------------------------------
+describe("PATCH /orders/:id/out-for-pickup", () => {
+  it("403 unless RIDER", async () => {
+    sessionState.value = warehouseAdmin()
+    const { status } = await call(outForPickup)
+    expect(status).toBe(403)
+  })
+
+  it("403 when not assigned to this rider", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [makeOrder({ pickupRiderId: "rider_2", status: "APPROVED" })],
+    ]
+    const { status, json } = await call(outForPickup)
+    expect(status).toBe(403)
+    expect(json).toEqual({ error: "This pickup is not assigned to you." })
+  })
+
+  it("400 when not APPROVED", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [makeOrder({ pickupRiderId: "rider_1", status: "PENDING" })],
+    ]
+    const { status, json } = await call(outForPickup)
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "Only APPROVED orders can go out for pickup.",
+    })
+  })
+
+  it("400 when already out for pickup — it is not idempotent", async () => {
+    // Re-running the transition would rewrite the timestamp a rider's manager
+    // might be reading as "when they left", so it is refused rather than
+    // silently updated.
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [makeOrder({ pickupRiderId: "rider_1", status: "OUT_FOR_PICKUP" })],
+    ]
+    const { status, json } = await call(outForPickup)
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "Only APPROVED orders can go out for pickup.",
+    })
+  })
+
+  it("goes out for pickup and stamps outForPickupAt", async () => {
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+    ]
+    dbState.updateResult = [makeOrder({ status: "OUT_FOR_PICKUP" })]
+    const { status, payload } = await call(outForPickup)
+    expect(status).toBe(200)
+    expect(payload).toMatchObject({ status: "OUT_FOR_PICKUP" })
+    expect(typeof payload?.outForPickupAt).toBe("string")
+    // Pickup is still locked at this point — this is what rule 2 hangs on.
+    expect(payload?.pickedUpAt).toBeFalsy()
+  })
+})
+
 describe("PATCH /orders/:id/picked-up", () => {
   it("403 unless RIDER with riderId", async () => {
     sessionState.value = admin
@@ -574,7 +634,7 @@ describe("PATCH /orders/:id/picked-up", () => {
   it("403 when pickup not assigned to this rider", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
-      [makeOrder({ pickupRiderId: "rider_2", status: "APPROVED" })],
+      [makeOrder({ pickupRiderId: "rider_2", status: "OUT_FOR_PICKUP" })],
     ]
     const { status, json } = await call(pickedUp, {
       proofRefs: ["/uploads/a.png"],
@@ -583,7 +643,24 @@ describe("PATCH /orders/:id/picked-up", () => {
     expect(json).toEqual({ error: "This pickup is not assigned to you." })
   })
 
-  it("400 when order not APPROVED", async () => {
+  it("400 while the order is still APPROVED, before going out for pickup", async () => {
+    // The gate this whole feature exists for: a rider may not collect until
+    // they have declared they are on the way. Asserted at the API because the
+    // UI merely hides the button, and a hidden button proves nothing.
+    sessionState.value = riderSession("rider_1")
+    dbState.selectQueue = [
+      [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+    ]
+    const { status, json } = await call(pickedUp, {
+      proofRefs: ["/uploads/a.png"],
+    })
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "Only OUT_FOR_PICKUP orders can be picked up.",
+    })
+  })
+
+  it("400 when the order never left PENDING either", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
       [makeOrder({ pickupRiderId: "rider_1", status: "PENDING" })],
@@ -592,13 +669,15 @@ describe("PATCH /orders/:id/picked-up", () => {
       proofRefs: ["/uploads/a.png"],
     })
     expect(status).toBe(400)
-    expect(json).toEqual({ error: "Only APPROVED orders can be picked up." })
+    expect(json).toEqual({
+      error: "Only OUT_FOR_PICKUP orders can be picked up.",
+    })
   })
 
   it("routes to the pickup location's warehouse", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
-      [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+      [makeOrder({ pickupRiderId: "rider_1", status: "OUT_FOR_PICKUP" })],
       [{ id: "pl_1", warehouseId: "wh_9" }], // pickup location with warehouse
     ]
     dbState.updateResult = [makeOrder({ status: "PICKED_UP" })]
@@ -617,7 +696,7 @@ describe("PATCH /orders/:id/picked-up", () => {
   it("leaves warehouseId null when pickup location has no warehouse", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
-      [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+      [makeOrder({ pickupRiderId: "rider_1", status: "OUT_FOR_PICKUP" })],
       [{ id: "pl_1", warehouseId: null }], // pickup location without warehouse
     ]
     dbState.updateResult = [makeOrder({ status: "PICKED_UP" })]
@@ -640,7 +719,7 @@ describe("PATCH /orders/:id/picked-up", () => {
       [
         makeOrder({
           pickupRiderId: "rider_1",
-          status: "APPROVED",
+          status: "OUT_FOR_PICKUP",
           parcelWeightKg: 1,
           deliveryFee: 60,
           codFee: 0,
@@ -682,7 +761,7 @@ describe("PATCH /orders/:id/picked-up", () => {
       [
         makeOrder({
           pickupRiderId: "rider_1",
-          status: "APPROVED",
+          status: "OUT_FOR_PICKUP",
           parcelWeightKg: 1,
           deliveryFee: 60,
           codFee: 0,
@@ -732,7 +811,7 @@ describe("PATCH /orders/:id/picked-up", () => {
       [
         makeOrder({
           pickupRiderId: "rider_1",
-          status: "APPROVED",
+          status: "OUT_FOR_PICKUP",
           deliveryFee: 60,
           deliveryCityId: "city_1",
         }),
@@ -772,7 +851,7 @@ describe("PATCH /orders/:id/picked-up", () => {
       [
         makeOrder({
           pickupRiderId: "rider_1",
-          status: "APPROVED",
+          status: "OUT_FOR_PICKUP",
           deliveryFee: 50,
           deliveryCityId: "city_1",
           packageRuleType: "FLAT",
@@ -812,7 +891,7 @@ describe("PATCH /orders/:id/picked-up", () => {
       [
         makeOrder({
           pickupRiderId: "rider_1",
-          status: "APPROVED",
+          status: "OUT_FOR_PICKUP",
           deliveryCityId: "city_1",
         }),
       ],
@@ -1423,6 +1502,34 @@ describe("PATCH /orders/:id/cancel", () => {
     })
   })
 
+  it("merchant can cancel while out for pickup — that is still before collection", async () => {
+    // The merchant's rule is stated as "before they are picked up", and going
+    // out for pickup happens before that. Refusing it here would put the real
+    // boundary somewhere other than the one the error message names.
+    sessionState.value = merchantSession("merch_1")
+    dbState.selectQueue = [
+      [makeOrder({ status: "OUT_FOR_PICKUP", merchantId: "merch_1" })],
+    ]
+    dbState.updateResult = [makeOrder({ status: "CANCELLED" })]
+    const { status, payload } = await call(cancel)
+    expect(status).toBe(200)
+    expect(payload).toMatchObject({ status: "CANCELLED" })
+  })
+
+  it("admin can cancel an OUT_FOR_PICKUP order, as they can a PICKED_UP one", async () => {
+    // The admin window runs up to OUT_FOR_DELIVERY. OUT_FOR_PICKUP precedes
+    // PICKED_UP — which is cancellable — so excluding it would make the
+    // boundary move backwards as a parcel advances.
+    sessionState.value = warehouseAdmin()
+    dbState.selectQueue = [
+      [makeOrder({ status: "OUT_FOR_PICKUP", warehouseId: "wh_1" })],
+    ]
+    dbState.updateResult = [makeOrder({ status: "CANCELLED" })]
+    const { status, payload } = await call(cancel)
+    expect(status).toBe(200)
+    expect(payload).toMatchObject({ status: "CANCELLED" })
+  })
+
   it("refunds the full creation charge when cancelled before pickup (ROADMAP B4)", async () => {
     sessionState.value = merchantSession("merch_1")
     dbState.selectQueue = [
@@ -1552,6 +1659,7 @@ describe("PATCH /orders/:id/cancel", () => {
     for (const status of [
       "PENDING",
       "APPROVED",
+      "OUT_FOR_PICKUP",
       "PICKED_UP",
       "IN_WAREHOUSE",
       "IN_TRANSIT",

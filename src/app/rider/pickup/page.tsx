@@ -1,6 +1,6 @@
 "use client"
 
-import { MapPin, PackageCheck } from "lucide-react"
+import { MapPin, Navigation, PackageCheck } from "lucide-react"
 import { useEffect, useState } from "react"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { DateRangePicker } from "@/components/date-range-picker"
@@ -14,11 +14,27 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { riderParcelColumn } from "@/features/orders/components/order-table-columns"
 import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
+import { OutForPickupDialog } from "@/features/orders/dialogs/out-for-pickup-dialog"
 import { PickupConfirmDialog } from "@/features/orders/dialogs/pickup-confirm-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import type { Order } from "@/lib/types"
+
+/**
+ * The two states in which a pickup is still this rider's work: approved and
+ * waiting to be started, or started and waiting to be completed.
+ *
+ * Anything else has left the pickup leg — collected, delivered, cancelled — so
+ * it counts as Completed on this queue. Deriving both the badge and the action
+ * buttons from one set is what stops them disagreeing the moment a third
+ * pre-collection state is added.
+ */
+const ACTIVE_PICKUP_STATUSES = new Set<Order["status"]>([
+  "APPROVED",
+  "OUT_FOR_PICKUP",
+])
+const isActivePickup = (o: Order) => ACTIVE_PICKUP_STATUSES.has(o.status)
 
 export default function RiderPickupQueuePage() {
   const { currentUser } = useAuth()
@@ -44,6 +60,8 @@ export default function RiderPickupQueuePage() {
   const { pickupLocations } = usePickupLocations()
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [startPickupOrder, setStartPickupOrder] = useState<Order | null>(null)
+  const [startPickupOpen, setStartPickupOpen] = useState(false)
   const [viewOrderCode, setViewOrderCode] = useState<string | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
 
@@ -68,6 +86,11 @@ export default function RiderPickupQueuePage() {
   function openConfirm(order: Order) {
     setActiveOrder(order)
     setDialogOpen(true)
+  }
+
+  function openStartPickup(order: Order) {
+    setStartPickupOrder(order)
+    setStartPickupOpen(true)
   }
 
   const columns: DataTableColumn<Order>[] = [
@@ -151,9 +174,9 @@ export default function RiderPickupQueuePage() {
     {
       id: "status",
       header: columnLabels.order.status,
-      sortValue: (o) => (o.status !== "APPROVED" ? "Completed" : "Ongoing"),
+      sortValue: (o) => (isActivePickup(o) ? "Ongoing" : "Completed"),
       cell: (o) => {
-        const isCompleted = o.status !== "APPROVED"
+        const isCompleted = !isActivePickup(o)
         return (
           <Badge variant={isCompleted ? "default" : "secondary"}>
             {isCompleted ? "Completed" : "Ongoing"}
@@ -168,12 +191,29 @@ export default function RiderPickupQueuePage() {
       align: "right",
       headClassName: "w-12",
       cell: (o) => {
-        const canPickup =
-          o.status === "APPROVED" && o.pickupRiderId === currentRider?.id
+        const isMine = o.pickupRiderId === currentRider?.id
+        const canStart = o.status === "APPROVED" && isMine
+        // Reachable only once OUT_FOR_PICKUP: `picked-up` refuses anything
+        // else, so offering it earlier would just surface a 400.
+        const canPickup = o.status === "OUT_FOR_PICKUP" && isMine
         return (
           <div className="flex justify-end gap-1">
+            {canStart ? (
+              <Button
+                size="sm"
+                data-testid={`rider-start-pickup-${o.id}`}
+                onClick={() => openStartPickup(o)}
+              >
+                <Navigation className="size-4" />
+                Out for pickup
+              </Button>
+            ) : null}
             {canPickup ? (
-              <Button size="sm" onClick={() => openConfirm(o)}>
+              <Button
+                size="sm"
+                data-testid={`rider-picked-up-${o.id}`}
+                onClick={() => openConfirm(o)}
+              >
                 <PackageCheck className="size-4" />
                 Picked up
               </Button>
@@ -232,6 +272,12 @@ export default function RiderPickupQueuePage() {
           />
         </CardContent>
       </Card>
+
+      <OutForPickupDialog
+        order={startPickupOrder}
+        open={startPickupOpen}
+        onOpenChange={setStartPickupOpen}
+      />
 
       <PickupConfirmDialog
         order={activeOrder}

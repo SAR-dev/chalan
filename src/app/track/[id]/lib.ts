@@ -51,6 +51,11 @@ export const STATUS_COPY: Record<
     sub: "A rider will collect your parcel from the merchant soon.",
     color: "text-chart-1",
   },
+  OUT_FOR_PICKUP: {
+    headline: "Rider is on the way!",
+    sub: "A rider is heading to the merchant to collect your parcel.",
+    color: "text-chart-1",
+  },
   PICKED_UP: {
     headline: "Parcel collected",
     sub: "Your parcel is on its way to the sorting hub.",

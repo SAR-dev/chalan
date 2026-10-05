@@ -36,7 +36,6 @@ const CADENCE_MS: Record<string, number> = {
   "cleanup-audit-logs": DAY_MS,
   "cleanup-email-logs": DAY_MS,
   "cleanup-uploads": DAY_MS,
-  "stale-orders": DAY_MS,
 }
 
 /** A job is stale once it is this many cadences past its last run. */

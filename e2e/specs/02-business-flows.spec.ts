@@ -282,6 +282,7 @@ test.describe("S78. Warehouse Ongoing Board", () => {
     // waiting to be received?".
     const statuses = [
       "APPROVED",
+      "OUT_FOR_PICKUP",
       "PICKED_UP",
       "IN_WAREHOUSE",
       "IN_TRANSIT",
@@ -473,7 +474,7 @@ test.describe("S78. Warehouse Ongoing Board", () => {
     await expect(page.locator(ongoing.noMatches)).toBeVisible()
     await expect(page.locator(ongoing.cardPrefix)).toHaveCount(0)
     // Lanes stay: an empty lane is still the answer to "where is it?".
-    await expect(page.locator(ongoing.columnPrefix)).toHaveCount(5)
+    await expect(page.locator(ongoing.columnPrefix)).toHaveCount(6)
 
     await page.locator(ongoing.filterClear).click()
     await expect(page.locator(ongoing.noMatches)).toHaveCount(0)

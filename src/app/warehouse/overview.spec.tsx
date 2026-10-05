@@ -36,6 +36,7 @@ describe("Warehouse overview", () => {
     for (const status of [
       "PENDING",
       "APPROVED",
+      "OUT_FOR_PICKUP",
       "PICKED_UP",
       "IN_WAREHOUSE",
       "IN_TRANSIT",

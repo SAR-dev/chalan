@@ -51,6 +51,7 @@ export const GET = withErrorHandler(
         approvedBy: order.approvedBy,
         approvedAt: order.approvedAt,
         assignedAt: order.assignedAt,
+        outForPickupAt: order.outForPickupAt,
         pickedUpAt: order.pickedUpAt,
         pickupProofRefs: order.pickupProofRefs,
         receivedAtWarehouseAt: order.receivedAtWarehouseAt,

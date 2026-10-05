@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/cleanup-sessions",
       "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/stale-orders",
-      "schedule": "0 6 * * *"
     }
   ],
   "git": {

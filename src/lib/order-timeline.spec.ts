@@ -17,16 +17,17 @@ import type { OrderStatus } from "@/lib/types"
 // what stops a second one being written.
 
 describe("order timeline (ROADMAP R5.2)", () => {
-  it("describes the lifecycle in six ordered steps", () => {
+  it("describes the lifecycle in seven ordered steps", () => {
     expect(STEPS.map((s) => s.key)).toEqual([
       "PLACED",
       "APPROVED",
+      "OUT_FOR_PICKUP",
       "PICKED_UP",
       "IN_WAREHOUSE",
       "OUT_FOR_DELIVERY",
       "DELIVERED",
     ])
-    expect(STEPS.map((s) => s.rank)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(STEPS.map((s) => s.rank)).toEqual([0, 1, 2, 3, 4, 5, 6])
     for (const step of STEPS) {
       expect(step.label, `${step.key} needs a label`).toBeTruthy()
       expect(step.description, `${step.key} needs a description`).toBeTruthy()
@@ -40,6 +41,7 @@ describe("order timeline (ROADMAP R5.2)", () => {
     const statuses: OrderStatus[] = [
       "PENDING",
       "APPROVED",
+      "OUT_FOR_PICKUP",
       "PICKED_UP",
       "IN_WAREHOUSE",
       "IN_TRANSIT",
@@ -66,8 +68,9 @@ describe("order timeline (ROADMAP R5.2)", () => {
     )
 
     // Every other step reads the same either way - the voice only exists
-    // because these two happen to differ.
-    for (const step of STEPS.filter((s) => s.key !== "OUT_FOR_DELIVERY")) {
+    // because these two happen to differ. Driven off the field rather than a
+    // key, so a third step with recipient wording cannot slip past this.
+    for (const step of STEPS.filter((s) => !s.descriptionForRecipient)) {
       expect(stepDescription(step, "recipient")).toBe(step.description)
     }
   })

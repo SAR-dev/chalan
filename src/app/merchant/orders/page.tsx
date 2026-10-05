@@ -27,6 +27,7 @@ type FilterTab = "ACTIVE" | "PENDING" | "IN_PROGRESS" | "ISSUES" | "ALL"
 const ACTIVE_STATUSES: OrderStatus[] = [
   "PENDING",
   "APPROVED",
+  "OUT_FOR_PICKUP",
   "PICKED_UP",
   "IN_WAREHOUSE",
   "IN_TRANSIT",
@@ -40,6 +41,7 @@ const TAB_STATUSES: Record<FilterTab, string[] | undefined> = {
   PENDING: ["PENDING"],
   IN_PROGRESS: [
     "APPROVED",
+    "OUT_FOR_PICKUP",
     "PICKED_UP",
     "IN_WAREHOUSE",
     "IN_TRANSIT",
@@ -91,6 +93,7 @@ export default function MerchantOrdersPage() {
       inProgress: all.filter((o) =>
         [
           "APPROVED",
+          "OUT_FOR_PICKUP",
           "PICKED_UP",
           "IN_WAREHOUSE",
           "IN_TRANSIT",

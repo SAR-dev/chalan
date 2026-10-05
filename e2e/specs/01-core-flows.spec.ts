@@ -84,6 +84,12 @@ test.describe("S8. Warehouse Operations", () => {
     await expect(page.getByText("Pending", { exact: true })).toBeVisible()
     await expect(page.getByText("Failed attempt")).toBeVisible()
     await expect(page.getByText("Waiting to be settled")).toBeVisible()
+    // The pre-collection leg is actionable work, so it earns a tile — the guard
+    // against a new status silently having no home on the homepage. (The
+    // absence of DELIVERED/RETURNED tiles is already pinned in
+    // `overview.spec.tsx`, where it can be asserted without a substring that
+    // would also match the page's prose.)
+    await expect(page.getByText("Out for pickup")).toBeVisible()
   })
 })
 
@@ -410,8 +416,14 @@ test.describe("S57. Rider corrects the parcel weight at pickup", () => {
     ).toBeTruthy()
     await warehouse.dispose()
 
-    // Rider picks up and corrects the weight upward.
+    // The rider must declare they are on the way before collecting — `picked-up`
+    // refuses an APPROVED parcel, which is exactly what the previous line left.
     const rider = await loginContext(CREDS.rider)
+    expect(
+      (await rider.patch(`/api/orders/${order.id}/out-for-pickup`)).ok(),
+    ).toBeTruthy()
+
+    // Rider picks up and corrects the weight upward.
     const pickRes = await rider.patch(`/api/orders/${order.id}/picked-up`, {
       data: { proofRefs: ["https://example.com/proof.png"], parcelWeightKg: 3 },
     })

@@ -152,7 +152,10 @@ export const order = pgTable(
     pickupRiderId: text("pickupRiderId").references(() => rider.id),
     assignedAt: ts("assignedAt"),
 
-    // Pickup rider collects parcel from merchant.
+    // Pickup rider collects parcel from merchant. `outForPickupAt` mirrors
+    // `outForDeliveryAt` on the delivery leg: the moment the rider declares they
+    // are heading to the shop, and the gate before `pickedUpAt` can be set.
+    outForPickupAt: ts("outForPickupAt"),
     pickedUpAt: ts("pickedUpAt"),
     // Photo(s) the pickup rider captures as proof of collection (shop front,
     // parcel in hand, etc). Multiple images allowed, same pattern as the

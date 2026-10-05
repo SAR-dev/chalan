@@ -17,6 +17,7 @@ import { WAREHOUSE_IDS } from "./warehouses"
 const ORDER_SEED_STATUSES: (
   | "PENDING"
   | "APPROVED"
+  | "OUT_FOR_PICKUP"
   | "PICKED_UP"
   | "IN_WAREHOUSE"
   | "IN_TRANSIT"
@@ -27,7 +28,11 @@ const ORDER_SEED_STATUSES: (
   | "CANCELLED"
 )[] = [
   ...Array.from({ length: 8 }, () => "PENDING" as const),
-  ...Array.from({ length: 8 }, () => "APPROVED" as const),
+  // Split 8 → 4 + 4 so the new status is represented without changing the
+  // total: suites assert "100 orders" as a number, and APPROVED only needs to
+  // keep enough rows to be assignable.
+  ...Array.from({ length: 4 }, () => "APPROVED" as const),
+  ...Array.from({ length: 4 }, () => "OUT_FOR_PICKUP" as const),
   ...Array.from({ length: 8 }, () => "PICKED_UP" as const),
   ...Array.from({ length: 10 }, () => "IN_WAREHOUSE" as const),
   ...Array.from({ length: 10 }, () => "IN_TRANSIT" as const),
@@ -128,6 +133,7 @@ export interface OrderSeedEntry {
   approvedAt: string | null
   pickupRiderId: string | null
   assignedAt: string | null
+  outForPickupAt: string | null
   pickedUpAt: string | null
   receivedAtWarehouseAt: string | null
   receivedByWarehouse: string | null
@@ -233,6 +239,7 @@ function buildSeedOrders(): OrderSeedEntry[] {
       approvedAt: null,
       pickupRiderId: null,
       assignedAt: null,
+      outForPickupAt: null,
       pickedUpAt: null,
       receivedAtWarehouseAt: null,
       receivedByWarehouse: null,
@@ -262,6 +269,7 @@ function buildSeedOrders(): OrderSeedEntry[] {
     }
 
     if (
+      status === "OUT_FOR_PICKUP" ||
       status === "PICKED_UP" ||
       status === "IN_WAREHOUSE" ||
       status === "IN_TRANSIT" ||
@@ -273,6 +281,26 @@ function buildSeedOrders(): OrderSeedEntry[] {
       const rider = pickupRiders[i % pickupRiders.length]
       base.pickupRiderId = rider.id
       base.assignedAt = base.approvedAt
+    }
+
+    // Heading out is half a day after approval; collecting is a day after
+    // approval, so a seeded OUT_FOR_PICKUP parcel has a believable gap before a
+    // pickup that has not happened yet.
+    if (status === "OUT_FOR_PICKUP") {
+      base.outForPickupAt = new Date(
+        new Date(base.approvedAt!).getTime() + 0.5 * DAY,
+      ).toISOString()
+    }
+
+    if (
+      status === "PICKED_UP" ||
+      status === "IN_WAREHOUSE" ||
+      status === "IN_TRANSIT" ||
+      status === "OUT_FOR_DELIVERY" ||
+      status === "DELIVERED" ||
+      status === "FAILED_ATTEMPT" ||
+      status === "RETURNED"
+    ) {
       base.pickedUpAt = new Date(
         new Date(base.approvedAt!).getTime() + DAY,
       ).toISOString()

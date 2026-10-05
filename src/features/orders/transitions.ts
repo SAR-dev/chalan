@@ -18,6 +18,7 @@ import {
   toPaisa,
 } from "@/lib/balance-ledger"
 import { refreshStats, statTag } from "@/lib/cached-stats"
+import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
 import { db } from "@/lib/db"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
 import {
@@ -320,6 +321,31 @@ export const ORDER_TRANSITIONS = {
     }),
   }),
 
+  // The rider declaring they are on the way to the shop. Mirrors
+  // `out-for-delivery` exactly — same authorize, same 403-for-the-wrong-rider /
+  // 400-for-the-wrong-status pair, no body schema — because the two legs are the
+  // same act ("I have started heading for it") at opposite ends of the parcel's
+  // life. Its only job is to open the gate in front of `picked-up`.
+  "out-for-pickup": defineTransition({
+    authorize: (me) => me.role === "RIDER" && Boolean(me.riderId),
+    guard: ({ order: o, session }) => {
+      if (o.pickupRiderId !== session.riderId) {
+        return { error: "This pickup is not assigned to you.", status: 403 }
+      }
+      if (o.status !== "APPROVED") {
+        return {
+          error: "Only APPROVED orders can go out for pickup.",
+          status: 400,
+        }
+      }
+      return null
+    },
+    buildUpdate: ({ now }) => ({
+      status: "OUT_FOR_PICKUP",
+      outForPickupAt: now,
+    }),
+  }),
+
   "picked-up": defineTransition({
     authorize: (me) => me.role === "RIDER" && Boolean(me.riderId),
     schema: orderPickedUpSchema,
@@ -327,8 +353,11 @@ export const ORDER_TRANSITIONS = {
       if (o.pickupRiderId !== session.riderId) {
         return { error: "This pickup is not assigned to you.", status: 403 }
       }
-      if (o.status !== "APPROVED") {
-        return { error: "Only APPROVED orders can be picked up.", status: 400 }
+      if (o.status !== "OUT_FOR_PICKUP") {
+        return {
+          error: "Only OUT_FOR_PICKUP orders can be picked up.",
+          status: 400,
+        }
       }
       return null
     },
@@ -617,7 +646,11 @@ export const ORDER_TRANSITIONS = {
         if (o.merchantId !== session.merchantId) {
           return { error: "Forbidden", status: 403 }
         }
-        const merchantAllowed = ["PENDING", "APPROVED"] as const
+        const merchantAllowed = [
+          "PENDING",
+          "APPROVED",
+          "OUT_FOR_PICKUP",
+        ] as const
         if (!(merchantAllowed as readonly string[]).includes(o.status)) {
           return {
             error: "Orders can only be cancelled before they are picked up.",
@@ -625,13 +658,11 @@ export const ORDER_TRANSITIONS = {
           }
         }
       } else {
-        const adminAllowed = [
-          "PENDING",
-          "APPROVED",
-          "PICKED_UP",
-          "IN_WAREHOUSE",
-          "IN_TRANSIT",
-        ] as const
+        // Anything up to the moment it leaves for delivery. See
+        // `CANCELLABLE_ORDER_STATUSES` for why this is one list rather than a
+        // literal here — and why OUT_FOR_PICKUP is inside it despite preceding
+        // PICKED_UP in the flow.
+        const adminAllowed = CANCELLABLE_ORDER_STATUSES
         if (!(adminAllowed as readonly string[]).includes(o.status)) {
           return {
             error: "Orders cannot be cancelled once they are out for delivery.",
@@ -668,6 +699,7 @@ const ORDER_DIFF_FIELDS = [
   "pickupRiderId",
   "assignedAt",
   "warehouseId",
+  "outForPickupAt",
   "pickedUpAt",
   "pickupProofRefs",
   "receivedAtWarehouseAt",
@@ -697,6 +729,7 @@ const TRANSITION_LABELS: Record<TransitionName, string> = {
   approve: "Approved",
   "assign-pickup-rider": "Assigned pickup rider",
   dispatch: "Dispatched",
+  "out-for-pickup": "Marked out for pickup",
   "picked-up": "Marked picked up",
   "out-for-delivery": "Marked out for delivery",
   delivered: "Marked delivered",

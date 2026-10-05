@@ -128,7 +128,7 @@ describe("staleCronJobs", () => {
   })
 
   it("reports a never-run job with a null age", async () => {
-    dbState.rows = [{ job: "stale-orders", lastRanAt: null }]
+    dbState.rows = [{ job: "cleanup-audit-logs", lastRanAt: null }]
     const stale = await staleCronJobs()
     expect(stale).toHaveLength(1)
     expect(stale[0].lastRanAt).toBeNull()
@@ -140,7 +140,6 @@ describe("neverRanCronJobs", () => {
   it("lists every scheduled job that has no heartbeat", async () => {
     dbState.rows = [{ job: "cleanup-sessions" }]
     const missing = await neverRanCronJobs()
-    expect(missing).toContain("stale-orders")
     expect(missing).toContain("drain-email-outbox")
     expect(missing).not.toContain("cleanup-sessions")
     expect(missing).toEqual([...missing].sort())
@@ -156,7 +155,6 @@ describe("neverRanCronJobs", () => {
       "cleanup-audit-logs",
       "cleanup-email-logs",
       "cleanup-uploads",
-      "stale-orders",
     ]) {
       expect(known, `missing cadence for ${job}`).toContain(job)
     }

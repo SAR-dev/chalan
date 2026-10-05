@@ -11,7 +11,7 @@ How to run your hub on {{APP_NAME}}. Sign in at **{{APP_URL}}/login** and open t
 ## 2. Read the overview
 
 1. Open **Overview** (`/warehouse`) — it is numbers only, no tables.
-2. The tiles count the parcels you can still act on: **Pending**, **Approved**, **Picked up**, **In warehouse**, **In transit**, **Out for delivery**, **Failed attempt**.
+2. The tiles count the parcels you can still act on: **Pending**, **Approved**, **Out for pickup**, **Picked up**, **In warehouse**, **In transit**, **Out for delivery**, **Failed attempt**.
 3. **Waiting to be settled** counts delivered parcels whose cash has not been handed over yet.
 4. Closed parcels are not tiled — nothing can be done to them. Find them under **Completed**.
 

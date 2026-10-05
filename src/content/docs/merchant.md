@@ -36,7 +36,7 @@ Step-by-step tasks for running your deliveries on {{APP_NAME}}. Open the merchan
 1. Open **Orders** (`/merchant/orders`) and switch between the **Active**, **Pending**, **In progress**, **Issues**, and **All** tabs.
 2. Search by tracking code, recipient, or city, and filter by date.
 3. Click a row to open the order detail page (`/merchant/orders/<code>`) — it shows the status timeline, assigned riders, and proof photos.
-4. Watch for these statuses: **Pending → Approved → Picked up → In warehouse → In transit → Out for delivery → Delivered**, with **Failed attempt**, **Returned**, or **Cancelled** as the exception paths.
+4. Watch for these statuses: **Pending → Approved → Out for pickup → Picked up → In warehouse → In transit → Out for delivery → Delivered**, with **Failed attempt**, **Returned**, or **Cancelled** as the exception paths.
 5. Cancel your own order from the detail page while it is still **Pending** or **Approved** (a reason is required).
 
 ## 5. Share tracking with your customer

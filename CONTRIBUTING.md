@@ -280,8 +280,8 @@ const transitions = {
     },
     buildUpdate: ({ body, now }) => ({ status: "APPROVED", approvedAt: now }),
   },
-  // ...12 transitions total:
-  // approve, assign-pickup-rider, dispatch, picked-up, receive,
+  // ...13 transitions total:
+  // approve, assign-pickup-rider, dispatch, out-for-pickup, picked-up, receive,
   // out-for-delivery, delivered, failed, reattempt, return,
   // settle-cod, cancel
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "order" ADD COLUMN "outForPickupAt" timestamp with time zone;

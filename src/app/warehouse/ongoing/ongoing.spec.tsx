@@ -103,6 +103,7 @@ describe("warehouse ongoing board", () => {
       .map((el) => el.getAttribute("data-testid"))
     expect(columns).toEqual([
       "kanban-column-APPROVED",
+      "kanban-column-OUT_FOR_PICKUP",
       "kanban-column-PICKED_UP",
       "kanban-column-IN_WAREHOUSE",
       "kanban-column-IN_TRANSIT",
@@ -262,7 +263,7 @@ describe("warehouse ongoing board", () => {
     )
     // The columns stay: "nothing is waiting to be received" is the answer the
     // warehouse admin came for, not five blank lanes.
-    expect(screen.getAllByTestId(/^kanban-column-/)).toHaveLength(5)
+    expect(screen.getAllByTestId(/^kanban-column-/)).toHaveLength(6)
   })
 })
 
@@ -485,7 +486,7 @@ describe("ongoing board filters", () => {
 
     expect(screen.getByTestId("kanban-no-matches")).toBeInTheDocument()
     // Columns stay — an empty lane is still the answer to "where is it?".
-    expect(screen.getAllByTestId(/^kanban-column-/)).toHaveLength(5)
+    expect(screen.getAllByTestId(/^kanban-column-/)).toHaveLength(6)
     expect(screen.queryByTestId("kanban-empty")).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId("kanban-filter-clear"))

@@ -320,6 +320,10 @@ export function useOrders({
       patchOrder(orderId, "dispatch", { riderId }),
     [patchOrder],
   )
+  const markOutForPickup = useCallback(
+    (orderId: string) => patchOrder(orderId, "out-for-pickup"),
+    [patchOrder],
+  )
   const markOutForDelivery = useCallback(
     (orderId: string) => patchOrder(orderId, "out-for-delivery"),
     [patchOrder],
@@ -505,6 +509,7 @@ export function useOrders({
     markOrderPickedUp,
     receiveOrderAtWarehouse,
     assignDeliveryRider,
+    markOutForPickup,
     markOutForDelivery,
     markDelivered,
     markDeliveryFailed,

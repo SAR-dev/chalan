@@ -71,6 +71,9 @@ export const orderDeliveryTypes = ["STANDARD", "FRAGILE"] as const
 export const orderStatuses = [
   "PENDING",
   "APPROVED",
+  // Mirrors OUT_FOR_DELIVERY on the collection leg: the rider has declared they
+  // are heading to the shop, and until they do, PICKED_UP is not reachable.
+  "OUT_FOR_PICKUP",
   "PICKED_UP",
   "IN_WAREHOUSE",
   "IN_TRANSIT",

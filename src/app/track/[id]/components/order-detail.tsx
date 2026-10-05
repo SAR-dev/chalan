@@ -39,6 +39,7 @@ import { Timeline } from "./timeline"
 const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
   PENDING: Clock,
   APPROVED: PackageCheck,
+  OUT_FOR_PICKUP: Bike,
   PICKED_UP: Bike,
   IN_WAREHOUSE: Warehouse,
   IN_TRANSIT: Truck,
@@ -52,6 +53,7 @@ const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
 const STATUS_TINT: Record<OrderStatus, string> = {
   PENDING: "bg-chart-3/10 text-chart-3 ring-chart-3/20",
   APPROVED: "bg-chart-1/10 text-chart-1 ring-chart-1/20",
+  OUT_FOR_PICKUP: "bg-chart-1/10 text-chart-1 ring-chart-1/20",
   PICKED_UP: "bg-chart-1/10 text-chart-1 ring-chart-1/20",
   IN_WAREHOUSE: "bg-chart-2/10 text-chart-2 ring-chart-2/20",
   IN_TRANSIT: "bg-chart-4/10 text-chart-4 ring-chart-4/20",

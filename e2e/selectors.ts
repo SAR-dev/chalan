@@ -321,6 +321,16 @@ export const ongoing = {
   details: "[data-testid='order-details-drawer']",
 }
 
+// ─── Rider pickup queue ──────────────────────────────────────────────────────
+// The two-stage pickup: APPROVED offers "Out for pickup", OUT_FOR_PICKUP offers
+// "Picked up". Addressed by order id, so a spec can assert that one parcel is
+// in exactly one of the two states rather than "some button exists".
+export const riderPickup = {
+  startPickup: (id: string) => `[data-testid='rider-start-pickup-${id}']`,
+  pickedUp: (id: string) => `[data-testid='rider-picked-up-${id}']`,
+  confirmStart: "[data-testid='out-for-pickup-confirm']",
+}
+
 // ─── Completed orders (warehouse) ────────────────────────────────────────────
 // Read-only, so the only things worth addressing are the tabs and the table.
 export const completed = {
