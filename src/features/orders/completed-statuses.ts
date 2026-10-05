@@ -20,5 +20,3 @@ export const COMPLETED_STATUSES = [
   "CANCELLED",
   "RETURNED",
 ] as const satisfies readonly OrderStatus[]
-
-export type CompletedStatus = (typeof COMPLETED_STATUSES)[number]

@@ -213,11 +213,6 @@ export const pageContent = {
       description:
         "Track your available balance and request payouts. Payouts cover COD amount only — delivery charge and security money are retained by the platform.",
     },
-    pickupLocations: {
-      title: "Pickup locations",
-      description:
-        "Manage the pickup locations where riders collect your parcels.",
-    },
     pricing: {
       title: "Delivery pricing",
       description:

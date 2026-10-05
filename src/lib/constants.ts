@@ -171,15 +171,6 @@ export const RIDER_VEHICLE_TYPE_LABELS: Record<RiderVehicleType, string> = {
   PICKUP_TRUCK: "Pickup truck",
 }
 
-export const RIDER_VEHICLE_TYPE_TONES: Record<RiderVehicleType, BadgeTone> = {
-  FOOT: "neutral",
-  BICYCLE: "info",
-  BIKE: "success",
-  CAR: "brand",
-  VAN: "violet",
-  PICKUP_TRUCK: "warehouse",
-}
-
 export const RIDER_STATUS_LABELS: Record<RiderStatus, string> = {
   PENDING: "Pending",
   APPROVED: "Approved",
@@ -205,17 +196,6 @@ export const BALANCE_TX_TYPE_LABELS: Record<BalanceTxType, string> = {
   PAYMENT_PENDING: "Payment Pending",
   PAYMENT_CONFIRMED: "Payment Confirmed",
   ADJUSTMENT: "Adjustment",
-}
-
-export const BALANCE_TX_TYPE_TONES: Record<BalanceTxType, BadgeTone> = {
-  ORDER_CHARGE: "danger",
-  ORDER_CHARGE_REVERSAL: "success",
-  ORDER_EARNINGS: "success",
-  ORDER_CANCELLATION: "pending",
-  PAYOUT: "info",
-  PAYMENT_PENDING: "pending",
-  PAYMENT_CONFIRMED: "success",
-  ADJUSTMENT: "neutral",
 }
 
 export const BALANCE_TX_STATUS_LABELS: Record<BalanceTxStatus, string> = {

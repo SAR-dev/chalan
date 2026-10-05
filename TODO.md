@@ -2,11 +2,13 @@
 
 ## Status
 
-**Phases 1–6 are implemented.** Every checkbox below is ticked. Verified with
-`pnpm ci:check` (clean), `pnpm test:unit:run` (2315 passing, 19 skipped),
-`pnpm test:coverage` (floors hold), and `pnpm build` (`/warehouse/ongoing` and
-`/warehouse/completed` in the route table, `/warehouse/dispatch` gone). `pnpm
-test:e2e` still needs a local Postgres and has not been run since the rewrite.
+**Phases 1–6 are implemented, and the verification checklist at the bottom of
+this file is complete.** Verified with `pnpm ci:check` (clean),
+`pnpm test:coverage` (floors hold), `pnpm build` (`/warehouse/ongoing` and
+`/warehouse/completed` in the route table, `/warehouse/dispatch` gone), and
+`pnpm test:e2e` — **143 passed**, so the suite now exercises the rewrite end to
+end rather than sitting unrun. It needs a local Postgres and reseeds the dev
+database (`pnpm db:seed:full`), which is its documented behaviour.
 
 Four places where the implementation departed from the plan text, and why:
 
@@ -28,6 +30,25 @@ Four places where the implementation departed from the plan text, and why:
   badge and by the board's column headings; a third copy in the labels file
   would have been a fourth thing to keep in sync. Only the COD tile needs a
   label, and it reuses `codSettlement.awaitingSettlement`.
+
+## Added after this plan was written
+
+Two requests landed once the restructure was in place, so no phase in this
+plan mentions them:
+
+- **Board filters on `/warehouse/ongoing`.** An order-ID search box alongside
+  three dropdowns: rider, pickup city and delivery city. Filter logic is pure
+  and unit tested in `src/features/orders/ongoing-filters.ts`; the bar is
+  `src/features/orders/components/ongoing-filter-bar.tsx`. Both city dropdowns
+  are fed from the **whole** `delivery_city` table (a second server query in
+  `page.tsx`) rather than from the loaded board, so an option list never shrinks
+  under the cursor. The rider filter matches `nextLegRiderId` — the same
+  "who holds it" answer the rider grouping and the card label use, so picking a
+  rider always shows that rider's parcels.
+- **The APPROVED card's pickup action no longer disappears** when a rider is
+  assigned: it renders `disabled` and reads **"Pickup Assigned"** instead. An
+  absent button reads as a card that failed to render its action, rather than as
+  "nobody needs to assign this one".
 
 ## Goal
 
@@ -327,23 +348,32 @@ decision row above rather than an assumption buried in a checklist item.
 
 ## Verification checklist (final)
 
-- [ ] `/warehouse` shows **eight** stat cards only — no table, no Receive button.
+- [x] `/warehouse` shows **eight** stat cards only — no table, no Receive button.
       Cards: PENDING, APPROVED, PICKED_UP, IN_WAREHOUSE, IN_TRANSIT,
       OUT_FOR_DELIVERY, FAILED_ATTEMPT, COD to settle. **No DELIVERED card, no
-      RETURNED card.**
-- [ ] The COD card equals `count(DELIVERED AND codSettledAt IS NULL)` for the
+      RETURNED card.** (`overview.spec.tsx` asserts the eight *and* that neither
+      closed-archive label appears.)
+- [x] The COD card equals `count(DELIVERED AND codSettledAt IS NULL)` for the
       warehouse — cross-check against `/warehouse/cod-settlement`'s own
       "Waiting to be settled" number; settling an order there moves the card.
-- [ ] `/warehouse/orders` lists only PENDING; approve/cancel still work (S77 green).
-- [ ] `/warehouse/ongoing` groups by status **and** by rider; each card appears
+      (Both use the identical predicate: `warehouse/page.tsx` and
+      `api/orders/counts` filter `warehouseId AND status='DELIVERED' AND
+      codSettledAt IS NULL`, and share the `statTag("order")` invalidation.)
+- [x] `/warehouse/orders` lists only PENDING; approve/cancel still work (S77
+      green).
+- [x] `/warehouse/ongoing` groups by status **and** by rider; each card appears
       in exactly one rider column; Receive/Assign/Dispatch reachable per card;
-      auto-assign toolbar works and hides when nothing is eligible.
-- [ ] `/warehouse/completed` shows DELIVERED + CANCELLED + RETURNED with zero
+      auto-assign toolbar works and hides when nothing is eligible. (S78 asserts
+      the two views total the same number of cards.)
+- [x] `/warehouse/completed` shows DELIVERED + CANCELLED + RETURNED with zero
       action controls; `returnReason` / `resolvedBy` visible on the `Returned`
-      tab.
-- [ ] `/warehouse/exceptions` shows FAILED_ATTEMPT only, with no tab bar and no
+      tab. (S79 green.)
+- [x] `/warehouse/exceptions` shows FAILED_ATTEMPT only, with no tab bar and no
       orphaned return columns; Resolve still re-attempts and closes as return.
-- [ ] No route to `/warehouse/dispatch`; nav has no Intake/Dispatch entries;
-      `warehouse-admin.md` and landing copy match reality.
-- [ ] `pnpm ci:check`, `pnpm test:unit:run`, `pnpm test:coverage`,
-      `pnpm build`, `pnpm test:e2e` all green; `AGENTS.md` counts accurate.
+      (S3/S4 assert no tab is present.)
+- [x] No route to `/warehouse/dispatch`; nav has no Intake/Dispatch entries;
+      `warehouse-admin.md` and landing copy match reality. (Route table from
+      `pnpm build`, `nav-config.spec.ts`, S42.)
+- [x] `pnpm ci:check`, `pnpm test:unit:run`, `pnpm test:coverage`,
+      `pnpm build`, `pnpm test:e2e` all green; `AGENTS.md` counts accurate —
+      **S1-S79 across 35 files / 143 tests**.

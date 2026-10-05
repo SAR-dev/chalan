@@ -12,8 +12,6 @@ export const auth = {
   registerForm: "[data-testid='register-form']",
   // Lives in the RightNav panel now: open topnav.userMenu first.
   logout: "[data-testid='logout']",
-  mobileMenu: "[data-testid='mobile-menu']",
-  accountSecurityTab: "[data-testid='account-tab-security']",
   accountTwoFactorTab: "[data-testid='account-tab-two-factor']",
 }
 
@@ -39,26 +37,20 @@ export const twoFactor = {
   enableButton: "[data-testid='two-factor-enable']",
   passwordInput: "[data-testid='two-factor-password-input']",
   passwordSubmit: "[data-testid='two-factor-password-submit']",
-  passwordCancel: "[data-testid='two-factor-password-cancel']",
   secret: "[data-testid='two-factor-secret']",
-  secretCopy: "[data-testid='two-factor-secret-copy']",
   qr: "[data-testid='two-factor-qr']",
   codeInput: "[data-testid='two-factor-code-input']",
   verifySubmit: "[data-testid='two-factor-verify-submit']",
-  verifyCancel: "[data-testid='two-factor-verify-cancel']",
   recoveryCodes: "[data-testid='two-factor-recovery-codes']",
   recoveryCopy: "[data-testid='two-factor-recovery-copy']",
   recoveryDownload: "[data-testid='two-factor-recovery-download']",
   recoveryDone: "[data-testid='two-factor-recovery-done']",
-  regenerateButton: "[data-testid='two-factor-regenerate']",
   disableButton: "[data-testid='two-factor-disable']",
   disableInput: "[data-testid='two-factor-disable-input']",
   disableSubmit: "[data-testid='two-factor-disable-submit']",
-  disableCancel: "[data-testid='two-factor-disable-cancel']",
   loginInput: "[data-testid='two-factor-login-input']",
   loginSubmit: "[data-testid='two-factor-login-submit']",
   loginRecoveryLink: "[data-testid='two-factor-login-recovery']",
-  loginBackLink: "[data-testid='two-factor-login-back']",
 }
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
@@ -66,7 +58,6 @@ export const nav = {
   sidebar: "[data-testid='sidebar']",
   sidebarLink: (label: string) =>
     `[data-testid='sidebar'] a:has-text("${label}")`,
-  mobileMenu: "[data-testid='mobile-menu']",
   userMenu: "[data-testid='user-menu']",
 }
 
@@ -102,10 +93,8 @@ export const announcementForm = {
   title: "[data-testid='ann-title']",
   // The testid sits on CodeMirror's root; fill() needs the contenteditable.
   content: "[data-testid='ann-content'] .cm-content",
-  contentPreview: "[data-testid='ann-content-preview']",
   role: (role: string) => `[data-testid='ann-role-${role}']`,
   submit: "[data-testid='ann-submit']",
-  cancel: "[data-testid='ann-cancel']",
   rowActions: (id: string) => `[data-testid='ann-actions-${id}']`,
   editItem: "[data-testid='ann-edit-item']",
 }
@@ -116,29 +105,21 @@ export const pricing = {
   table: "[data-testid='pricing-table']",
   cancellationTable: "[data-testid='cancellation-fee-table']",
   navLink: "[data-testid='nav-pricing']",
-  rateCardLink: "[data-testid='rate-card-link']",
   // Zone × zone rate matrix. Rows are pickup zones, columns delivery zones;
   // both directions are priced separately, so cells are addressed by lane.
   zoneRateCard: "[data-testid='merchant-zone-rate-card']",
   zoneMatrix: "[data-testid='zone-rate-matrix']",
   zoneMatrixCell: (fromZoneId: string, toZoneId: string) =>
     `[data-testid='zone-matrix-cell'][data-lane='${fromZoneId}:${toZoneId}']`,
-  zoneMatrixUnpriced: "[data-testid='zone-matrix-unpriced']",
   zoneMatrixDetail: "[data-testid='zone-matrix-detail']",
   zoneMatrixDetailLane: "[data-testid='zone-matrix-detail-lane']",
-  zoneMatrixEmpty: "[data-testid='zone-rate-matrix-empty']",
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboard = {
-  statCard: (label: string) => `[data-testid='stat-card-${label}']`,
-  overview: "[data-testid='dashboard-overview']",
   // Zone-pricing coverage: lanes with no configured rate.
   pricingCoverageCard: "[data-testid='pricing-coverage-card']",
   pricingCoverageMissing: "[data-testid='pricing-coverage-missing']",
-  pricingCoverageClear: "[data-testid='pricing-coverage-clear']",
-  pricingCoverageEmpty: "[data-testid='pricing-coverage-empty']",
-  pricingCoverageOverflow: "[data-testid='pricing-coverage-overflow']",
 }
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
@@ -149,11 +130,7 @@ export const orders = {
   // on the order id. The previous `order-row-<id>` form matched nothing in
   // `src/` — the same stale copy the riders selectors had, fixed to the
   // pattern `packages` already used correctly.
-  row: (id: string) => `[data-testid='row-dashboard-orders-${id}']`,
-  rowPrefix: "[data-testid^='row-dashboard-orders-']",
-  merchantRow: (id: string) => `[data-testid='row-merchant-orders-${id}']`,
   merchantRowPrefix: "[data-testid^='row-merchant-orders-']",
-  createButton: "[data-testid='create-order']",
   // The submit button of `approve-order-dialog`, wired via `submitTestId`.
   approveButton: "[data-testid='approve-order']",
   approveItemType: "[data-testid='approve-order-item-type']",
@@ -164,10 +141,7 @@ export const orders = {
   cancelOrderButton: "[data-testid='cancel-order']",
   cancelOrderSubmit: "[data-testid='cancel-order-submit']",
   cancelReasonInput: "[data-testid='cancel-reason-input']",
-  bulkApprove: "[data-testid='bulk-approve']",
-  bulkCancel: "[data-testid='bulk-cancel']",
   selectAll: "[data-testid='select-all']",
-  selectRow: (id: string) => `[data-testid='select-${id}']`,
   // The toolbar's search field. The previous `orders-search` value matched
   // nothing in `src/`; `SearchInput` carries no testid of its own and the
   // DataTable prefixes its toolbar field with the table id.
@@ -183,16 +157,12 @@ export const orders = {
   bulkImportOpen: "[data-testid='bulk-import-open']",
   bulkImportTemplate: "[data-testid='bulk-import-template']",
   bulkImportFile: "[data-testid='bulk-import-file']",
-  bulkImportLoading: "[data-testid='bulk-import-loading']",
   bulkImportSummary: "[data-testid='bulk-import-summary']",
-  bulkImportPreview: "[data-testid='bulk-import-preview']",
   bulkImportRow: (line: number) => `[data-testid='bulk-import-row-${line}']`,
   bulkImportFilterAll: "[data-testid='bulk-import-filter-all']",
   bulkImportFilterErrors: "[data-testid='bulk-import-filter-errors']",
-  bulkImportJumpError: "[data-testid='bulk-import-jump-error']",
   bulkImportErrorExport: "[data-testid='bulk-import-error-export']",
   bulkImportConfirm: "[data-testid='bulk-import-confirm']",
-  bulkImportCancel: "[data-testid='bulk-import-cancel']",
 }
 
 // ─── Order Form ──────────────────────────────────────────────────────────────
@@ -203,23 +173,18 @@ export const orderForm = {
   recipientPhone: "[data-testid='recipient-phone']",
   deliveryCity: "[data-testid='delivery-city']",
   deliveryAddress: "[data-testid='delivery-address']",
-  deliveryMap: "[data-testid='delivery-map']",
   parcelWeight: "[data-testid='parcel-weight']",
   itemType: "[data-testid='parcel-item-type']",
   productCost: "[data-testid='product-cost']",
   submitOrder: "[data-testid='submit-order']",
-  addParcel: "[data-testid='add-parcel']",
   // 1-based: `removeParcel(1)` is the first card, matching its "Parcel 1"
   // heading and its aria-label.
-  removeParcel: (index: number) => `[data-testid='remove-parcel-${index}']`,
   // Shown instead of a delivery charge when the lane has no configured rate.
-  pricingUnavailable: "[data-testid='parcel-pricing-unavailable']",
 }
 
 // ─── Merchants ───────────────────────────────────────────────────────────────
 export const merchants = {
   table: "[data-testid='table-dashboard-merchants']",
-  row: (id: string) => `[data-testid='row-dashboard-merchants-${id}']`,
   firstRow: "[data-testid^='row-dashboard-merchants-']",
   // No `approveButton` here. It used to be, but the merchants list has no
   // approve action: approving a merchant happens through
@@ -227,8 +192,6 @@ export const merchants = {
   // `merchants.spec.tsx` asserts outright that no inline "Approve" button
   // renders for a PENDING merchant. Keeping the selector would advertise an
   // affordance that the UI deliberately does not have.
-  suspendButton: "[data-testid='suspend-merchant']",
-  reactivateButton: "[data-testid='reactivate-merchant']",
 }
 
 // ─── Riders ──────────────────────────────────────────────────────────────────
@@ -246,10 +209,6 @@ export const riders = {
   // `vehicleCell` repeats per row — always scope it inside `row(id)`.
   vehicleCell: "[data-testid='rider-vehicle-cell']",
   detailVehicle: "[data-testid='rider-detail-vehicle']",
-  editVehicleType: "[data-testid='edit-rider-vehicle-type']",
-  editVehicleOption: (type: string) =>
-    `[data-testid='edit-rider-vehicle-option-${type}']`,
-  editVehiclePlate: "[data-testid='edit-rider-vehicle-plate']",
 }
 
 // ─── Sign-out confirmation ───────────────────────────────────────────────────
@@ -282,9 +241,7 @@ export const warehouse = {
   // `DataTable` derives its testid from the table's `id` prop as `table-<id>`, so
   // these carry the prefix rather than repeating the id verbatim.
   exceptionsTable: "[data-testid='table-warehouse-exceptions']",
-  settlementTable: "[data-testid='table-warehouse-settlement']",
   settleButton: "[data-testid='settle-cod']",
-  bulkSettle: "[data-testid='bulk-settle']",
 }
 
 // ─── Ongoing board (warehouse kanban) ────────────────────────────────────────
@@ -294,8 +251,6 @@ export const warehouse = {
 // prefix match refined by the concrete status or rider the spec cares about.
 export const ongoing = {
   board: "[data-testid='kanban-board']",
-  groupBy: "[data-testid='kanban-groupby']",
-  groupByStatus: "[data-testid='kanban-groupby-status']",
   groupByRiders: "[data-testid='kanban-groupby-riders']",
   columnPrefix: "[data-testid^='kanban-column-']",
   /** A lane by id — a status in the status view, a rider id or `UNASSIGNED`. */
@@ -308,8 +263,6 @@ export const ongoing = {
     "[data-testid^='kanban-column-IN_TRANSIT']," +
     "[data-testid^='kanban-column-OUT_FOR_DELIVERY']",
   unassignedColumn: "[data-testid='kanban-column-UNASSIGNED']",
-  columnCountPrefix: "[data-testid^='kanban-count-']",
-  columnCount: (id: string) => `[data-testid='kanban-count-${id}']`,
   // The In-warehouse lane specifically. Auto-assign plans over exactly this set,
   // so a spec comparing a plan's totals to the board has to read this count and
   // not the first column's.
@@ -322,17 +275,13 @@ export const ongoing = {
   // property the rider grouping exists to guarantee — would have gone unasserted.
   cardPrefix: "[data-testid^='kanban-card-']",
   cardOpenPrefix: "[data-testid^='kanban-open-']",
-  assignPickupPrefix: "[data-testid^='kanban-assign-pickup-']",
-  receivePrefix: "[data-testid^='kanban-receive-']",
   dispatchPrefix: "[data-testid^='kanban-dispatch-']",
   // A selector that must never match anything. Cancel lives on the approval
   // queue and in the admin portal; putting it on a board card would undo the
   // PENDING-only approval split (TODO.md decision #9).
   cancelPrefix: "[data-testid^='kanban-cancel-']",
-  empty: "[data-testid='kanban-empty']",
   // Distinct from `empty`: there ARE parcels, the filter just hides all of them.
   noMatches: "[data-testid='kanban-no-matches']",
-  truncated: "[data-testid='kanban-truncated']",
   // Order-id box plus the three dropdowns. `…-option-<id>` addresses one entry
   // in an open dropdown; the trigger itself is the filter, not an option.
   query: "[data-testid='kanban-filter-query']",
@@ -369,10 +318,8 @@ export const completed = {
 // its own says nothing about whether it produced a plan. The dialog frame itself
 // is the shared `dialog.formDialog`.
 export const autoAssign = {
-  loading: "[data-testid='auto-assign-loading']",
   error: "[data-testid='auto-assign-error']",
   empty: "[data-testid='auto-assign-empty']",
-  unassigned: "[data-testid='auto-assign-unassigned']",
   confirm: "[data-testid='auto-assign-confirm']",
   // The per-rider blocks. The `:not` matters: the parcel tally inside each block
   // shares the prefix, so a bare prefix match counts one block as two and a
@@ -398,7 +345,6 @@ export const riderCash = {
   totalCollected: "[data-testid='rider-cash-total-collected']",
   totalSubmitted: "[data-testid='rider-cash-total-submitted']",
   loading: "[data-testid='rider-cash-loading']",
-  refreshing: "[data-testid='rider-cash-refreshing']",
   empty: "[data-testid='rider-cash-empty']",
   error: "[data-testid='rider-cash-error']",
   row: (riderId: string) => `[data-testid='rider-cash-row-${riderId}']`,
@@ -407,13 +353,6 @@ export const riderCash = {
 
 // ─── Rider Pages ─────────────────────────────────────────────────────────────
 export const rider = {
-  dashboard: "[data-testid='rider-dashboard']",
-  pickupQueue: "[data-testid='rider-pickup']",
-  deliveryQueue: "[data-testid='rider-delivery']",
-  pickedUpButton: "[data-testid='picked-up']",
-  startDeliveryButton: "[data-testid='start-delivery']",
-  recordDeliveryButton: "[data-testid='record-delivery']",
-  cashToSubmit: "[data-testid='cash-to-submit']",
   // The suggested run order above the delivery queue. Stop rows are keyed by
   // their sequence number, because the sequence is the thing under test — a
   // row selected by parcel code would pass even if the order were scrambled.
@@ -422,15 +361,11 @@ export const rider = {
   // Destination per stop (city and, when the order carries one, its zone).
   // Tagged separately from the row so a spec can read every stop's destination
   // in order without depending on the row's internal markup.
-  runSheetDestination: (sequence: number) =>
-    `[data-testid='run-sheet-destination-${sequence}']`,
   runSheetDestinationPrefix: "[data-testid^='run-sheet-destination-']",
   // Zone per stop, tagged apart from the destination so a spec can read the
   // zone sequence without splitting the rendered line on "·". This is what
   // makes the grouping assertable: the run sheet's whole claim is that a zone
   // is served in one run, which only a zone-by-zone reading can check.
-  runSheetZone: (sequence: number) =>
-    `[data-testid='run-sheet-zone-${sequence}']`,
   runSheetZonePrefix: "[data-testid^='run-sheet-zone-']",
   // Parcel code per stop. Tagged so a spec can compare the rendered order
   // against the API's own sequence — numbering the rows 1..N proves only that
@@ -440,14 +375,9 @@ export const rider = {
 
 // ─── Payouts ─────────────────────────────────────────────────────────────────
 export const payouts = {
-  table: "[data-testid='payouts-table']",
-  requestButton: "[data-testid='request-payout']",
   // Both point at the same ConfirmDialog, whose confirm button now carries a
   // per-action id — see `payouts-client`. `mark-paid` never existed in `src`;
   // the real value is `mark-paid-payout`.
-  approveButton: "[data-testid='approve-payout']",
-  rejectButton: "[data-testid='reject-payout']",
-  markPaidButton: "[data-testid='mark-paid-payout']",
 }
 
 // ─── Rider parcel column (weight) ────────────────────────────────────────────
@@ -458,13 +388,10 @@ export const payouts = {
 // text answers without a cell-level hook that would exist only for them.
 export const riderParcel = {
   pickupRow: (orderId: string) => `[data-testid='row-rider-pickup-${orderId}']`,
-  deliveryRow: (orderId: string) =>
-    `[data-testid='row-rider-delivery-${orderId}']`,
 }
 
 // ─── Rider applications (admin review queue) ─────────────────────────────────
 export const riderApplications = {
-  table: "[data-testid='table-dashboard-rider-applications']",
   search: "[data-testid='table-search-dashboard-rider-applications']",
   viewButton: (id: string) => `[data-testid='rider-app-view-${id}']`,
   openApprove: "[data-testid='rider-app-approve']",
@@ -484,10 +411,6 @@ export const riderApplyForm = {
 
 // ─── Zone Pricing ────────────────────────────────────────────────────────────
 export const zones = {
-  table: "[data-testid='zones-table']",
-  addButton: "[data-testid='add-zone']",
-  pricingTable: "[data-testid='zone-pricing-table']",
-  addPricingButton: "[data-testid='add-zone-pricing']",
   // The admin zone-pricing page shows the same rates two ways. List is the
   // default because it is the only one carrying the row actions; the matrix is
   // a read-only coverage audit. Both triggers stay on screen in both views, so
@@ -495,31 +418,22 @@ export const zones = {
   viewList: "[data-testid='zone-pricing-view-list']",
   viewMatrix: "[data-testid='zone-pricing-view-matrix']",
   listView: "[data-testid='zone-pricing-list-view']",
-  matrixLoading: "[data-testid='zone-pricing-matrix-loading']",
 }
 
 // ─── Delivery Cities ─────────────────────────────────────────────────────────
 // `table`/`addButton` are the admin management page; the `merchant*` selectors
 // are the read-only merchant view at /merchant/delivery-cities.
 export const deliveryCities = {
-  table: "[data-testid='delivery-cities-table']",
   addButton: "[data-testid='add-city']",
   merchantPage: "[data-testid='delivery-cities-page']",
   merchantSearch: "[data-testid='delivery-city-search']",
   merchantZone: (zoneId: string) => `[data-testid='delivery-zone-${zoneId}']`,
-  merchantZoneCount: (zoneId: string) =>
-    `[data-testid='delivery-zone-count-${zoneId}']`,
   merchantCity: (cityId: string) => `[data-testid='delivery-city-${cityId}']`,
   merchantEmpty: "[data-testid='delivery-cities-empty']",
 }
 
 // ─── Balance ─────────────────────────────────────────────────────────────────
-export const balance = {
-  balancePage: "[data-testid='merchant-balance']",
-  adjustButton: "[data-testid='adjust-balance']",
-  confirmPayment: "[data-testid='confirm-payment']",
-  rejectPayment: "[data-testid='reject-payment']",
-}
+export const balance = {}
 
 // ─── Account email change (5.3) ──────────────────────────────────────────────
 export const email = {
@@ -530,7 +444,6 @@ export const email = {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 export const settings = {
-  mailConfigTable: "[data-testid='mail-config-table']",
   cancellationPolicyCard: "[data-testid='cancellation-policy-card']",
   refundOnCancel: "[data-testid='refund-on-cancel-switch']",
   savePolicy: "[data-testid='save-policy']",
@@ -545,7 +458,6 @@ export const tracking = {
 // --- Merchants (moderators) + staff activation (S41/S42) ---
 export const moderators = {
   card: "[data-testid='moderators-card']",
-  empty: "[data-testid='moderators-empty']",
   add: "[data-testid='add-moderator']",
   nameInput: "[data-testid='moderator-name']",
   emailInput: "[data-testid='moderator-email']",
@@ -553,12 +465,7 @@ export const moderators = {
   createSubmit: "[data-testid='create-moderator-submit']",
   grant: (slug: string) => `[data-testid='grant-${slug}']`,
   row: "[data-testid='moderator-row']",
-  status: "[data-testid='moderator-status']",
-  resend: "[data-testid='resend-activation']",
   deactivate: "[data-testid='deactivate-moderator']",
-  reactivate: "[data-testid='reactivate-moderator']",
-  edit: "[data-testid='edit-moderator']",
-  saveAccess: "[data-testid='save-moderator-access']",
   quotaFull: "[data-testid='quota-full']",
 }
 
@@ -566,7 +473,6 @@ export const activation = {
   password: "[data-testid='activate-password']",
   confirm: "[data-testid='activate-confirm']",
   submit: "[data-testid='activate-submit']",
-  error: "[data-testid='activate-error']",
 }
 
 // Post-activation welcome page (/activated) — the sign-out confirmation that
@@ -574,11 +480,9 @@ export const activation = {
 export const activated = {
   title: "[data-testid='activated-title']",
   message: "[data-testid='activated-message']",
-  continue: "[data-testid='activated-continue']",
 }
 
 export const merchantQuota = {
-  card: "[data-testid='moderator-quota-card']",
   input: "[data-testid='moderator-quota-input']",
   save: "[data-testid='moderator-quota-save']",
 }
@@ -592,7 +496,6 @@ export const team = {
   emailInput: "[data-testid='team-email']",
   phoneInput: "[data-testid='team-phone']",
   passwordInput: "[data-testid='team-password']",
-  warehouseSelect: "[data-testid='team-warehouse']",
 }
 
 // ─── Merchant identity in chrome ─────────────────────────────────────────────
@@ -606,20 +509,15 @@ export const identity = {
 }
 
 // ─── Audit logs ──────────────────────────────────────────────────────────────
-export const auditLogs = {
-  diff: "[data-testid='audit-diff']",
-}
+export const auditLogs = {}
 
 // ─── Dialogs ─────────────────────────────────────────────────────────────────
 export const dialog = {
   confirm: "[data-testid='confirm-dialog']",
   confirmButton: "[data-testid='confirm-button']",
-  cancelButton: "[data-testid='cancel-button']",
   formDialog: "[data-testid='form-dialog']",
   // `FormDialog`'s Cancel is shared by ~24 call sites; it carries the default
   // `form-dialog-cancel` because callers can override submit but not cancel.
-  formDialogCancel: "[data-testid='form-dialog-cancel']",
-  closeButton: "[data-testid='dialog-close']",
 }
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
@@ -629,22 +527,12 @@ export const dialog = {
 export const pagination = {
   prev: (tableId: string) => `[data-testid='table-prev-${tableId}']`,
   next: (tableId: string) => `[data-testid='table-next-${tableId}']`,
-  csv: (tableId: string) => `[data-testid='table-csv-${tableId}']`,
   /** "Page X of Y" — the only thing that proves a page change landed. */
   pageLabel: (tableId: string) => `[data-testid='table-page-label-${tableId}']`,
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
-export const shared = {
-  loading: "[data-testid='loading']",
-  emptyState: "[data-testid='empty-state']",
-  toast: "[data-testid='toast']",
-  searchInput: "[data-testid='search-input']",
-  refreshButton: "[data-testid='refresh-button']",
-  addButton: "[data-testid='add-button']",
-  submitButton: "[data-testid='submit-button']",
-  printButton: "[data-testid='print-button']",
-}
+export const shared = {}
 
 // ─── Help center ─────────────────────────────────────────────────────────────
 export const help = {
@@ -653,18 +541,9 @@ export const help = {
 
 // ─── Support tickets ─────────────────────────────────────────────────────────
 export const support = {
-  table: "[data-testid='support-tickets']",
-  row: "[data-testid='support-row']",
   rowActions: "[data-testid='support-row-actions']",
   status: "[data-testid='support-status']",
   rowByTableId: (tableId: string) => `[data-testid^='row-${tableId}-']`,
-  newButton: "[data-testid='support-new']",
-  subjectInput: "[data-testid='support-subject']",
-  messageInput: "[data-testid='support-message']",
-  submit: "[data-testid='support-submit']",
-  replyOpen: "[data-testid='support-reply-open']",
-  replyInput: "[data-testid='support-reply-input']",
-  replySubmit: "[data-testid='support-reply-submit']",
 }
 
 // ─── Packages (admin catalogue + purchase request queue) ─────────────────────
@@ -680,16 +559,12 @@ export const packages = {
   nameInput: "[data-testid='package-name-input']",
   descriptionInput: "[data-testid='package-description-input']",
   priceInput: "[data-testid='package-price-input']",
-  activeSwitch: "[data-testid='package-active-switch']",
   saveButton: "[data-testid='package-save']",
   activeSwitchFor: (id: string) => `[data-testid='package-active-${id}']`,
   actionsButton: (id: string) => `[data-testid='package-actions-${id}']`,
   editItem: (id: string) => `[data-testid='package-edit-${id}']`,
   addTierItem: (id: string) => `[data-testid='package-add-tier-${id}']`,
   deleteItem: (id: string) => `[data-testid='package-delete-${id}']`,
-  tierLabel: (tierId: string) => `[data-testid='tier-edit-${tierId}']`,
-  deleteTierItem: (tierId: string) =>
-    `[data-testid='package-delete-tier-${tierId}']`,
 
   // Tier dialog
   tierOrderCountInput: "[data-testid='tier-order-count-input']",
@@ -710,8 +585,6 @@ export const packages = {
   requestReject: (id: string) => `[data-testid='request-reject-${id}']`,
   requestRejectReason: "[data-testid='request-reject-reason-input']",
   requestRejectConfirm: "[data-testid='request-reject-confirm']",
-  requestRejectCancel: "[data-testid='request-reject-cancel']",
-  requestsTab: (tab: string) => `[data-testid='requests-tab-${tab}']`,
 
   // Merchant: /merchant/pricing
   activePackage: "[data-testid='merchant-active-package']",

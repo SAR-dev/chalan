@@ -3,20 +3,7 @@
 
 export const statCardLabels = {
   dashboard: {
-    admin: {
-      pendingApproval: {
-        label: "Waiting for approval",
-        hint: "Waiting for your review",
-      },
-      inProgress: { label: "In progress" },
-      activeRiders: { label: "Active riders" },
-      pendingMerchants: {
-        label: "Waiting merchants",
-        hint: "Waiting to be approved",
-      },
-    },
     superAdmin: {
-      admins: { label: "Admins" },
       warehouseAdmins: { label: "Warehouse Admins" },
       activeWarehouses: { label: "Active warehouses" },
       pendingMerchants: {
@@ -49,7 +36,6 @@ export const statCardLabels = {
     merchants: {
       totalMerchants: { label: "Total merchants" },
       active: { label: "Active" },
-      pendingApproval: { label: "Waiting for approval" },
       suspended: { label: "Suspended" },
     },
     payouts: {
@@ -59,38 +45,16 @@ export const statCardLabels = {
       rejected: { label: "Rejected" },
     },
   },
-  merchant: {
-    overview: {
-      totalOrders: { label: "Total orders" },
-      inTransit: { label: "On the way", hint: "Active deliveries" },
-      pendingApproval: { label: "Waiting for approval" },
-      codOutstanding: { label: "COD to collect" },
-    },
-    finance: {
-      availableFunds: { label: "Available balance" },
-      inReview: { label: "Being reviewed" },
-      paidOut: { label: "Paid out" },
-      outstandingBalance: { label: "Balance owed" },
-    },
-  },
   warehouse: {
-    // The `intake` and `dispatch` groups are gone with their pages. What is
-    // left in `orders` and `exceptions` is partly orphaned too — `delivered`,
-    // `returned` and `totalExceptions` lost their only reader when those tiles
-    // moved or were dropped — but they are cheap to keep and re-reading them
-    // is likelier than editing this file blind.
+    // Every key in this file is referenced — dead groups and tiles are pruned
+    // rather than kept "in case". `intake` and `dispatch` went with their
+    // pages; the orphaned `orders`/`exceptions` tiles (`delivered`, `returned`,
+    // `totalExceptions`, …) went when the overview became stats-only.
     orders: {
       pendingApproval: { label: "Waiting for approval" },
-      approved: { label: "Approved" },
-      heldInWarehouse: { label: "In the warehouse" },
-      inProgress: { label: "In progress" },
-      delivered: { label: "Delivered" },
-      exceptions: { label: "Exceptions" },
     },
     exceptions: {
       needsAction: { label: "Needs attention" },
-      returned: { label: "Returned" },
-      totalExceptions: { label: "Total exceptions" },
     },
     codSettlement: {
       awaitingSettlement: { label: "Waiting to be settled" },
@@ -106,10 +70,6 @@ export const statCardLabels = {
   },
   rider: {
     todo: {
-      toPickUp: { label: "To pick up" },
-      pickedUpToday: { label: "Picked up today" },
-      toDeliver: { label: "To deliver" },
-      deliveredToday: { label: "Delivered today" },
       cashToSubmit: { label: "Cash to submit" },
     },
   },
