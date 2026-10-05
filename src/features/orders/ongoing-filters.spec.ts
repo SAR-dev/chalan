@@ -53,26 +53,60 @@ describe("filterOngoingOrders", () => {
     expect(filterOngoingOrders(board, filters({ query: "nope" }))).toEqual([])
   })
 
-  it("filters the rider by whoever holds the parcel's next leg", () => {
-    // ORD-1 is collected by rider_1, ORD-2 delivered by rider_2. Filtering on
-    // rider_1 must not surface ORD-2 just because rider_2 also has an id.
+  it("filters the pickup rider and the delivery rider independently", () => {
+    // Two distinct fields, not two views of one: ORD-1 is being *collected* by
+    // rider_1 while ORD-2 is being *delivered* by rider_2. A parcel carries both
+    // at once, and they are usually different people.
     expect(
-      filterOngoingOrders(board, filters({ riderId: "rider_1" })).map(
+      filterOngoingOrders(board, filters({ pickupRiderId: "rider_1" })).map(
         (o) => o.id,
       ),
     ).toEqual(["ORD-1"])
     expect(
-      filterOngoingOrders(board, filters({ riderId: "rider_2" })).map(
+      filterOngoingOrders(board, filters({ deliveryRiderId: "rider_2" })).map(
         (o) => o.id,
       ),
     ).toEqual(["ORD-2"])
+    // rider_2 is nobody's pickup rider on this board. Filtering the pickup field
+    // by that id must not fall through to the delivery field and surface ORD-2 —
+    // that is exactly the conflation the two dropdowns exist to prevent.
+    expect(
+      filterOngoingOrders(board, filters({ pickupRiderId: "rider_2" })),
+    ).toEqual([])
   })
 
-  it("has no rider option for an unassigned parcel", () => {
-    // ORD-3 sits in the warehouse with nobody on it; it matches only when the
-    // rider filter is off, never a specific rider.
+  it("narrows to a parcel held by both of the chosen riders", () => {
+    const both = makeOrder({
+      id: "ORD-BOTH",
+      status: "IN_WAREHOUSE",
+      pickupRiderId: "rider_1",
+      deliveryRiderId: "rider_2",
+    })
+    const rows = [...board, both]
+
     expect(
-      filterOngoingOrders(board, filters({ riderId: "rider_2" })),
+      filterOngoingOrders(
+        rows,
+        filters({ pickupRiderId: "rider_1", deliveryRiderId: "rider_2" }),
+      ).map((o) => o.id),
+    ).toEqual(["ORD-BOTH"])
+    // AND, not OR: nothing on this board is collected *and* delivered by rider_1.
+    expect(
+      filterOngoingOrders(
+        rows,
+        filters({ pickupRiderId: "rider_1", deliveryRiderId: "rider_1" }),
+      ),
+    ).toEqual([])
+  })
+
+  it("keeps an unassigned parcel out of any specific rider filter", () => {
+    // ORD-3 sits in the warehouse with no rider on either leg, so it appears
+    // only while both rider filters are off.
+    expect(
+      filterOngoingOrders(board, filters({ deliveryRiderId: "rider_2" })),
+    ).not.toContainEqual(expect.objectContaining({ id: "ORD-3" }))
+    expect(
+      filterOngoingOrders(board, filters({ pickupRiderId: "rider_1" })),
     ).not.toContainEqual(expect.objectContaining({ id: "ORD-3" }))
     expect(filterOngoingOrders(board, filters())).toContainEqual(
       expect.objectContaining({ id: "ORD-3" }),
@@ -142,7 +176,8 @@ describe("isFiltering", () => {
     // trigger the no-matches message over a full board.
     expect(isFiltering(filters({ query: "   " }))).toBe(false)
     expect(isFiltering(filters({ query: "ORD-1" }))).toBe(true)
-    expect(isFiltering(filters({ riderId: "rider_1" }))).toBe(true)
+    expect(isFiltering(filters({ pickupRiderId: "rider_1" }))).toBe(true)
+    expect(isFiltering(filters({ deliveryRiderId: "rider_1" }))).toBe(true)
     expect(isFiltering(filters({ pickupCityId: "dc_1" }))).toBe(true)
     expect(isFiltering(filters({ deliveryCityId: "dc_1" }))).toBe(true)
   })
@@ -151,7 +186,8 @@ describe("isFiltering", () => {
     expect(
       isFiltering(
         filters({
-          riderId: ANY_RIDER,
+          pickupRiderId: ANY_RIDER,
+          deliveryRiderId: ANY_RIDER,
           pickupCityId: ANY_CITY,
           deliveryCityId: ANY_CITY,
         }),

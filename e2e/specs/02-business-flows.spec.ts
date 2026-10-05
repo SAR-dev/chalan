@@ -333,19 +333,39 @@ test.describe("S78. Warehouse Ongoing Board", () => {
     await expect(page.locator(ongoing.cancelPrefix)).toHaveCount(0)
   })
 
-  test("the rider and city dropdowns list every city, not just loaded ones", async ({
+  test("every board filter is labelled and its dropdown lists the full set", async ({
     page,
   }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse/ongoing")
     await waitForAppReady(page)
 
+    // Five fields, each with a visible label wired to its control. A placeholder
+    // alone would have satisfied "there is some hint" while being announced by
+    // nobody and disappearing as soon as the box has a value.
+    for (const controlId of [
+      "kanban-filter-query",
+      "kanban-filter-pickup-rider",
+      "kanban-filter-delivery-rider",
+      "kanban-filter-pickup-city",
+      "kanban-filter-delivery-city",
+    ]) {
+      await expect(page.locator(ongoing.labelFor(controlId))).toHaveText(/\S+/)
+      await expect(page.getByTestId(controlId)).toBeVisible()
+    }
+
     // Every dropdown opens on its "All …" entry — the untouched board — and that
     // default is read from the *trigger* (the text the user actually sees),
-    // not from the popup.
-    await expect(page.locator(ongoing.riderFilter)).toHaveText(/all riders/i, {
-      timeout: 15_000,
-    })
+    // not from the popup. Two rider fields, because a parcel has a pickup rider
+    // and a delivery rider at the same time and they are rarely the same person.
+    for (const trigger of [
+      ongoing.pickupRiderFilter,
+      ongoing.deliveryRiderFilter,
+    ]) {
+      await expect(page.locator(trigger)).toHaveText(/all riders/i, {
+        timeout: 15_000,
+      })
+    }
     for (const trigger of [
       ongoing.pickupCityFilter,
       ongoing.deliveryCityFilter,
@@ -353,21 +373,12 @@ test.describe("S78. Warehouse Ongoing Board", () => {
       await expect(page.locator(trigger)).toHaveText(/all cities/i)
     }
 
-    // The rider dropdown offers the warehouse's roster — including riders with
-    // nothing on the board, since who holds a parcel changes minute to minute.
-    // Waiting on the first *rider* rather than counting once: the roster arrives
-    // over SWR after the page shell, and a bare count read before it lands would
+    // Open each dropdown and wait for its first real option. The roster arrives
+    // over SWR after the page shell, so a bare count read before it lands would
     // assert a one-item list.
-    await page.locator(ongoing.riderFilter).click()
-    await expect(page.locator(ongoing.riderOptionPrefix).first()).toBeVisible({
-      timeout: 15_000,
-    })
-    await page.keyboard.press("Escape")
-
-    // Both city dropdowns are filled from the whole `delivery_city` table, not
-    // from the cities on the page — so each must list at least one real city
-    // even when the loaded board happens to be all-Dhaka.
     for (const [trigger, optionPrefix] of [
+      [ongoing.pickupRiderFilter, ongoing.pickupRiderOptionPrefix],
+      [ongoing.deliveryRiderFilter, ongoing.deliveryRiderOptionPrefix],
       [ongoing.pickupCityFilter, ongoing.pickupCityOptionPrefix],
       [ongoing.deliveryCityFilter, ongoing.deliveryCityOptionPrefix],
     ] as const) {
@@ -390,6 +401,54 @@ test.describe("S78. Warehouse Ongoing Board", () => {
     expect(await page.locator(ongoing.cardPrefix).count()).toBeLessThanOrEqual(
       before,
     )
+  })
+
+  test("filters sit equal width on a desktop and fill the row on a phone", async ({
+    page,
+  }) => {
+    await login(page, CREDS.warehouseAdmin)
+    await page.goto("/warehouse/ongoing")
+    await waitForAppReady(page)
+    await expect(page.locator(ongoing.board)).toBeVisible({ timeout: 15_000 })
+
+    const measure = async () => {
+      const locators = page.locator(ongoing.fieldPrefix)
+      const boxes = await locators.all()
+      return (
+        await Promise.all(
+          boxes.map(async (box) => {
+            const bb = await box.boundingBox()
+            return bb ? Math.round(bb.width) : 0
+          }),
+        )
+      ).sort((a, b) => a - b)
+    }
+
+    // Desktop: five equal columns on one line. The 1px tolerance is the
+    // rounding sub-pixel grid columns land on — anything wider means a field
+    // really is a different size, and a 60px city dropdown next to a 300px
+    // order box makes the row read as broken.
+    const desktop = await measure()
+    expect(desktop).toHaveLength(5)
+    expect(desktop[desktop.length - 1] - desktop[0]).toBeLessThanOrEqual(1)
+
+    // Phone: one column, so every field is the full width of the toolbar.
+    await page.setViewportSize({ width: 375, height: 812 })
+    const barWidth = Math.round(
+      (await page.locator(ongoing.filters).boundingBox())?.width ?? 0,
+    )
+    await expect
+      .poll(
+        async () => {
+          const phone = await measure()
+          return (
+            phone.length === 5 &&
+            phone.every((w) => Math.abs(w - barWidth) <= 1)
+          )
+        },
+        { timeout: 10_000 },
+      )
+      .toBe(true)
   })
 
   test("order id search narrows the board and reports when nothing matches", async ({
