@@ -338,6 +338,30 @@ describe("PATCH /orders/:id/approve", () => {
     expect(status).toBe(200)
   })
 
+  it("403 when the warehouse admin's hub does not own the order", async () => {
+    // The widened authorize must not widen scope: without this guard any
+    // warehouse could clear another hub's PENDING queue. It runs before the
+    // merchant/pricing lookups, so the order row is all the fixture needs.
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [[makeOrder({ warehouseId: "wh_2" })]]
+    const { status, json } = await call(approve)
+    expect(status).toBe(403)
+    expect(json).toEqual({
+      error: "This order belongs to a different warehouse.",
+    })
+  })
+
+  it("approves a PENDING order in the warehouse admin's own hub", async () => {
+    sessionState.value = warehouseAdmin("wh_1")
+    dbState.selectQueue = [
+      [makeOrder({ warehouseId: "wh_1" })],
+      [{ status: "ACTIVE" }],
+    ]
+    dbState.updateResult = [makeOrder({ status: "APPROVED" })]
+    const { status } = await call(approve)
+    expect(status).toBe(200)
+  })
+
   it("400 when the merchant is suspended (ROADMAP B8)", async () => {
     sessionState.value = admin
     dbState.selectQueue = [

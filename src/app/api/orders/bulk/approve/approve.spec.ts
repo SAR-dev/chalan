@@ -106,10 +106,38 @@ describe("PATCH /api/orders/bulk/approve", () => {
     expect(res.status).toBe(401)
   })
 
-  it("403 for warehouse admin", async () => {
+  it("403 when the order sits in another warehouse", async () => {
+    // Approve's authorize now admits warehouse admins — so the scope moved
+    // into the guard. wh_1's admin must not clear wh_2's queue.
     sessionState.value = whAdmin
+    selectQueue.push([makeOrder({ warehouseId: "wh_2" })])
     const res = await approve(req({ ids: ["o1"] }))
     expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.error).toBe("This order belongs to a different warehouse.")
+  })
+
+  it("approves PENDING orders in the admin's own hub", async () => {
+    sessionState.value = whAdmin
+    selectQueue.push(
+      [
+        makeOrder({
+          status: "PENDING",
+          parcelWeightKg: 2,
+          warehouseId: "wh_1",
+        }),
+      ],
+      [{ status: "ACTIVE" }],
+    )
+    updateResult.push(makeOrder({ status: "APPROVED" }))
+    const res = await approve(req({ ids: ["o1"] }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toMatchObject({ ok: true, count: 1 })
+    expect(updatePayloads[0]).toMatchObject({
+      status: "APPROVED",
+      approvedBy: "WH Walt",
+    })
   })
 
   it("403 for merchant", async () => {

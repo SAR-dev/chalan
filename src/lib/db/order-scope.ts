@@ -1,4 +1,4 @@
-import { and, eq, isNull, or, type SQL } from "drizzle-orm"
+﻿import { and, eq, isNull, or, type SQL } from "drizzle-orm"
 import { order } from "@/lib/db/schema"
 
 /**
@@ -16,11 +16,10 @@ import { order } from "@/lib/db/schema"
  * A third clause used to OR in `warehouseId IS NULL AND status = 'PICKED_UP'`
  * for "incoming intake candidates". It can never match: `order.warehouseId` is
  * NOT NULL and its FK is `ON DELETE no action`, so no row can be null and no
- * update in the codebase assigns one. The intake queue is driven by *status*
- * (`INCOMING` = `PICKED_UP`, see `src/app/warehouse/intake-client.tsx`), which
- * branch 1 already covers — so the clause only made the planner consider an
- * impossible case and forced a bitmap-OR over an otherwise index-friendly
- * Predicate.
+ * update in the codebase assigns one. Inbound parcels are driven by *status*
+ * (`PICKED_UP`, now the board's Picked-up lane), which branch 1 already
+ * covers — so the clause only made the planner consider an impossible case and
+ * forced a bitmap-OR over an otherwise index-friendly predicate.
  */
 export function buildWarehouseOrderScope(warehouseId: string): SQL | undefined {
   return or(

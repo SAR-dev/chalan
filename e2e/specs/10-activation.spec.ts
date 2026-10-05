@@ -19,33 +19,62 @@ import {
  * Read the latest activation email for an address straight from Postgres —
  * the raw token only ever exists in that email (DB stores its hash).
  */
-async function latestActivationUrl(emailAddress: string): Promise<string> {
+async function newestActivationEmail(
+  emailAddress: string,
+): Promise<{ id: string; url: string | null } | null> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set — .env failed to load")
   }
   const client = new Client({ connectionString: process.env.DATABASE_URL })
   await client.connect()
   try {
-    // The mailer retries SMTP a few times before logging the FAILED row —
-    // poll so a just-sent invite is found once its log row lands.
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const res = await client.query(
-        `SELECT "textBody" FROM email_log
-         WHERE "to" = $1 AND subject LIKE 'Activate%'
-         ORDER BY "createdAt" DESC LIMIT 1`,
-        [emailAddress],
-      )
-      const text = (res.rows[0]?.textBody as string | undefined) ?? ""
-      const match = text.match(/https?:\/\/\S+\/activate\?token=\S+/)
-      if (match) return match[0]
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-    }
-    throw new Error(
-      `No activation link in the latest email for ${emailAddress}`,
+    const res = await client.query(
+      `SELECT id, "textBody" FROM email_log
+       WHERE "to" = $1 AND subject LIKE 'Activate%'
+       ORDER BY "createdAt" DESC LIMIT 1`,
+      [emailAddress],
     )
+    const row = res.rows[0] as
+      | { id: string; textBody: string | null }
+      | undefined
+    if (!row) return null
+    const match = (row.textBody ?? "").match(
+      /https?:\/\/\S+\/activate\?token=\S+/,
+    )
+    return { id: row.id, url: match?.[0] ?? null }
   } finally {
     await client.end()
   }
+}
+
+/**
+ * Wait for a usable activation link, optionally one *newer* than `notBeforeId`.
+ *
+ * The mailer retries SMTP before logging the FAILED row, so a just-sent invite
+ * is not readable the instant it is sent — hence the poll.
+ *
+ * `notBeforeId` matters after a resend. `api/team/[id]/resend-activation`
+ * rotates the token ("overwrites the previous token so the old link dies"), but
+ * the replacement only shows up in `email_log` once the outbox drain actually
+ * attempts that row. Asking for "the newest email" without saying *which* email
+ * is newest therefore races the drain and hands back the link the resend just
+ * killed, which surfaces as "This activation link is invalid or has expired".
+ * Passing the id seen before the resend pins the answer to the replacement.
+ */
+async function latestActivationUrl(
+  emailAddress: string,
+  notBeforeId?: string,
+): Promise<string> {
+  const deadline = Date.now() + 20_000
+  while (Date.now() < deadline) {
+    const row = await newestActivationEmail(emailAddress)
+    if (row?.url && row.id !== notBeforeId) return row.url
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  throw new Error(
+    `No activation link ${notBeforeId ? `newer than ${notBeforeId} ` : ""}` +
+      `for ${emailAddress} within 20s`,
+  )
 }
 
 /** Email of the newest PENDING moderator created by this suite (test1). */
@@ -141,8 +170,13 @@ function csvFile(name: string, recipient: string) {
   }
 }
 
-async function activateFromEmail(page: Page, email: string, password: string) {
-  const url = await latestActivationUrl(email)
+async function activateFromEmail(
+  page: Page,
+  email: string,
+  password: string,
+  notBeforeId?: string,
+) {
+  const url = await latestActivationUrl(email, notBeforeId)
   await page.goto(url)
   await page.locator(activation.password).fill(password)
   await page.locator(activation.confirm).fill(password)
@@ -315,12 +349,17 @@ test.describe("S42. Warehouse admin activation", () => {
     const pendingRow = page.locator("tr").filter({ hasText: WA_EMAIL })
     await expect(pendingRow.locator(team.pendingBadge)).toBeVisible()
 
+    // Snapshot the invite's email *before* the resend. The resend rotates the
+    // token, so the activation below must wait for the replacement mail rather
+    // than settle for whichever link happens to be newest when it looks.
+    const inviteEmail = await newestActivationEmail(WA_EMAIL)
+
     // Owner/admin re-sends before the invitee acts on it.
     await pendingRow.locator(team.resend).click()
     await expect(toast(page, "Activation email resent")).toBeVisible()
 
-    // Invitee activates from the (latest) email and signs in.
-    await activateFromEmail(page, WA_EMAIL, WA_PASSWORD2)
+    // Invitee activates from the *resent* email and signs in.
+    await activateFromEmail(page, WA_EMAIL, WA_PASSWORD2, inviteEmail?.id)
     // The super admin who created the invite was signed in during activation —
     // activation must have signed them out too.
     await expect(page.locator(activated.message)).toBeVisible()
@@ -329,8 +368,13 @@ test.describe("S42. Warehouse admin activation", () => {
     await page.goto("/login")
     await login(page, { email: WA_EMAIL, password: WA_PASSWORD2 })
     await page.waitForURL(/\/warehouse/, { timeout: 15_000 })
+    // Asserts the new invitee landed on the warehouse portal and can see its
+    // nav, not that a particular page is called something. "Overview" is the
+    // landing item (it used to be "Intake queue" back when the homepage was the
+    // intake queue); matching on the label would make this test a rename alarm
+    // for a nav change that has nothing to do with activation.
     await expect(
-      page.locator(nav.sidebarLink("Intake queue")).first(),
+      page.locator(nav.sidebarLink("Overview")).first(),
     ).toBeVisible()
 
     // The roster now shows an active member (no Pending/resend anymore).

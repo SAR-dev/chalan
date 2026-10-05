@@ -135,7 +135,7 @@ const features = [
     icon: <Building2 className="size-5" />,
     iconClass: "bg-chart-5/10 text-chart-5",
     title: "Warehouse Operations",
-    desc: "Intake queue, dispatch desk, and COD settlement — warehouse admins manage the full flow.",
+    desc: "Approval queue, ongoing kanban board, and COD settlement — warehouse admins manage the full flow.",
   },
   {
     icon: <Banknote className="size-5" />,

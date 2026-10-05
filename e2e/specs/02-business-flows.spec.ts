@@ -1,13 +1,16 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import {
+  completed,
   deliveryCities,
   dialog,
   merchants,
+  ongoing,
   orders,
   register,
   riderApplication,
   riders,
+  warehouse,
 } from "../selectors"
 
 // ─── S2. Merchant Registration ─────────────────────────────────────────────────
@@ -30,11 +33,20 @@ test.describe("S2. Merchant Registration", () => {
 
 // ─── S3. Order Exception — Failed → Reattempt ────────────────────────────────
 test.describe("S3. Failed → Reattempt → Delivery", () => {
-  test("warehouse admin can view exceptions tab", async ({ page }) => {
+  test("exceptions lists only the parcels still awaiting a decision", async ({
+    page,
+  }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse/exceptions")
     await waitForAppReady(page)
-    await expect(page.getByRole("heading").first()).toBeVisible()
+    await expect(page.locator(warehouse.exceptionsTable)).toBeVisible({
+      timeout: 15_000,
+    })
+
+    // FAILED_ATTEMPT is the only status with a next action, so the page has no
+    // tab bar at all. The retired "Resolved"/Returned tab listed parcels that
+    // were already closed; those now live on the Completed page.
+    await expect(page.getByRole("tab")).toHaveCount(0)
   })
 })
 
@@ -44,7 +56,9 @@ test.describe("S4. Failed → Return", () => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse/exceptions")
     await waitForAppReady(page)
-    await expect(page.getByRole("heading").first()).toBeVisible()
+    await expect(page.locator(warehouse.exceptionsTable)).toBeVisible({
+      timeout: 15_000,
+    })
   })
 })
 
@@ -250,22 +264,189 @@ test.describe("S32. Admin Rider Management", () => {
   })
 })
 
-// ─── Warehouse Dispatch ───────────────────────────────────────────────────────
-test.describe("S33. Warehouse Dispatch", () => {
-  test("warehouse admin can view dispatch desk", async ({ page }) => {
+// ─── S78. Warehouse Ongoing Board ────────────────────────────────────────────
+// Replaces the retired S33 (dispatch desk) and S34 (intake queue). Their serials
+// stay unused on purpose: renumbering every later scenario to close the gap
+// churns history for no safety gain, and `docs-drift.spec.ts` allows holes.
+test.describe("S78. Warehouse Ongoing Board", () => {
+  test("board shows one lane per ongoing status, groupable by rider", async ({
+    page,
+  }) => {
     await login(page, CREDS.warehouseAdmin)
-    await page.goto("/warehouse/dispatch")
+    await page.goto("/warehouse/ongoing")
     await waitForAppReady(page)
-    await expect(page.getByRole("heading").first()).toBeVisible()
+    await expect(page.locator(ongoing.board)).toBeVisible({ timeout: 15_000 })
+
+    // Five lanes, always — including the empty ones. A lane that disappears
+    // when it empties makes the board jump and hides the answer to "is anything
+    // waiting to be received?".
+    const statuses = [
+      "APPROVED",
+      "PICKED_UP",
+      "IN_WAREHOUSE",
+      "IN_TRANSIT",
+      "OUT_FOR_DELIVERY",
+    ]
+    for (const status of statuses) {
+      await expect(page.locator(ongoing.column(status))).toBeVisible()
+    }
+
+    const cardsByStatus = await Promise.all(
+      statuses.map(async (status) =>
+        page
+          .locator(ongoing.column(status))
+          .locator(ongoing.cardPrefix)
+          .count(),
+      ),
+    )
+    const totalByStatus = cardsByStatus.reduce((a, b) => a + b, 0)
+    expect(totalByStatus).toBeGreaterThan(0)
+
+    // Switching to the rider view re-files every card, and no card may appear
+    // twice: a parcel shown in both a status lane and a rider lane would be two
+    // dispatchable copies of one order.
+    await page.locator(ongoing.groupByRiders).click()
+    await expect(page.locator(ongoing.unassignedColumn)).toBeVisible({
+      timeout: 15_000,
+    })
+
+    const riderCards = await page.locator(ongoing.cardPrefix).count()
+    expect(riderCards).toBe(totalByStatus)
+  })
+
+  test("a card opens its details and the page stays read-only", async ({
+    page,
+  }) => {
+    await login(page, CREDS.warehouseAdmin)
+    await page.goto("/warehouse/ongoing")
+    await waitForAppReady(page)
+
+    const firstCard = page.locator(ongoing.cardOpenPrefix).first()
+    await expect(firstCard).toBeVisible({ timeout: 15_000 })
+    await firstCard.click()
+    await expect(page.locator(ongoing.details)).toBeVisible({
+      timeout: 15_000,
+    })
+
+    // Cancel is the approval queue's action. On a board it would be an undo for
+    // work already in motion, so no card may offer it.
+    await expect(page.locator(ongoing.cancelPrefix)).toHaveCount(0)
+  })
+
+  test("the rider and city dropdowns list every city, not just loaded ones", async ({
+    page,
+  }) => {
+    await login(page, CREDS.warehouseAdmin)
+    await page.goto("/warehouse/ongoing")
+    await waitForAppReady(page)
+
+    // Every dropdown opens on its "All …" entry — the untouched board — and that
+    // default is read from the *trigger* (the text the user actually sees),
+    // not from the popup.
+    await expect(page.locator(ongoing.riderFilter)).toHaveText(/all riders/i, {
+      timeout: 15_000,
+    })
+    for (const trigger of [
+      ongoing.pickupCityFilter,
+      ongoing.deliveryCityFilter,
+    ]) {
+      await expect(page.locator(trigger)).toHaveText(/all cities/i)
+    }
+
+    // The rider dropdown offers the warehouse's roster — including riders with
+    // nothing on the board, since who holds a parcel changes minute to minute.
+    // Waiting on the first *rider* rather than counting once: the roster arrives
+    // over SWR after the page shell, and a bare count read before it lands would
+    // assert a one-item list.
+    await page.locator(ongoing.riderFilter).click()
+    await expect(page.locator(ongoing.riderOptionPrefix).first()).toBeVisible({
+      timeout: 15_000,
+    })
+    await page.keyboard.press("Escape")
+
+    // Both city dropdowns are filled from the whole `delivery_city` table, not
+    // from the cities on the page — so each must list at least one real city
+    // even when the loaded board happens to be all-Dhaka.
+    for (const [trigger, optionPrefix] of [
+      [ongoing.pickupCityFilter, ongoing.pickupCityOptionPrefix],
+      [ongoing.deliveryCityFilter, ongoing.deliveryCityOptionPrefix],
+    ] as const) {
+      await page.locator(trigger).click()
+      await expect(page.locator(optionPrefix).first()).toBeVisible({
+        timeout: 15_000,
+      })
+      await page.keyboard.press("Escape")
+    }
+
+    // Picking one really does narrow the board — and arms the way back out.
+    const before = await page.locator(ongoing.cardPrefix).count()
+    expect(before).toBeGreaterThan(0)
+    await page.locator(ongoing.deliveryCityFilter).click()
+    await page.locator(ongoing.deliveryCityOptionPrefix).first().click()
+    await expect(page.locator(ongoing.filterClear)).toBeVisible()
+    // Never wider: a filter can only take parcels away, and the "Clear" control
+    // appearing is what proves the selection actually took effect rather than
+    // the trigger merely re-rendering.
+    expect(await page.locator(ongoing.cardPrefix).count()).toBeLessThanOrEqual(
+      before,
+    )
+  })
+
+  test("order id search narrows the board and reports when nothing matches", async ({
+    page,
+  }) => {
+    await login(page, CREDS.warehouseAdmin)
+    await page.goto("/warehouse/ongoing")
+    await waitForAppReady(page)
+    await expect(page.locator(ongoing.board)).toBeVisible({ timeout: 15_000 })
+
+    const before = await page.locator(ongoing.cardPrefix).count()
+    expect(before).toBeGreaterThan(0)
+
+    // A real parcel's own code narrows to exactly that parcel.
+    const code = await page.locator(ongoing.cardOpenPrefix).first().innerText()
+    await page.locator(ongoing.query).fill(code.trim())
+    await expect(page.locator(ongoing.cardPrefix)).toHaveCount(1)
+
+    // A code that is not on the board is reported as such — and offers a way
+    // back, rather than leaving an empty board that looks broken.
+    await page.locator(ongoing.query).fill("ORD-DOES-NOT-EXIST")
+    await expect(page.locator(ongoing.noMatches)).toBeVisible()
+    await expect(page.locator(ongoing.cardPrefix)).toHaveCount(0)
+    // Lanes stay: an empty lane is still the answer to "where is it?".
+    await expect(page.locator(ongoing.columnPrefix)).toHaveCount(5)
+
+    await page.locator(ongoing.filterClear).click()
+    await expect(page.locator(ongoing.noMatches)).toHaveCount(0)
+    await expect(page.locator(ongoing.cardPrefix)).toHaveCount(before)
   })
 })
 
-// ─── Warehouse Intake ─────────────────────────────────────────────────────────
-test.describe("S34. Warehouse Intake", () => {
-  test("warehouse admin can view intake queue", async ({ page }) => {
+// ─── S79. Warehouse Completed Orders ─────────────────────────────────────────
+test.describe("S79. Warehouse Completed Orders", () => {
+  test("completed page is read-only across delivered, cancelled and returned", async ({
+    page,
+  }) => {
     await login(page, CREDS.warehouseAdmin)
-    await page.goto("/warehouse")
+    await page.goto("/warehouse/completed")
     await waitForAppReady(page)
-    await expect(page.getByRole("heading").first()).toBeVisible()
+    await expect(page.locator(completed.table)).toBeVisible({ timeout: 15_000 })
+
+    // All four tabs, because RETURNED moved here from Exceptions and the tab
+    // that used to say "Resolved" was on a page that no longer lists it.
+    for (const tab of [
+      completed.tabAll,
+      completed.tabDelivered,
+      completed.tabCancelled,
+      completed.tabReturned,
+    ]) {
+      await expect(page.locator(tab)).toBeVisible()
+    }
+
+    // No selection and no actions: a closed parcel has nothing left to do to it,
+    // so a checkbox on its row would promise an action that cannot exist, and a
+    // settle button would move money out of a history page.
+    await expect(page.locator(orders.selectAll)).toHaveCount(0)
+    await expect(page.locator(warehouse.settleButton)).toHaveCount(0)
   })
 })

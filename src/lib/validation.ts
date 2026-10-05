@@ -312,8 +312,6 @@ export const orderBulkCreateSchema = z.object({
     ),
 })
 
-export const orderApproveSchema = z.object({})
-
 export const orderAssignPickupRiderSchema = z.object({
   riderId: requiredString("riderId"),
 })
@@ -570,10 +568,6 @@ export const merchantProfileSchema = z.object({
   email: z.email("A valid email is required"),
   phone: bdPhone("Phone"),
   address: requiredString("Address"),
-})
-
-export const merchantVerifyEmailSchema = z.object({
-  token: requiredString("Verification token"),
 })
 
 export const nidSubmitSchema = z.object({

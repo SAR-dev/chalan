@@ -362,17 +362,8 @@ export function useOrders({
       patchOrders(ids, "cancel", reason ? { reason } : undefined),
     [patchOrders],
   )
-  const bulkReceiveOrders = useCallback(
-    (ids: string[]) => patchOrders(ids, "receive"),
-    [patchOrders],
-  )
   const bulkSettleCod = useCallback(
     (ids: string[]) => patchOrders(ids, "settle-cod"),
-    [patchOrders],
-  )
-  const bulkAssignPickupRider = useCallback(
-    (ids: string[], riderId: string) =>
-      patchOrders(ids, "assign-pickup-rider", { riderId }),
     [patchOrders],
   )
   const bulkDispatch = useCallback(
@@ -526,9 +517,11 @@ export function useOrders({
     patchOrders,
     bulkApproveOrders,
     bulkCancelOrders,
-    bulkReceiveOrders,
     bulkSettleCod,
-    bulkAssignPickupRider,
+    // The only bulk transition left: `bulkDispatch` backs auto-assign, which
+    // hands a whole rider's batch to the API in one call. The per-parcel
+    // receive/assign flows became single-order dialogs on the Ongoing board, so
+    // their bulk variants lost their only callers.
     bulkDispatch,
   }
 }

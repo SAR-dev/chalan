@@ -31,13 +31,6 @@ export interface RiderSeedEntry {
   vehiclePlate?: string | null
 }
 
-export const RIDER_IDS: Record<string, string> = Object.fromEntries(
-  Array.from({ length: SEED_COUNTS.riders }, (_, i) => [
-    `rider${i + 1}`,
-    `RID-${String(100001 + i).padStart(6, "0")}E`,
-  ]),
-)
-
 const RIDER_TASK_TYPES: ("PICKUP" | "DELIVERY" | "BOTH")[] = [
   "PICKUP",
   "DELIVERY",

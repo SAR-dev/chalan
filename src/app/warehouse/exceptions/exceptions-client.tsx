@@ -1,12 +1,6 @@
 "use client"
 
-import {
-  AlertTriangle,
-  MoreHorizontal,
-  RotateCcw,
-  Undo2,
-  Wrench,
-} from "lucide-react"
+import { AlertTriangle, MoreHorizontal, RotateCcw } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import {
   CellContent,
@@ -24,7 +18,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { statCardLabels } from "@/config/stat-card-labels"
 import { columnLabels } from "@/config/table-column-labels"
@@ -40,14 +33,19 @@ import { FailedDeliveryDialog } from "@/features/orders/dialogs/failed-delivery-
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
-import type { Order, OrderStatus } from "@/lib/types"
+import type { Order } from "@/lib/types"
 
-type FilterTab = "NEEDS_ACTION" | "RESOLVED"
-
-const TAB_STATUSES: Record<FilterTab, OrderStatus[] | undefined> = {
-  NEEDS_ACTION: ["FAILED_ATTEMPT"],
-  RESOLVED: ["RETURNED"],
-}
+/**
+ * FAILED_ATTEMPT is the only status a warehouse admin can still act on, and it
+ * is the only one this page lists (TODO.md decision #1).
+ *
+ * RETURNED used to sit here under a "Resolved" tab. It is terminal — the
+ * `return` transition sets it and nothing leaves it — so filing it on a page
+ * whose purpose is "parcels you can still resolve" was ownership by history
+ * rather than by state. Its return-reason and resolved-by columns moved to the
+ * Completed page's `Returned` tab; nothing was lost, only filed correctly.
+ */
+const EXCEPTION_STATUSES = ["FAILED_ATTEMPT"]
 
 export function WarehouseExceptionsPageClient({
   initialData,
@@ -60,7 +58,6 @@ export function WarehouseExceptionsPageClient({
   const { currentWarehouse } = useWarehouses()
   const {
     orders,
-    allOrders,
     warehouseFailedOrders,
     total,
     page: _page,
@@ -77,10 +74,9 @@ export function WarehouseExceptionsPageClient({
     isLoading,
     isRefreshing,
     mutate: refresh,
-  } = useOrders({ initialData, initialTotal, includeAllOrders: true })
+  } = useOrders({ initialData, initialTotal })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
-  const [tab, setTab] = useState<FilterTab>("NEEDS_ACTION")
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
@@ -89,10 +85,13 @@ export function WarehouseExceptionsPageClient({
   const riderName = (id?: string | null) =>
     id ? (riders.find((r) => r.id === id)?.name ?? "—") : "—"
 
+  // Forced, like the approval queue: a single-status page has nothing to
+  // switch between, and leaving the filter open would let a stray `statuses`
+  // value from a previous page leak in and render the wrong parcels.
   useEffect(() => {
-    setStatuses(TAB_STATUSES[tab])
+    setStatuses(EXCEPTION_STATUSES)
     setPage(1)
-  }, [tab, setStatuses, setPage])
+  }, [setStatuses, setPage])
 
   const needsActionCount = warehouseFailedOrders
 
@@ -106,17 +105,6 @@ export function WarehouseExceptionsPageClient({
           )
         : [],
     [orders, currentWarehouse],
-  )
-
-  const resolved = useMemo(
-    () =>
-      currentWarehouse
-        ? allOrders.filter(
-            (o) =>
-              o.warehouseId === currentWarehouse.id && o.status === "RETURNED",
-          )
-        : [],
-    [allOrders, currentWarehouse],
   )
 
   function openResolve(order: Order) {
@@ -151,37 +139,6 @@ export function WarehouseExceptionsPageClient({
           {o.deliveryAttempts ?? 1}
         </CellContent>
       ),
-    },
-    {
-      id: "resolvedBy",
-      header: columnLabels.order.resolvedBy,
-      sortValue: (o) =>
-        o.status === "RETURNED"
-          ? (o.failedResolvedBy ?? "Warehouse Admin")
-          : "—",
-      cell: (o) =>
-        o.status === "RETURNED" ? (
-          <CellContent className="text-muted-foreground">
-            {o.failedResolvedBy ?? "Warehouse Admin"}
-          </CellContent>
-        ) : (
-          <CellContent className="text-muted-foreground">—</CellContent>
-        ),
-    },
-    {
-      id: "returnReason",
-      header: columnLabels.order.returnReason,
-      sortValue: (o) =>
-        o.status === "RETURNED" && o.returnReason ? o.returnReason : "—",
-      cellClassName: "whitespace-normal align-top",
-      cell: (o) =>
-        o.status === "RETURNED" && o.returnReason ? (
-          <CellContent className="text-muted-foreground max-w-40">
-            {o.returnReason}
-          </CellContent>
-        ) : (
-          <CellContent className="text-muted-foreground">—</CellContent>
-        ),
     },
     {
       id: "actions",
@@ -232,6 +189,8 @@ export function WarehouseExceptionsPageClient({
         )}
       />
 
+      {/* One card, because there is one thing to act on. The page's counts
+          belong to the parcels that still need a decision. */}
       <StatCardList
         items={[
           {
@@ -240,23 +199,13 @@ export function WarehouseExceptionsPageClient({
             icon: AlertTriangle,
             tone: "bg-destructive/10 text-destructive",
           },
-          {
-            label: statCardLabels.warehouse.exceptions.returned.label,
-            value: resolved.length,
-            icon: Undo2,
-            tone: "bg-muted text-muted-foreground",
-          },
-          {
-            label: statCardLabels.warehouse.exceptions.totalExceptions.label,
-            value: needsActionCount + resolved.length,
-            icon: Wrench,
-            tone: "bg-chart-4/15 text-chart-4",
-          },
         ]}
       />
 
       <Card>
         <CardContent className="p-0">
+          {/* No tab bar (decision #11): a single-status page with two tabs was
+              a tab that did nothing. */}
           <DataTable
             pinnedColumns={["order"]}
             id="warehouse-exceptions"
@@ -267,24 +216,12 @@ export function WarehouseExceptionsPageClient({
               "deliveryRider",
               "deliveryCity",
             ]}
-            toolbarLeft={
-              <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-                <TabsList>
-                  <TabsTrigger value="NEEDS_ACTION">Needs action</TabsTrigger>
-                  <TabsTrigger value="RESOLVED">Returned</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            }
             columns={columns}
-            data={tab === "NEEDS_ACTION" ? needsAction : resolved}
+            data={needsAction}
             getRowKey={(o) => o.id}
             initialSortId="order"
             loading={isLoading || isRefreshing}
-            emptyMessage={
-              tab === "NEEDS_ACTION"
-                ? "No failed deliveries. Parcels appear here when a delivery rider records a failed attempt."
-                : "Nothing returned yet."
-            }
+            emptyMessage="No failed deliveries. Parcels appear here when a delivery rider records a failed attempt."
             serverPaginated
             total={total}
             query={query}

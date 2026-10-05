@@ -513,8 +513,8 @@ Rules:
   against the other tabs' column ids, silently hiding any column unique to
   them. A shared `id` is only correct when every tab renders the **same**
   columns and only the row filter (`statuses`) changes — see
-  `src/app/dashboard/orders/page.tsx`. See `src/app/warehouse/dispatch/page.tsx` for
-  the per-tab-columns case.
+  `src/app/dashboard/orders/page.tsx`. See `src/app/warehouse/completed/page.tsx`
+  for a same-column, multi-tab case where the id is still shared.
 - **Hooks own the pagination/search state.** The `DataTable` never manages its
   own page or search — it receives and reports via props.
 - **Tab/status filters** pass a `statuses` array to the hook, which adds
@@ -543,19 +543,32 @@ Rules:
 
 ### Order table patterns by role
 
-All six order tables share the same `useOrders()` hook and column factories,
+All order tables share the same `useOrders()` hook and column factories,
 but each view composes a different subset of columns and applies different
-tab/status filters suited to that role's workflow:
+tab/status filters suited to that role's workflow. Two warehouse surfaces are
+**not** tables at all — the Ongoing board and the Overview — noted below.
 
 | View                     | File                                    | Tabs / filter                              | Column set                                                                                                                                                                             | Actions                                                                     |
 | ------------------------ | --------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | **Admin orders**         | `src/app/dashboard/orders/page.tsx`     | PENDING · APPROVED · ALL                   | `useOrderColumns()` (all base columns) + inline actions                                                                                                                                | Approve (PENDING only), Cancel                                              |
-| **Warehouse intake**     | `src/app/warehouse/page.tsx`            | INCOMING · RECEIVED                        | Inline: order code, merchant, receiver, pickup rider, parcel, city, address, collectible, delivery fee, security, notes, status                                                        | Receive (PICKED_UP only)                                                    |
-| **Warehouse orders**     | `src/app/warehouse/orders/page.tsx`     | ALL · IN_PROGRESS · DELIVERED · EXCEPTIONS | `orderCodeColumn`, `merchantColumn`, `recipientNameColumn`, `warehouseColumn`, `deliveryAddressColumn`, `collectibleColumn`, `statusColumn`, `riderColumn(pickup)`, `riderColumn(delivery)` | Cancel only                                                                 |
-| **Warehouse exceptions** | `src/app/warehouse/exceptions/page.tsx` | FAILED_ATTEMPT · RETURNED statuses         | Subset focused on delivery outcome                                                                                                                                                     | Resolve (FAILED_ATTEMPT only, assigned warehouse)                           |
+| **Warehouse approval**   | `src/app/warehouse/orders/page.tsx`     | PENDING only (forced, no tabs)             | `orderCodeColumn`, `merchantColumn`, `recipientName(+Phone)`, `parcelWeightColumn`, `deliveryAddressColumn`, `deliveryTypeColumn`, `collectibleColumn`, fees, `merchantNoteColumn`, `createdAtColumn`, `statusColumn`, `riderColumn(pickup)`, `riderColumn(delivery)` | Approve (PENDING, own hub only — ownership guard in the transition) + Cancel                                                                 |
+| **Warehouse completed**  | `src/app/warehouse/completed/page.tsx`  | ALL · DELIVERED · CANCELLED · RETURNED     | Read-only: order code + status, merchant, receiver, delivery address, closed-at, outcome, resolved-by, collectible. No actions column and **not** `selectable`            | None — a closed parcel has nothing left to do                                                                 |
+| **Warehouse exceptions** | `src/app/warehouse/exceptions/page.tsx` | FAILED_ATTEMPT only (forced, no tabs)      | Subset focused on delivery outcome                                                                                                                                                     | Resolve (FAILED_ATTEMPT only, assigned warehouse)                           |
 | **Rider pickup queue**   | `src/app/rider/pickup/page.tsx`         | TO_COLLECT · COLLECTED                     | Inline: order code, merchant, pickup location, parcel, warehouse, city, status                                                                                                         | Mark picked up (APPROVED only, assigned pickup rider)                       |
 | **Rider delivery queue** | `src/app/rider/delivery/page.tsx`       | TO_DELIVER · COMPLETED                     | Inline: order code, recipient, delivery address, parcel, collectible, status                                                                                                           | Out for delivery (IN_TRANSIT only, assigned delivery rider), Record outcome |
 | **Merchant overview**    | `src/app/merchant/page.tsx`             | None (client-filtered, unpaginated)        | Inline: tracking, pickup location, recipient, weight, delivery charge, collectible, notes, status                                                                                      | Cancel (PENDING only)                                                       |
+
+The two warehouse surfaces that are not tables:
+
+- **Warehouse overview** (`src/app/warehouse/page.tsx` → `overview-client.tsx`)
+  is stats only: a `StatCardList` of one tile per status the admin can still act
+  on, plus outstanding COD. It renders no `DataTable` at all, and its counts come
+  from two cached aggregate queries on the server rather than from a fetched list.
+- **Warehouse ongoing** (`src/app/warehouse/ongoing/`) is a kanban board, not a
+  `DataTable`. Columns come from the pure helpers in
+  `src/features/orders/kanban-grouping.ts` — group by status or by whoever holds
+  the parcel's next leg — and each card carries its own action buttons. Rows are
+  server-fetched with a hard cap (500) rather than paginated.
 
 Key differences to know when adding a column or action:
 
@@ -570,13 +583,17 @@ Key differences to know when adding a column or action:
 - **Rider views** define all columns inline and intentionally omit financial
   columns (`collectibleColumn`) and admin-only columns.
   Don't pull `useOrderColumns()` into rider pages.
-- **Warehouse orders** renders both pickup and delivery rider columns side by
+- **Warehouse approval** renders both pickup and delivery rider columns side by
   side via `riderColumn("pickup", riderName)` and
   `riderColumn("delivery", riderName)`. The Admin view uses `useOrderColumns()`
   which composes the same factories as a convenience hook.
+- **Single-status warehouse queues force their filter.** Approval and Exceptions
+  call `setStatuses([...])` in a `useEffect` with no tab state to change it — the
+  filter is a constant of the page, not a control. Completed is the one warehouse
+  page with a tab bar, because it covers three statuses.
 - **Tab counts** on rider views derive from `myPickups` / `myDeliveries` (client-side
-  filtered by rider ID), and on warehouse views from `incoming` / `received` /
-  `needsAction` / `resolved` (client-side filtered by warehouse ID). Badge numbers
+  filtered by rider ID) and on Exceptions from `needsAction` (client-side filtered
+  by warehouse ID). Badge numbers
   reflect only the rows relevant to that tab and role scope, not the raw API response.
   `setStatuses(...)` is called in a `useEffect` on tab change and always resets `page` to 1.
   The DataTable `data` prop receives the same filtered array, so the tab count badge
@@ -1124,7 +1141,7 @@ Rules:
 - When selected rows exist, a toolbar appears between the search bar and
   the table showing "N selected" and the provided action buttons.
 - **Bulk actions that need user input** (e.g. assign rider) open a dialog
-  instead of executing directly. See `src/app/warehouse/dispatch/page.tsx` for
+  instead of executing directly. See `src/app/dashboard/orders/page.tsx` for
   the dialog pattern — the action's `onClick` sets dialog open state, and
   the dialog calls the bulk API once on confirm. Selection is cleared via
   `onComplete` / `onOpenChange` callbacks rather than `clear()`.
