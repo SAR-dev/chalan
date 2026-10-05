@@ -4,6 +4,7 @@
 export const columnLabels = {
   order: {
     order: "Order",
+    orderId: "Order ID",
     merchant: "Business",
     merchantPhone: "Phone",
     receiver: "Receiver",

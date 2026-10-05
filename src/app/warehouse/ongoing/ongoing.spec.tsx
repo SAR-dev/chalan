@@ -305,15 +305,41 @@ describe("ongoing board filters", () => {
     }
   })
 
-  it("lists every rider in the rider dropdown", async () => {
+  it("lists the roster in both rider dropdowns", async () => {
     await importPage([makeOrder({ status: "IN_TRANSIT" })])
-    await userEvent.click(screen.getByTestId("kanban-filter-rider"))
-    for (const rider of mockRiders) {
-      expect(
-        await screen.findByTestId(`kanban-filter-rider-option-${rider.id}`),
-      ).toHaveTextContent(rider.name)
+    for (const testId of [
+      "kanban-filter-pickup-rider",
+      "kanban-filter-delivery-rider",
+    ]) {
+      await userEvent.click(screen.getByTestId(testId))
+      for (const rider of mockRiders) {
+        expect(
+          await screen.findByTestId(`${testId}-option-${rider.id}`),
+        ).toHaveTextContent(rider.name)
+      }
+      await userEvent.keyboard("{Escape}")
     }
-    await userEvent.keyboard("{Escape}")
+  })
+
+  it("labels every field instead of leaving the boxes nameless", async () => {
+    // A placeholder vanishes the moment you type — precisely when someone
+    // coming back to the toolbar needs to know what they are still in.
+    await importPage([makeOrder({ status: "IN_TRANSIT" })])
+    const expected = [
+      "Order ID",
+      "Pickup Rider",
+      "Delivery Rider",
+      "Pickup city",
+      "Delivery city",
+    ]
+    for (const text of expected) {
+      const label = screen.getByText(text)
+      expect(label).toHaveAttribute("for")
+      // The label must actually point at a control that exists.
+      expect(
+        screen.getByTestId(label.getAttribute("for") ?? ""),
+      ).toBeInTheDocument()
+    }
   })
 
   it("shows the selection on the trigger, never the raw sentinel", async () => {
@@ -321,9 +347,12 @@ describe("ongoing board filters", () => {
     // on `SelectValue` the trigger reads "any", which was a real (caught by e2e)
     // regression rather than a hypothetical.
     await importPage([makeOrder({ status: "IN_TRANSIT" })])
-    expect(screen.getByTestId("kanban-filter-rider")).toHaveTextContent(
-      "All riders",
-    )
+    for (const testId of [
+      "kanban-filter-pickup-rider",
+      "kanban-filter-delivery-rider",
+    ]) {
+      expect(screen.getByTestId(testId)).toHaveTextContent("All riders")
+    }
     expect(screen.getByTestId("kanban-filter-pickup-city")).toHaveTextContent(
       "All cities",
     )
@@ -339,11 +368,15 @@ describe("ongoing board filters", () => {
       "Chattogram",
     )
 
-    // The accessible name stays the *field*. If it tracked the value, a
-    // screen-reader user would lose their place in the toolbar on every change.
-    expect(screen.getByTestId("kanban-filter-pickup-city")).toHaveAttribute(
+    // The accessible name is the *visible label* now, not an aria-label that
+    // would shadow it. If the name tracked the value, a screen-reader user
+    // would lose their place in the toolbar on every change.
+    expect(screen.getByTestId("kanban-filter-pickup-city")).not.toHaveAttribute(
       "aria-label",
-      "Pickup city",
+    )
+    expect(screen.getByText("Pickup city")).toHaveAttribute(
+      "for",
+      "kanban-filter-pickup-city",
     )
   })
 
@@ -369,25 +402,32 @@ describe("ongoing board filters", () => {
     expect(boardCards()).toEqual(["ORD-100001E"])
   })
 
-  it("narrows to one rider, and only the parcels that rider holds", async () => {
-    const mine = makeOrder({
+  it("narrows by pickup rider without dragging in the delivery rider", async () => {
+    const beingCollected = makeOrder({
       status: "PICKED_UP",
       pickupRiderId: "rider_1",
     })
-    // Same rider, other leg: not held by Rakib right now, so it must not appear
-    // when "Rakib" is chosen — this is the next-leg rule the rider view uses.
-    const notHis = makeOrder({
+    // The other field, the other rider. Choosing Rakib as the *pickup* rider
+    // must not surface this parcel just because Sadia is delivering it — the
+    // whole point of two dropdowns is that these are different questions.
+    const beingDelivered = makeOrder({
       status: "IN_TRANSIT",
       deliveryRiderId: "rider_2",
     })
-    await importPage([mine, notHis])
+    await importPage([beingCollected, beingDelivered])
 
     await pickOption(
-      "kanban-filter-rider",
-      "kanban-filter-rider-option-rider_1",
+      "kanban-filter-pickup-rider",
+      "kanban-filter-pickup-rider-option-rider_1",
     )
+    expect(boardCards()).toEqual([beingCollected.id])
 
-    expect(boardCards()).toEqual([mine.id])
+    await userEvent.click(screen.getByTestId("kanban-filter-clear"))
+    await pickOption(
+      "kanban-filter-delivery-rider",
+      "kanban-filter-delivery-rider-option-rider_2",
+    )
+    expect(boardCards()).toEqual([beingDelivered.id])
   })
 
   it("narrows by pickup city and by delivery city independently", async () => {
@@ -477,8 +517,8 @@ describe("ongoing board filters", () => {
     await importPage([mine, theirs])
 
     await pickOption(
-      "kanban-filter-rider",
-      "kanban-filter-rider-option-rider_1",
+      "kanban-filter-delivery-rider",
+      "kanban-filter-delivery-rider-option-rider_1",
     )
     expect(boardCards()).toEqual(["ORD-MINE"])
 

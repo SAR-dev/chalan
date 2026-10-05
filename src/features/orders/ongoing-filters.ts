@@ -1,13 +1,22 @@
 import type { Order } from "@/lib/types"
-import { nextLegRiderId } from "./kanban-grouping"
 
 /**
  * Filters for the warehouse "Ongoing" board.
  *
- * An order-id box plus three dropdowns (rider, pickup city, delivery city),
- * because those are the four questions a dispatcher actually asks of a board:
- * "where is my parcel", "whose is it", "which way did it come from", "where is
- * it going".
+ * An order-ID box, a pickup-rider dropdown, a delivery-rider dropdown, a
+ * pickup-city dropdown and a delivery-city dropdown — the five questions a
+ * dispatcher actually asks of a board: "where is my parcel", "who is collecting
+ * it", "who is delivering it", "which way did it come from", "where is it
+ * going".
+ *
+ * Pickup and delivery riders are **separate** filters rather than one "the
+ * rider" filter, because a parcel has both at once and they are different
+ * people at different times: an APPROVED parcel has a pickup rider and no
+ * delivery rider, and once it is in the warehouse the reverse is true. A single
+ * next-leg filter answered "who holds this right now" well, but it could not
+ * answer "show me everything Rakib is collecting" — which is the question a
+ * dispatcher planning a collection route asks. Filtering each field directly
+ * also means the option list never needs to know what state a parcel is in.
  *
  * Filtering happens on the client over the rows the server already fetched. The
  * board is bounded (`BOARD_LIMIT`) and never re-fetches while you type, so a
@@ -15,11 +24,6 @@ import { nextLegRiderId } from "./kanban-grouping"
  * columns flicker. The trade is honest: a filter can only narrow what is loaded,
  * which is why the truncation notice sits above the board rather than being
  * buried in this file.
- *
- * The rider filter matches the **next-leg holder** (`nextLegRiderId`), the same
- * answer the rider view groups by and the same name the card prints. Filtering
- * on `pickupRiderId`/`deliveryRiderId` instead would let a dispatcher pick a
- * rider and still not see their parcels, because the parcel is on the other leg.
  */
 
 /**
@@ -38,7 +42,9 @@ export interface OngoingFilters {
   /** Free-text match on the order code. */
   query: string
   /** A rider id, or {@link ANY_RIDER}. */
-  riderId: string
+  pickupRiderId: string
+  /** A rider id, or {@link ANY_RIDER}. */
+  deliveryRiderId: string
   /** A delivery-city id used as a *pickup* city, or {@link ANY_CITY}. */
   pickupCityId: string
   /** A delivery-city id used as a *delivery* city, or {@link ANY_CITY}. */
@@ -47,7 +53,8 @@ export interface OngoingFilters {
 
 export const NO_ONGOING_FILTERS: OngoingFilters = {
   query: "",
-  riderId: ANY_RIDER,
+  pickupRiderId: ANY_RIDER,
+  deliveryRiderId: ANY_RIDER,
   pickupCityId: ANY_CITY,
   deliveryCityId: ANY_CITY,
 }
@@ -56,34 +63,48 @@ export const NO_ONGOING_FILTERS: OngoingFilters = {
 export function isFiltering(filters: OngoingFilters): boolean {
   return (
     filters.query.trim() !== "" ||
-    filters.riderId !== ANY_RIDER ||
+    filters.pickupRiderId !== ANY_RIDER ||
+    filters.deliveryRiderId !== ANY_RIDER ||
     filters.pickupCityId !== ANY_CITY ||
     filters.deliveryCityId !== ANY_CITY
   )
 }
 
 /**
- * Narrow board rows. All four filters combine with AND; an unset filter is
+ * Narrow board rows. All five filters combine with AND; an unset filter is
  * skipped entirely rather than compared, so a `null` `pickupCityId` (a parcel
  * whose pickup location no longer exists) is not silently dropped when the
- * pickup filter is untouched.
+ * pickup filter is untouched. The same holds for the rider fields: a parcel
+ * with no delivery rider yet matches neither rider filter but both city ones.
  */
 export function filterOngoingOrders(
   rows: Order[],
   filters: OngoingFilters,
 ): Order[] {
   const query = filters.query.trim().toLowerCase()
-  const byRider = filters.riderId !== ANY_RIDER
+  const byPickupRider = filters.pickupRiderId !== ANY_RIDER
+  const byDeliveryRider = filters.deliveryRiderId !== ANY_RIDER
   const byPickupCity = filters.pickupCityId !== ANY_CITY
   const byDeliveryCity = filters.deliveryCityId !== ANY_CITY
 
-  if (query === "" && !byRider && !byPickupCity && !byDeliveryCity) {
+  if (
+    query === "" &&
+    !byPickupRider &&
+    !byDeliveryRider &&
+    !byPickupCity &&
+    !byDeliveryCity
+  ) {
     return rows
   }
 
   return rows.filter((order) => {
     if (query !== "" && !order.id.toLowerCase().includes(query)) return false
-    if (byRider && nextLegRiderId(order) !== filters.riderId) return false
+    if (byPickupRider && order.pickupRiderId !== filters.pickupRiderId) {
+      return false
+    }
+    if (byDeliveryRider && order.deliveryRiderId !== filters.deliveryRiderId) {
+      return false
+    }
     if (byPickupCity && (order.pickupCityId ?? null) !== filters.pickupCityId) {
       return false
     }

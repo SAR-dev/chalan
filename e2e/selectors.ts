@@ -285,13 +285,32 @@ export const ongoing = {
   // Order-id box plus the three dropdowns. `…-option-<id>` addresses one entry
   // in an open dropdown; the trigger itself is the filter, not an option.
   query: "[data-testid='kanban-filter-query']",
-  riderFilter: "[data-testid='kanban-filter-rider']",
+  pickupRiderFilter: "[data-testid='kanban-filter-pickup-rider']",
+  deliveryRiderFilter: "[data-testid='kanban-filter-delivery-rider']",
+  /**
+   * A field's visible label, addressed by the control it points at rather than
+   * by its text: `label[for=…]` asserts the wiring itself, so a label that is
+   * merely adjacent to the input (present, but announced by nobody) fails.
+   */
+  labelFor: (controlTestId: string) => `label[for='${controlTestId}']`,
+  /** The whole filter toolbar, for measuring its layout. */
+  filters: "[data-testid='kanban-filters']",
+  /** Every field in the bar, as one selector, for "are these equal width?". */
+  fieldPrefix:
+    "[data-testid='kanban-filter-query']," +
+    "[data-testid='kanban-filter-pickup-rider']," +
+    "[data-testid='kanban-filter-delivery-rider']," +
+    "[data-testid='kanban-filter-pickup-city']," +
+    "[data-testid='kanban-filter-delivery-city']",
   pickupCityFilter: "[data-testid='kanban-filter-pickup-city']",
   deliveryCityFilter: "[data-testid='kanban-filter-delivery-city']",
   // Real options, by prefix: the synthetic "All …" entry carries no id, so a
   // prefix locator counts only genuine riders/cities. Addressed this way rather
   // than `getByRole("option")` — options are taggable, so the taggable path wins.
-  riderOptionPrefix: "[data-testid^='kanban-filter-rider-option-']",
+  pickupRiderOptionPrefix:
+    "[data-testid^='kanban-filter-pickup-rider-option-']",
+  deliveryRiderOptionPrefix:
+    "[data-testid^='kanban-filter-delivery-rider-option-']",
   pickupCityOptionPrefix: "[data-testid^='kanban-filter-pickup-city-option-']",
   deliveryCityOptionPrefix:
     "[data-testid^='kanban-filter-delivery-city-option-']",
