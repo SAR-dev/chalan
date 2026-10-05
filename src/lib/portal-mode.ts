@@ -19,8 +19,6 @@
 
 export type PortalMode = "admin" | "public" | "all"
 
-export const PORTAL_MODES: PortalMode[] = ["admin", "public", "all"]
-
 // Role groups per mode. `public` is a deployment name, not a role name — it
 // maps to the two roles on the customer-facing side of the product.
 const ADMIN_ROLES = ["SUPER_ADMIN", "WAREHOUSE_ADMIN"]

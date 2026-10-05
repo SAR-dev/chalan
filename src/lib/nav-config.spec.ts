@@ -111,9 +111,10 @@ describe("MERCHANT_SIDEBAR", () => {
 describe("WAREHOUSE_SIDEBAR", () => {
   it("has all expected navigation items", () => {
     const labels = WAREHOUSE_SIDEBAR.items.map((i) => i.label)
-    expect(labels).toContain("Intake queue")
-    expect(labels).toContain("Dispatch desk")
-    expect(labels).toContain("Order progress")
+    expect(labels).toContain("Overview")
+    expect(labels).toContain("Order approval")
+    expect(labels).toContain("Ongoing")
+    expect(labels).toContain("Completed")
     expect(labels).toContain("Riders")
     expect(labels).toContain("Exceptions")
     expect(labels).toContain("COD Settlement")

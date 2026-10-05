@@ -51,7 +51,7 @@ export default function WarehouseRiderCashPage() {
           description="Track cash collected by riders in your warehouse"
         />
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-3 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">

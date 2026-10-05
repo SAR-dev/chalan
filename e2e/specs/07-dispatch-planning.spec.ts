@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
-import { autoAssign, dialog, rider, warehouse } from "../selectors"
+import { autoAssign, dialog, ongoing, rider } from "../selectors"
 
 /**
  * Route planning and auto-assignment.
@@ -10,6 +10,11 @@ import { autoAssign, dialog, rider, warehouse } from "../selectors"
  * they were already given. Both are read-first — the proposal is applied through
  * the ordinary bulk-dispatch endpoint, and the run sheet is a pure function of
  * the parcels on the rider's run.
+ *
+ * The admin half moved from the retired dispatch desk to the Ongoing board's
+ * toolbar, which plans over every parcel sitting in the warehouse rather than
+ * over a row selection. There is no select-all step any more: the set is defined
+ * by the parcels' state, so a spec cannot accidentally narrow it.
  */
 
 test.describe("S74. Route planning and auto-assignment", () => {
@@ -17,43 +22,39 @@ test.describe("S74. Route planning and auto-assignment", () => {
     page,
   }) => {
     await login(page, CREDS.warehouseAdmin)
-    await page.goto("/warehouse/dispatch")
+    await page.goto("/warehouse/ongoing")
     await waitForAppReady(page)
 
-    await page.locator(warehouse.tabDelivery).click()
-    await expect(page.locator(warehouse.dispatchDeliveryTable)).toBeVisible({
+    // The plan covers the In-warehouse lane in full, so that lane's card count
+    // is the number the proposal has to add up to. Read it from the board rather
+    // than hard-coding the seed, which would make the assertion a tautology.
+    await expect(page.locator(ongoing.heldColumn)).toBeVisible({
       timeout: 15_000,
     })
+    const heldCount = Number.parseInt(
+      await page.locator(ongoing.heldColumnCount).innerText(),
+      10,
+    )
+    expect(heldCount).toBeGreaterThan(1)
 
-    // Select-all, not a row click: the planner reads the whole selection, so a
-    // single-parcel selection would exercise a different path than the UI
-    // invites. `count()` does not auto-wait, so wait for a row to exist before
-    // reading how many there are.
-    const rows = page.locator(warehouse.selectRow)
-    await expect(rows.first()).toBeVisible({ timeout: 15_000 })
-    const rowCount = await rows.count()
-    expect(rowCount).toBeGreaterThan(1)
-    await page.locator(warehouse.selectAll).check()
-    await page.locator(warehouse.bulkAutoAssign).click()
-    // Bulk actions confirm before running — that step belongs to the DataTable,
-    // not to this feature, but the spec still has to walk through it.
-    await page.locator(dialog.confirmButton).click()
+    await expect(page.locator(ongoing.autoAssign)).toBeVisible()
+    await page.locator(ongoing.autoAssign).click()
 
     const form = page.locator(dialog.formDialog)
     await expect(form).toBeVisible({ timeout: 15_000 })
-    // An error here means the endpoint rejected the whole selection; an empty
-    // plan means it accepted it and found nobody to give it to. Both are
-    // failures for a hub with delivery riders on shift.
+    // An error here means the endpoint rejected the whole set; an empty plan
+    // means it accepted it and found nobody to give it to. Both are failures for
+    // a hub with delivery riders on shift.
     await expect(page.locator(autoAssign.error)).toHaveCount(0)
     await expect(page.locator(autoAssign.empty)).toHaveCount(0)
     await expect(page.locator(autoAssign.confirm)).toBeEnabled({
       timeout: 15_000,
     })
 
-    // The plan must account for every selected parcel and must not hand the
-    // whole batch to one rider. A planner that returned the first eligible
-    // rider would still produce a complete plan, so completeness alone proves
-    // nothing — the spread is the property under test.
+    // The plan must account for every held parcel and must not hand the whole
+    // batch to one rider. A planner that returned the first eligible rider would
+    // still produce a complete plan, so completeness alone proves nothing — the
+    // spread is the property under test.
     const blocks = page.locator(autoAssign.riderBlockPrefix)
     await expect(blocks.first()).toBeVisible()
     expect(await blocks.count()).toBeGreaterThan(1)
@@ -62,7 +63,7 @@ test.describe("S74. Route planning and auto-assignment", () => {
       await page.locator(autoAssign.riderCountPrefix).allInnerTexts()
     ).map((text) => Number.parseInt(text, 10))
     expect(tallies.every((n) => Number.isInteger(n))).toBe(true)
-    expect(tallies.reduce((sum, n) => sum + n, 0)).toBe(rowCount)
+    expect(tallies.reduce((sum, n) => sum + n, 0)).toBe(heldCount)
 
     // Every proposed rider is shown with the load the choice was made on, so a
     // dispatcher can audit the suggestion instead of trusting it.
@@ -74,18 +75,24 @@ test.describe("S74. Route planning and auto-assignment", () => {
     page,
   }) => {
     await login(page, CREDS.warehouseAdmin)
-    await page.goto("/warehouse/dispatch")
+    await page.goto("/warehouse/ongoing")
     await waitForAppReady(page)
 
-    // Pickup parcels are assigned before they reach a hub, so offering a
-    // delivery-planning action on that tab would propose dispatches the state
-    // machine would refuse.
-    await expect(page.locator(warehouse.dispatchPickupTable)).toBeVisible({
-      timeout: 15_000,
-    })
-    await page.locator(warehouse.selectAll).check()
-    await expect(page.locator(warehouse.bulkAssignDeliveryRider)).toHaveCount(0)
-    await expect(page.locator(warehouse.bulkAutoAssign)).toHaveCount(0)
+    await expect(page.locator(ongoing.board)).toBeVisible({ timeout: 15_000 })
+
+    // Dispatch is a per-card action, offered only on a parcel that has actually
+    // reached the hub. A card anywhere else on the board must not carry one —
+    // the button is what the API would refuse, so a card that offers it is
+    // promising something the state machine will not do.
+    const dispatchable = await page.locator(ongoing.dispatchPrefix).count()
+    const held = await page
+      .locator(ongoing.heldColumn)
+      .locator(ongoing.cardPrefix)
+      .count()
+    expect(dispatchable).toBe(held)
+
+    // And the cancel action lives on the approval queue, never here.
+    await expect(page.locator(ongoing.cancelPrefix)).toHaveCount(0)
   })
 
   test("rider sees the drop order, batched by zone, that the server sequenced", async ({

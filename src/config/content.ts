@@ -115,24 +115,29 @@ export const pageContent = {
         `Manage the riders based at ${warehouseName} — update their details, task type, and active status.`,
     },
     orders: {
-      title: (firstName: string) => `Order progress, ${firstName}`,
+      title: (firstName: string) => `Order approval, ${firstName}`,
       description: (warehouseName: string) =>
-        `Track every parcel moving through ${warehouseName}, from intake to delivery.`,
+        `Review and approve the new orders waiting for ${warehouseName}, and cancel the ones that will not go out.`,
     },
-    intake: {
-      title: (firstName: string) => `Warehouse intake, ${firstName}`,
+    ongoing: {
+      title: (firstName: string) => `Ongoing orders, ${firstName}`,
       description: (warehouseName: string) =>
-        `Receive picked-up parcels into ${warehouseName} and log them into inventory.`,
+        `Every parcel in flight at ${warehouseName} — group by status, or by the rider who has to act next.`,
     },
-    dispatch: {
-      title: (firstName: string) => `Dispatch desk, ${firstName}`,
+    completed: {
+      title: (firstName: string) => `Completed orders, ${firstName}`,
       description: (warehouseName: string) =>
-        `Assign delivery riders to parcels waiting in ${warehouseName} and send them out for the final mile.`,
+        `Closed parcels for ${warehouseName} — delivered, cancelled and returned. Read-only history.`,
+    },
+    overview: {
+      title: (firstName: string) => `Overview, ${firstName}`,
+      description: (warehouseName: string) =>
+        `Where ${warehouseName} stands right now — what is waiting to be approved, picked up, received or dispatched, and what cash is still to be settled.`,
     },
     exceptions: {
       title: (firstName: string) => `Exceptions desk, ${firstName}`,
       description: (warehouseName: string) =>
-        `Resolve failed delivery attempts at ${warehouseName} — re-attempt the delivery or close the parcel as a return.`,
+        `Failed delivery attempts at ${warehouseName} that are waiting on a decision — re-attempt the delivery or close the parcel as a return. Returned parcels move to Completed.`,
     },
     codSettlement: {
       title: (firstName: string) => `COD settlement, ${firstName}`,
@@ -207,11 +212,6 @@ export const pageContent = {
       title: "Finances & payouts",
       description:
         "Track your available balance and request payouts. Payouts cover COD amount only — delivery charge and security money are retained by the platform.",
-    },
-    pickupLocations: {
-      title: "Pickup locations",
-      description:
-        "Manage the pickup locations where riders collect your parcels.",
     },
     pricing: {
       title: "Delivery pricing",

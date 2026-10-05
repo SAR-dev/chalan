@@ -127,8 +127,6 @@ export const SEED_COUNTS = {
   payoutRequests: 2,
   payoutLinkedOrders: 2,
   announcements: 6,
-  auditLogs: 5,
-  emailLogs: 3,
 }
 
 export const RIDER_CREDENTIALS = buildRiderCredentials(SEED_COUNTS.riders)

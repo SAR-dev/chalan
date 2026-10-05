@@ -1,21 +1,10 @@
 "use client"
 
-import {
-  Ban,
-  Boxes,
-  Check,
-  CheckCircle2,
-  Clock,
-  MoreHorizontal,
-  ShieldCheck,
-  Truck,
-  X,
-} from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Ban, Check, MoreHorizontal, ShieldCheck, X } from "lucide-react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
-import { StatCardList } from "@/components/stat-card-list"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -25,9 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
-import { statCardLabels } from "@/config/stat-card-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import {
@@ -52,27 +39,19 @@ import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
-import type { Order, OrderStatus } from "@/lib/types"
+import type { Order } from "@/lib/types"
 
-type FilterTab = "PENDING" | "APPROVED" | "ALL"
-
-const EXCEPTION_STATUSES: OrderStatus[] = ["FAILED_ATTEMPT", "RETURNED"]
-const IN_PROGRESS_STATUSES: OrderStatus[] = [
-  "PICKED_UP",
-  "IN_WAREHOUSE",
-  "IN_TRANSIT",
-  "OUT_FOR_DELIVERY",
-]
-
-// Tab set, labels, order and default are the admin orders page's, verbatim —
-// the two views are meant to be the same feature (approve is now a shared
-// action too). The status arrays above still power the stat cards; only the
-// *filters* mirror the admin trio.
-const TAB_STATUSES: Record<FilterTab, OrderStatus[] | undefined> = {
-  PENDING: ["PENDING"],
-  APPROVED: ["APPROVED"],
-  ALL: undefined,
-}
+/**
+ * This queue is PENDING and nothing else (decision #2).
+ *
+ * It used to mirror the admin page's Pending/Approved/All trio, but every
+ * other status now owns a page of its own: APPROVED onward live on the Ongoing
+ * board, DELIVERED/CANCELLED/RETURNED on Completed, FAILED_ATTEMPT on
+ * Exceptions. A tab here would be a second place to look for the same parcel,
+ * and the warehouse admin's job on this page is a single question — what is
+ * waiting for me to approve?
+ */
+const APPROVAL_STATUSES = ["PENDING"]
 
 export function WarehouseOrdersPageClient({
   initialData,
@@ -85,7 +64,6 @@ export function WarehouseOrdersPageClient({
   const { currentWarehouse } = useWarehouses()
   const {
     orders,
-    allOrders,
     total,
     page: _page,
     setPage,
@@ -103,8 +81,6 @@ export function WarehouseOrdersPageClient({
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
-  // Same default as the admin orders page: the approval queue first.
-  const [tab, setTab] = useState<FilterTab>("PENDING")
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
@@ -138,10 +114,13 @@ export function WarehouseOrdersPageClient({
     setBulkBusy(false)
   }
 
+  // Forced, not a default: nothing on this page may widen the queue. The
+  // `setPage(1)` keeps a search made on page 3 from leaving the user staring at
+  // an empty page 1 of results.
   useEffect(() => {
-    setStatuses(TAB_STATUSES[tab])
+    setStatuses(APPROVAL_STATUSES)
     setPage(1)
-  }, [tab, setStatuses, setPage])
+  }, [setStatuses, setPage])
 
   const merchantName = (id: string) =>
     merchants.find((m) => m.id === id)?.businessName ?? "Merchant"
@@ -149,34 +128,6 @@ export function WarehouseOrdersPageClient({
     id ? (riders.find((r) => r.id === id)?.name ?? "—") : "—"
   const riderPhone = (id?: string | null) =>
     id ? (riders.find((r) => r.id === id)?.phone ?? "—") : "—"
-
-  const inProgress = useMemo(
-    () => allOrders.filter((o) => IN_PROGRESS_STATUSES.includes(o.status)),
-    [allOrders],
-  )
-  const delivered = useMemo(
-    () => allOrders.filter((o) => o.status === "DELIVERED"),
-    [allOrders],
-  )
-  const exceptions = useMemo(
-    () => allOrders.filter((o) => EXCEPTION_STATUSES.includes(o.status)),
-    [allOrders],
-  )
-  const inWarehouse = useMemo(
-    () => allOrders.filter((o) => o.status === "IN_WAREHOUSE"),
-    [allOrders],
-  )
-  // Approval-workflow counts for the stat cards — derived from the same
-  // scoped `allOrders` list as the other four cards (client-side, no extra
-  // round trip; the list is already the warehouse's own).
-  const pendingApproval = useMemo(
-    () => allOrders.filter((o) => o.status === "PENDING"),
-    [allOrders],
-  )
-  const approvedCount = useMemo(
-    () => allOrders.filter((o) => o.status === "APPROVED"),
-    [allOrders],
-  )
 
   const columns: DataTableColumn<Order>[] = [
     orderCodeColumn(),
@@ -276,78 +227,19 @@ export function WarehouseOrdersPageClient({
         )}
       />
 
-      <StatCardList
-        columns={3}
-        items={[
-          {
-            label: statCardLabels.warehouse.orders.pendingApproval.label,
-            value: pendingApproval.length,
-            icon: ShieldCheck,
-            tone: "bg-chart-3/15 text-chart-3",
-          },
-          {
-            label: statCardLabels.warehouse.orders.approved.label,
-            value: approvedCount.length,
-            icon: CheckCircle2,
-            tone: "bg-chart-1/15 text-chart-1",
-          },
-          {
-            label: statCardLabels.warehouse.orders.heldInWarehouse.label,
-            value: inWarehouse.length,
-            icon: Boxes,
-            tone: "bg-chart-2/15 text-chart-2",
-          },
-          {
-            label: statCardLabels.warehouse.orders.inProgress.label,
-            value: inProgress.length,
-            icon: Clock,
-            tone: "bg-primary/10 text-primary",
-          },
-          {
-            label: statCardLabels.warehouse.orders.delivered.label,
-            value: delivered.length,
-            icon: CheckCircle2,
-            tone: "bg-chart-2/15 text-chart-2",
-          },
-          {
-            label: statCardLabels.warehouse.orders.exceptions.label,
-            value: exceptions.length,
-            icon: Truck,
-            tone: "bg-chart-4/15 text-chart-4",
-          },
-        ]}
-      />
-
+      {/* No stat cards here: the warehouse overview owns the counts now, and a
+          second copy of "how many are pending" on the page that lists the
+          pending orders is a number that can disagree with its own table. */}
       <Card>
         <CardContent className="p-0">
           <DataTable
             pinnedColumns={["order"]}
             id="warehouse-orders"
             searchable
-            toolbarLeft={
-              <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-                {/* Labels, order and `orders-tab-*` testids mirror the admin
-                    orders page — same feature, same selectors. */}
-                <TabsList>
-                  <TabsTrigger value="PENDING" data-testid="orders-tab-PENDING">
-                    Pending
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="APPROVED"
-                    data-testid="orders-tab-APPROVED"
-                  >
-                    Approved
-                  </TabsTrigger>
-                  <TabsTrigger value="ALL" data-testid="orders-tab-ALL">
-                    All
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            }
             columns={columns}
             data={orders}
             getRowKey={(o) => o.id}
-            emptyMessage="No orders to show for this view."
+            emptyMessage="No orders are waiting for approval."
             loading={isLoading || isRefreshing}
             serverPaginated
             total={total}

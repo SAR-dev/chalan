@@ -66,17 +66,24 @@ test.describe("S6. Merchant Suspend & Reactivate", () => {
 
 // ─── S8. Warehouse Operations ────────────────────────────────────────────────
 test.describe("S8. Warehouse Operations", () => {
-  test("warehouse admin views queues", async ({ page }) => {
+  test("warehouse admin lands on the stats-only overview", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
 
     await page.goto("/warehouse")
     await waitForAppReady(page)
-    // The page title or heading should be visible
     await expect(page.getByRole("heading").first()).toBeVisible()
 
-    await page.goto("/warehouse/dispatch")
-    await waitForAppReady(page)
-    await expect(page.getByRole("heading").first()).toBeVisible()
+    // The homepage is numbers and nothing else. Asserting the absence of a table
+    // is the point: the page used to be the intake queue, and a spec that only
+    // checked for a heading would have passed on the queue too.
+    await expect(page.getByRole("table")).toHaveCount(0)
+
+    // Every actionable status is tiled, and the cash still to be handed over is
+    // tiled alongside them. Both labels are text, so this is the one place the
+    // text matcher policy applies — a tile has no testid slot to tag.
+    await expect(page.getByText("Pending", { exact: true })).toBeVisible()
+    await expect(page.getByText("Failed attempt")).toBeVisible()
+    await expect(page.getByText("Waiting to be settled")).toBeVisible()
   })
 })
 
