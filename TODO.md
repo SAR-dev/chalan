@@ -1,379 +1,191 @@
-# TODO — Warehouse portal restructure
+# TODO — "Out for Pickup" order status
 
 ## Status
 
-**Phases 1–6 are implemented, and the verification checklist at the bottom of
-this file is complete.** Verified with `pnpm ci:check` (clean),
-`pnpm test:coverage` (floors hold), `pnpm build` (`/warehouse/ongoing` and
-`/warehouse/completed` in the route table, `/warehouse/dispatch` gone), and
-`pnpm test:e2e` — **143 passed**, so the suite now exercises the rewrite end to
-end rather than sitting unrun. It needs a local Postgres and reseeds the dev
-database (`pnpm db:seed:full`), which is its documented behaviour.
+**Plan only. Nothing is implemented.** Every box below is unchecked on purpose.
 
-Four places where the implementation departed from the plan text, and why:
-
-- **The board and Completed live under phases 1 and 3 as planned, but their e2e
-  specs landed in `02-business-flows.spec.ts` rather than the new
-  `34-`/`35-` files.** S78 and S79 sit beside the retired S33/S34 they replace,
-  which keeps the removed scenarios and their replacements readable as one diff.
-  `docs-drift.spec.ts` allows the resulting holes at 33, 34 and 36.
-- **The board fetches through its own server query, not `useOrders`.** The plan
-  already called for this (the API caps `limit` at 100); what changed is that
-  the client receives a plain `Order[]` and never re-fetches, so a card's state
-  comes from `router.refresh()` after a dialog succeeds.
-- **The board's empty state is a line *above* the board, not a replacement for
-  it.** The five status columns render even when empty — "nothing is waiting to
-  be received" is the answer the page exists to give — so swapping them out for a
-  sentence would have hidden it.
-- **`statCardLabels` gained no `overview` group.** The seven status tiles read
-  `ORDER_STATUS_LABELS`, which is already the single string used by every status
-  badge and by the board's column headings; a third copy in the labels file
-  would have been a fourth thing to keep in sync. Only the COD tile needs a
-  label, and it reuses `codSettlement.awaitingSettlement`.
-
-## Added after this plan was written
-
-Two requests landed once the restructure was in place, so no phase in this
-plan mentions them:
-
-- **Board filters on `/warehouse/ongoing`.** An order-ID search box alongside
-  three dropdowns: rider, pickup city and delivery city. Filter logic is pure
-  and unit tested in `src/features/orders/ongoing-filters.ts`; the bar is
-  `src/features/orders/components/ongoing-filter-bar.tsx`. Both city dropdowns
-  are fed from the **whole** `delivery_city` table (a second server query in
-  `page.tsx`) rather than from the loaded board, so an option list never shrinks
-  under the cursor. The rider filter matches `nextLegRiderId` — the same
-  "who holds it" answer the rider grouping and the card label use, so picking a
-  rider always shows that rider's parcels.
-- **The APPROVED card's pickup action no longer disappears** when a rider is
-  assigned: it renders `disabled` and reads **"Pickup Assigned"** instead. An
-  absent button reads as a card that failed to render its action, rather than as
-  "nobody needs to assign this one".
+Written after reading the code, so file references are real. Line numbers are
+approximate — they were read from `17a5007`.
 
 ## Goal
 
-Reorganize the warehouse-admin portal around four focused surfaces and remove the
-two legacy queue pages:
+Add a new order status **`OUT_FOR_PICKUP`** that behaves exactly like
+`OUT_FOR_DELIVERY`, but on the collection leg:
 
-| Page | Route | Content |
-|------|-------|---------|
-| Overview (homepage) | `/warehouse` | **Stats only** — order lifecycle counts, no tables, no order progress |
-| Order approval | `/warehouse/orders` | **Pending only** queue with approve/cancel actions |
-| Ongoing (kanban) | `/warehouse/ongoing` | Board of in-flight orders, groupable **by status** or **by riders** |
-| Completed | `/warehouse/completed` | **Read-only** DELIVERED + CANCELLED + RETURNED list, no actions |
+```
+Assigned (APPROVED) → OUT FOR PICKUP → Picked up → [received → dispatched →
+in transit] → Out for delivery → Delivered
+```
 
-**Removed:** intake queue (today's homepage content) and dispatch desk
-(`/warehouse/dispatch`). Their functionality moves onto the kanban board as
-per-card actions plus one toolbar button.
+### Rules
 
-## Decisions (settled with the user)
+1. The rider must click **"Out for pickup"** before they can start the pickup.
+2. The `picked-up` transition is **blocked until the status is
+   `OUT_FOR_PICKUP`** — not before.
 
-| # | Question | Decision |
-|---|----------|----------|
-| 1 | What counts as "completed"? | **DELIVERED + CANCELLED + RETURNED.** RETURNED is terminal (`transitions.ts:553` sets it, nothing leaves it; notes lock, COD settles) so it belongs in a read-only archive. Ownership splits on **actionability, not lifecycle**: FAILED_ATTEMPT is the only status with a next action, so it stays on Exceptions alone and the Exceptions `RESOLVED` tab is **removed** — its `returnReason` / `failedResolvedBy` columns move to Completed's `Returned` tab. No status lives on two pages |
-| 2 | Approval page tabs? | **Pending only** — the admin-parity Approved/All trio on `/warehouse/orders` is dropped; every other status has a home on another page |
-| 3 | "Group by riders" semantics? | **Next-leg holder, exactly one column per card**: APPROVED/PICKED_UP → pickup rider (null → Unassigned); IN_WAREHOUSE/IN_TRANSIT/OUT_FOR_DELIVERY → delivery rider (null → Unassigned) |
-| 4 | Kanban interaction? | **Read-only cards + action buttons**, no drag-and-drop, no new dependency. Card body opens the existing `OrderDetailsDrawer` |
-| 5 | Bulk receive/assign/dispatch after queue removal? | **Toolbar only**: `AutoAssignDialog` survives as a board toolbar button (plans over all eligible ids — no selection needed). Receive / Assign pickup / Dispatch become **per-card**. `BulkAssignPickupRiderDialog` and `BulkDispatchDialog` are **deleted**. `bulkDispatch` hook method stays (auto-assign applies through it) |
-| 6 | Homepage stats? | **Actionable counts only** — seven status cards (PENDING, APPROVED, PICKED_UP, IN_WAREHOUSE, IN_TRANSIT, OUT_FOR_DELIVERY, FAILED_ATTEMPT) **plus "COD to settle"** = DELIVERED orders where `codSettledAt IS NULL` for this warehouse. **DELIVERED and RETURNED get no card** — they are closed archives with no pending work, and a "Delivered" count on a homepage whose job is "what needs me today" is noise. The stats no longer cover every status, which is deliberate |
-| 7 | Old `/warehouse/dispatch` URL? | **No redirect** (internal nav only; old URL 404s into the existing not-found page). Revisit only if bookmarks matter |
+Today `picked-up` guards on `status === "APPROVED"`
+(`transitions.ts:330`), which is exactly what changes.
 
-**Status → page ownership after the restructure** (no status is homeless, which
-is what makes the Approved/All tabs and the "All" table disposable):
+## Open decisions — confirm before Phase A
 
-- PENDING → Order approval
-- APPROVED, PICKED_UP, IN_WAREHOUSE, IN_TRANSIT, OUT_FOR_DELIVERY → Ongoing board
-- DELIVERED, CANCELLED, RETURNED → Completed (read-only archive; RETURNED keeps
-  its reason/resolved-by columns on Completed's `Returned` tab)
-- FAILED_ATTEMPT → Exceptions (the only status with a next action:
-  re-attempt / close as return)
+| # | Question | Recommendation |
+|---|----------|----------------|
+| 1 | New `outForPickupAt` timestamp column? | **Yes.** Mirrors `outForDeliveryAt`, which the tracking timeline and `ORDER_DIFF_FIELDS` both read. Needs `pnpm db:generate` + `pnpm db:push`, and the e2e DB (`db:push:e2e`) / CI's Postgres must be re-pushed before tests run. |
+| 2 | A stat card on `/warehouse`? | **Yes.** The restructure's decision #6 is "actionable counts only", and a parcel nobody has collected is actionable. That makes **9 cards** (8 statuses + COD), replacing the documented "eight" in `overview.spec.tsx` and e2e **S8**. |
+| 3 | Cancel while `OUT_FOR_PICKUP`? | **No** for merchants — consistent with `OUT_FOR_DELIVERY`, which the cancel guard already refuses. Confirm warehouse/admin cancel behaves the same. |
+| 4 | Reassign the pickup rider while out for pickup? | **No.** `assign-pickup-rider` stays `APPROVED`-only, mirroring how the delivery legs lock in. |
+| 5 | Badge tone | `BADGE_TONES` keys are reused per status; `info` = APPROVED and `violet` = PICKED_UP, so pick a free key that reads "moving toward collection". |
+| 6 | Seed distribution | `ORDER_SEED_STATUSES` (`seed-content/orders.ts:17-34`) must gain the status, which **changes seeded lane counts** and therefore S78, S8 and `18-order-history` expectations. |
 
-Exceptions therefore shrinks to a single-status queue and loses its `RESOLVED`
-tab — the return workflow is still fully covered, just filed under Completed.
+## The `OUT_FOR_DELIVERY` pattern to copy
 
-**Homepage stat cards do not mirror page ownership one-for-one.** DELIVERED and
-RETURNED have a home on Completed but no stat card (decision #6): a settled or
-returned parcel is history, not a to-do. The one money-ish number that does earn
-a card is COD awaiting settlement, because it is an unsettled balance sitting in
-a rider's pocket — genuinely pending work.
+| Concern | Where it lives today |
+|---|---|
+| Status list | `lib/db/schema.postgres/enums.ts:77` — `orderStatuses` (a TS const; the column is `text(...)`, so the value itself needs no DDL, but confirm no CHECK constraint in `drizzle/`) |
+| Timestamp column | `lib/db/schema.postgres/orders.ts:177` — `outForDeliveryAt` |
+| Transition | `features/orders/transitions.ts:427` — `"out-for-delivery"` (guard on `IN_TRANSIT` + `deliveryRiderId`) |
+| Transition labels | `transitions.ts:696` `TRANSITION_LABELS`, `transitions.ts:664` `ORDER_DIFF_FIELDS` |
+| API route | `app/api/orders/[id]/out-for-delivery/route.ts` — one line, `applyOrderTransition(...)` |
+| Hook method | `features/orders/hooks/use-orders.ts:324` |
+| Validation | none — `out-for-delivery` has no body schema; `picked-up` uses `orderPickedUpSchema` |
+| Label + tone | `lib/constants.ts:68` `ORDER_STATUS_LABELS`, `:81` `ORDER_STATUS_TONES` (both `Record<OrderStatus, …>` → **tsc lists every site that must be updated**) |
+| Badge | `features/orders/components/order-status-badge.tsx` — derives from the two maps, no edit needed |
+| Timeline | `lib/order-timeline.ts:37` `STATUS_RANK`, `:108` step timestamp; `features/orders/components/tracking-timeline.tsx:79,98-99` |
+| Rider action | `app/rider/page.tsx:113,273` (`canStart` / `canRecord`), `OutForDeliveryDialog` + `app/rider/pickup/page.tsx:171` (`canPickup`) |
 
-## Key reuse (verified in the codebase)
+Three `Record<OrderStatus, …>` maps — `ORDER_STATUS_LABELS`,
+`ORDER_STATUS_TONES`, `STATUS_RANK` — make `tsc --noEmit` an exhaustive
+checklist of what the type change breaks. **Phase C is complete when `tsc` is
+clean with no `any`.**
 
-- All action dialogs already live in `src/features/orders/dialogs/` and are
-  page-agnostic: `WarehouseReceiveDialog`, `AssignPickupRiderDialog`,
-  `WarehouseDispatchDialog`, `AutoAssignDialog`, `OrderDetailsDrawer`,
-  `ApproveOrderDialog`, `CancelOrderDialog`.
-- `buildWarehouseOrderScope()` (`src/lib/db/order-scope.ts`) is the scope for
-  every server fetch below; `ORDER_CORE_COLUMNS` + lifecycle columns in
-  `src/app/warehouse/orders/page.tsx` is the projection to copy.
-- Homepage counts: `cachedStats()` (`src/lib/cached-stats.ts`) accepts args
-  (key = `fixedKey + JSON.stringify(args)`), so pass `warehouseId` and tag
-  `statTag("order")` — the same pattern as `src/app/dashboard/page.tsx`.
-- **`useOrders({ includeAllOrders })` is NOT the board's data layer**: its
-  `allUrl` is hard-capped at `limit: 100` and the API clamps to `MAX_LIMIT=100`.
-  The board server-fetches directly in `page.tsx` (bypasses the clamp) and
-  revalidates with `router.refresh()` after actions — no SWR round trip that
-  would silently shrink 500 rows to 100.
-- Order of phases matters: **the kanban (Receive action) ships before the
-  intake page dies**, so Receive is never unreachable.
+## Why `/warehouse/ongoing` must change
+
+The status is pre-collection and in-flight, so a parcel in it belongs on the
+board. If it is not added there, the moment a rider taps "Out for pickup" the
+parcel vanishes from every warehouse surface.
+
+- `features/orders/kanban-grouping.ts:26` — `ONGOING_STATUSES` gains
+  `OUT_FOR_PICKUP` (after `APPROVED`, before `PICKED_UP`, matching flow order)
+  and `ONGOING_STATUS_LABELS:37` gains `"Out for pickup"`.
+- **`nextLegRiderId` (`kanban-grouping.ts:70`) must gain a
+  `case "OUT_FOR_PICKUP"` returning `order.pickupRiderId`.** Miss this and the
+  parcel drops into the *Unassigned* column even though a rider is holding it —
+  a silent, easy-to-miss regression.
+- Card actions (`ongoing-client.tsx`): `APPROVED` keeps *Assign pickup*
+  (enabled / disabled-per-`Pickup Assigned`); `OUT_FOR_PICKUP` gets **no
+  button** — the rider acts, the warehouse observes. That matches the existing
+  "others → observe only" rule.
+- Unit specs currently pin **5** lanes: `ongoing.spec.tsx` asserts the exact
+  column list, `kanban-grouping.spec.ts` asserts `columns.map(c => c.id)` deep-
+  equals `ONGOING_STATUSES`. Both become 6.
 
 ## Phases
 
-Each phase ends with the tree green (`pnpm ci:check` + `pnpm test:unit:run`;
-run `pnpm build` + `pnpm test:e2e` when e2e-affected specs changed). E2E suite
-counts change in phases 1, 3, 4 → update the `AGENTS.md` "currently S1-…"
-line **in the same phase** (`docs-drift.spec.ts` enforces it).
+### Phase A — enum, schema, migration
+- [ ] `enums.ts` — add `"OUT_FOR_PICKUP"` to `orderStatuses`.
+- [ ] `orders.ts` schema — add `outForPickupAt: ts("outForPickupAt")`.
+- [ ] `pnpm db:generate` then `pnpm db:push`; re-push the e2e DB.
+- [ ] `app/api/orders/[id]/route.ts:60` — project the new field.
+- [ ] `app/__tests__/test-utils.tsx` — `makeOrder` default `outForPickupAt: null`.
 
-### Phase 1 — Ongoing kanban board (new page, additive)
+### Phase B — transition + API
+- [ ] New `"out-for-pickup"` transition in `transitions.ts`, modelled on
+      `"out-for-delivery"`: `authorize` RIDER, `guard` =
+      `pickupRiderId === session.riderId` (403) **and** `status === "APPROVED"`
+      (400), `buildUpdate` = `{ status: "OUT_FOR_PICKUP", outForPickupAt: now }`.
+      No schema (no body), same as `out-for-delivery`.
+- [ ] `picked-up` guard (`transitions.ts:330`) — `APPROVED` → `OUT_FOR_PICKUP`,
+      and the error message must say so. **This is rule 2.**
+- [ ] `ORDER_DIFF_FIELDS` += `outForPickupAt`; `TRANSITION_LABELS` +=
+      `"out-for-pickup": "Marked out for pickup"`.
+- [ ] Audit the other guards that assume `APPROVED` is the pre-pickup state:
+      `assign-pickup-rider` (decision #4), `cancel` (decision #3), and any
+      admin/warehouse bulk action that whitelists statuses.
+- [ ] New `app/api/orders/[id]/out-for-pickup/route.ts`.
+- [ ] `use-orders.ts` — add `outForPickup(orderId)` beside `outForDelivery`.
+- [ ] `transitions.spec.ts` — new describe for `out-for-pickup` (happy path,
+      not-yours 403, not-APPROVED 400) **plus** a regression test that
+      `picked-up` now 400s while `APPROVED` and succeeds at `OUT_FOR_PICKUP`.
 
-- [x] `src/features/orders/kanban-grouping.ts` — pure grouping helpers:
-      `groupOngoingByStatus(rows)` (fixed column order: Approved → Picked up →
-      In warehouse → In transit → Out for delivery) and
-      `groupOngoingByRider(rows, riders)` (decision #3 next-leg rule + leading
-      Unassigned column). Colocated `kanban-grouping.spec.ts` pins the rule:
-      exactly one column per card, PICKED_UP under the pickup rider,
-      IN_WAREHOUSE under the delivery rider / Unassigned, empty columns for
-      riders with no load.
-- [x] `src/app/warehouse/ongoing/page.tsx` — `requireSession()` + WAREHOUSE_ADMIN
-      gate (copy `/warehouse/orders/page.tsx`), `buildWarehouseOrderScope`,
-      statuses = the 5 ongoing, ordered `createdAt asc`, direct `dbRead`,
-      `.limit(500)` (decision #8); if `rows.length === 500`, the client renders
-      a truncation notice ("showing 500 oldest — search or check Completed for
-      the rest"). Project the orders-page column set + delivery city join.
-- [x] `src/app/warehouse/ongoing/ongoing-client.tsx` —
-      `Tabs` group toggle (`data-testid="kanban-groupby-status" | "-riders"`),
-      column layout (header label + count badge, horizontally scrollable),
-      card = order code (opens `OrderDetailsDrawer`), recipient, city, weight,
-      collectible, status badge, holder rider name, contextual action button:
-      - APPROVED && !pickupRiderId → **Assign pickup** → `AssignPickupRiderDialog`
-      - PICKED_UP → **Receive** → `WarehouseReceiveDialog`
-      - IN_WAREHOUSE → **Dispatch** → `WarehouseDispatchDialog`
-      - others → no button (observe only)
-      Toolbar: **Auto-assign** button (visible/enabled only when ≥1
-      IN_WAREHOUSE card exists; ids = all IN_WAREHOUSE card ids, no selection →
-      `AutoAssignDialog`). After any dialog success: `router.refresh()`.
-      **No Cancel on cards** (decision #9).
-- [x] `src/app/warehouse/ongoing/ongoing.spec.tsx` — colocated unit spec:
-      renders both group modes, per-status action-button visibility, auto-assign
-      button hidden with no eligible cards, drawer opens on card click.
-- [x] Nav: add `{ href: "/warehouse/ongoing", label: "Ongoing", group: "Floor" }`
-      after `Order approval` slot; update `nav-config.spec.ts` label list.
-- [x] Copy: add `pageContent.warehouse.ongoing` in `src/config/content.ts`
-      (title/description functions, follow the existing warehouse entries).
-- [x] E2E: new `e2e/specs/34-warehouse-board.spec.ts`, describe **S78** —
-      board shows ongoing statuses only; group toggle switches to rider columns
-      (Unassigned present); Receive from a PICKED_UP card via new selectors in
-      `e2e/selectors.ts` (new `kanban` namespace). Update the `AGENTS.md`
-      suite line to the computed value.
+### Phase C — labels, timeline, badge
+- [ ] `constants.ts` — `ORDER_STATUS_LABELS` + `ORDER_STATUS_TONES`.
+- [ ] `order-timeline.ts` — `STATUS_RANK` rank + a step with
+      `outForPickupAt`; `tracking-timeline.tsx` — `stepDetails.OUT_FOR_PICKUP`
+      and check the `showFailedAfter` / `showReturnedAfter` branch keys.
+- [ ] `constants.spec.ts`, `order-timeline.spec.ts` — update counts.
+- [ ] `tsc --noEmit` clean.
 
-### Phase 2 — Order approval page (repurpose `/warehouse/orders`)
+### Phase D — rider UI
+- [ ] New `features/orders/dialogs/out-for-pickup-dialog.tsx`, cloned from
+      `out-for-delivery-dialog.tsx`.
+- [ ] `app/rider/page.tsx`:
+  - `toPickup` (`:111`) — `APPROVED` only → `APPROVED || OUT_FOR_PICKUP`
+    (both mean "not collected yet"), or the parcel disappears from the queue.
+  - `canStartPickup = status === "APPROVED"` → the "Out for pickup" button.
+  - pickup-confirm gate → `status === "OUT_FOR_PICKUP"` (**rule 1**).
+- [ ] `app/rider/pickup/page.tsx:171` — same two changes to `canPickup`.
+- [ ] `rider.spec.tsx`, `pickup.spec.tsx`, `delivery.spec.tsx` — assert the
+      new gating both ways (button present at APPROVED, pickup hidden; button
+      gone at OUT_FOR_PICKUP, pickup shown).
 
-- [x] `orders-client.tsx`: drop `FilterTab`/`TAB_STATUSES`/Tabs (and the
-      just-added `orders-tab-*` testids — superseded by decision #2), force
-      `setStatuses(["PENDING"])` on mount, drop the 6-card `StatCardList`
-      (the homepage owns stats now), keep approve/cancel row actions **and**
-      bulk approve/cancel (admin parity — decision #5 was about intake/dispatch
-      bulk only).
-- [x] `orders/spec` update: the "shows all status-matching orders…" test becomes
-      "wires the queue to PENDING only" (asserts `useOrders` received
-      `statuses: ["PENDING"]`); keep cancel-visibility/dialog tests.
-- [x] Nav label `Order progress` → **Order approval** (`nav-config.ts` +
-      `nav-config.spec.ts`).
-- [x] Copy: `pageContent.warehouse.orders` title/description → approval wording.
-- [x] E2E: S77 (`33-warehouse-approval.spec.ts`) must stay green unchanged —
-      ORD-100003E is pending and the search/actions testids don't move.
+### Phase E — `/warehouse/ongoing` + overview
+- [ ] `kanban-grouping.ts` — statuses, labels, **`nextLegRiderId`**.
+- [ ] `ongoing-client.tsx` — no action button for the new status.
+- [ ] `kanban-grouping.spec.ts`, `ongoing.spec.tsx` — 5 lanes → 6.
+- [ ] `warehouse/page.tsx:26` + `overview-client.tsx:48` — add the tile
+      (decision #2); `overview.spec.tsx` eight cards → nine, and re-check the
+      "no DELIVERED / no RETURNED card" assertions still hold.
 
-### Phase 3 — Completed page (new, read-only)
+### Phase F — remaining status lists + seed
+Audit every place `OUT_FOR_DELIVERY` is one entry of a status list — add the
+new status where it belongs, leave it alone where it does not:
+- [ ] `app/api/orders/summary/route.ts:28`
+- [ ] `app/merchant/orders/page.tsx:33,46,97` (tabs / stat lists)
+- [ ] `app/merchant/page.tsx:62`
+- [ ] `app/api/orders/auto-assign/route.ts:17` `ACTIVE_DELIVERY_STATUSES` —
+      **delivery-side; probably no change.** Confirm rather than assume.
+- [ ] `seed-content/orders.ts` — `ORDER_SEED_STATUSES` union + distribution +
+      the lifecycle-timestamp block (`:257-268`) + `outForPickupAt`.
 
-- [x] `src/app/warehouse/completed/page.tsx` — same gate/scope pattern;
-      statuses `[DELIVERED, CANCELLED, RETURNED]`; columns: order code,
-      recipient, delivery city, `deliveredAt` / `cancelledAt`+`cancelReason` /
-      `returnedAt`+`returnReason`, `amountCollected`, status; count + first 20
-      rows server-side.
-- [x] `src/app/warehouse/completed/completed-client.tsx` — `useOrders` with
-      `statuses: ["DELIVERED", "CANCELLED", "RETURNED"]` forced,
-      server-paginated search. **No actions column, no `bulkActions`, no
-      `selectedKeys`** — read-only by construction (decision #1).
-- [x] Status filter tabs **Delivered / Cancelled / Returned / All**, reusing the
-      `TAB_STATUSES` + `setStatuses` pattern from the approval page (no local
-      filtering). Carry the two columns Exceptions gives up:
-      `columnLabels.order.returnReason` and `resolvedBy` (render `—` /
-      `failedResolvedBy` for non-RETURNED rows, matching `exceptions-client.tsx:155-185`).
-- [x] **Trim Exceptions** (`src/app/warehouse/exceptions/`) to FAILED_ATTEMPT
-      only: drop the `RESOLVED` tab from `TAB_STATUSES` (line 49), the
-      `warehouseFailedOrders` RETURNED branch, the `resolvedBy`/`returnReason`
-      columns, and the resolved-count stat; `page.tsx:45` becomes
-      `inArray(order.status, ["FAILED_ATTEMPT"])`. Update `exceptions.spec.tsx`
-      — the `RESOLVED` cases (lines 79-128) go away; keep the FAILED_ATTEMPT ones.
-      **Drop the `Tabs` import and the `FilterTab` state entirely** (decision
-      #11) — no tab bar on a single-status page. The `canResolve` dropdown
-      (re-attempt / close as return) is the page's only affordance, so it stays
-      exactly as-is; only the RETURNED branches and the two columns are removed.
-- [x] `completed.spec.tsx` — asserts: renders all three statuses, the
-      `order-actions-*` buttons are absent everywhere, the status filter is
-      forced, and `returnReason` renders on a RETURNED row.
-- [x] `exceptions.spec.tsx` — asserts FAILED_ATTEMPT only, no tab bar at all,
-      and that the Resolve dropdown still offers both outcomes.
-- [x] Nav: add `/warehouse/completed` **Completed** to the Floor group (after
-      Ongoing) + `nav-config.spec.ts`.
-- [x] Copy: `pageContent.warehouse.completed`.
-- [x] E2E: new `e2e/specs/35-warehouse-completed.spec.ts`, describe **S79** —
-      page lists delivered/cancelled/returned rows and exposes no action menu.
-      `02-business-flows` S3/S4 stay green unchanged (they only assert a heading
-      on `/warehouse/exceptions`); add an assertion there that no `RESOLVED` tab
-      is present. Update the `AGENTS.md` suite line.
+### Phase G — e2e, docs, gate
+- [ ] e2e **S80** (below) in `02-business-flows.spec.ts` beside S78/S79.
+- [ ] Update S78's five-lane list to six; update S8 if decision #2 lands.
+- [ ] `AGENTS.md` suite line (`docs-drift.spec.ts` enforces it — currently
+      `S1-S79 across 35 files / 144 tests`).
+- [ ] Docs: `src/content/docs/warehouse-admin.md`, `CONTRIBUTING.md:285`
+      (transition list), the status→page ownership tables.
+- [ ] Full gate: `ci:check` → `tsc` → `test:unit:run` → `test:coverage` →
+      `build` → `test:e2e`.
 
-### Phase 4 — Stats-only homepage (intake queue removed)
+## E2E tests
 
-- [x] `src/app/warehouse/page.tsx` → server component: gate, then **two** cached
-      queries in one `Promise.all`:
-      1. `cachedStats(async (warehouseId) => …, { key: "warehouse-overview",
-         tags: [statTag("order")] })` — **one** `GROUP BY status` count over
-         `buildWarehouseOrderScope`, from which the six ongoing counts +
-         PENDING + FAILED_ATTEMPT are read off. DELIVERED/RETURNED are computed
-         by the same query but **not rendered** (decision #6).
-      2. A second `cachedStats` for the COD card, same `statTag("order")` tag so
-         one `refreshStats` invalidates both: `count(*)` where
-         `warehouseId = $1 AND status = 'DELIVERED' AND codSettledAt IS NULL`.
-         Copy the scope + tag shape from `getRiderCashInHand`
-         (`src/app/warehouse/cod-settlement/page.tsx:49-70`) — it already counts
-         exactly this set, and its comment explains why the caching is narrow
-         (the set only moves on delivery or settlement, both of which call
-         `refreshStats`).
-- [x] `src/app/warehouse/overview-client.tsx` — `PageHeader` + `StatCardList`
-      (keeps the dashboard spec pattern: props = counts, no db needed in jsdom).
-      Eight items in this order, matching the nav's mental model:
-      PENDING, APPROVED, PICKED_UP, IN_WAREHOUSE, IN_TRANSIT, OUT_FOR_DELIVERY,
-      FAILED_ATTEMPT, **COD to settle**. Icons from `lucide-react`, tones on the
-      `bg-chart-N/15 text-chart-N` scale like the settlement page's three cards
-      (`cod-settlement-client.tsx:259-281`).
-- [x] New labels group `statCardLabels.warehouse.overview.*` in
-      `src/config/stat-card-labels.ts` (follow the file's own conventions).
-      Reuse `warehouse.codSettlement.awaitingSettlement.label`
-      ("Waiting to be settled") for the COD card rather than inventing a near
-      synonym — same concept, one string. Do **not** repurpose the now-orphaned
-      `warehouse.orders.delivered` / `warehouse.exceptions.returned` labels; leave
-      them, other surfaces still reference the file's groups.
-- [x] **No link on the COD card.** Checked: `StatCardItem`
-      (`src/components/stat-card-list.tsx:3-12`) has no `href` slot, and
-      wrapping the card in an `<a>` would put an interactive element inside
-      another. Keep it a plain card. If the click-through is wanted later, the
-      clean change is an optional `href` on `StatCardItem` (shadcn `Card`
-      supports `render={…}`) as a **separate** task — out of scope here.
-- [x] **Delete** `src/app/warehouse/intake-client.tsx` and
-      `src/app/warehouse/warehouse-intake.spec.tsx`; replace with
-      `src/app/warehouse/overview.spec.tsx`:
-      - renders all **eight** cards with the expected values,
-      - asserts **no DELIVERED and no RETURNED** card label appears (decision #6
-        — the regression guard, otherwise someone re-adds them),
-      - asserts the `codToSettle` card renders and is **not** an anchor,
-      - asserts no table / no `bulk-receive` button (stats-only page).
-- [x] `useOrders`: remove now-unused `bulkReceiveOrders` (intake was its only
-      caller); update `test-utils.tsx` `createMockOrders` surface + any specs
-      referencing it.
-- [x] Nav: first item label `Intake queue` → **Overview** (icon → keep or
-      switch to a dashboard-ish icon) + `nav-config.spec.ts` +
-      `e2e/specs/10-activation.spec.ts:333` `sidebarLink("Intake queue")` →
-      `"Overview"`.
-- [x] Comment fix: `src/lib/db/order-scope.ts:20` references
-      `intake-client.tsx` → point at the board instead.
-- [x] E2E: `02-business-flows` S34 describe "Warehouse Intake" → "Warehouse
-      Overview" (same heading assertion; add stat-card visible / table absent);
-      `30-rider-cash` and `18-order-history` land on `/warehouse` and only need
-      a heading — verify unchanged. Update the `AGENTS.md` suite line if test
-      counts change.
+**S80. "Rider goes out for pickup before collecting"** — the flow the feature
+exists for:
 
-### Phase 5 — Dispatch desk removed
+1. Log in as the seeded rider, land on the pickup queue.
+2. An `APPROVED` parcel shows **Out for pickup** and does **not** offer
+   pickup confirmation.
+3. Call `PATCH /api/orders/:id/picked-up` directly → **400**, and the message
+   names the required status. This is the guard, asserted at the API because
+   the UI simply hides the control (a hidden button proves nothing about rule 2).
+4. Click **Out for pickup** → toast → status becomes `OUT_FOR_PICKUP`.
+5. Pickup confirmation is now offered → confirm → status `PICKED_UP`.
+6. Assert `/warehouse/ongoing` shows a sixth lane **Out for pickup** holding
+   that parcel (covers the `nextLegRiderId` rule).
 
-- [x] **Delete** `src/app/warehouse/dispatch/` (page, client, `dispatch.spec.tsx`).
-- [x] **Delete** `src/features/orders/dialogs/bulk-assign-pickup-rider-dialog.tsx`
-      and `bulk-dispatch-dialog.tsx` (decision #5); remove unused
-      `bulkAssignPickupRider` from `useOrders` — **keep `bulkDispatch`**
-      (`use-order-auto-assign.ts` applies plans through it) — and its
-      auto-assign dialog spec mocks.
-- [x] Nav: remove the **Dispatch desk** item + `nav-config.spec.ts`.
-- [x] E2E rewrites (same phase, suite stays green):
-  - `01-core-flows` S8: second `goto("/warehouse/dispatch")` → `/warehouse/ongoing`.
-  - `02-business-flows` S33 "view dispatch desk" → "view ongoing board"
-    (`/warehouse/ongoing`).
-  - `07-dispatch-planning` S74 test 1: navigate the board, click the toolbar
-    auto-assign (`bulk-auto-assign` testid reused on the toolbar button →
-    dialog assertions unchanged); drop the select-all preamble (toolbar
-    collects ids itself). Test 2 ("planning offered only where a dispatch
-    would be legal") → assert the toolbar button is absent when no
-    IN_WAREHOUSE cards exist (needs a board state with none — use the seed's
-    status mix or drive it via API). Test 3 (rider run sheet) untouched.
-  - `e2e/selectors.ts`: delete `intakeTable`, `dispatchPickupTable`,
-    `dispatchDeliveryTable`, `tabPickup`, `tabDelivery`, `bulkAssignDeliveryRider`,
-    `receiveButton`, `dispatchButton` (board namespace supersedes);
-    keep `selectAll`/`selectRow` (approval page still selects rows).
-- [x] Hygiene: `two-factor.spec.ts:64` fixture pathname `/warehouse/dispatch` →
-      a live route; grep `ROADMAP.md`, `CONTRIBUTING.md`, `src/landing` for
-      "dispatch desk"/"intake queue" wording.
+Existing tests expected to need edits: **S78** (lanes), **S8** (cards),
+`18-order-history.spec.ts` (drives `OUT_FOR_DELIVERY` through SQL), plus any
+spec asserting seeded status counts.
 
-### Phase 6 — Docs & ledger
+## Verification checklist
 
-- [x] `CONTRIBUTING.md` "Order table patterns by role": replace the
-      **Warehouse intake** row with **Warehouse approval** (pending queue,
-      actions) and add **Completed** (read-only) + a note that Ongoing is a
-      board, not a DataTable.
-- [x] `src/content/docs/warehouse-admin.md`: rewrite §2 (intake queue),
-      §3 (dispatch desk), §4 (order progress) into Overview / Order approval /
-      Ongoing / Completed flows — including "Receive from the card in the
-      Picked-up column" and "Auto-assign from the board toolbar". Rewrite the
-      exceptions section too: re-attempt / close-as-return stays, but where to
-      **find** closed returns moves to the Completed page's `Returned` tab.
-- [x] `pageContent.warehouse.exceptions` description
-      (`src/config/content.ts:132`) — drop the now-stale "resolve failed
-      attempts" framing if the page becomes a single-status queue.
-- [x] `src/config/content.ts` + `src/app/landing/page.tsx:138`: drop
-      "Intake queue, dispatch desk" wording.
-- [x] `AGENTS.md`: suite line (final computed count), and the spec-file examples
-      if any referenced removed files.
-- [x] Full gate: `pnpm ci:check` → `pnpm test:unit:run` → `pnpm test:coverage`
-      (floors hold — removed dispatch/intake specs are backfilled by
-      ongoing/completed/overview specs) → `pnpm build` → `pnpm test:e2e`.
-
-## Settled during planning (all confirmed)
-
-| # | Question | Decision |
-|---|----------|----------|
-| 8 | Board row cap? | **500 + truncation notice.** Enough for a live single-hub board; the notice points at search + Completed |
-| 9 | Cancel on kanban cards? | **No.** Card actions stay Receive / Assign pickup / Dispatch. PENDING cancel stays on the approval page, admin cancel unchanged |
-| 10 | Toolbar Auto-assign scope? | **All IN_WAREHOUSE cards on the board.** No selection — this is what let the bulk dialogs go (decision #5) |
-| 11 | Exceptions page shape? | **Drop the Tabs, keep the table.** One status means one tab is noise; the table + its Resolve dropdown is the whole page |
-
-No open points remain. If a phase surfaces a genuine fork, it gets a new
-decision row above rather than an assumption buried in a checklist item.
-
-## Verification checklist (final)
-
-- [x] `/warehouse` shows **eight** stat cards only — no table, no Receive button.
-      Cards: PENDING, APPROVED, PICKED_UP, IN_WAREHOUSE, IN_TRANSIT,
-      OUT_FOR_DELIVERY, FAILED_ATTEMPT, COD to settle. **No DELIVERED card, no
-      RETURNED card.** (`overview.spec.tsx` asserts the eight *and* that neither
-      closed-archive label appears.)
-- [x] The COD card equals `count(DELIVERED AND codSettledAt IS NULL)` for the
-      warehouse — cross-check against `/warehouse/cod-settlement`'s own
-      "Waiting to be settled" number; settling an order there moves the card.
-      (Both use the identical predicate: `warehouse/page.tsx` and
-      `api/orders/counts` filter `warehouseId AND status='DELIVERED' AND
-      codSettledAt IS NULL`, and share the `statTag("order")` invalidation.)
-- [x] `/warehouse/orders` lists only PENDING; approve/cancel still work (S77
-      green).
-- [x] `/warehouse/ongoing` groups by status **and** by rider; each card appears
-      in exactly one rider column; Receive/Assign/Dispatch reachable per card;
-      auto-assign toolbar works and hides when nothing is eligible. (S78 asserts
-      the two views total the same number of cards.)
-- [x] `/warehouse/completed` shows DELIVERED + CANCELLED + RETURNED with zero
-      action controls; `returnReason` / `resolvedBy` visible on the `Returned`
-      tab. (S79 green.)
-- [x] `/warehouse/exceptions` shows FAILED_ATTEMPT only, with no tab bar and no
-      orphaned return columns; Resolve still re-attempts and closes as return.
-      (S3/S4 assert no tab is present.)
-- [x] No route to `/warehouse/dispatch`; nav has no Intake/Dispatch entries;
-      `warehouse-admin.md` and landing copy match reality. (Route table from
-      `pnpm build`, `nav-config.spec.ts`, S42.)
-- [x] `pnpm ci:check`, `pnpm test:unit:run`, `pnpm test:coverage`,
-      `pnpm build`, `pnpm test:e2e` all green; `AGENTS.md` counts accurate —
-      **S1-S79 across 35 files / 143 tests**.
+- [ ] Flow is `APPROVED → OUT_FOR_PICKUP → PICKED_UP → … → OUT_FOR_DELIVERY →
+      DELIVERED`, and nothing else reaches `PICKED_UP`.
+- [ ] `picked-up` returns 400 while `APPROVED` (rule 2, API-level).
+- [ ] Rider sees "Out for pickup" only while `APPROVED`, and only for their own
+      parcel (403 otherwise).
+- [ ] `/warehouse/ongoing` has six lanes; an `OUT_FOR_PICKUP` parcel sits under
+      **its pickup rider**, never Unassigned.
+- [ ] Overview count + badge + timeline all show the new status.
+- [ ] e2e DB re-pushed before the suite runs; `pnpm test:e2e` green.
+- [ ] Full gate green, `AGENTS.md` counts accurate.
