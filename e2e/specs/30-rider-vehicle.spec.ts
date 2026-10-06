@@ -26,22 +26,22 @@ function rows(json: unknown): Array<Record<string, unknown>> {
 // does not reseed between local runs.
 const RUN = Date.now()
 const APPLICANT = {
-  name: `S69 Vehicle ${RUN}`,
-  email: `s69-vehicle-${RUN}@test.com`,
+  name: `3001 Vehicle ${RUN}`,
+  email: `s3001-vehicle-${RUN}@test.com`,
   phone: "01712345678",
   zone: "Dhaka South",
   address: "12 Test Road, Dhanmondi",
   nidNumber: "9876543210",
   warehouseId: WAREHOUSE_ID,
-  password: "s69-passw0rd",
+  password: "s3001-passw0rd",
 }
 
-// ─── S69. Rider vehicle through registration and approval ─────────────────────
+// ─── 3001. Rider vehicle through registration and approval ─────────────────────
 // Two halves that have to line up: the registration form must collect the
 // vehicle, and the approval form must show what it collected. Both used to be
 // missing — and even once collected, the approval list never returned it, so
 // the reviewer saw an empty field while the type claimed the value existed.
-test.describe("S69. Rider vehicle registration and approval", () => {
+test.describe("3001. Rider vehicle registration and approval", () => {
   test("the registration form asks for a vehicle, and a plate only when it applies", async ({
     page,
   }) => {

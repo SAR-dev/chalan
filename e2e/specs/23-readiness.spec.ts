@@ -2,12 +2,12 @@ import "dotenv/config"
 
 import { expect, test } from "@playwright/test"
 
-// ─── S54. Readiness probe ────────────────────────────────────
+// ─── 2301. Readiness probe ────────────────────────────────────
 //
 // `/api/ready` must run a real dependency check (DB `SELECT 1`); `/api/health`
 // stays a liveness probe with no DB dependency.
 
-test.describe("S54. Readiness probe", () => {
+test.describe("2301. Readiness probe", () => {
   test("reports healthy when the database is reachable", async ({
     request,
   }) => {

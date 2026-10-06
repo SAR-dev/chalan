@@ -74,7 +74,7 @@ async function restoreState(
   }
 }
 
-test.describe("S38. User management", () => {
+test.describe("0901. User management", () => {
   test("admin can reset a password and ban/unban a user", async ({
     page,
     request,

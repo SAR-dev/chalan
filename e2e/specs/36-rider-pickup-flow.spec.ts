@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import { riderPickup } from "../selectors"
 
-// ─── S80. Rider goes out for pickup ──────────────────────────────────────────
+// ─── 3601. Rider goes out for pickup ──────────────────────────────────────────
 
 /**
  * The collection leg got its own state, mirroring Out-for-delivery on the
@@ -30,7 +30,7 @@ import { riderPickup } from "../selectors"
 const TARGET = "ORD-100009E"
 const RIDER_ID = "RID-100001E" // rider1, seeded PICKUP-only
 
-test.describe("S80. Rider goes out for pickup", () => {
+test.describe("3601. Rider goes out for pickup", () => {
   test("a rider must go out for pickup before collecting", async ({ page }) => {
     // 1. Warehouse admin hands the APPROVED parcel to a pickup rider.
     await login(page, CREDS.warehouseAdmin)

@@ -2635,15 +2635,17 @@ e2e/
   specs/
     01-core-flows.spec.ts       # login per role, order lifecycle, warehouse/rider flows
     02-business-flows.spec.ts   # order ops, warehouse dispatch/intake/exceptions
-    03-onboarding.spec.ts       # merchant onboarding + registration gate
+    03-merchant-registration.spec.ts       # merchant onboarding + registration gate
     04-tracking-identity.spec.ts   # merchant sidebar identity + tracking token
     05-two-factor.spec.ts       # 2FA enrollment + TOTP login for admins
     06-support.spec.ts          # support ticket create → admin reply
+    …                              # 07–37 continue in the same shape
 ```
 
-**51 tests total** across 6 spec files. Every `test.describe` carries a unique
-scenario id in `S<number>. <Name>` format (currently **S1–S37**, no gaps, no
-duplicates).
+**149 tests total** across 37 spec files. Every `test.describe` carries a unique
+scenario id in `<file number><index>. <Name>` format — `2901.` is the first
+scenario in `29-sign-out.spec.ts`. Ids are scoped to their file, so a deletion
+renumbers that one file and leaves no gap.
 
 #### Configuration
 
@@ -2713,8 +2715,8 @@ pnpm test:e2e
 
 ```bash
 pnpm test:e2e -g "renders rider management"   # single test by name
-pnpm test:e2e e2e/specs/03-onboarding.spec.ts # single file
-pnpm test:e2e e2e/specs/03-onboarding.spec.ts:34  # single test at line
+pnpm test:e2e e2e/specs/03-merchant-registration.spec.ts # single file
+pnpm test:e2e e2e/specs/03-merchant-registration.spec.ts:34  # single test at line
 ```
 
 #### Debugging
@@ -2739,10 +2741,11 @@ auth, money, roles or the order lifecycle.
 
 1. **Sign in with the shared helper** — `await login(page, CREDS.merchant)` from
    `e2e/helpers.ts`. Never re-implement the fill/press/wait sequence.
-2. **Name the describe `S<number>. <Scenario>`** — unique serial id; continue
-   from the highest existing number (grep `test.describe("S` across
-   `e2e/specs/` for the current max — currently S1–S37). Never reuse or skip
-   numbers, and never leave a describe unprefixed.
+2. **Name the describe `<file number><index>. <Scenario>`.** The prefix is
+   the file's own two-digit number; the index is the next free one *in that
+   file* (grep `test.describe("` in the file — there is no cross-file "current
+   max" to look up). Renumber the file after a deletion. Never leave a describe
+   unprefixed.
 3. **Use `CREDS` / seed constants** — don't hardcode emails, passwords, codes,
    or IDs in a spec; take them from `e2e/helpers.ts` or
    `src/lib/db/seed/seed-content.ts`.

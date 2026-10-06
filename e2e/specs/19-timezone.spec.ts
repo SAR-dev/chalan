@@ -4,7 +4,7 @@ import { type APIRequestContext, expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS } from "../helpers"
 
-// ─── S50. Business timezone ──────────────────────────────────
+// ─── 1901. Business timezone ──────────────────────────────────
 //
 // The business runs in Asia/Dhaka (UTC+6) but containers/database default to
 // UTC. Day-bucketed analytics and date-range filters must use the Dhaka
@@ -49,7 +49,7 @@ async function ordersByDay(
   return new Map(json.ordersByDay.map((d) => [d.date, d.count]))
 }
 
-test.describe("S50. Business timezone (Asia/Dhaka)", () => {
+test.describe("1901. Business timezone (Asia/Dhaka)", () => {
   test("day buckets and date ranges use the Dhaka calendar day", async ({
     request,
   }) => {

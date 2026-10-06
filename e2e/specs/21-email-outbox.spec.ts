@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 
-// ─── S52. Email outbox ───────────────────────────────────────
+// ─── 2101. Email outbox ───────────────────────────────────────
 //
 // A domain write commits its email as an `email_outbox` row; if the process
 // dies before delivery, the drain cron still sends it. Here we simulate the
@@ -23,20 +23,20 @@ async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   }
 }
 
-test.describe("S52. Email outbox", () => {
+test.describe("2101. Email outbox", () => {
   test("the drain cron delivers a row left behind by a dead request", async ({
     request,
   }) => {
     const secret = process.env.CRON_SECRET
     expect(secret, "CRON_SECRET must be set for this spec").toBeTruthy()
-    const subject = `S52 outbox ${Date.now()}`
+    const subject = `2101 outbox ${Date.now()}`
 
     const id = await withDb(async (client) => {
       const rowId = randomUUID()
       await client.query(
         `INSERT INTO email_outbox (id, "to", subject, text, status)
          VALUES ($1, $2, $3, $4, 'PENDING')`,
-        [rowId, "s52@example.com", subject, "outbox delivery test"],
+        [rowId, "s2101@example.com", subject, "outbox delivery test"],
       )
       return rowId
     })

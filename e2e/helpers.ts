@@ -52,7 +52,7 @@ const AUTHENTICATED_URL = /\/(merchant|dashboard|warehouse|rider)/
  *
  * Cookies are cleared first: starting a login while a prior session is active
  * makes the login page redirect an already-authed user away before the form can
- * be submitted (e.g. S1 logs in as merchant, then as admin).
+ * be submitted (e.g. 0101 logs in as merchant, then as admin).
  */
 export async function login(
   page: Page,

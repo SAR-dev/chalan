@@ -3,7 +3,7 @@ import "dotenv/config"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 
-// ─── S46. Server-side session gates ──────────────────────────
+// ─── 1501. Server-side session gates ──────────────────────────
 //
 // The 2FA-policy and merchant-email-verification rules used to be enforced in
 // the browser only, so any authenticated session could call the APIs directly.
@@ -29,7 +29,7 @@ async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
 const PASSWORD = "testpass123"
 const merchant = { email: "", password: PASSWORD }
 
-test.describe("S46. Server-side session gates", () => {
+test.describe("1501. Server-side session gates", () => {
   test.beforeAll(async ({ request }) => {
     merchant.email = `e2e-gate-${Date.now()}@test.com`
     const reg = await request.post("/api/merchants", {

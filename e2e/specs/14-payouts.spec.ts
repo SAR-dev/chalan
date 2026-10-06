@@ -4,7 +4,7 @@ import { type APIRequestContext, expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS } from "../helpers"
 
-// ─── S45. Payout settlement ──────────────────────────────────
+// ─── 1401. Payout settlement ──────────────────────────────────
 
 async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   if (!process.env.DATABASE_URL) {
@@ -30,7 +30,7 @@ async function signInAsAdmin(request: APIRequestContext) {
   expect(res.ok()).toBeTruthy()
 }
 
-test.describe("S45. Payout settlement", () => {
+test.describe("1401. Payout settlement", () => {
   test("bulk mark-paid writes the ledger and debits the balance exactly once", async ({
     request,
   }) => {

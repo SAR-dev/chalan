@@ -3,7 +3,7 @@ import { CREDS, login, toast, waitForAppReady } from "../helpers"
 import { settings } from "../selectors"
 
 /**
- * S67. The toast must be usable on a phone.
+ * 2801. The toast must be usable on a phone.
  *
  * Layout cannot be asserted in jsdom, so the three requirements — almost full
  * width, a gutter so it does not touch either edge, and correct positioning —
@@ -40,7 +40,7 @@ async function measure(
   return { x: box.x, width: box.width, right: box.x + box.width }
 }
 
-test.describe("S67. Toast responsiveness", () => {
+test.describe("2801. Toast responsiveness", () => {
   test.describe("mobile", () => {
     test.use({ viewport: MOBILE })
 

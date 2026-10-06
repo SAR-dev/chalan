@@ -15,7 +15,7 @@ async function openRightNavAndSignOut(page: import("@playwright/test").Page) {
   await page.locator(auth.logout).click()
 }
 
-test.describe("S68. Sign-out confirmation", () => {
+test.describe("2901. Sign-out confirmation", () => {
   test("clicking Sign out asks first instead of ending the session", async ({
     page,
   }) => {
@@ -89,7 +89,7 @@ test.describe("S68. Sign-out confirmation", () => {
   })
 })
 
-test.describe("S72. Sign-out confirmation - mobile", () => {
+test.describe("2902. Sign-out confirmation - mobile", () => {
   test.use({ viewport: { width: 375, height: 812 } })
 
   test("the account panel asks before signing out", async ({ page }) => {

@@ -5,7 +5,7 @@ import { CREDS, login, waitForAppReady } from "../helpers"
 import { deliveryCities, nav, pricing } from "../selectors"
 
 /**
- * Merchant-side pricing reference (S64–S65).
+ * Merchant-side pricing reference (2701–2702).
  *
  * Zone pricing is per lane, so the two things a merchant needs before booking
  * are "where can I deliver?" and "what does each route cost?". Both are
@@ -20,7 +20,7 @@ const DIVISIONAL = "DZ-100002E"
 const CITY_DHAKA = "DC-100001E"
 const CITY_RANGPUR = "DC-100007E"
 
-test.describe("S64. Merchant Delivery Cities", () => {
+test.describe("2701. Merchant Delivery Cities", () => {
   test("lists every city under its zone, and search narrows the list", async ({
     page,
   }) => {
@@ -65,7 +65,7 @@ test.describe("S64. Merchant Delivery Cities", () => {
   })
 })
 
-test.describe("S65. Merchant zone rate matrix", () => {
+test.describe("2702. Merchant zone rate matrix", () => {
   test("shows each lane's base rate and the full rates on select", async ({
     page,
   }) => {

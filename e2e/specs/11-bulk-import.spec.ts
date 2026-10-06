@@ -69,8 +69,8 @@ async function openOrdersPage(page: any) {
   await waitForAppReady(page)
 }
 
-// ─── S40. CSV bulk import ────────────────────────────────────────────────────
-test.describe("S40. CSV bulk import", () => {
+// ─── 1101. CSV bulk import ────────────────────────────────────────────────────
+test.describe("1101. CSV bulk import", () => {
   test("merchant uploads a CSV, fixes the errors, and imports", async ({
     page,
   }) => {

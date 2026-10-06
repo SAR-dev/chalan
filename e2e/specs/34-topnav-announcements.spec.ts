@@ -9,14 +9,14 @@ import {
   topnav,
 } from "../selectors"
 
-// ─── S75. TopNav & RightNav ─────────────────────────────────────────────────
+// ─── 3401. TopNav & RightNav ─────────────────────────────────────────────────
 //
 // The header replaced the sidebar footer + mobile header as the home of the
 // account actions. These tests pin the three surfaces that did not exist
 // before: menu search (command palette), the avatar → RightNav panel, and the
-// sign-out route through it (S68/S72 cover the confirmation itself).
+// sign-out route through it (2901/2902 cover the confirmation itself).
 
-test.describe("S75. TopNav & RightNav", () => {
+test.describe("3401. TopNav & RightNav", () => {
   test("menu search filters nav items and Enter navigates", async ({
     page,
   }) => {
@@ -139,7 +139,7 @@ test.describe("S75. TopNav & RightNav", () => {
   })
 })
 
-// ─── S76. Announcements (badge, feed, detail page, markdown) ─────────────────
+// ─── 3402. Announcements (badge, feed, detail page, markdown) ─────────────────
 //
 // Announcements are a board, not a notification feed: the badge counts
 // announcements published since `profile.announcementsSeenAt`, visiting the
@@ -147,7 +147,7 @@ test.describe("S75. TopNav & RightNav", () => {
 // The reload assertions are the cross-device proof — server state, not a
 // per-browser localStorage key.
 
-test.describe("S76. Announcements", () => {
+test.describe("3402. Announcements", () => {
   test("visiting the feed drains the badge, and it stays drained across a reload", async ({
     page,
   }) => {

@@ -5,8 +5,8 @@ import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import { identity, tracking } from "../selectors"
 
-// ─── S56. Merchant sidebar identity ──────────────────────────
-test.describe("S56. Merchant sidebar identity", () => {
+// ─── 0401. Merchant sidebar identity ──────────────────────────
+test.describe("0401. Merchant sidebar identity", () => {
   test("the merchant sidebar shows the business name, not a logo", async ({
     page,
   }) => {
@@ -18,8 +18,8 @@ test.describe("S56. Merchant sidebar identity", () => {
   })
 })
 
-// ─── S43. Public tracking token ──────────────────────────────────────
-test.describe("S43. Public tracking token", () => {
+// ─── 0402. Public tracking token ──────────────────────────────────────
+test.describe("0402. Public tracking token", () => {
   /**
    * Pick any seeded order that is still actionable (the receiver note is
    * rejected once an order is DELIVERED / RETURNED / CANCELLED) and read its

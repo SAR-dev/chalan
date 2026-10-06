@@ -5,7 +5,7 @@ import { CREDS, login, toast, waitForAppReady } from "../helpers"
 import { dashboard, settings } from "../selectors"
 
 /**
- * Zone-pricing coverage and the settings split (S62–S63).
+ * Zone-pricing coverage and the settings split (2601–2602).
  *
  * Delivery, COD and cancellation rates are per-lane `zone_pricing` rows with no
  * platform-wide fallback, so the super admin needs a place to see which lanes
@@ -13,7 +13,7 @@ import { dashboard, settings } from "../selectors"
  * left — whether a cancelled order is refunded.
  */
 
-test.describe("S62. Zone pricing coverage checklist", () => {
+test.describe("2601. Zone pricing coverage checklist", () => {
   test("the dashboard lists lanes with no configured rate", async ({
     page,
   }) => {
@@ -50,7 +50,7 @@ test.describe("S62. Zone pricing coverage checklist", () => {
   })
 })
 
-test.describe("S63. Settings — cancellation policy", () => {
+test.describe("2602. Settings — cancellation policy", () => {
   test("settings keeps the cancellation policy, not a platform-wide price list", async ({
     page,
   }) => {

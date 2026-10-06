@@ -187,8 +187,8 @@ async function activateFromEmail(
   await expect(page.locator(activated.title)).toBeVisible()
 }
 
-// S41. Merchant moderator accounts
-test.describe("S41. Merchant moderator accounts", () => {
+// 1201. Merchant moderator accounts
+test.describe("1201. Merchant moderator accounts", () => {
   test("admin sets quota and the owner invites moderators", async ({
     page,
   }) => {
@@ -326,8 +326,8 @@ test.describe("S41. Merchant moderator accounts", () => {
   })
 })
 
-// S42. Warehouse admin activation
-test.describe("S42. Warehouse admin activation", () => {
+// 1202. Warehouse admin activation
+test.describe("1202. Warehouse admin activation", () => {
   test("admin creates an invite, resends it, and the invitee activates", async ({
     page,
   }) => {

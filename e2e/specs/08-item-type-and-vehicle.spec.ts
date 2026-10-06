@@ -28,14 +28,14 @@ function rows(json: unknown): Array<Record<string, unknown>> {
   return Array.isArray(data) ? data : []
 }
 
-// ─── S66. Item type + rider vehicle + pricing view toggle ─────────────────────
+// ─── 0801. Item type + rider vehicle + pricing view toggle ─────────────────────
 // The three fields added in this round are all read-only-to-others data: a
 // merchant states what is in a parcel, an admin records what a rider rides, and
 // an admin reads the same rates in two shapes. Each test drives the write
 // through the API (so the fixture is exact) and then asserts it is actually
 // visible where the reader looks for it — a field that persists but never
 // renders is the failure mode these are here to catch.
-test.describe("S66. Item type, rider vehicle, and pricing view", () => {
+test.describe("0801. Item type, rider vehicle, and pricing view", () => {
   test("merchant states the item type and the rider sees it when collecting", async ({
     page,
   }) => {

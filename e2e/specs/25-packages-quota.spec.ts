@@ -6,7 +6,7 @@ import { CREDS, login, toast, waitForAppReady } from "../helpers"
 import { dialog, orders, packages } from "../selectors"
 
 /**
- * Bundle quota accounting (S61).
+ * Bundle quota accounting (2501).
  *
  * Two invariants that only a real batch can prove:
  *
@@ -42,7 +42,7 @@ function csvRow(recipient: string): string[] {
     recipient,
     "01712345678",
     CITY,
-    "123 S61 Street Dhaka",
+    "123 2501 Street Dhaka",
     "1",
     "500",
     "STANDARD",
@@ -54,7 +54,7 @@ function csvRow(recipient: string): string[] {
 function csvFile(recipients: string[]) {
   const rows = [HEADER_CELLS, ...recipients.map(csvRow)]
   return {
-    name: "s61-bulk.csv",
+    name: "s2501-bulk.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(rows.map((c) => c.join(",")).join("\r\n"), "utf8"),
   }
@@ -150,8 +150,8 @@ async function bundleUsageOnPage(page: Page): Promise<number> {
   return Number(await counter.textContent())
 }
 
-// ─── S61. Quota refunds and tier-boundary pricing ────────────────────────────
-test.describe("S61. Bundle quota refunds and tier boundaries", () => {
+// ─── 2501. Quota refunds and tier-boundary pricing ────────────────────────────
+test.describe("2501. Bundle quota refunds and tier boundaries", () => {
   test("cancelling an order gives its bundle quota back", async ({ page }) => {
     await setBundleUsage(60)
     await login(page, CREDS.merchant)
@@ -173,7 +173,7 @@ test.describe("S61. Bundle quota refunds and tier boundaries", () => {
     await expect(page.locator(dialog.formDialog)).toBeVisible()
     await page
       .locator(orders.cancelReasonInput)
-      .fill("S61: parcel never shipped")
+      .fill("2501: parcel never shipped")
     await page.locator(orders.cancelOrderSubmit).click()
     await expect(toast(page, `${orderId} has been cancelled.`)).toBeVisible({
       timeout: 15_000,

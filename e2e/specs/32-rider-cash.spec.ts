@@ -8,7 +8,7 @@ const CASH_URL = "/warehouse/rider-cash"
 const CASH_API = "/api/riders/cash"
 
 /**
- * Warehouse rider-cash holdings (S71).
+ * Warehouse rider-cash holdings (3201).
  *
  * The page used to hold its rows in `useState` behind a local `loading` flag and
  * gate the entire table on it, so any remount replaced rows the server still had
@@ -25,7 +25,7 @@ const CASH_API = "/api/riders/cash"
  * The page also had no inbound nav link at all — it was reachable only by typing
  * the URL, so the sidebar entry is asserted here too.
  */
-test.describe("S71. Warehouse rider cash holdings", () => {
+test.describe("3201. Warehouse rider cash holdings", () => {
   test("is reachable from the warehouse sidebar", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse")

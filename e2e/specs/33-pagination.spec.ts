@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import { orders, pagination } from "../selectors"
 
-// ─── S73. Server-side pagination ─────────────────────────────────────────────
+// ─── 3301. Server-side pagination ─────────────────────────────────────────────
 //
 // The four footer controls under every list page carried no
 // `data-testid` at all, and `e2e/` never referenced them — so server-side
@@ -50,7 +50,7 @@ async function openOrdersAsAdmin(page: import("@playwright/test").Page) {
   await waitForAppReady(page)
 }
 
-test.describe("S73. Server-side pagination", () => {
+test.describe("3301. Server-side pagination", () => {
   test("the footer reports the whole result set, not the visible rows", async ({
     page,
   }) => {

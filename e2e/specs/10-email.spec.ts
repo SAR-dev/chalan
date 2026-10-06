@@ -81,8 +81,8 @@ function expectRedirect(res: { status(): number }) {
   expect(res.status()).toBeLessThan(400)
 }
 
-// ─── S39. Change email ──────────────────────────────────────────────────────
-test.describe("S39. Change email", () => {
+// ─── 1001. Change email ──────────────────────────────────────────────────────
+test.describe("1001. Change email", () => {
   test("merchant changes their own login email via the verification link", async ({
     page,
   }) => {

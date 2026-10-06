@@ -11,7 +11,7 @@ const BASE_URL = "http://localhost:3000"
  * `seed-content/users.ts`): every seeded order belongs to WH-100001E (Dhaka
  * Central Hub), which `warehouse.admin1` manages; the first eight orders are
  * PENDING and `itemType` is null whenever `i % 3 === 0` — so ORD-100003E is a
- * pending order that states its contents. S70 only *confirms* ORD-100002E,
+ * pending order that states its contents. 3101 only *confirms* ORD-100002E,
  * leaving 100003E awaiting approval for whoever runs first.
  */
 
@@ -26,12 +26,12 @@ async function loginContext(cred: { email: string; password: string }) {
   return ctx
 }
 
-// ─── S77. Warehouse approves an order ────────────────────────────────────────
+// ─── 3501. Warehouse approves an order ────────────────────────────────────────
 // Approve used to be SUPER_ADMIN-only; the warehouse hub now approves the
 // orders it physically handles, with an ownership guard keeping it to its own
 // hub (that guard is unit-pinned in transitions.spec.ts — here we prove the
 // happy path end to end through the UI).
-test.describe("S77. Warehouse approves an order", () => {
+test.describe("3501. Warehouse approves an order", () => {
   test("the warehouse admin approves a pending order in their own hub", async ({
     page,
   }) => {

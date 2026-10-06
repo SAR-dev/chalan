@@ -40,11 +40,11 @@ async function openApproveDialog(
   await page.locator(orders.reviewOrder(orderId)).click()
 }
 
-// ─── S70. Admin approves an order ────────────────────────────────────────────
+// ─── 3101. Admin approves an order ────────────────────────────────────────────
 // The confirmation an *admin* sees — the surface item 4.2 of the requirements
-// adds the item type to. Approve now also accepts the warehouse hub (S77);
+// adds the item type to. Approve now also accepts the warehouse hub (3501);
 // the role split lives in the approve transition, not in this dialog.
-test.describe("S70. Admin approves an order", () => {
+test.describe("3101. Admin approves an order", () => {
   test("the confirmation shows what is in the parcel", async ({ page }) => {
     await openApproveDialog(page, WITH_CONTENTS.id)
 

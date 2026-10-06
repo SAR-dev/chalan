@@ -496,7 +496,7 @@ export const tracking = {
   noteLocked: "[data-testid='receiver-note-locked']",
 }
 
-// --- Merchants (moderators) + staff activation (S41/S42) ---
+// --- Merchants (moderators) + staff activation (1201/1202) ---
 export const moderators = {
   card: "[data-testid='moderators-card']",
   add: "[data-testid='add-moderator']",

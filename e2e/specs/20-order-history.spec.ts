@@ -4,7 +4,7 @@ import { type APIRequestContext, expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { CREDS } from "../helpers"
 
-// ─── S51. Order status history ───────────────────────────────
+// ─── 2001. Order status history ───────────────────────────────
 //
 // Every lifecycle transition writes an append-only `order_status_history` row
 // in the same transaction. A `reattempt` clears the failure fields on the
@@ -40,7 +40,7 @@ async function signIn(
   expect(res.ok()).toBeTruthy()
 }
 
-test.describe("S51. Order status history", () => {
+test.describe("2001. Order status history", () => {
   test("reattempt preserves the prior failed attempt in the history", async ({
     request,
   }) => {

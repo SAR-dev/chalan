@@ -13,8 +13,8 @@ import {
   warehouse,
 } from "../selectors"
 
-// ─── S2. Merchant Registration ─────────────────────────────────────────────────
-test.describe("S2. Merchant Registration", () => {
+// ─── 0201. Merchant Registration ─────────────────────────────────────────────────
+test.describe("0201. Merchant Registration", () => {
   test("user can access registration page", async ({ page }) => {
     await page.goto("/register")
     await waitForAppReady(page)
@@ -31,8 +31,8 @@ test.describe("S2. Merchant Registration", () => {
   })
 })
 
-// ─── S3. Order Exception — Failed → Reattempt ────────────────────────────────
-test.describe("S3. Failed → Reattempt → Delivery", () => {
+// ─── 0202. Order Exception — Failed → Reattempt ────────────────────────────────
+test.describe("0202. Failed → Reattempt → Delivery", () => {
   test("exceptions lists only the parcels still awaiting a decision", async ({
     page,
   }) => {
@@ -50,8 +50,8 @@ test.describe("S3. Failed → Reattempt → Delivery", () => {
   })
 })
 
-// ─── S4. Failed → Return to Sender ──────────────────────────────────────────
-test.describe("S4. Failed → Return", () => {
+// ─── 0203. Failed → Return to Sender ──────────────────────────────────────────
+test.describe("0203. Failed → Return", () => {
   test("warehouse admin can view exceptions for return", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse/exceptions")
@@ -62,8 +62,8 @@ test.describe("S4. Failed → Return", () => {
   })
 })
 
-// ─── S5. Merchant Self-Cancellation ──────────────────────────────────────────
-test.describe("S5. Merchant Self-Cancellation", () => {
+// ─── 0204. Merchant Self-Cancellation ──────────────────────────────────────────
+test.describe("0204. Merchant Self-Cancellation", () => {
   test("merchant can view orders and cancel button exists", async ({
     page,
   }) => {
@@ -78,8 +78,8 @@ test.describe("S5. Merchant Self-Cancellation", () => {
   })
 })
 
-// ─── S7. Bulk Order Operations ───────────────────────────────────────────────
-test.describe("S7. Bulk Order Operations", () => {
+// ─── 0205. Bulk Order Operations ───────────────────────────────────────────────
+test.describe("0205. Bulk Order Operations", () => {
   test("admin can access bulk actions on orders page", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/orders")
@@ -88,8 +88,8 @@ test.describe("S7. Bulk Order Operations", () => {
   })
 })
 
-// ─── S11. Payout Rejection ──────────────────────────────────────────────────
-test.describe("S11. Payout Rejection", () => {
+// ─── 0206. Payout Rejection ──────────────────────────────────────────────────
+test.describe("0206. Payout Rejection", () => {
   test("admin can view payout list", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/payouts")
@@ -98,8 +98,8 @@ test.describe("S11. Payout Rejection", () => {
   })
 })
 
-// ─── S13. Zone-Based Order Pricing ───────────────────────────────────────────
-test.describe("S13. Zone-Based Order Pricing", () => {
+// ─── 0207. Zone-Based Order Pricing ───────────────────────────────────────────
+test.describe("0207. Zone-Based Order Pricing", () => {
   test("order form loads correctly", async ({ page }) => {
     await login(page, CREDS.merchant)
     await page.goto("/merchant/orders/new")
@@ -109,8 +109,8 @@ test.describe("S13. Zone-Based Order Pricing", () => {
   })
 })
 
-// ─── S14. Delivery City Management ───────────────────────────────────────────
-test.describe("S14. Delivery City Management", () => {
+// ─── 0208. Delivery City Management ───────────────────────────────────────────
+test.describe("0208. Delivery City Management", () => {
   test("admin can view and create cities", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/delivery-cities")
@@ -127,8 +127,8 @@ test.describe("S14. Delivery City Management", () => {
   })
 })
 
-// ─── S15. Rider Application → Delivery ───────────────────────────────────────
-test.describe("S15. Rider Application", () => {
+// ─── 0209. Rider Application → Delivery ───────────────────────────────────────
+test.describe("0209. Rider Application", () => {
   test("rider application page has all fields", async ({ page }) => {
     await page.goto("/apply/rider")
     await waitForAppReady(page)
@@ -140,8 +140,8 @@ test.describe("S15. Rider Application", () => {
   })
 })
 
-// ─── S20. Announcement Lifecycle ──────────────────────────────────────────────
-test.describe("S20. Announcement Lifecycle", () => {
+// ─── 0210. Announcement Lifecycle ──────────────────────────────────────────────
+test.describe("0210. Announcement Lifecycle", () => {
   test("admin can view announcements page", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/announcements")
@@ -157,8 +157,8 @@ test.describe("S20. Announcement Lifecycle", () => {
   })
 })
 
-// ─── S23. Merchant Balance & Payment ──────────────────────────────────────────
-test.describe("S23. Merchant Balance & Payment", () => {
+// ─── 0211. Merchant Balance & Payment ──────────────────────────────────────────
+test.describe("0211. Merchant Balance & Payment", () => {
   test("merchant can view finance page", async ({ page }) => {
     await login(page, CREDS.merchant)
     await page.goto("/merchant/finance")
@@ -182,7 +182,7 @@ test.describe("S23. Merchant Balance & Payment", () => {
 })
 
 // ─── Warehouse COD Settlement ─────────────────────────────────────────────────
-test.describe("S29. Warehouse COD Settlement", () => {
+test.describe("0212. Warehouse COD Settlement", () => {
   test("warehouse admin can view COD settlement page", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
     await page.goto("/warehouse/cod-settlement")
@@ -192,7 +192,7 @@ test.describe("S29. Warehouse COD Settlement", () => {
 })
 
 // ─── Merchant Pricing ─────────────────────────────────────────────────────────
-test.describe("S30. Merchant Pricing", () => {
+test.describe("0213. Merchant Pricing", () => {
   test("merchant can view pricing page", async ({ page }) => {
     await login(page, CREDS.merchant)
     await page.goto("/merchant/pricing")
@@ -202,7 +202,7 @@ test.describe("S30. Merchant Pricing", () => {
 })
 
 // ─── Admin Merchant Management ────────────────────────────────────────────────
-test.describe("S31. Admin Merchant Management", () => {
+test.describe("0214. Admin Merchant Management", () => {
   test("admin can view merchant details", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/merchants")
@@ -220,7 +220,7 @@ test.describe("S31. Admin Merchant Management", () => {
 })
 
 // ─── Admin Rider Management ───────────────────────────────────────────────────
-test.describe("S32. Admin Rider Management", () => {
+test.describe("0215. Admin Rider Management", () => {
   test("admin can view rider list", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/riders")
@@ -264,11 +264,11 @@ test.describe("S32. Admin Rider Management", () => {
   })
 })
 
-// ─── S78. Warehouse Ongoing Board ────────────────────────────────────────────
-// Replaces the retired S33 (dispatch desk) and S34 (intake queue). Their serials
-// stay unused on purpose: renumbering every later scenario to close the gap
-// churns history for no safety gain, and `docs-drift.spec.ts` allows holes.
-test.describe("S78. Warehouse Ongoing Board", () => {
+// ─── 0216. Warehouse Ongoing Board ────────────────────────────────────────────
+// Replaces the retired dispatch-desk and intake-queue scenarios. Their ids went
+// with them: ids are scoped to a file, so a deletion renumbers that one file
+// rather than leaving a hole for readers to wonder about.
+test.describe("0216. Warehouse Ongoing Board", () => {
   test("board shows one lane per ongoing status, groupable by rider", async ({
     page,
   }) => {
@@ -482,8 +482,8 @@ test.describe("S78. Warehouse Ongoing Board", () => {
   })
 })
 
-// ─── S79. Warehouse Completed Orders ─────────────────────────────────────────
-test.describe("S79. Warehouse Completed Orders", () => {
+// ─── 0217. Warehouse Completed Orders ─────────────────────────────────────────
+test.describe("0217. Warehouse Completed Orders", () => {
   test("completed page is read-only across delivered, cancelled and returned", async ({
     page,
   }) => {

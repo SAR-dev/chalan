@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 import { auth, register } from "../selectors"
 
-// ─── S47. Public signup is closed ────────────────────────────
+// ─── 1601. Public signup is closed ────────────────────────────
 //
 // Accounts are only ever created server-side (merchant application, admin /
 // owner invites). Better Auth's public email sign-up was left enabled, so
@@ -24,7 +24,7 @@ async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   }
 }
 
-test.describe("S47. Public signup is closed", () => {
+test.describe("1601. Public signup is closed", () => {
   test("the public sign-up endpoint refuses to create an account", async ({
     request,
   }) => {

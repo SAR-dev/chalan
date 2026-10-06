@@ -6,7 +6,7 @@ import { CREDS, login, waitForAppReady } from "../helpers"
 import { dialog, packages } from "../selectors"
 
 /**
- * Package catalogue / purchase request flow (S58–S60).
+ * Package catalogue / purchase request flow (2401–2403).
  *
  * Package ids are seeded by `src/lib/db/seed/packages.ts` and are stable, so the
  * specs address rows and cards by id rather than by copy.
@@ -43,7 +43,7 @@ async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
 }
 
 /**
- * The S59 flow leaves MERCHANT_3 holding a live bundle and the approval credit
+ * The 2402 flow leaves MERCHANT_3 holding a live bundle and the approval credit
  * that paid for it, so a CI retry would start from the wrong state (the test
  * asserts "no bundle yet"). Reset that merchant's package state and rebuild the
  * balance from the ledger, the same way the payouts suite does.
@@ -119,8 +119,8 @@ async function requestIdFor(page: Page, merchantName: string): Promise<string> {
   return (testid ?? "").slice(packages.requestRowIdPrefix.length)
 }
 
-// ─── S58. Admin package CRUD ─────────────────────────────────────────────────
-test.describe("S58. Admin package catalogue CRUD", () => {
+// ─── 2401. Admin package CRUD ─────────────────────────────────────────────────
+test.describe("2401. Admin package catalogue CRUD", () => {
   test("create, tier, edit, toggle and delete a package", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await openAdminPackages(page)
@@ -131,7 +131,7 @@ test.describe("S58. Admin package catalogue CRUD", () => {
     await page.locator(packages.nameInput).fill(name)
     await page
       .locator(packages.descriptionInput)
-      .fill("Created by the S58 e2e flow")
+      .fill("Created by the 2401 e2e flow")
     await page.locator(packages.priceInput).fill("777")
     await page.locator(packages.saveButton).click()
     await expect(page.locator(dialog.formDialog)).toBeHidden()
@@ -198,8 +198,8 @@ test.describe("S58. Admin package catalogue CRUD", () => {
   })
 })
 
-// ─── S59. Purchase request → admin review ────────────────────────────────────
-test.describe("S59. Package purchase request and approval", () => {
+// ─── 2402. Purchase request → admin review ────────────────────────────────────
+test.describe("2402. Package purchase request and approval", () => {
   test("merchant requests a package, admin approves, bundle activates", async ({
     page,
   }) => {
@@ -269,8 +269,8 @@ test.describe("S59. Package purchase request and approval", () => {
   })
 })
 
-// ─── S60. Merchant bundle card ───────────────────────────────────────────────
-test.describe("S60. Active bundle, quota and tier progress", () => {
+// ─── 2403. Merchant bundle card ───────────────────────────────────────────────
+test.describe("2403. Active bundle, quota and tier progress", () => {
   test("a merchant with a live bundle sees quota and next-tier progress", async ({
     page,
   }) => {

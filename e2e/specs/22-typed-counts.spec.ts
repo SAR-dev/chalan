@@ -3,7 +3,7 @@ import "dotenv/config"
 import { type APIRequestContext, expect, test } from "@playwright/test"
 import { CREDS } from "../helpers"
 
-// ─── S53. Typed counts ───────────────────────────────────────
+// ─── 2201. Typed counts ───────────────────────────────────────
 //
 // `count(*)` is a Postgres bigint, which node-postgres returns as a JS string
 // even though `sql<number>` claims a number. Every list endpoint must cast
@@ -20,7 +20,7 @@ async function signInAsAdmin(request: APIRequestContext) {
   expect(res.ok()).toBeTruthy()
 }
 
-test.describe("S53. Typed counts", () => {
+test.describe("2201. Typed counts", () => {
   test("paginated list endpoints return a numeric total", async ({
     request,
   }) => {

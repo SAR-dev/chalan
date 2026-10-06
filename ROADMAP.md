@@ -9,7 +9,7 @@
 > **Health:** `pnpm ci:check` green (909 files) · Unit **2385 pass** (2428
 > total, 228 spec files) · coverage **55.98 / 50.30 / 44.44 / 56.87** against
 > floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **149
-> tests / 37 files / S1-S81** (S36 gap preserved), run locally only
+> tests / 37 files / 78 scenarios**, run locally only
 > (`pnpm test:e2e`, ~8 min) by decision - CI runs quality · build · security ·
 > coverage · integration jobs and nothing else · `route-auth-guard.spec.ts`
 > enforces server-side auth on all 129 API route files · `pnpm build` green.
@@ -553,7 +553,7 @@ and `earnings` dashboards all exist - they are not exportable.
 | **Auth on every API route** | enforced by `src/app/api/route-auth-guard.spec.ts` over all 129 route files, with a minimal allowlist it also asserts stays minimal (the spec pins a floor of 100, so this count is prose — recount when editing this row) |
 | **E2E selector policy** | `data-testid` first, centralised in `e2e/selectors.ts` |
 | **Docs drift** | `src/app/__tests__/docs-drift.spec.ts`, `ci-workflow.spec.ts`, `compose-cron.spec.ts` already exist - extend them rather than starting new ones |
-| **E2E suite serials** | unique, S1-S81 with S36 retired (gap preserved, ids never reused); `docs-drift.spec.ts` asserts the suite summary in **both** AGENTS.md (`S1-S81 across 37 files / 149 tests`) and ROADMAP.md (`149 tests / 37 files / S1-S81`), plus the coverage floors and ROADMAP's unit spec-file count |
+| **E2E suite serials** | **scoped to the file**: `<fileNN><index>`, so `2901` is the first scenario in `29-sign-out.spec.ts`. File prefixes run `01`…`37` and are unique, so ids never collide, and deleting a scenario renumbers one file only — there are no retired gaps to preserve any more. `docs-drift.spec.ts` asserts uniqueness, that every serial matches its filename and runs `01…` in sequence, and the suite summary in **both** AGENTS.md (`78 scenarios across 37 files / 149 tests`) and ROADMAP.md (`149 tests / 37 files / 78 scenarios`), plus the coverage floors and ROADMAP's unit spec-file count |
 | **Workflow shape** | `ci-workflow.spec.ts` and `deploy-workflow.spec.ts` (both `src/app/__tests__/`) read `ci.yml` / `deploy.yml` and pin job shape, step order and the required env union |
 | **Source-level invariants** | `biome-config.spec.ts`, `p2-polish.spec.ts`, `dockerfile-stages.spec.ts`, `dependency-security.spec.ts` (all in `src/app/__tests__/`) read the source rather than rendering it - structural claims have no other way to fail |
 
@@ -561,7 +561,7 @@ and `earnings` dashboards all exist - they are not exportable.
 
 | Area | Status |
 |---|---|
-| **App chrome has one home per concern** | one header per shell (`top-nav.tsx` replaced `mobile-header.tsx` - never stack two); sidebar = brand + nav only; identity/theme/sign-out live only in the avatar-opened RightNav panel (`right-nav.tsx`), the mobile drawer has no footer; pinned by e2e S68/S72/S75 |
+| **App chrome has one home per concern** | one header per shell (`top-nav.tsx` replaced `mobile-header.tsx` - never stack two); sidebar = brand + nav only; identity/theme/sign-out live only in the avatar-opened RightNav panel (`right-nav.tsx`), the mobile drawer has no footer; pinned by e2e `2901`/`2902` (sign-out) and `3401` (TopNav) |
 | **Nav placement is rendering-only** | `placement: "rightnav"` (Help, and Support for the self-service roles) moves *where a link renders*, never whether it exists: the item stays in `config.items`, which is what the merchant moderator grants, the shell route guard and the command palette read. `nav-config.spec.ts` pins the split, the no-loss invariant, that grantable hrefs are untouched, and that the announcements feed is never relegated to the RightNav (it is a destination, not a utility) |
 | **Announcements render as markdown** | authored in Write/Preview tabs (`markdown-editor.tsx`), rendered by `src/components/markdown.tsx`, listed through `stripMarkdown()` (`src/lib/markdown.ts`) so raw syntax never reaches a one-line preview; detail lives at the shared, role-gated `/announcements/[id]` |
 | **Skip link** | `src/components/skip-to-content.tsx`, rendered once at `src/app/layout.tsx:93`; `skip-link.spec.ts` asserts every `<main>` carries its `id="main-content"` target |

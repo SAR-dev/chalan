@@ -3,7 +3,7 @@ import "dotenv/config"
 import { expect, test } from "@playwright/test"
 import { Client } from "pg"
 
-// ─── S48. Money is stored as exact decimal ────────────────────
+// ─── 1701. Money is stored as exact decimal ────────────────────
 //
 // Every money column used to be `double precision`: a binary float where 0.1 is
 // really 0.1000000000000000055511151231257827…, so a ledger of such values
@@ -51,7 +51,7 @@ const NON_MONEY_COLUMNS: [string, string][] = [
   ["zone_pricing", "codFeePercentage"],
 ]
 
-test.describe("S48. Money is stored as exact decimal", () => {
+test.describe("1701. Money is stored as exact decimal", () => {
   test("every money column is numeric(14,2)", async () => {
     const rows = await withDb(async (client) => {
       const res = await client.query<{

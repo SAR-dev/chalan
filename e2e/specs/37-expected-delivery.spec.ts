@@ -5,7 +5,7 @@ import { Client } from "pg"
 import { CREDS, login, toast } from "../helpers"
 import { deliveryPromise } from "../selectors"
 
-// ─── S81. Expected delivery date ─────────────────────────────────────────────
+// ─── 3701. Expected delivery date ─────────────────────────────────────────────
 
 /**
  * A seeded order. Every seeded order carries a promise (the seed snapshots one
@@ -47,7 +47,7 @@ async function trackingToken(): Promise<string> {
   })
 }
 
-test.describe("S81. Expected delivery date", () => {
+test.describe("3701. Expected delivery date", () => {
   test("the recipient sees the promised date on their tracking page", async ({
     page,
   }) => {
