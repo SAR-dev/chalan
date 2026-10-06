@@ -172,8 +172,12 @@ src/content/
 drizzle/
   postgres/                          PostgreSQL migration files
 scripts/
-  check-auth.ts                      verifies the Better Auth session table is reachable
+  bump-sw-version.js                 increments the service-worker cache version (pnpm bump-sw)
+  db-invariant-audit.ts              counts rows violating candidate DB invariants (pnpm db:audit-invariants)
   init-extensions.sql                creates PostgreSQL extensions on first boot
+  rename-brand.mjs                   renames the product brand + domain across the repo
+  setup-pg-cron.sql                  creates the pg_cron scheduling jobs
+  setup.ts                           interactive superadmin/setup menu (pnpm db:admin)
 src/lib/db/seed/seed-content.ts          deterministic seed constants — single source of truth for all seed entity data
 ```
 
