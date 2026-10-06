@@ -29,7 +29,7 @@ export const DISPLAY_LOCALE = "en-US"
  * `hour`/`minute` is not enough: the `{ dateStyle, timeStyle }` pair — the shape
  * most call sites actually want, and the one the merchant order page uses —
  * reveals nothing through those two keys, so it was routed to the date-only
- * method and took the page's error boundary with it (E2E S61).
+ * method and took the page's error boundary with it (E2E 2501).
  */
 const TIME_ONLY_OPTIONS = [
   "timeStyle",
