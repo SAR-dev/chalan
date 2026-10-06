@@ -55,6 +55,35 @@ export function useZonePricing() {
     [mutate],
   )
 
+  const updatePricing = useCallback(
+    async (
+      id: string,
+      input: {
+        baseRate: number
+        extraRatePerKg: number
+        freeWeightKg: number
+        maxWeightKg: number
+        codFeePercentage: number
+        cancellationFee?: number
+      },
+    ): Promise<Result> => {
+      const res = await fetch(`${KEY}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok)
+        return {
+          ok: false,
+          error: formatError(data, "Could not update pricing."),
+        }
+      await mutate()
+      return { ok: true }
+    },
+    [mutate],
+  )
+
   const deletePricing = useCallback(
     async (id: string): Promise<Result> => {
       const res = await fetch(`${KEY}/${id}`, { method: "DELETE" })
@@ -80,6 +109,7 @@ export function useZonePricing() {
     error,
     mutate,
     upsertPricing,
+    updatePricing,
     deletePricing,
   }
 }

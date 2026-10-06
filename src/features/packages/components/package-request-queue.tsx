@@ -3,6 +3,7 @@
 import { Check, X } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellTwoRow,
   DataTable,
@@ -25,6 +26,9 @@ export function PackageRequestQueue() {
     usePackageRequests()
   const [tab, setTab] = useState<TabFilter>("PENDING")
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [approving, setApproving] = useState<(typeof requests)[number] | null>(
+    null,
+  )
   const [rejecting, setRejecting] = useState<(typeof requests)[number] | null>(
     null,
   )
@@ -42,6 +46,7 @@ export function PackageRequestQueue() {
       return
     }
     toast.success("Package approved — the merchant's bundle is now active.")
+    setApproving(null)
   }
 
   async function handleReject() {
@@ -130,7 +135,7 @@ export function PackageRequestQueue() {
               size="sm"
               data-testid={`request-approve-${r.id}`}
               disabled={busyId === r.id}
-              onClick={() => handleApprove(r.id)}
+              onClick={() => setApproving(r)}
             >
               <Check className="size-4" />
               Approve
@@ -198,6 +203,25 @@ export function PackageRequestQueue() {
           />
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={approving !== null}
+        onOpenChange={(o) => !o && setApproving(null)}
+        title="Approve package request"
+        description={
+          approving
+            ? `Activate ${approving.packageName} for ${approving.merchantName}? They paid ${formatTk(
+                Number(approving.amount),
+              )} and the bundle goes live immediately.`
+            : ""
+        }
+        confirmLabel="Approve request"
+        loading={busyId !== null}
+        testId="request-approve-confirm"
+        onConfirm={() => {
+          if (approving) handleApprove(approving.id)
+        }}
+      />
 
       <RejectRequestDialog
         target={rejecting}

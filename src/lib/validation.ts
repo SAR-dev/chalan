@@ -794,6 +794,24 @@ export const zoneDeliveryTimeCreateSchema = z.object({
     .max(365, "Delivery days must be 365 or fewer"),
 })
 
+/**
+ * Editing a lane's delivery time in place.
+ *
+ * The zone pair is deliberately excluded: it is the row's identity (the unique
+ * index on (fromZoneId, toZoneId)), so retargeting a row would mean deleting
+ * one lane and creating another — a different operation with a different
+ * conflict shape. Only the day count is editable here; `deliveryDays` stays
+ * optional so a PATCH with no meaningful change still validates.
+ */
+export const zoneDeliveryTimeUpdateSchema = z.object({
+  deliveryDays: z
+    .number()
+    .int("Delivery days must be a whole number")
+    .min(0, "Delivery days cannot be negative")
+    .max(365, "Delivery days must be 365 or fewer")
+    .optional(),
+})
+
 // ---------------------------------------------------------------------------
 // Support tickets
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 "use client"
 
-import { MoreHorizontal, Plus, ShieldCheck } from "lucide-react"
+import { MoreHorizontal, Pencil, Plus, ShieldCheck } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CreateDeliveryCityDialog } from "@/features/platform-config/dialogs/create-delivery-city-dialog"
+import { EditDeliveryCityDialog } from "@/features/platform-config/dialogs/edit-delivery-city-dialog"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
@@ -37,6 +38,7 @@ export function DeliveryCitiesPageClient() {
   const { zones } = useDeliveryZones()
   const { warehouses } = useWarehouses()
   const [createOpen, setCreateOpen] = useState(false)
+  const [editing, setEditing] = useState<DeliveryCity | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryCity | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -123,6 +125,13 @@ export function DeliveryCitiesPageClient() {
               }
             />
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                data-testid={`delivery-city-edit-${o.id}`}
+                onSelect={() => setEditing(o)}
+              >
+                <Pencil className="size-4" />
+                Edit
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => handleToggleActive(o)}>
                 {o.isActive ? "Deactivate" : "Activate"}
               </DropdownMenuItem>
@@ -174,6 +183,13 @@ export function DeliveryCitiesPageClient() {
       <CreateDeliveryCityDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
+      />
+
+      <EditDeliveryCityDialog
+        city={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null)
+        }}
       />
 
       <ConfirmDialog

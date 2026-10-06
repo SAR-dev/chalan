@@ -56,6 +56,25 @@ export function useZoneDeliveryTime() {
     [mutate],
   )
 
+  const updateDeliveryTime = useCallback(
+    async (id: string, deliveryDays: number): Promise<Result> => {
+      const res = await fetch(`${KEY}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryDays }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok)
+        return {
+          ok: false,
+          error: formatError(data, "Could not update delivery time."),
+        }
+      await mutate()
+      return { ok: true }
+    },
+    [mutate],
+  )
+
   const deleteDeliveryTime = useCallback(
     async (id: string): Promise<Result> => {
       const res = await fetch(`${KEY}/${id}`, { method: "DELETE" })
@@ -78,6 +97,7 @@ export function useZoneDeliveryTime() {
     error,
     mutate,
     upsertDeliveryTime,
+    updateDeliveryTime,
     deleteDeliveryTime,
   }
 }

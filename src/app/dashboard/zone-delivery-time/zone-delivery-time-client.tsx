@@ -1,6 +1,6 @@
 "use client"
 
-import { MoreHorizontal, Plus } from "lucide-react"
+import { LayoutGrid, List, MoreHorizontal, Pencil, Plus } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -18,21 +18,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ZoneDeliveryTimeMatrix } from "@/features/platform-config/components/zone-delivery-time-matrix"
 import { CreateZoneDeliveryTimeDialog } from "@/features/platform-config/dialogs/create-zone-delivery-time-dialog"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useZoneDeliveryTime } from "@/features/platform-config/hooks/use-zone-delivery-time"
 import type { ZoneDeliveryTime } from "@/lib/types"
 
 /**
- * The zone-to-zone delivery-time matrix, as a list.
+ * Which view of the same lane table is on screen.
  *
- * Deliberately list-only, unlike Zone Pricing's list/matrix pair: that matrix
- * exists to answer "which lanes am I *missing*?", which needs both endpoints of
- * every pair on screen at once. This page starts from an empty table and grows,
- * so the missing lanes are simply the rows not yet present — a coverage grid
- * would need the full zone × zone cross product generated client-side, and is
- * worth adding when this list stops being a page someone visits twice.
+ * The list is the default and stays the home of the row actions (add, edit,
+ * delete), because that is where an admin lands to *change* a lane. The matrix
+ * answers the coverage question — "which zone pairs are missing a promise?" —
+ * and, unlike the pricing matrix, is admin-only, so its selected cell can offer
+ * edit/delete too without any read-only split.
  */
+type DeliveryTimeView = "list" | "matrix"
+
 export function ZoneDeliveryTimePageClient() {
   const { zones } = useDeliveryZones()
   const {
@@ -42,7 +45,9 @@ export function ZoneDeliveryTimePageClient() {
     deleteDeliveryTime,
     mutate: refresh,
   } = useZoneDeliveryTime()
+  const [view, setView] = useState<DeliveryTimeView>("list")
   const [createOpen, setCreateOpen] = useState(false)
+  const [editing, setEditing] = useState<ZoneDeliveryTime | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ZoneDeliveryTime | null>(
     null,
   )
@@ -56,7 +61,11 @@ export function ZoneDeliveryTimePageClient() {
     setDeleteOpen(false)
     setDeleteTarget(null)
     if (!result.ok) return toast.error(result.error)
-    toast.success("Delivery time removed. This lane shows no estimate again.")
+    toast.success(
+      `Delivery time for ${zoneName(deleteTarget.fromZoneId)} → ${zoneName(
+        deleteTarget.toZoneId,
+      )} removed. This lane shows no estimate again.`,
+    )
   }
 
   const columns: DataTableColumn<ZoneDeliveryTime>[] = [
@@ -89,7 +98,9 @@ export function ZoneDeliveryTimePageClient() {
       sortValue: (r) => r.deliveryDays,
       align: "right",
       cell: (r) => (
-        <CellContent className="tabular-nums">{r.deliveryDays}</CellContent>
+        <CellContent className="tabular-nums">
+          {r.deliveryDays === 1 ? "1 day" : `${r.deliveryDays} days`}
+        </CellContent>
       ),
     },
     {
@@ -111,7 +122,15 @@ export function ZoneDeliveryTimePageClient() {
             />
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem
+                data-testid={`zone-delivery-time-edit-${r.id}`}
+                onSelect={() => setEditing(r)}
+              >
+                <Pencil className="size-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 variant="destructive"
+                data-testid={`zone-delivery-time-delete-${r.id}`}
                 onSelect={() => {
                   setDeleteTarget(r)
                   setDeleteOpen(true)
@@ -141,31 +160,94 @@ export function ZoneDeliveryTimePageClient() {
         </Button>
       </PageHeader>
 
+      {/* Sits above the card, not inside either view. Inside the table toolbar
+          it would disappear the moment the matrix was selected, leaving no way
+          back. */}
+      <Tabs
+        value={view}
+        onValueChange={(v) => setView(v as DeliveryTimeView)}
+        className="w-fit"
+      >
+        <TabsList>
+          <TabsTrigger value="list" data-testid="zone-delivery-time-view-list">
+            <List className="size-4" />
+            List
+          </TabsTrigger>
+          <TabsTrigger
+            value="matrix"
+            data-testid="zone-delivery-time-view-matrix"
+          >
+            <LayoutGrid className="size-4" />
+            Matrix
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Card>
         <CardContent className="p-0">
-          <DataTable
-            pinnedColumns={["fromZone"]}
-            id="zone-delivery-time"
-            columns={columns}
-            data={rows}
-            getRowKey={(r) => r.id}
-            loading={isLoading || isRefreshing}
-            onRefresh={refresh}
-            emptyMessage="No delivery times yet. Add one to give this lane an estimate."
-          />
+          {view === "list" ? (
+            <div data-testid="zone-delivery-time-list-view">
+              <DataTable
+                pinnedColumns={["fromZone"]}
+                id="zone-delivery-time"
+                columns={columns}
+                data={rows}
+                getRowKey={(r) => r.id}
+                loading={isLoading || isRefreshing}
+                onRefresh={refresh}
+                emptyMessage="No delivery times yet. Add one to give this lane an estimate."
+              />
+            </div>
+          ) : // `rows` is `[]` until the first fetch resolves, so gating on
+          // loading is what stops the matrix from claiming there are no lanes
+          // configured when in fact they simply have not arrived yet. Revalidating
+          // an already-rendered grid keeps showing it — blanking it every refresh
+          // would blink the matrix.
+          isLoading ? (
+            <p
+              className="text-muted-foreground px-6 py-10 text-center text-sm"
+              data-testid="zone-delivery-time-matrix-loading"
+            >
+              Loading delivery times…
+            </p>
+          ) : (
+            <div className="p-6">
+              <ZoneDeliveryTimeMatrix
+                zones={zones}
+                rows={rows}
+                onEdit={(r) => setEditing(r)}
+                onDelete={(r) => {
+                  setDeleteTarget(r)
+                  setDeleteOpen(true)
+                }}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <CreateZoneDeliveryTimeDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
+        open={createOpen || editing !== null}
+        onOpenChange={(open) => {
+          setCreateOpen(open)
+          if (!open) setEditing(null)
+        }}
+        editing={editing}
       />
 
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete delivery time"
-        description="Remove this lane's delivery time? Orders on it will show no estimate until a time is set again."
+        description={
+          deleteTarget
+            ? `Remove the delivery time for ${zoneName(
+                deleteTarget.fromZoneId,
+              )} → ${zoneName(
+                deleteTarget.toZoneId,
+              )}? Orders on it will show no estimate until a time is set again.`
+            : ""
+        }
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={async () => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { MoreHorizontal, Plus, ShieldCheck } from "lucide-react"
+import { MoreHorizontal, Pencil, Plus, ShieldCheck } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CreateDeliveryZoneDialog } from "@/features/platform-config/dialogs/create-delivery-zone-dialog"
+import { EditDeliveryZoneDialog } from "@/features/platform-config/dialogs/edit-delivery-zone-dialog"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import type { DeliveryZone } from "@/lib/types"
 
@@ -33,6 +34,7 @@ export function DeliveryZonesPageClient() {
     mutate: refresh,
   } = useDeliveryZones()
   const [createOpen, setCreateOpen] = useState(false)
+  const [editing, setEditing] = useState<DeliveryZone | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryZone | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -92,6 +94,13 @@ export function DeliveryZonesPageClient() {
               }
             />
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                data-testid={`delivery-zone-edit-${o.id}`}
+                onSelect={() => setEditing(o)}
+              >
+                <Pencil className="size-4" />
+                Edit
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => handleToggleActive(o)}>
                 {o.isActive ? "Deactivate" : "Activate"}
               </DropdownMenuItem>
@@ -143,6 +152,13 @@ export function DeliveryZonesPageClient() {
       <CreateDeliveryZoneDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
+      />
+
+      <EditDeliveryZoneDialog
+        zone={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null)
+        }}
       />
 
       <ConfirmDialog
