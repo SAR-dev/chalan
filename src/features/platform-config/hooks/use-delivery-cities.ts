@@ -64,6 +64,28 @@ export function useDeliveryCities() {
     [mutate],
   )
 
+  const updateCity = useCallback(
+    async (
+      id: string,
+      input: { name: string; zoneId: string; warehouseId: string },
+    ): Promise<Result> => {
+      const res = await fetch(`${ADMIN_KEY}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok)
+        return {
+          ok: false,
+          error: formatError(data, "Could not update city."),
+        }
+      await mutate()
+      return { ok: true }
+    },
+    [mutate],
+  )
+
   const toggleCity = useCallback(
     async (id: string, isActive: boolean): Promise<Result> => {
       const res = await fetch(`${ADMIN_KEY}/${id}`, {
@@ -108,6 +130,7 @@ export function useDeliveryCities() {
     error,
     mutate,
     createCity,
+    updateCity,
     toggleCity,
     deleteCity,
   }

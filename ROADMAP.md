@@ -6,8 +6,8 @@
 > closed - see the ledger in git history and the decisions below.
 > **SMS has been withdrawn from planning** - see Decisions.
 >
-> **Health:** `pnpm ci:check` green (908 files) · Unit **2386 pass** (2429
-> total, 228 spec files) · coverage **55.98 / 50.30 / 44.44 / 56.87** against
+> **Health:** `pnpm ci:check` green (911 files) · Unit **2386 pass** (2429
+> total, 228 spec files) · coverage **55.3 / 49.75 / 43.79 / 56.2** against
 > floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **149
 > tests / 37 files / 78 scenarios**, run locally only
 > (`pnpm test:e2e`, ~8 min) by decision - CI runs quality · build · security ·

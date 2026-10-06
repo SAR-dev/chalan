@@ -4,7 +4,36 @@ import { requireSession } from "@/lib/api-auth"
 import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { db } from "@/lib/db"
 import { zoneDeliveryTime } from "@/lib/db/schema"
+import { parseBody, zoneDeliveryTimeUpdateSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
+
+/**
+ * Editing a lane's days in place. The zone pair is the row's identity (unique
+ * index), so retargeting a lane is delete + create — not this route.
+ */
+export const PATCH = withErrorHandler(
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const me = await requireSession()
+    if (!me) return unauthorized()
+    if (me.role !== "SUPER_ADMIN") return forbidden()
+
+    const { id } = await params
+    const parsed = await parseBody(req, zoneDeliveryTimeUpdateSchema)
+    if (parsed.error) return parsed.error
+
+    const [updated] = await db
+      .update(zoneDeliveryTime)
+      .set({
+        ...parsed.data,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(zoneDeliveryTime.id, id))
+      .returning()
+
+    if (!updated) return notFound("Delivery time not found")
+    return NextResponse.json(updated)
+  },
+)
 
 /**
  * Deleting a lane's delivery time puts it back to "no estimate" rather than

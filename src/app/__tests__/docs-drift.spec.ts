@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
@@ -42,7 +42,8 @@ function e2eTestCount(): number {
  * The unit suite's own spec-file count. Vitest's include pattern matches every
  * `.spec.` and `.test.` file under `.ts`/`.tsx`, minus `node_modules`, `.next`
  * and `e2e` — so the roots are `src`, `scripts` and `env`, plus anything
- * sitting at the repo root.
+ * sitting at the repo root. `env/` is not tracked and need not exist; a missing
+ * root contributes nothing rather than throwing.
  *
  * Do not paste the literal include glob into this comment: it contains a pair
  * that terminates the comment and fails to parse.
@@ -51,14 +52,16 @@ function unitSpecFileCount(): number {
   const roots = ["src", "scripts", "env"]
   const pattern = /\.(test|spec)\.(ts|tsx)$/
   const walk = (dir: string): string[] =>
-    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-      const full = join(dir, entry.name)
-      return entry.isDirectory()
-        ? walk(full)
-        : pattern.test(entry.name)
-          ? [full]
-          : []
-    })
+    !existsSync(dir)
+      ? []
+      : readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+          const full = join(dir, entry.name)
+          return entry.isDirectory()
+            ? walk(full)
+            : pattern.test(entry.name)
+              ? [full]
+              : []
+        })
   const top = readdirSync(process.cwd(), { withFileTypes: true }).flatMap(
     (entry) =>
       pattern.test(entry.name) && entry.isFile()

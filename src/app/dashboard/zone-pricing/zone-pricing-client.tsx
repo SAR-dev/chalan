@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutGrid, List, MoreHorizontal, Plus } from "lucide-react"
+import { LayoutGrid, List, MoreHorizontal, Pencil, Plus } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -47,6 +47,7 @@ export function ZonePricingPageClient() {
   } = useZonePricing()
   const [view, setView] = useState<PricingView>("list")
   const [createOpen, setCreateOpen] = useState(false)
+  const [editing, setEditing] = useState<ZonePricing | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ZonePricing | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -133,6 +134,13 @@ export function ZonePricingPageClient() {
             />
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem
+                data-testid={`zone-pricing-edit-${o.id}`}
+                onSelect={() => setEditing(o)}
+              >
+                <Pencil className="size-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 variant="destructive"
                 onSelect={() => {
                   setDeleteTarget(o)
@@ -213,7 +221,14 @@ export function ZonePricingPageClient() {
         </CardContent>
       </Card>
 
-      <CreateZonePricingDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateZonePricingDialog
+        open={createOpen || editing !== null}
+        onOpenChange={(open) => {
+          setCreateOpen(open)
+          if (!open) setEditing(null)
+        }}
+        editing={editing}
+      />
 
       <ConfirmDialog
         open={deleteOpen}

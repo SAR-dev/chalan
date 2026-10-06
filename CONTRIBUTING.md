@@ -50,7 +50,7 @@ src/app/
   api/admin/zone-pricing/route.ts          GET + POST — pricing CRUD (upsert on zone pair)
   api/admin/zone-pricing/[id]/route.ts     PATCH + DELETE — pricing update/delete
   api/admin/zone-delivery-time/route.ts    GET + POST — delivery-days CRUD (upsert on zone pair)
-  api/admin/zone-delivery-time/[id]/route.ts DELETE — clear a lane's estimate
+  api/admin/zone-delivery-time/[id]/route.ts PATCH + DELETE — update days or clear a lane's estimate
   api/riders/[id]/active/route.ts     PATCH — toggle rider active status
   api/payouts/route.ts                GET list, POST request (merchant self-service)
   api/payouts/[id]/approve/route.ts   PATCH — super admin approves

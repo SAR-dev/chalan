@@ -136,6 +136,8 @@ export default function PackagesPage() {
                   setEditingTier(t)
                 }}
               >
+                <span className="font-medium">≥ {t.orderCount} orders</span>
+                <span aria-hidden> · </span>
                 {tierLabel(t)}
               </button>
             ))

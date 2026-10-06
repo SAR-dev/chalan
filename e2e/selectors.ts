@@ -623,6 +623,7 @@ export const packages = {
   requestRowPrefix: "[data-testid^='row-dashboard-package-requests-']",
   requestRowIdPrefix: "row-dashboard-package-requests-",
   requestApprove: (id: string) => `[data-testid='request-approve-${id}']`,
+  requestApproveConfirm: "[data-testid='request-approve-confirm']",
   requestReject: (id: string) => `[data-testid='request-reject-${id}']`,
   requestRejectReason: "[data-testid='request-reject-reason-input']",
   requestRejectConfirm: "[data-testid='request-reject-confirm']",

@@ -230,6 +230,9 @@ test.describe("2402. Package purchase request and approval", () => {
     await openAdminPackages(page)
     const requestId = await requestIdFor(page, MERCHANT_3_NAME)
     await page.locator(packages.requestApprove(requestId)).click()
+    // Approving asks for confirmation first (it activates the merchant's
+    // bundle — money has changed hands).
+    await page.locator(packages.requestApproveConfirm).click()
     // Approving leaves the PENDING tab, so the row drops out of the queue.
     await expect(page.locator(packages.requestRow(requestId))).toHaveCount(0)
 
