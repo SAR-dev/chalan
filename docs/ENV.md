@@ -157,7 +157,7 @@ manual invocations only.
 > Do **not** set `MAIL_DISABLED=1` for the e2e suite. It makes `sendMail` return
 > as a *success*, so the outbox row is deleted and no `email_log` record is
 > written — the specs that read activation/verification links out of
-> `email_log` (S42, S47) and the outbox assertions (S52) depend on the
+> `email_log` (1202, 1601) and the outbox assertions (2101) depend on the
 > "attempted, logged as FAILED, kept for review" path.
 
 | Variable                   | Required | Default | Description                                                    |

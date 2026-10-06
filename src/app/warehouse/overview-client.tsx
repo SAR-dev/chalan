@@ -5,6 +5,7 @@ import {
   Banknote,
   Bike,
   CheckCircle2,
+  Navigation,
   PackageCheck,
   PackagePlus,
   ShieldCheck,
@@ -31,6 +32,14 @@ const TILES = [
   {
     status: "APPROVED",
     icon: CheckCircle2,
+    tone: "bg-chart-1/15 text-chart-1",
+  },
+  {
+    // Same chart-1 as APPROVED on purpose: the two are one leg (waiting to be
+    // collected, then heading to collect) and reading them as a pair is more
+    // useful than giving each its own colour.
+    status: "OUT_FOR_PICKUP",
+    icon: Navigation,
     tone: "bg-chart-1/15 text-chart-1",
   },
   {

@@ -22,6 +22,7 @@ import { TrackingTimeline } from "@/features/orders/components/tracking-timeline
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 import type { Order, Rider, Warehouse } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -213,13 +214,7 @@ export function OrderDetailView({
         </div>
       </div>
 
-      {[
-        "PENDING",
-        "APPROVED",
-        "PICKED_UP",
-        "IN_WAREHOUSE",
-        "IN_TRANSIT",
-      ].includes(order.status) && (
+      {CANCELLABLE_ORDER_STATUSES.includes(order.status) && (
         <div className="border-destructive/20 bg-destructive/5 flex items-center justify-between gap-4 rounded-xl border p-4">
           <p className="text-muted-foreground text-sm">
             Cancelling this order is permanent and cannot be undone.

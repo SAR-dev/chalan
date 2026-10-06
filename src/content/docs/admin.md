@@ -38,7 +38,7 @@ Operating tasks for Super Admins running {{APP_NAME}} from the admin console at 
 
 1. **Delivery Zones** (`/dashboard/delivery-zones`) — create and maintain zones such as "Dhaka Metro" or "Divisional Cities".
 2. **Delivery Cities** (`/dashboard/delivery-cities`) — assign each city a zone and the warehouse that serves it. This drives both routing and pricing.
-3. **Zone Pricing** (`/dashboard/zone-pricing`) — fill the origin × destination pricing matrix: for each zone pair set the base rate, extra per-kg rate, free weight, max weight, and COD fee percentage.
+3. **Zone Pricing** (`/dashboard/zone-pricing`) — fill the origin × destination pricing matrix: for each zone pair set the base rate, extra per-kg rate, free weight, max weight, and COD fee percentage. Then open **Zone Delivery Times** (`/dashboard/zone-delivery-time`) and set the same pairs' delivery days — those days are what every promised delivery date on an order is computed from.
 4. **Packages** (`/dashboard/packages`) — prepaid delivery bundles merchants can buy. Define each package, the discount tiers it unlocks, then approve or reject a merchant's purchase request.
 5. Orders price themselves from that matrix; if a pair is missing, the merchant's own flat rates are used as a fallback.
 6. **Settings** (`/dashboard/settings`) holds **default merchant pricing** for new merchants and the **mail configuration** (SMTP) used for all outgoing email.

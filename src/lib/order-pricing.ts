@@ -1,12 +1,9 @@
 import { and, eq } from "drizzle-orm"
 import { db, dbRead } from "@/lib/db"
 import {
-  deliveryCity,
-  deliveryZone,
   merchantPackage,
   pricingPackage,
   pricingPackageTier,
-  warehouse,
   zonePricing,
 } from "@/lib/db/schema"
 import {
@@ -15,6 +12,7 @@ import {
   pickTierForCount,
 } from "@/lib/packages"
 import type { PricingUnavailableReason, ZoneRef } from "@/lib/pricing"
+import { type RouteZoneRunner, resolveRouteZones } from "@/lib/route-zones"
 
 export interface ResolvedPricing {
   baseRate: number
@@ -33,7 +31,7 @@ export type { PricingUnavailableReason, ZoneRef } from "@/lib/pricing"
  * `db` / `dbRead`, or a live transaction handle. Structurally `select`-shaped
  * because a `PgTransaction`'s `$client` is not the pool's.
  */
-export type PricingRunner = Pick<typeof dbRead, "select">
+export type PricingRunner = RouteZoneRunner
 
 export type ResolveRoutePricingResult =
   | { ok: true; pricing: ResolvedPricing }
@@ -48,6 +46,10 @@ export type ResolveRoutePricingResult =
 /**
  * Resolves the pricing for a route from the `zone_pricing` matrix (origin = the
  * pickup warehouse's city zone, destination = the delivery city's zone).
+ *
+ * Resolving *which* zones those are is shared with `zone_delivery_time` via
+ * `resolveRouteZones`, so the two matrices can never disagree about what a lane
+ * is — see that function for why.
  *
  * There is deliberately no platform-level fallback: zone pricing is the single
  * source for delivery, COD and cancellation fees, so an unconfigured lane is a
@@ -77,71 +79,20 @@ export async function resolveRoutePricing(
    */
   runner: PricingRunner = dbRead,
 ): Promise<ResolveRoutePricingResult> {
-  const [w] = await runner
-    .select({ city: warehouse.city })
-    .from(warehouse)
-    .where(eq(warehouse.id, originWarehouseId))
-    .limit(1)
-
-  const [origCity] = w?.city
-    ? await runner
-        .select({ zone: deliveryZone })
-        .from(deliveryCity)
-        .leftJoin(deliveryZone, eq(deliveryCity.zoneId, deliveryZone.id))
-        .where(eq(deliveryCity.name, w.city))
-        .limit(1)
-    : []
-
-  if (!origCity?.zone) {
-    return {
-      ok: false,
-      reason: "origin-zone-unknown",
-      fromZone: null,
-      toZone: null,
-    }
-  }
-
-  if (!deliveryCityId) {
-    return {
-      ok: false,
-      reason: "destination-city-unknown",
-      fromZone: null,
-      toZone: null,
-    }
-  }
-
-  const [destCity] = await runner
-    .select({ zone: deliveryZone })
-    .from(deliveryCity)
-    .leftJoin(deliveryZone, eq(deliveryCity.zoneId, deliveryZone.id))
-    .where(eq(deliveryCity.id, deliveryCityId))
-    .limit(1)
-
-  if (!destCity) {
-    return {
-      ok: false,
-      reason: "destination-city-unknown",
-      fromZone: null,
-      toZone: null,
-    }
-  }
-
-  if (!destCity.zone) {
-    return {
-      ok: false,
-      reason: "destination-zone-unknown",
-      fromZone: origCity.zone,
-      toZone: null,
-    }
-  }
+  const zones = await resolveRouteZones(
+    originWarehouseId,
+    deliveryCityId,
+    runner,
+  )
+  if (!zones.ok) return zones
 
   const [zp] = await runner
     .select()
     .from(zonePricing)
     .where(
       and(
-        eq(zonePricing.fromZoneId, origCity.zone.id),
-        eq(zonePricing.toZoneId, destCity.zone.id),
+        eq(zonePricing.fromZoneId, zones.fromZone.id),
+        eq(zonePricing.toZoneId, zones.toZone.id),
       ),
     )
     .limit(1)
@@ -150,8 +101,8 @@ export async function resolveRoutePricing(
     return {
       ok: false,
       reason: "no-pricing-for-lane",
-      fromZone: origCity.zone,
-      toZone: destCity.zone,
+      fromZone: zones.fromZone,
+      toZone: zones.toZone,
     }
   }
 

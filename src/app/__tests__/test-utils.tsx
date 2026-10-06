@@ -112,6 +112,7 @@ export function makeOrder(overrides?: Partial<Order>): Order {
     pickupLocationId: "pl_1",
     deliveryCityId: "dc_1",
     pickupCityId: "dc_1",
+    outForPickupAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: null,
     ...overrides,

@@ -13,10 +13,11 @@ How to work your pickup and delivery queues on {{APP_NAME}}. Sign in at **{{APP_
 ## 2. Work the pickup queue
 
 1. Open **Pickups** (`/rider/pickup`) and find an order in **Approved** status assigned to you.
-2. Press the pickup action to open the confirmation dialog.
-3. **Capture at least one photo** of the parcel at the pickup location — photos are required; the submit button stays disabled until you add one.
-4. Confirm. The order moves to **Picked up**, and the warehouse hub takes over from there.
-5. Pickup orders that are no longer **Approved** show as completed in the same list.
+2. Press **Out for pickup** and confirm that you are heading to the shop. The order moves to **Out for pickup** — collecting before this is refused, because the hub needs to know you have actually left.
+3. Press the pickup action to open the confirmation dialog.
+4. **Capture at least one photo** of the parcel at the pickup location — photos are required; the submit button stays disabled until you add one.
+5. Confirm. The order moves to **Picked up**, and the warehouse hub takes over from there.
+6. Pickup orders that are neither **Approved** nor **Out for pickup** show as completed in the same list.
 
 ## 3. Work the delivery queue
 

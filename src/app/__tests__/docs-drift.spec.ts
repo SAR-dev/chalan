@@ -12,6 +12,62 @@ function read(...parts: string[]): string {
   return readFileSync(join(process.cwd(), ...parts), "utf-8")
 }
 
+/**
+ * Markdown wraps prose, so a quoted phrase can straddle a newline — compare
+ * whitespace-normalised text or every reflow would fail the assertion.
+ */
+const normalize = (s: string) => s.replace(/\s+/g, " ")
+
+function e2eSpecFiles(): string[] {
+  return readdirSync(join(process.cwd(), "e2e", "specs")).filter((f) =>
+    f.endsWith(".spec.ts"),
+  )
+}
+
+/** `test(` at line start — one per e2e case, matching how AGENTS.md counts. */
+function e2eTestCount(): number {
+  let count = 0
+  for (const file of e2eSpecFiles()) {
+    count += [
+      ...readFileSync(
+        join(process.cwd(), "e2e", "specs", file),
+        "utf-8",
+      ).matchAll(/^\s*test\(/gm),
+    ].length
+  }
+  return count
+}
+
+/**
+ * The unit suite's own spec-file count. Vitest's include pattern matches every
+ * `.spec.` and `.test.` file under `.ts`/`.tsx`, minus `node_modules`, `.next`
+ * and `e2e` — so the roots are `src`, `scripts` and `env`, plus anything
+ * sitting at the repo root.
+ *
+ * Do not paste the literal include glob into this comment: it contains a pair
+ * that terminates the comment and fails to parse.
+ */
+function unitSpecFileCount(): number {
+  const roots = ["src", "scripts", "env"]
+  const pattern = /\.(test|spec)\.(ts|tsx)$/
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name)
+      return entry.isDirectory()
+        ? walk(full)
+        : pattern.test(entry.name)
+          ? [full]
+          : []
+    })
+  const top = readdirSync(process.cwd(), { withFileTypes: true }).flatMap(
+    (entry) =>
+      pattern.test(entry.name) && entry.isFile()
+        ? [join(process.cwd(), entry.name)]
+        : [],
+  )
+  return [...roots.flatMap((r) => walk(join(process.cwd(), r))), ...top].length
+}
+
 describe("docs / env drift (ROADMAP P2.6)", () => {
   it("ships a BETTER_AUTH_SECRET placeholder that passes the 32-char boot check", () => {
     const raw = read(".env.example")
@@ -102,71 +158,104 @@ describe("retention defaults (ROADMAP R0.7)", () => {
 })
 
 /**
- * E2E serials are a documented invariant ("unique, no gaps or duplicates"), and
- * AGENTS.md had drifted to S65/104 while the suite was already at S71/129 —
- * With a duplicate S68 nobody noticed. Structural facts are
- * asserted rather than exact totals: file and test counts churn with every new
- * spec, but a duplicate serial or a gap is always a mistake.
+ * Scenario serials are `<fileNN><index>` — `0101` is the first scenario in
+ * `01-core-flows.spec.ts`, `2902` the second in `29-sign-out.spec.ts`.
+ *
+ * They were a single global sequence (`S1…S81`), which hid two defects: numbers
+ * drifted out of file order (a log read S1, S6, S8, S55, S21, …) and gaps piled
+ * up as scenarios were deleted, leaving nobody sure whether S33 was retired or
+ * simply lost. Scoped ids make both structural impossibilities — adding or
+ * removing a scenario renumbers exactly one file, and the log runs in serial
+ * order because the files do.
  */
 describe("E2E suite invariants (ROADMAP R1.4)", () => {
   function serials() {
     const dir = join(process.cwd(), "e2e", "specs")
     return readdirSync(dir)
       .filter((file) => file.endsWith(".spec.ts"))
+      .sort()
       .flatMap((file) => {
         const raw = readFileSync(join(dir, file), "utf-8")
-        return [...raw.matchAll(/describe\("S(\d+)\.\s*([^"]*)"/g)].map(
-          (m) => ({ id: Number(m[1]), name: m[2], file }),
+        return [...raw.matchAll(/describe\("(\d{4})\.\s*([^"]*)"/g)].map(
+          (m) => ({ id: m[1], name: m[2], file }),
         )
       })
   }
 
   it("assigns every scenario a unique serial", () => {
-    const seen = new Map<number, string>()
+    const seen = new Map<string, string>()
     const dupes: string[] = []
     for (const { id, file, name } of serials()) {
       const where = `${file} ("${name}")`
-      if (seen.has(id)) dupes.push(`S${id}: ${seen.get(id)} and ${where}`)
+      if (seen.has(id)) dupes.push(`${id}: ${seen.get(id)} and ${where}`)
       seen.set(id, where)
     }
     expect(dupes, "scenario serials must be unique").toEqual([])
   })
 
-  // Deliberately NOT a "no gaps" assertion. Removing a feature holes the
-  // sequence — dropping the branding suites left S36 unused — and renumbering
-  // every later serial across 32 files to close one hole would churn history
-  // for no safety gain. What actually drifts is the summary AGENTS.md quotes,
-  // which had gone stale (S65 / 104 tests) while the suite was already at
-  // S71 / 129 with a duplicate nobody noticed.
-  it("quotes suite numbers in AGENTS.md that match the tree", () => {
-    const ids = serials().map((s) => s.id)
-    expect(ids.length).toBeGreaterThan(0)
-
-    const files = readdirSync(join(process.cwd(), "e2e", "specs")).filter((f) =>
-      f.endsWith(".spec.ts"),
-    )
-    let testCount = 0
-    for (const f of files) {
-      const raw = readFileSync(join(process.cwd(), "e2e", "specs", f), "utf-8")
-      testCount += [...raw.matchAll(/^\s*test\(/gm)].length
+  // The structural half of the scheme: a file's serials must be its own
+  // two-digit prefix followed by 01, 02, … in file order. That is what makes a
+  // log readable, and it means nobody has to grep every file for "the current
+  // max" before adding one. It also fails on the two things the old global
+  // sequence could not see: a serial out of order inside its file, and a gap.
+  it("numbers each file's scenarios from 01, in order", () => {
+    const byFile = new Map<string, string[]>()
+    for (const { id, file } of serials()) {
+      byFile.set(file, [...(byFile.get(file) ?? []), id])
     }
+    expect(byFile.size).toBeGreaterThan(0)
 
-    const expected = `S1-S${Math.max(...ids)} across ${files.length} files / ${testCount} tests`
-    // Markdown wraps prose, so the phrase can straddle a newline — compare
-    // whitespace-normalised text or every reflow would fail this.
-    const normalize = (s: string) => s.replace(/\s+/g, " ")
+    for (const [file, ids] of byFile) {
+      expect(/^\d{2}-/.test(file), `${file} needs a two-digit prefix`).toBe(
+        true,
+      )
+      expect(ids, `${file} serials are out of order, or gapped`).toEqual(
+        ids.map(
+          (_, i) => `${file.slice(0, 2)}${String(i + 1).padStart(2, "0")}`,
+        ),
+      )
+    }
+  })
+
+  it("quotes suite numbers in AGENTS.md that match the tree", () => {
+    const list = serials()
+    expect(list.length).toBeGreaterThan(0)
+
+    const expected = `${list.length} scenarios across ${e2eSpecFiles().length} files / ${e2eTestCount()} tests`
     expect(
       normalize(read("AGENTS.md")),
       "AGENTS.md suite summary is stale — update it to: " + expected,
     ).toContain(normalize(expected))
   })
 
+  // ROADMAP.md carries the same snapshot in a different order, and had drifted
+  // to "883 files / 138 tests / S1-S76" while the tree was well past it — it
+  // was the one quoting the numbers and not being checked.
+  it("quotes suite numbers in ROADMAP.md that match the tree", () => {
+    const list = serials()
+    expect(list.length).toBeGreaterThan(0)
+    const expected = `${e2eTestCount()} tests / ${e2eSpecFiles().length} files / ${list.length} scenarios`
+    expect(
+      normalize(read("ROADMAP.md")),
+      "ROADMAP.md E2E summary is stale — update it to: " + expected,
+    ).toContain(normalize(expected))
+  })
+
   it("documents coverage floors that match vitest.config.ts", () => {
     const config = read("vitest.config.ts")
-    const agents = read("AGENTS.md")
     const floor = (key: string) =>
       Number(config.match(new RegExp(`\\b${key}:\\s*(\\d+)`))?.[1])
     const documented = `${floor("statements")} / ${floor("branches")} / ${floor("functions")} / ${floor("lines")}`
-    expect(agents).toContain(`(${documented})`)
+    expect(read("AGENTS.md")).toContain(`(${documented})`)
+    expect(normalize(read("ROADMAP.md"))).toContain(`floors **${documented}**`)
+  })
+
+  it("quotes a unit spec-file count in ROADMAP.md that matches the tree", () => {
+    const count = unitSpecFileCount()
+    expect(count).toBeGreaterThan(0)
+    expect(
+      normalize(read("ROADMAP.md")),
+      "ROADMAP.md spec-file count is stale — update it to: " + count,
+    ).toContain(`${count} spec files`)
   })
 })

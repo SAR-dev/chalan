@@ -15,6 +15,7 @@ describe("orderImportHeaders", () => {
       "pickup_location",
       "recipient_name",
       "recipient_phone",
+      "recipient_mail",
       "delivery_city",
       "delivery_address",
       "parcel_weight_kg",
@@ -27,10 +28,12 @@ describe("orderImportHeaders", () => {
   })
 
   it("requires the seven columns that identify a deliverable parcel", () => {
-    // `item_type` is deliberately NOT required even though it sits inside the
-    // first seven positions of the canonical order. Requiring it would reject
-    // every file imported before it existed, and the field is descriptive — an
-    // order with no stated contents is still a valid order.
+    // `item_type` is deliberately NOT required even though it sits between
+    // required columns in the canonical order. Requiring it would reject every
+    // file imported before it existed, and the field is descriptive — an
+    // order with no stated contents is still a valid order. `recipient_mail`
+    // is likewise optional: a merchant who only ever collects a phone number
+    // must keep importing unchanged.
     expect(requiredImportHeaders).toHaveLength(7)
     expect([...requiredImportHeaders]).toEqual([
       "pickup_location",
@@ -56,6 +59,10 @@ describe("orderImportHeaders", () => {
       mobile: "recipient_phone",
       recipient_mobile: "recipient_phone",
       customer_phone: "recipient_phone",
+      email: "recipient_mail",
+      mail: "recipient_mail",
+      recipient_email: "recipient_mail",
+      customer_email: "recipient_mail",
       city: "delivery_city",
       address: "delivery_address",
       recipient_address: "delivery_address",
@@ -96,6 +103,7 @@ describe("buildTemplateCsv", () => {
       pickup_location: PLACEHOLDER_PICKUP_LOCATION,
       recipient_name: "John Doe",
       recipient_phone: "01712345678",
+      recipient_mail: "johndoe@example.com",
       delivery_city: "Dhaka",
       delivery_address: "House 1 Road 1 Dhanmondi Dhaka",
       parcel_weight_kg: "1.5",

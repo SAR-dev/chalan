@@ -1,5 +1,5 @@
 {
-  "id": "11ba97fc-46a7-4731-8f1e-f44de1e3e211",
+  "id": "0ada289a-107f-4a0d-a985-80eeb42ed07f",
   "prevId": "63ac0b4a-c601-4b43-928e-2c106106bda4",
   "version": "7",
   "dialect": "postgresql",
@@ -163,6 +163,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 20
+        },
+        "announcementsSeenAt": {
+          "name": "announcementsSeenAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "warehouseId": {
           "name": "warehouseId",
@@ -1028,7 +1034,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "balance_transaction_orderId_order_id_fk": {
@@ -1297,6 +1303,136 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.zone_delivery_time": {
+      "name": "zone_delivery_time",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "fromZoneId": {
+          "name": "fromZoneId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "toZoneId": {
+          "name": "toZoneId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deliveryDays": {
+          "name": "deliveryDays",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "zone_delivery_time_from_idx": {
+          "name": "zone_delivery_time_from_idx",
+          "columns": [
+            {
+              "expression": "fromZoneId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "zone_delivery_time_to_idx": {
+          "name": "zone_delivery_time_to_idx",
+          "columns": [
+            {
+              "expression": "toZoneId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "zone_delivery_time_pair_uniq": {
+          "name": "zone_delivery_time_pair_uniq",
+          "columns": [
+            {
+              "expression": "fromZoneId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "toZoneId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "zone_delivery_time_fromZoneId_delivery_zone_id_fk": {
+          "name": "zone_delivery_time_fromZoneId_delivery_zone_id_fk",
+          "tableFrom": "zone_delivery_time",
+          "tableTo": "delivery_zone",
+          "columnsFrom": [
+            "fromZoneId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "zone_delivery_time_toZoneId_delivery_zone_id_fk": {
+          "name": "zone_delivery_time_toZoneId_delivery_zone_id_fk",
+          "tableFrom": "zone_delivery_time",
+          "tableTo": "delivery_zone",
+          "columnsFrom": [
+            "toZoneId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.zone_pricing": {
       "name": "zone_pricing",
       "schema": "",
@@ -1440,7 +1576,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "zone_pricing_toZoneId_delivery_zone_id_fk": {
@@ -1453,7 +1589,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2043,6 +2179,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "recipientMail": {
+          "name": "recipientMail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "deliveryAddress": {
           "name": "deliveryAddress",
           "type": "text",
@@ -2188,6 +2330,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "outForPickupAt": {
+          "name": "outForPickupAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "pickedUpAt": {
           "name": "pickedUpAt",
           "type": "timestamp with time zone",
@@ -2233,6 +2381,24 @@
         "dispatchedBy": {
           "name": "dispatchedBy",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expectedDeliveryDays": {
+          "name": "expectedDeliveryDays",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expectedDeliveryAt": {
+          "name": "expectedDeliveryAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actualDeliveryDays": {
+          "name": "actualDeliveryDays",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -2855,7 +3021,56 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "order_delivered_needs_delivered_at": {
+          "name": "order_delivered_needs_delivered_at",
+          "value": "\"order\".\"status\" <> 'DELIVERED' OR \"order\".\"deliveredAt\" IS NOT NULL"
+        },
+        "order_cancelled_needs_cancelled_at": {
+          "name": "order_cancelled_needs_cancelled_at",
+          "value": "\"order\".\"status\" <> 'CANCELLED' OR \"order\".\"cancelledAt\" IS NOT NULL"
+        },
+        "order_returned_needs_returned_at": {
+          "name": "order_returned_needs_returned_at",
+          "value": "\"order\".\"status\" <> 'RETURNED' OR \"order\".\"returnedAt\" IS NOT NULL"
+        },
+        "order_picked_up_needs_picked_up_at": {
+          "name": "order_picked_up_needs_picked_up_at",
+          "value": "\"order\".\"status\" <> 'PICKED_UP' OR \"order\".\"pickedUpAt\" IS NOT NULL"
+        },
+        "order_out_for_pickup_needs_out_for_pickup_at": {
+          "name": "order_out_for_pickup_needs_out_for_pickup_at",
+          "value": "\"order\".\"status\" <> 'OUT_FOR_PICKUP' OR \"order\".\"outForPickupAt\" IS NOT NULL"
+        },
+        "order_out_for_delivery_needs_out_for_delivery_at": {
+          "name": "order_out_for_delivery_needs_out_for_delivery_at",
+          "value": "\"order\".\"status\" <> 'OUT_FOR_DELIVERY' OR \"order\".\"outForDeliveryAt\" IS NOT NULL"
+        },
+        "order_product_cost_nonneg": {
+          "name": "order_product_cost_nonneg",
+          "value": "\"order\".\"productCost\" >= 0"
+        },
+        "order_delivery_fee_nonneg": {
+          "name": "order_delivery_fee_nonneg",
+          "value": "\"order\".\"deliveryFee\" >= 0"
+        },
+        "order_cod_fee_nonneg": {
+          "name": "order_cod_fee_nonneg",
+          "value": "\"order\".\"codFee\" >= 0"
+        },
+        "order_cancellation_fee_nonneg": {
+          "name": "order_cancellation_fee_nonneg",
+          "value": "\"order\".\"cancellationFee\" >= 0"
+        },
+        "order_merchant_earnings_nonneg": {
+          "name": "order_merchant_earnings_nonneg",
+          "value": "\"order\".\"merchantEarnings\" >= 0"
+        },
+        "order_amount_collected_nonneg": {
+          "name": "order_amount_collected_nonneg",
+          "value": "\"order\".\"amountCollected\" IS NULL OR \"order\".\"amountCollected\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.order_status_history": {

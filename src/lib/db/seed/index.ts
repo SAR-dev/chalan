@@ -15,6 +15,7 @@ import { seedPlatformConfig } from "./platform-config"
 import { assertSeedAllowedInDev } from "./seed-content/credentials"
 import { seedUsers } from "./users"
 import { seedWarehouses } from "./warehouses"
+import { seedZoneDeliveryTime } from "./zone-delivery-time"
 import { seedZonePricing } from "./zone-pricing"
 
 async function main() {
@@ -28,6 +29,7 @@ async function main() {
     await seedDeliveryZones()
     await seedDeliveryCities()
     await seedZonePricing()
+    await seedZoneDeliveryTime()
     await seedPlatformConfig()
     await seedUsers()
 

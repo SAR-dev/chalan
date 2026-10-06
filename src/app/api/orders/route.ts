@@ -40,6 +40,10 @@ import { enumValues } from "@/lib/db-helpers"
 import { canPlaceOrders } from "@/lib/merchant-verification"
 import { hasNavPermission } from "@/lib/nav-config"
 import {
+  computeExpectedDeliveryAt,
+  resolveRouteDeliveryTime,
+} from "@/lib/order-delivery-time"
+import {
   lockAndResolveMerchantPackageRule,
   resolveRoutePricing,
 } from "@/lib/order-pricing"
@@ -160,6 +164,8 @@ export const GET = withErrorHandler(async (req: Request) => {
     merchantNote: order.merchantNote,
     merchantPhone: merchant.phone,
     pickupLocationMapLink: pickupLocation.mapLink,
+    // The promise, so the merchant's list can show it without a second read.
+    expectedDeliveryAt: order.expectedDeliveryAt,
   }
 
   // The merchant join is for the projection (`merchantPhone`); the search no
@@ -243,6 +249,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     pickupLocationId,
     recipientName,
     recipientPhone,
+    recipientMail,
     deliveryAddress,
     deliveryMapLink,
     parcelWeightKg,
@@ -346,6 +353,16 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
   const pricing = resolved.pricing
 
+  // ── Delivery time: the same zone-pair matrix as pricing, but never blocking.
+  //    An unconfigured lane yields no estimate and the order still proceeds —
+  //    pricing rejects because money would be owed on a lane nobody configured,
+  //    while a missing promised date is a gap in what we can *show*.
+  const deliveryTime = await resolveRouteDeliveryTime(
+    hub.id,
+    destCityId ?? null,
+  )
+  const expectedDeliveryDays = deliveryTime.ok ? deliveryTime.days : null
+
   const { total: zoneDeliveryFee, exceedsMax } = calcDeliveryCharge(
     pricing,
     parcelWeightKg,
@@ -360,6 +377,12 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
   const codFee = calcCodFee(productCost, pricing.codFeePercentage ?? 1)
   const cancellationFee = toPaisa(pricing.cancellationFee ?? 0)
+
+  // One clock for the creation instant and for the promise derived from it.
+  // The promise is end-of-day N days after *this* instant, so computing it from
+  // the app clock while `createdAt` defaults to the database's could disagree by
+  // a whole day if an order landed within a few ms of midnight Dhaka.
+  const createdAtIso = new Date().toISOString()
 
   const created = await db.transaction(async (tx) => {
     // Lock the merchant's active bundle (if any) and resolve the tier unlocked
@@ -383,6 +406,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         idempotencyKey,
         recipientName,
         recipientPhone,
+        recipientMail,
         deliveryCityId: destCityId ?? null,
         deliveryAddress,
         deliveryMapLink: normalizedMapLink,
@@ -402,6 +426,13 @@ export const POST = withErrorHandler(async (req: Request) => {
         status: "PENDING",
         deliveryAttempts: 0,
         merchantNote: merchantNote?.trim() || null,
+        // The quoted delivery promise, snapshotted — see `zone_delivery_time`.
+        createdAt: createdAtIso,
+        expectedDeliveryDays,
+        expectedDeliveryAt: computeExpectedDeliveryAt(
+          createdAtIso,
+          expectedDeliveryDays,
+        ),
       })
       .onConflictDoNothing()
       .returning({
@@ -411,6 +442,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         warehouseId: order.warehouseId,
         recipientName: order.recipientName,
         recipientPhone: order.recipientPhone,
+        recipientMail: order.recipientMail,
         deliveryAddress: order.deliveryAddress,
         deliveryMapLink: order.deliveryMapLink,
         parcelWeightKg: order.parcelWeightKg,

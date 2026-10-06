@@ -6,6 +6,9 @@ export interface ParcelState {
   pickupLocationId: string
   recipientName: string
   recipientPhone: string
+  /** Optional. Kept in the same `string` shape as the other inputs so it can
+   *  ride `updateParcel` and `ParcelField` unchanged — blank means "no email". */
+  recipientMail: string
   deliveryCityId: string
   deliveryAddress: string
   parcelWeightKg: string

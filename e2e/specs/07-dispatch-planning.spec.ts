@@ -17,7 +17,7 @@ import { autoAssign, dialog, ongoing, rider } from "../selectors"
  * by the parcels' state, so a spec cannot accidentally narrow it.
  */
 
-test.describe("S74. Route planning and auto-assignment", () => {
+test.describe("0701. Route planning and auto-assignment", () => {
   test("warehouse admin previews a split that names every rider's load", async ({
     page,
   }) => {

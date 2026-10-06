@@ -55,7 +55,7 @@ describe("formatDateTime (ROADMAP R3.3)", () => {
    * timeStyle` on *any* time option, so routing is decided by more than
    * `hour`/`minute`. `{ dateStyle, timeStyle }` looks date-only through those
    * two keys, went to `toLocaleDateString`, and crashed the merchant order page
-   * into its error boundary (E2E S61).
+   * into its error boundary (E2E 2501).
    *
    * The assertion is a pass-through contract rather than a rendered shape:
    * whatever the caller asked for must come back from the matching `Intl`

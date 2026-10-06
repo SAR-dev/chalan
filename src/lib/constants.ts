@@ -59,9 +59,33 @@ export const BADGE_TONES = {
 
 export type BadgeTone = keyof typeof BADGE_TONES
 
+/**
+ * The statuses an admin (or super admin) may cancel an order from — everything
+ * up to, but not including, `OUT_FOR_DELIVERY`.
+ *
+ * One definition because there were previously six copies of this exact array:
+ * the server guard, the order detail view, and four places across the admin and
+ * warehouse order tables. Six copies means six places to forget when a status
+ * is added between two existing ones, which is precisely how a parcel that
+ * nobody had collected yet became un-cancellable while the parcel that *had*
+ * been collected stayed cancellable.
+ *
+ * `merchantAllowed` in `transitions.ts` is deliberately separate: a merchant's
+ * window is narrower ("before they are picked up") than the admin's.
+ */
+export const CANCELLABLE_ORDER_STATUSES: readonly OrderStatus[] = [
+  "PENDING",
+  "APPROVED",
+  "OUT_FOR_PICKUP",
+  "PICKED_UP",
+  "IN_WAREHOUSE",
+  "IN_TRANSIT",
+]
+
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING: "Pending",
   APPROVED: "Approved",
+  OUT_FOR_PICKUP: "Out for pickup",
   PICKED_UP: "Picked up",
   IN_WAREHOUSE: "In warehouse",
   IN_TRANSIT: "In transit",
@@ -75,6 +99,9 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 export const ORDER_STATUS_TONES: Record<OrderStatus, BadgeTone> = {
   PENDING: "pending",
   APPROVED: "info",
+  // `brand` is the one tone no other status claims — APPROVED reads "waiting"
+  // and PICKED_UP reads "collected", so the leg between them needed its own.
+  OUT_FOR_PICKUP: "brand",
   PICKED_UP: "violet",
   IN_WAREHOUSE: "warehouse",
   IN_TRANSIT: "rose",

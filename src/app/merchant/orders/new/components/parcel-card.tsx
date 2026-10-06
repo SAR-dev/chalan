@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { formLabels } from "@/config/content"
 import type { DeliveryCityOption } from "@/features/platform-config/hooks/use-delivery-cities"
 import { ORDER_DELIVERY_TYPE_LABELS } from "@/lib/constants"
 import { formatTk } from "@/lib/pricing"
@@ -237,6 +238,27 @@ export function ParcelCard({
               placeholder="+8801811112233"
               error={fieldError("recipientPhone")}
               required
+            />
+          </Field>
+          {/* Optional: deliberately no `required`. Blank is a real answer —
+              most merchants only ever collect a phone number — and is stored
+              as NULL so a later unsubscribe path can skip it cleanly. */}
+          <Field
+            label={formLabels.newOrder.recipientMail}
+            htmlFor={`mail-${p.id}`}
+          >
+            <Input
+              id={`mail-${p.id}`}
+              data-testid="recipient-mail"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={p.recipientMail}
+              onChange={(e) =>
+                updateParcel(p.id, "recipientMail", e.target.value)
+              }
+              placeholder="sumaiya@example.com"
+              error={fieldError("recipientMail")}
             />
           </Field>
           <Field label="Parcel weight (KG)" htmlFor={`weight-${p.id}`}>

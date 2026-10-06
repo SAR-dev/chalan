@@ -20,6 +20,7 @@ import type { Order, OrderStatus, Rider } from "@/lib/types"
 /** The statuses the board owns, in column order. */
 export const ONGOING_STATUSES = [
   "APPROVED",
+  "OUT_FOR_PICKUP",
   "PICKED_UP",
   "IN_WAREHOUSE",
   "IN_TRANSIT",
@@ -31,6 +32,7 @@ export type OngoingStatus = (typeof ONGOING_STATUSES)[number]
 /** Column headings for the status view, in board order. */
 export const ONGOING_STATUS_LABELS: Record<OngoingStatus, string> = {
   APPROVED: "Approved",
+  OUT_FOR_PICKUP: "Out for pickup",
   PICKED_UP: "Picked up",
   IN_WAREHOUSE: "In warehouse",
   IN_TRANSIT: "In transit",
@@ -63,6 +65,7 @@ function isOngoingStatus(status: OrderStatus): status is OngoingStatus {
 export function nextLegRiderId(order: Order): string | null {
   switch (order.status) {
     case "APPROVED":
+    case "OUT_FOR_PICKUP":
     case "PICKED_UP":
       return order.pickupRiderId ?? null
     case "IN_WAREHOUSE":

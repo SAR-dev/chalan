@@ -91,13 +91,31 @@ describe("Rider dashboard", () => {
     expect(screen.queryByText("ORD-0002")).not.toBeInTheDocument()
   })
 
-  it('shows "Picked up" button in pickup table', async () => {
+  it('shows "Out for pickup" then "Picked up" across the pickup leg', async () => {
+    // Two states, two buttons: an APPROVED parcel can only be started, and an
+    // OUT_FOR_PICKUP one can only be collected. Showing both at once would be
+    // an invitation to hit the server's 400.
     mockOrdersState = createMockOrders({
-      orders: [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+      orders: [
+        makeOrder({
+          id: "ORD-0001",
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+        }),
+        makeOrder({
+          id: "ORD-0002",
+          pickupRiderId: "rider_1",
+          status: "OUT_FOR_PICKUP",
+        }),
+      ],
     })
     await importPage()
-    const buttons = screen.getAllByRole("button", { name: /picked up/i })
-    expect(buttons.length).toBeGreaterThanOrEqual(1)
+    expect(
+      screen.getAllByRole("button", { name: /out for pickup/i }).length,
+    ).toBeGreaterThanOrEqual(1)
+    expect(
+      screen.getAllByRole("button", { name: /picked up/i }).length,
+    ).toBeGreaterThanOrEqual(1)
   })
 
   it('shows "Record" button in delivery table', async () => {
@@ -145,11 +163,23 @@ describe("Rider dashboard", () => {
 
   it("opens Pickup dialog", async () => {
     mockOrdersState = createMockOrders({
-      orders: [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+      orders: [
+        makeOrder({ pickupRiderId: "rider_1", status: "OUT_FOR_PICKUP" }),
+      ],
     })
     await importPage()
     const user = userEvent.setup()
     await user.click(screen.getByRole("button", { name: /picked up/i }))
+    expect(await screen.findByRole("dialog")).toBeInTheDocument()
+  })
+
+  it("opens the out-for-pickup dialog instead", async () => {
+    mockOrdersState = createMockOrders({
+      orders: [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+    })
+    await importPage()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("button", { name: /out for pickup/i }))
     expect(await screen.findByRole("dialog")).toBeInTheDocument()
   })
 })

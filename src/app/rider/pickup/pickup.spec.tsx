@@ -89,13 +89,32 @@ describe("Rider pickup queue", () => {
     expect(screen.getByText("ORD-0002")).toBeInTheDocument()
   })
 
-  it('shows "Picked up" button for APPROVED orders assigned to this rider', async () => {
+  it('shows "Out for pickup" for an APPROVED order assigned to this rider', async () => {
     mockOrdersState = createMockOrders({
       orders: [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
     })
     await importPage()
+    const buttons = screen.getAllByRole("button", { name: /out for pickup/i })
+    expect(buttons.length).toBeGreaterThanOrEqual(1)
+    // Not yet collectable — `picked-up` refuses anything but OUT_FOR_PICKUP.
+    expect(
+      screen.queryByRole("button", { name: /picked up/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows "Picked up" only once the rider has gone out for pickup', async () => {
+    mockOrdersState = createMockOrders({
+      orders: [
+        makeOrder({ pickupRiderId: "rider_1", status: "OUT_FOR_PICKUP" }),
+      ],
+    })
+    await importPage()
     const buttons = screen.getAllByRole("button", { name: /picked up/i })
     expect(buttons.length).toBeGreaterThanOrEqual(1)
+    // The start step is done; offering it again would invite a 400.
+    expect(
+      screen.queryByRole("button", { name: /out for pickup/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('hides "Picked up" button when pickupRiderId does not match', async () => {
@@ -108,7 +127,7 @@ describe("Rider pickup queue", () => {
     ).not.toBeInTheDocument()
   })
 
-  it('hides "Picked up" button when status is not APPROVED', async () => {
+  it("hides both buttons when the pickup is neither starting nor started", async () => {
     mockOrdersState = createMockOrders({
       orders: [makeOrder({ pickupRiderId: "rider_1", status: "PICKED_UP" })],
     })
@@ -158,13 +177,26 @@ describe("Rider pickup queue", () => {
     expect(screen.getByText(/no pickups waiting/i)).toBeInTheDocument()
   })
 
-  it("opens Pickup dialog", async () => {
+  it("opens the Pickup dialog from a started pickup", async () => {
     mockOrdersState = createMockOrders({
-      orders: [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+      orders: [
+        makeOrder({ pickupRiderId: "rider_1", status: "OUT_FOR_PICKUP" }),
+      ],
     })
     await importPage()
     const user = userEvent.setup()
     await user.click(screen.getByRole("button", { name: /picked up/i }))
     expect(await screen.findByRole("dialog")).toBeInTheDocument()
+  })
+
+  it("opens the out-for-pickup dialog from an APPROVED pickup", async () => {
+    mockOrdersState = createMockOrders({
+      orders: [makeOrder({ pickupRiderId: "rider_1", status: "APPROVED" })],
+    })
+    await importPage()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("button", { name: /out for pickup/i }))
+    expect(await screen.findByRole("dialog")).toBeInTheDocument()
+    expect(screen.getByText(/start pickup for/i)).toBeInTheDocument()
   })
 })

@@ -63,19 +63,20 @@ export default defineConfig({
         "src/lib/db/seed/**",
         "src/instrumentation*.ts",
       ],
-      // Global floors, set just under the measured baseline (statements 50.96,
-      // branches 44.4, functions 39.15, lines 51.66) so a drop fails the gate.
-      // They are a regression guard, not a target — raise them as tests land.
+      // Global floors, set under the measured baseline so a drop fails the gate
+      // (measured 55.98 / 50.30 / 44.44 / 56.87 at the last raise — see the
+      // ROADMAP health block). They are a regression guard, not a target —
+      // raise them as tests land; never lower them to make CI pass.
       //
       // The glob floors exist because a *global* number can be met while a
       // whole directory rots: `src/features/**` is deliberately not unit-tested
       // (feature hooks are covered through API specs and e2e), so it drags the
       // global figure down and would mask a real regression in src/lib.
       thresholds: {
-        statements: 49,
-        branches: 42,
-        functions: 37,
-        lines: 50,
+        statements: 50,
+        branches: 45,
+        functions: 40,
+        lines: 52,
         "src/lib/**": {
           statements: 80,
           branches: 74,

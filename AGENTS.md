@@ -167,14 +167,17 @@ be tagged. When fixing or writing e2e tests, **convert** existing `getByText` /
 must match text, scope it to a tagged container (e.g.
 `page.locator(selectors.x.table).getByText(...)`), not the whole page.
 
-**Suite naming:** every `test.describe` must be prefixed with a unique scenario
-id — `S<number>. <Scenario name>` (e.g. `S26. Merchant Dashboard`). New
-describes continue the serial from the current maximum (check the existing
-specs first); numbers must stay unique (a removed scenario leaves its serial
-unused rather than renumbering every later file). The summary below is
-asserted by `src/app/__tests__/docs-drift.spec.ts`, which fails on either a
-duplicate serial or stale counts: **currently S1-S79 across 35 files / 144
-tests**.
+**Suite naming:** every `test.describe` is prefixed with a scenario id **scoped
+to its file** — `<file number><index in that file>`, both two digits, so `2901.`
+is the first scenario in `29-sign-out.spec.ts`. File prefixes run `01`…`37` and
+must be unique, so ids never collide. Adding or removing a scenario renumbers
+**that one file only** — renumber it; there are no gaps to preserve any more.
+Files sort in run order, so the log now reads in id order too.
+
+The summary below is asserted by `src/app/__tests__/docs-drift.spec.ts`, which
+fails on a duplicate id, a prefix that does not match the filename, an
+out-of-sequence index, or stale counts: **currently 78 scenarios across 37 files
+/ 149 tests**.
 
 ## Coding Patterns
 
@@ -295,7 +298,7 @@ function formatOrderError(data: {
 
 - `pnpm test:coverage` runs the unit suite under `@vitest/coverage-v8` and
   fails if statements/branches/functions/lines drop below the floors in
-  `vitest.config.ts` (49 / 42 / 37 / 50). A CI `coverage` job enforces it.
+  `vitest.config.ts` (50 / 45 / 40 / 52). A CI `coverage` job enforces it.
 - Raise the floors as tests land — they are a regression guard, not a target.
   New code should come with tests, not with a lowered threshold.
 

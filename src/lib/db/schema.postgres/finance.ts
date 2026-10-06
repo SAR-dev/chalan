@@ -43,9 +43,18 @@ export const balanceTransaction = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => createId()),
+    // `restrict`, not `cascade`. The table comment below calls this an
+    // append-only ledger where "every correction is itself a new ADJUSTMENT
+    // row" — but `cascade` means one future `delete(merchant)` erases it whole,
+    // with no ADJUSTMENT row and no trace. A cascade and an audit trail cannot
+    // both be true; the ledger wins, because a silent balance that no longer
+    // adds up is worse than a delete that has to be un-done.
+    //
+    // `merchant_balance` above stays `cascade`: that is a derived cache of the
+    // ledger, so dying with its parent is correct.
     merchantId: text("merchantId")
       .notNull()
-      .references(() => merchant.id, { onDelete: "cascade" }),
+      .references(() => merchant.id, { onDelete: "restrict" }),
     type: text("type", { enum: balanceTxTypes }).notNull(),
     // Positive = charge / debit (merchant owes more).
     // Negative = payment / credit (merchant owes less).

@@ -12,22 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1791002458364,
-      "tag": "0001_smart_mastermind",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1791044088053,
-      "tag": "0002_same_wasp",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1791062549111,
-      "tag": "0003_next_callisto",
+      "when": 1791266382792,
+      "tag": "0001_spotty_sunfire",
       "breakpoints": true
     }
   ]

@@ -26,6 +26,7 @@ const HEADER_BY_KEY: Partial<Record<keyof ParcelState, OrderImportHeader>> = {
   pickupLocationId: "pickup_location",
   recipientName: "recipient_name",
   recipientPhone: "recipient_phone",
+  recipientMail: "recipient_mail",
   deliveryCityId: "delivery_city",
   deliveryAddress: "delivery_address",
   parcelWeightKg: "parcel_weight_kg",
@@ -81,6 +82,7 @@ export function resolvedRowToParcelState(
     ),
     recipientName: raw.recipient_name,
     recipientPhone: raw.recipient_phone,
+    recipientMail: raw.recipient_mail,
     deliveryCityId: idByName(
       deliveryCities,
       raw.delivery_city,

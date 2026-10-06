@@ -1,6 +1,7 @@
 import { createId } from "@paralleldrive/cuid2"
 import { sql } from "drizzle-orm"
 import {
+  check,
   doublePrecision,
   index,
   integer,
@@ -73,6 +74,31 @@ export const payoutRequest = pgTable(
 //
 // All lifecycle timestamps are embedded directly on the order row rather than
 // in a separate audit log table. Fields are null until their stage is reached.
+//
+// ── On the CHECK constraints below ───────────────────────────────────────────
+//
+// `order.status` is deliberately *not* a PostgreSQL enum, and deliberately has
+// no `status IN (…)` CHECK. That omission is the design, not an oversight: a
+// new status then needs no DDL at all beyond whatever columns it adds. Adding
+// `OUT_FOR_PICKUP` cost one `ALTER TABLE ADD COLUMN` and nothing else — no
+// `ALTER TYPE … ADD VALUE`, no table rewrite, no migration-ordering problem. A
+// whitelist would cost a migration per future status to enforce a rule the
+// transition guards already enforce.
+//
+// The constraints that *do* exist are therefore **conditional**: each one names
+// a specific status, and adding a new status cannot invalidate any of them, so
+// their cost stays at zero per status while incoherent rows become impossible.
+// A constraint that had to be edited whenever a status was added would not be
+// worth having.
+//
+// Deliberately absent: business rules. The transition guards in
+// `src/features/orders/transitions.ts` read the session and call
+// `resolveRoutePricing`; they belong in the application, and the database
+// trusts the app as the only process allowed to write `order`.
+//
+// Baseline before these were added: 111 orders, 0 violations of all twelve
+// (`pnpm db:audit-invariants`, see DBREFACTOR.md Phase A). Each one is proved to
+// reject a bad row in `src/lib/db/integration.spec.ts`.
 // =============================================================================
 
 export const order = pgTable(
@@ -96,6 +122,16 @@ export const order = pgTable(
       .references(() => pickupLocation.id),
     recipientName: text("recipientName").notNull(),
     recipientPhone: text("recipientPhone").notNull(),
+    // Recipient's email — deliberately **nullable**, never NOT NULL. Orders
+    // created before this column existed, bulk rows that omit it, and merchants
+    // who simply never collect an address all have to keep working: a NOT NULL
+    // here would fail every one of them, which is the lesson
+    // `profile.announcementsSeenAt` already taught (that column's nullability is
+    // pinned by an integration spec for the same reason).
+    //
+    // Personal data: only the owning merchant and staff may read it, and it
+    // never appears on the public track page.
+    recipientMail: text("recipientMail"),
     deliveryAddress: text("deliveryAddress").notNull(),
     deliveryCityId: text("deliveryCityId").references(() => deliveryCity.id, {
       onDelete: "set null",
@@ -152,7 +188,10 @@ export const order = pgTable(
     pickupRiderId: text("pickupRiderId").references(() => rider.id),
     assignedAt: ts("assignedAt"),
 
-    // Pickup rider collects parcel from merchant.
+    // Pickup rider collects parcel from merchant. `outForPickupAt` mirrors
+    // `outForDeliveryAt` on the delivery leg: the moment the rider declares they
+    // are heading to the shop, and the gate before `pickedUpAt` can be set.
+    outForPickupAt: ts("outForPickupAt"),
     pickedUpAt: ts("pickedUpAt"),
     // Photo(s) the pickup rider captures as proof of collection (shop front,
     // parcel in hand, etc). Multiple images allowed, same pattern as the
@@ -172,6 +211,23 @@ export const order = pgTable(
     dispatchedAt: ts("dispatchedAt"),
     // Name of the Warehouse Admin who dispatched.
     dispatchedBy: text("dispatchedBy"),
+
+    // The delivery promise, and whether it was kept.
+    //
+    // Snapshotted at creation from `zone_delivery_time` (days from
+    // `createdAt`), never recomputed — editing the zone matrix afterwards
+    // must not move a promised date that a merchant has already seen. Null
+    // when the lane has no configured delivery time: an estimate that is
+    // missing is honest, one that changes is not. Admins and warehouse
+    // admins may set a custom `expectedDeliveryAt` (see the
+    // `set-expected-delivery` transition), which is recorded but not
+    // derivable — hence the days staying as quoted alongside it.
+    expectedDeliveryDays: integer("expectedDeliveryDays"),
+    expectedDeliveryAt: ts("expectedDeliveryAt"),
+    // Written once, by the `delivered` transition: whole days from `createdAt`
+    // to `deliveredAt`. Null until delivered, so "late" can never be inferred
+    // from a parcel that has not arrived.
+    actualDeliveryDays: integer("actualDeliveryDays"),
 
     // Delivery rider heads out and attempts delivery.
     outForDeliveryAt: ts("outForDeliveryAt"),
@@ -262,6 +318,66 @@ export const order = pgTable(
     index("order_recipient_phone_trgm_idx").using(
       "gin",
       sql`${t.recipientPhone} gin_trgm_ops`,
+    ),
+
+    // ── Conditional lifecycle pairings (DBREFACTOR Phase C) ──────────────────
+    //
+    // Each says: this status already happened, so the timestamp that records it
+    // must exist. A row claiming DELIVERED with no `deliveredAt` is incoherent —
+    // every SLA report, the COD settlement page and the tracking timeline all
+    // read that column, so its absence silently becomes "delivered at the epoch".
+    //
+    // The constraint name is the error message Postgres surfaces
+    // (`violates check constraint "order_delivered_needs_delivered_at"`), so
+    // each one names the pairing it caught rather than being `check_1`.
+    check(
+      "order_delivered_needs_delivered_at",
+      sql`${t.status} <> 'DELIVERED' OR ${t.deliveredAt} IS NOT NULL`,
+    ),
+    check(
+      "order_cancelled_needs_cancelled_at",
+      sql`${t.status} <> 'CANCELLED' OR ${t.cancelledAt} IS NOT NULL`,
+    ),
+    check(
+      "order_returned_needs_returned_at",
+      sql`${t.status} <> 'RETURNED' OR ${t.returnedAt} IS NOT NULL`,
+    ),
+    check(
+      "order_picked_up_needs_picked_up_at",
+      sql`${t.status} <> 'PICKED_UP' OR ${t.pickedUpAt} IS NOT NULL`,
+    ),
+    check(
+      "order_out_for_pickup_needs_out_for_pickup_at",
+      sql`${t.status} <> 'OUT_FOR_PICKUP' OR ${t.outForPickupAt} IS NOT NULL`,
+    ),
+    check(
+      "order_out_for_delivery_needs_out_for_delivery_at",
+      sql`${t.status} <> 'OUT_FOR_DELIVERY' OR ${t.outForDeliveryAt} IS NOT NULL`,
+    ),
+
+    // ── Money is never negative (DBREFACTOR Phase D) ─────────────────────────
+    //
+    // The four fee columns and the earnings snapshot are all `>= 0` by
+    // construction in `resolveRoutePricing` and the transition guards; nothing
+    // in the app can produce a negative one. That is exactly why a constraint
+    // is safe here — it cannot fire, so it costs nothing to keep true, and it
+    // turns a future pricing bug into a failed transaction rather than a
+    // negative fee that quietly credits a merchant.
+    //
+    // `balance_transaction.amount` is NOT in this list and must never be: it is
+    // signed by design, and 23 of 150 live rows are negative reversals.
+    check("order_product_cost_nonneg", sql`${t.productCost} >= 0`),
+    check("order_delivery_fee_nonneg", sql`${t.deliveryFee} >= 0`),
+    check("order_cod_fee_nonneg", sql`${t.codFee} >= 0`),
+    check("order_cancellation_fee_nonneg", sql`${t.cancellationFee} >= 0`),
+    check("order_merchant_earnings_nonneg", sql`${t.merchantEarnings} >= 0`),
+    // `amountCollected` is nullable (null until a rider hands cash over), and a
+    // CHECK that evaluates to NULL passes — but the `IS NULL` is written out
+    // anyway so the next reader does not have to know that rule of three-valued
+    // logic to trust this.
+    check(
+      "order_amount_collected_nonneg",
+      sql`${t.amountCollected} IS NULL OR ${t.amountCollected} >= 0`,
     ),
   ],
 )

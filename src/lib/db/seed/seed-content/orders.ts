@@ -1,6 +1,11 @@
 import { randomBytes } from "node:crypto"
+import {
+  computeActualDeliveryDays,
+  computeExpectedDeliveryAt,
+} from "@/lib/order-delivery-time"
+import { DELIVERY_TIME_MATRIX } from "../zone-delivery-time"
 import { SEED_COUNTS } from "./credentials"
-import { SEED_DELIVERY_CITIES } from "./delivery-cities"
+import { SEED_DELIVERY_CITIES, SEED_ZONE_IDS } from "./delivery-cities"
 import { MERCHANT_IDS } from "./merchants"
 import { SEED_RIDERS } from "./riders"
 import { ADMIN_USER_NAMES } from "./users"
@@ -17,6 +22,7 @@ import { WAREHOUSE_IDS } from "./warehouses"
 const ORDER_SEED_STATUSES: (
   | "PENDING"
   | "APPROVED"
+  | "OUT_FOR_PICKUP"
   | "PICKED_UP"
   | "IN_WAREHOUSE"
   | "IN_TRANSIT"
@@ -27,7 +33,11 @@ const ORDER_SEED_STATUSES: (
   | "CANCELLED"
 )[] = [
   ...Array.from({ length: 8 }, () => "PENDING" as const),
-  ...Array.from({ length: 8 }, () => "APPROVED" as const),
+  // Split 8 → 4 + 4 so the new status is represented without changing the
+  // total: suites assert "100 orders" as a number, and APPROVED only needs to
+  // keep enough rows to be assignable.
+  ...Array.from({ length: 4 }, () => "APPROVED" as const),
+  ...Array.from({ length: 4 }, () => "OUT_FOR_PICKUP" as const),
   ...Array.from({ length: 8 }, () => "PICKED_UP" as const),
   ...Array.from({ length: 10 }, () => "IN_WAREHOUSE" as const),
   ...Array.from({ length: 10 }, () => "IN_TRANSIT" as const),
@@ -109,6 +119,8 @@ export interface OrderSeedEntry {
   pickupLocationId: string
   recipientName: string
   recipientPhone: string
+  /** Nullable by design — the column is, and so is the seed's coverage of it. */
+  recipientMail: string | null
   deliveryAddress: string
   /** `delivery_city.id` — the destination zone the pricing lane and the rider
    *  run sheet are both derived from. Required by `orderCreateSchema`, so a
@@ -128,6 +140,7 @@ export interface OrderSeedEntry {
   approvedAt: string | null
   pickupRiderId: string | null
   assignedAt: string | null
+  outForPickupAt: string | null
   pickedUpAt: string | null
   receivedAtWarehouseAt: string | null
   receivedByWarehouse: string | null
@@ -147,6 +160,9 @@ export interface OrderSeedEntry {
   cancelReason: string | null
   deliveryAttempts: number
   createdAt: string
+  expectedDeliveryDays: number | null
+  expectedDeliveryAt: string | null
+  actualDeliveryDays: number | null
 }
 
 function buildSeedOrders(): OrderSeedEntry[] {
@@ -211,6 +227,18 @@ function buildSeedOrders(): OrderSeedEntry[] {
       now - (SEED_COUNTS.orders - i) * (DAY / 4),
     ).toISOString()
 
+    // The quoted promise, computed the way order creation computes it: the
+    // destination zone comes from the seeded city, the origin is Dhaka Metro
+    // (every seeded order sits at the central hub), and the days come from the
+    // same matrix the seed inserts — so a seeded order is indistinguishable from
+    // one created through the API.
+    const deliveryDays =
+      DELIVERY_TIME_MATRIX.find(
+        (r) =>
+          r.fromZoneId === SEED_ZONE_IDS.dhakaMetro &&
+          r.toZoneId === city.zoneId,
+      )?.deliveryDays ?? null
+
     const base: OrderSeedEntry = {
       id: `ORD-${String(100001 + i).padStart(6, "0")}E`,
       trackingToken: randomBytes(16).toString("hex"),
@@ -218,6 +246,10 @@ function buildSeedOrders(): OrderSeedEntry[] {
       pickupLocationId: merchant.pickupId,
       recipientName,
       recipientPhone: `+8801712${String(10000 + i).slice(0, 5)}`,
+      // Mostly populated, sometimes null: both states have to be representable
+      // in seeded data, because the order details only render the email row when
+      // one exists and a seed where every row had one would hide that.
+      recipientMail: i % 4 === 0 ? null : `recipient${i + 1}@example.com`,
       deliveryAddress: `${100 + i} Seed Road, ${city.name}`,
       deliveryCityId: city.id,
       parcelWeightKg: weight,
@@ -233,6 +265,7 @@ function buildSeedOrders(): OrderSeedEntry[] {
       approvedAt: null,
       pickupRiderId: null,
       assignedAt: null,
+      outForPickupAt: null,
       pickedUpAt: null,
       receivedAtWarehouseAt: null,
       receivedByWarehouse: null,
@@ -252,12 +285,39 @@ function buildSeedOrders(): OrderSeedEntry[] {
       cancelReason: null,
       deliveryAttempts: 0,
       createdAt,
+      expectedDeliveryDays: deliveryDays,
+      expectedDeliveryAt: computeExpectedDeliveryAt(createdAt, deliveryDays),
+      actualDeliveryDays: null,
     }
 
     if (status !== "PENDING" && status !== "CANCELLED") {
       base.approvedBy = ADMIN_USER_NAMES.tanvir
       base.approvedAt = new Date(
         new Date(createdAt).getTime() + 0.5 * DAY,
+      ).toISOString()
+    }
+
+    if (
+      status === "OUT_FOR_PICKUP" ||
+      status === "PICKED_UP" ||
+      status === "IN_WAREHOUSE" ||
+      status === "IN_TRANSIT" ||
+      status === "OUT_FOR_DELIVERY" ||
+      status === "DELIVERED" ||
+      status === "FAILED_ATTEMPT" ||
+      status === "RETURNED"
+    ) {
+      const rider = pickupRiders[i % pickupRiders.length]
+      base.pickupRiderId = rider.id
+      base.assignedAt = base.approvedAt
+    }
+
+    // Heading out is half a day after approval; collecting is a day after
+    // approval, so a seeded OUT_FOR_PICKUP parcel has a believable gap before a
+    // pickup that has not happened yet.
+    if (status === "OUT_FOR_PICKUP") {
+      base.outForPickupAt = new Date(
+        new Date(base.approvedAt!).getTime() + 0.5 * DAY,
       ).toISOString()
     }
 
@@ -270,9 +330,6 @@ function buildSeedOrders(): OrderSeedEntry[] {
       status === "FAILED_ATTEMPT" ||
       status === "RETURNED"
     ) {
-      const rider = pickupRiders[i % pickupRiders.length]
-      base.pickupRiderId = rider.id
-      base.assignedAt = base.approvedAt
       base.pickedUpAt = new Date(
         new Date(base.approvedAt!).getTime() + DAY,
       ).toISOString()
@@ -325,6 +382,11 @@ function buildSeedOrders(): OrderSeedEntry[] {
       base.deliveryProofRef = `proof_seed_${i + 1}.jpg`
       base.amountCollected = productCost
       base.deliveryAttempts = 1
+      // Finalized on delivery, exactly as the transition would have done it.
+      base.actualDeliveryDays = computeActualDeliveryDays(
+        base.createdAt,
+        base.deliveredAt,
+      )
     }
 
     if (status === "FAILED_ATTEMPT") {

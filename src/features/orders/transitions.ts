@@ -18,6 +18,7 @@ import {
   toPaisa,
 } from "@/lib/balance-ledger"
 import { refreshStats, statTag } from "@/lib/cached-stats"
+import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
 import { db } from "@/lib/db"
 import { pickupWarehouseId } from "@/lib/db/order-lookup"
 import {
@@ -31,9 +32,15 @@ import {
   rider,
 } from "@/lib/db/schema"
 import { hasNavPermission } from "@/lib/nav-config"
+import { computeActualDeliveryDays } from "@/lib/order-delivery-time"
 import { resolveRoutePricing } from "@/lib/order-pricing"
 import { applyPackageRule } from "@/lib/packages"
 import { calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
+import {
+  businessDateString,
+  businessDayEnd,
+  businessDaysBetween,
+} from "@/lib/timezone"
 import {
   orderAssignPickupRiderSchema,
   orderCancelSchema,
@@ -42,6 +49,7 @@ import {
   orderFailedSchema,
   orderPickedUpSchema,
   orderReturnSchema,
+  orderSetExpectedDeliverySchema,
   parseBody,
 } from "@/lib/validation"
 
@@ -274,6 +282,62 @@ export const ORDER_TRANSITIONS = {
     }),
   }),
 
+  // An admin, or the warehouse admin who owns the parcel, overrides the promised
+  // date. Like `assign-pickup-rider` this writes fields without moving the
+  // lifecycle — which is exactly why it is a transition and not a bare PATCH:
+  // the audit row and the before/after diff come with it, and the authorise
+  // step is the only place the two roles are named.
+  "set-expected-delivery": defineTransition({
+    authorize: (me) =>
+      me.role === "SUPER_ADMIN" || me.role === "WAREHOUSE_ADMIN",
+    schema: orderSetExpectedDeliverySchema,
+    guard: ({ order: o, session, body }) => {
+      if (o.deliveredAt) {
+        return {
+          error: "The delivery date is final once the parcel is delivered.",
+          status: 400,
+        }
+      }
+      if (
+        session.role === "WAREHOUSE_ADMIN" &&
+        !warehouseOrderInScope(o, session.warehouseId)
+      ) {
+        return {
+          error: "This parcel is held at a different warehouse.",
+          status: 400,
+        }
+      }
+      // A promise that predates the order was already broken the day it was
+      // made. Compared as strings — both sides are `YYYY-MM-DD`, so ordering is
+      // lexicographic. The parse is guarded because a missing or unparseable
+      // `createdAt` must answer 400, not throw a 500 out of a guard: a bad row
+      // is the caller's problem to hear about, not a server fault to hide.
+      const createdDate = new Date(o.createdAt)
+      const created = Number.isNaN(createdDate.getTime())
+        ? null
+        : businessDateString(createdDate)
+      if (!created || body.date < created) {
+        return {
+          error: "Delivery date cannot be before the order was created.",
+          status: 400,
+        }
+      }
+      return null
+    },
+    buildUpdate: ({ order: o, body }) => {
+      const created = businessDateString(new Date(o.createdAt))
+      return {
+        // End of the chosen Dhaka day — the same boundary the quoted promise
+        // uses, so an override and a quote are never on different calendars.
+        expectedDeliveryAt: businessDayEnd(body.date).toISOString(),
+        // Recomputed alongside so the day count and the date can never disagree.
+        // The original quote is not lost: `order_status_history` diffs both
+        // fields, so the value being replaced is still recorded.
+        expectedDeliveryDays: businessDaysBetween(created, body.date),
+      }
+    },
+  }),
+
   dispatch: defineTransition({
     authorize: (me) => me.role === "WAREHOUSE_ADMIN" && Boolean(me.warehouseId),
     schema: orderDispatchSchema,
@@ -320,6 +384,31 @@ export const ORDER_TRANSITIONS = {
     }),
   }),
 
+  // The rider declaring they are on the way to the shop. Mirrors
+  // `out-for-delivery` exactly — same authorize, same 403-for-the-wrong-rider /
+  // 400-for-the-wrong-status pair, no body schema — because the two legs are the
+  // same act ("I have started heading for it") at opposite ends of the parcel's
+  // life. Its only job is to open the gate in front of `picked-up`.
+  "out-for-pickup": defineTransition({
+    authorize: (me) => me.role === "RIDER" && Boolean(me.riderId),
+    guard: ({ order: o, session }) => {
+      if (o.pickupRiderId !== session.riderId) {
+        return { error: "This pickup is not assigned to you.", status: 403 }
+      }
+      if (o.status !== "APPROVED") {
+        return {
+          error: "Only APPROVED orders can go out for pickup.",
+          status: 400,
+        }
+      }
+      return null
+    },
+    buildUpdate: ({ now }) => ({
+      status: "OUT_FOR_PICKUP",
+      outForPickupAt: now,
+    }),
+  }),
+
   "picked-up": defineTransition({
     authorize: (me) => me.role === "RIDER" && Boolean(me.riderId),
     schema: orderPickedUpSchema,
@@ -327,8 +416,11 @@ export const ORDER_TRANSITIONS = {
       if (o.pickupRiderId !== session.riderId) {
         return { error: "This pickup is not assigned to you.", status: 403 }
       }
-      if (o.status !== "APPROVED") {
-        return { error: "Only APPROVED orders can be picked up.", status: 400 }
+      if (o.status !== "OUT_FOR_PICKUP") {
+        return {
+          error: "Only OUT_FOR_PICKUP orders can be picked up.",
+          status: 400,
+        }
       }
       return null
     },
@@ -485,6 +577,11 @@ export const ORDER_TRANSITIONS = {
       return {
         status: "DELIVERED",
         deliveredAt: now,
+        // Finalize the delivery promise. Written here, at the moment it becomes
+        // a fact, rather than computed at display time — so "was it late?" stays
+        // a recorded number even if the zone matrix is edited afterwards, and
+        // the same applies to an overridden date.
+        actualDeliveryDays: computeActualDeliveryDays(o.createdAt, now),
         deliveryProofRef: body.proofRef ?? `proof_${o.id.toLowerCase()}.jpg`,
         amountCollected: collected,
         deliveryShortfallReason: body.shortfallReason?.trim() || null,
@@ -617,7 +714,11 @@ export const ORDER_TRANSITIONS = {
         if (o.merchantId !== session.merchantId) {
           return { error: "Forbidden", status: 403 }
         }
-        const merchantAllowed = ["PENDING", "APPROVED"] as const
+        const merchantAllowed = [
+          "PENDING",
+          "APPROVED",
+          "OUT_FOR_PICKUP",
+        ] as const
         if (!(merchantAllowed as readonly string[]).includes(o.status)) {
           return {
             error: "Orders can only be cancelled before they are picked up.",
@@ -625,13 +726,11 @@ export const ORDER_TRANSITIONS = {
           }
         }
       } else {
-        const adminAllowed = [
-          "PENDING",
-          "APPROVED",
-          "PICKED_UP",
-          "IN_WAREHOUSE",
-          "IN_TRANSIT",
-        ] as const
+        // Anything up to the moment it leaves for delivery. See
+        // `CANCELLABLE_ORDER_STATUSES` for why this is one list rather than a
+        // literal here — and why OUT_FOR_PICKUP is inside it despite preceding
+        // PICKED_UP in the flow.
+        const adminAllowed = CANCELLABLE_ORDER_STATUSES
         if (!(adminAllowed as readonly string[]).includes(o.status)) {
           return {
             error: "Orders cannot be cancelled once they are out for delivery.",
@@ -668,6 +767,7 @@ const ORDER_DIFF_FIELDS = [
   "pickupRiderId",
   "assignedAt",
   "warehouseId",
+  "outForPickupAt",
   "pickedUpAt",
   "pickupProofRefs",
   "receivedAtWarehouseAt",
@@ -689,6 +789,9 @@ const ORDER_DIFF_FIELDS = [
   "cancelledAt",
   "cancelledBy",
   "cancelReason",
+  "expectedDeliveryDays",
+  "expectedDeliveryAt",
+  "actualDeliveryDays",
   "codSettledAt",
   "codSettledBy",
 ] as const
@@ -696,7 +799,9 @@ const ORDER_DIFF_FIELDS = [
 const TRANSITION_LABELS: Record<TransitionName, string> = {
   approve: "Approved",
   "assign-pickup-rider": "Assigned pickup rider",
+  "set-expected-delivery": "Set expected delivery date for",
   dispatch: "Dispatched",
+  "out-for-pickup": "Marked out for pickup",
   "picked-up": "Marked picked up",
   "out-for-delivery": "Marked out for delivery",
   delivered: "Marked delivered",

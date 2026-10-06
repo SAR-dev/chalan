@@ -321,6 +321,28 @@ export const ongoing = {
   details: "[data-testid='order-details-drawer']",
 }
 
+// ─── Rider pickup queue ──────────────────────────────────────────────────────
+// The two-stage pickup: APPROVED offers "Out for pickup", OUT_FOR_PICKUP offers
+// "Picked up". Addressed by order id, so a spec can assert that one parcel is
+// in exactly one of the two states rather than "some button exists".
+export const riderPickup = {
+  startPickup: (id: string) => `[data-testid='rider-start-pickup-${id}']`,
+  pickedUp: (id: string) => `[data-testid='rider-picked-up-${id}']`,
+  confirmStart: "[data-testid='out-for-pickup-confirm']",
+}
+
+// ─── Expected delivery (promise + admin override) ─────────────────────────────
+export const deliveryPromise = {
+  // The tracking page's read of the promise: a label/value row, so it carries a
+  // testid rather than a spec matching on its label text.
+  trackExpectedBy: "[data-testid='track-expected-by']",
+  trackOutcome: "[data-testid='track-outcome']",
+  // The override control, its date input, and the confirm button.
+  setExpectedDate: "[data-testid='set-expected-delivery-open']",
+  dateInput: "[data-testid='expected-delivery-date']",
+  confirm: "[data-testid='set-expected-delivery-confirm']",
+}
+
 // ─── Completed orders (warehouse) ────────────────────────────────────────────
 // Read-only, so the only things worth addressing are the tabs and the table.
 export const completed = {
@@ -474,7 +496,7 @@ export const tracking = {
   noteLocked: "[data-testid='receiver-note-locked']",
 }
 
-// --- Merchants (moderators) + staff activation (S41/S42) ---
+// --- Merchants (moderators) + staff activation (1201/1202) ---
 export const moderators = {
   card: "[data-testid='moderators-card']",
   add: "[data-testid='add-moderator']",

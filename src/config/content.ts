@@ -8,6 +8,28 @@ import { siteConfig } from "@/config/site"
 
 const teamDescription = `Active platform announcements from the ${siteConfig.name} team.`
 
+/**
+ * Form copy that is not a page header.
+ *
+ * `pageContent` below owns titles and descriptions; this owns the handful of
+ * *control* labels that a decision has said must not be inlined in a
+ * component. It exists so that when i18n lands (deferred, not cancelled — see
+ * the R1 decision in ROADMAP.md) the catalog has somewhere to start instead of
+ * ~500 scattered literals.
+ *
+ * Not a migration of everything: the sibling labels in `parcel-card.tsx`
+ * ("Recipient name", "Recipient phone", …) are still inline, as is most form
+ * copy. Only new labels added by decision land here.
+ */
+export const formLabels = {
+  newOrder: {
+    // Optional by design — merchants often only have a phone number — so the
+    // label says so rather than leaving the merchant to discover it from the
+    // absence of a red asterisk.
+    recipientMail: "Recipient email (optional)",
+  },
+} as const
+
 export const pageContent = {
   dashboard: {
     overview: {

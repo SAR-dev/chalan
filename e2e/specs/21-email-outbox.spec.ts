@@ -1,0 +1,101 @@
+import "dotenv/config"
+
+import { randomUUID } from "node:crypto"
+import { expect, test } from "@playwright/test"
+import { Client } from "pg"
+
+// ─── 2101. Email outbox ───────────────────────────────────────
+//
+// A domain write commits its email as an `email_outbox` row; if the process
+// dies before delivery, the drain cron still sends it. Here we simulate the
+// "committed then died" case by inserting a row directly and running the cron.
+
+async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set — .env failed to load")
+  }
+  const client = new Client({ connectionString: process.env.DATABASE_URL })
+  await client.connect()
+  try {
+    return await fn(client)
+  } finally {
+    await client.end()
+  }
+}
+
+test.describe("2101. Email outbox", () => {
+  test("the drain cron delivers a row left behind by a dead request", async ({
+    request,
+  }) => {
+    const secret = process.env.CRON_SECRET
+    expect(secret, "CRON_SECRET must be set for this spec").toBeTruthy()
+    const subject = `2101 outbox ${Date.now()}`
+
+    const id = await withDb(async (client) => {
+      const rowId = randomUUID()
+      await client.query(
+        `INSERT INTO email_outbox (id, "to", subject, text, status)
+         VALUES ($1, $2, $3, $4, 'PENDING')`,
+        [rowId, "s2101@example.com", subject, "outbox delivery test"],
+      )
+      return rowId
+    })
+
+    try {
+      const res = await request.post("/api/cron/drain-email-outbox", {
+        headers: { authorization: `Bearer ${secret}` },
+      })
+      expect(res.ok()).toBeTruthy()
+      const json = (await res.json()) as { claimed: number }
+      expect(json.claimed).toBeGreaterThanOrEqual(1)
+
+      const after = await withDb(async (client) => {
+        const row = await client.query(
+          `SELECT status, attempts, "lastError", "nextAttemptAt"
+             FROM email_outbox WHERE id = $1`,
+          [id],
+        )
+        const logs = await client.query(
+          `SELECT count(1)::int AS n FROM email_log WHERE subject = $1`,
+          [subject],
+        )
+        return {
+          status: row.rows[0]?.status as string | undefined,
+          attempts: Number(row.rows[0]?.attempts ?? 0),
+          nextAttemptAt: row.rows[0]?.nextAttemptAt as Date | null | undefined,
+          logs: Number(logs.rows[0]?.n ?? 0),
+        }
+      })
+
+      // The row is processed exactly once and a delivery record is always
+      // written. The outcome depends on the environment: CI has no SMTP, so the
+      // attempt fails; a dev database may have an active `mail_config` (it is
+      // preserved across reseeds), in which case the send succeeds and the
+      // queue row is deleted.
+      expect(after.logs).toBe(1)
+      if (after.status === undefined) {
+        // Delivered — the queue row is removed on success.
+        expect(after.attempts).toBe(0)
+      } else {
+        // A failed attempt requeues with backoff instead of parking on the
+        // First failure: this outbox exists so a transient SMTP
+        // blip cannot cost someone their activation or password-reset link.
+        // The row only becomes FAILED once the attempts are spent.
+        expect(after.status).toBe("PENDING")
+        expect(after.attempts).toBe(1)
+        // …and it must not be claimable again immediately, or a stuck provider
+        // would be hammered every minute.
+        expect(new Date(after.nextAttemptAt ?? 0).getTime()).toBeGreaterThan(
+          Date.now(),
+        )
+      }
+    } finally {
+      await withDb(async (client) => {
+        await client.query(`DELETE FROM email_outbox WHERE id = $1`, [id])
+        await client.query(`DELETE FROM email_log WHERE subject = $1`, [
+          subject,
+        ])
+      })
+    }
+  })
+})

@@ -64,6 +64,7 @@ describe("resolvedRowToParcelState", () => {
       pickupLocationId: "PKL-1",
       recipientName: "John Doe",
       recipientPhone: "01712345678",
+      recipientMail: "",
       deliveryCityId: "DC-1",
       deliveryAddress: "House 1 Road 1",
       parcelWeightKg: "1.5",

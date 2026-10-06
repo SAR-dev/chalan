@@ -39,6 +39,7 @@ import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
 import type { Order } from "@/lib/types"
 
 /**
@@ -153,13 +154,7 @@ export function WarehouseOrdersPageClient({
       headClassName: "w-12",
       cell: (o) => {
         const canApprove = o.status === "PENDING"
-        const canCancel = [
-          "PENDING",
-          "APPROVED",
-          "PICKED_UP",
-          "IN_WAREHOUSE",
-          "IN_TRANSIT",
-        ].includes(o.status)
+        const canCancel = CANCELLABLE_ORDER_STATUSES.includes(o.status)
         return (
           <div className="flex justify-end gap-1">
             <DropdownMenu>
@@ -277,13 +272,7 @@ export function WarehouseOrdersPageClient({
                   await handleBulkCancel(
                     rows
                       .filter((o) =>
-                        [
-                          "PENDING",
-                          "APPROVED",
-                          "PICKED_UP",
-                          "IN_WAREHOUSE",
-                          "IN_TRANSIT",
-                        ].includes(o.status),
+                        CANCELLABLE_ORDER_STATUSES.includes(o.status),
                       )
                       .map((o) => o.id),
                   )

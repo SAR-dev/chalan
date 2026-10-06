@@ -44,7 +44,7 @@ export async function parseBody<T extends z.ZodType>(
 ): Promise<
   { data: z.infer<T>; error: null } | { data: null; error: NextResponse }
 > {
-  // CSRF â€” reject cross-site requests up front. Browsers attach Origin to
+  // CSRF — reject cross-site requests up front. Browsers attach Origin to
   // state-changing same/cross-origin requests, so any mismatch cannot come
   // from a legitimate page in this app.
   if (!isAllowedOrigin(req)) {
@@ -157,7 +157,7 @@ const bdPhone = (label: string) =>
     })
 
 // Accepts either an absolute URL (e.g. an externally hosted image) or a
-// site-relative upload path served by app/uploads/[...path]/route.ts â€” the
+// site-relative upload path served by app/uploads/[...path]/route.ts — the
 // local storage driver returns paths like "/uploads/avatars/<id>/<uuid>.png",
 // which z.url() alone would reject.
 const imageUrl = (label: string) =>
@@ -171,7 +171,7 @@ const imageUrl = (label: string) =>
 /**
  * Attested by the signup form, which blocks submission until the box is ticked.
  *
- * `.optional()` so an API caller that never attests records **no** consent â€”
+ * `.optional()` so an API caller that never attests records **no** consent —
  * see `user.termsAcceptedAt`, which stays null rather than claiming agreement
  * nobody gave. `z.literal(true)` rejects `false` outright: a refusal must not
  * be storable as though it were an acceptance. The value itself is discarded
@@ -236,8 +236,8 @@ export const platformConfigSchema = z.object({
   refundOnCancel: z.boolean().optional(),
 })
 
-// Disabling 2FA requires a *current* second factor â€” a live TOTP
-// code or one of the remaining recovery codes â€” even though the caller is
+// Disabling 2FA requires a *current* second factor — a live TOTP
+// code or one of the remaining recovery codes — even though the caller is
 // already signed in.
 export const twoFactorDisableSchema = z.object({
   code: z
@@ -255,8 +255,8 @@ const noteField = (label: string) =>
  *
  * Optional, and a blank submission is stored as NULL rather than "" so
  * "did not say" stays distinguishable from "said nothing useful" when the field
- * is later grouped or counted. The cap is a single line of a label â€” enough for
- * "saree", "cooked food", "phone charger" â€” and stops the field being used as
+ * is later grouped or counted. The cap is a single line of a label — enough for
+ * "saree", "cooked food", "phone charger" — and stops the field being used as
  * free-form notes that nothing will ever read.
  */
 const itemTypeField = () =>
@@ -267,10 +267,33 @@ const itemTypeField = () =>
     .nullish()
     .transform((v) => (v ? v.replace(/\s+/g, " ") : null))
 
+/**
+ * The recipient's email — optional, because most orders are placed by a
+ * merchant who has only ever collected a phone number.
+ *
+ * Blank means "did not say" and is stored as NULL rather than "": they look
+ * identical in a text input and are not identical in the database, and NULL is
+ * exactly what the future unsubscribe path needs to be able to skip.
+ *
+ * 254 is the RFC 5321 limit on a whole address (64 for the local part plus 253
+ * for the domain), so anything longer is malformed rather than merely unusual.
+ */
+const recipientMailField = () =>
+  z
+    .string({ error: "Recipient email must be a valid email address" })
+    .trim()
+    .max(254, "Recipient email cannot exceed 254 characters")
+    .nullish()
+    .refine((v) => !v || z.email().safeParse(v).success, {
+      error: "Recipient email must be a valid email address",
+    })
+    .transform((v) => v || null)
+
 export const orderCreateSchema = z.object({
   pickupLocationId: requiredString("Pickup location"),
   recipientName: requiredString("Recipient name"),
   recipientPhone: bdPhone("Recipient phone"),
+  recipientMail: recipientMailField(),
   deliveryAddress: requiredString("Delivery address"),
   deliveryCityId: requiredString("Delivery city"),
   deliveryMapLink: z
@@ -318,6 +341,20 @@ export const orderAssignPickupRiderSchema = z.object({
 
 export const orderDispatchSchema = z.object({
   riderId: requiredString("riderId"),
+})
+
+/**
+ * A promised delivery day, set by an admin or warehouse admin.
+ *
+ * Sent as a calendar day rather than an instant because the day is what gets
+ * promised ("by the 9th") — the server expands it to the end of that Dhaka day,
+ * the same boundary `computeExpectedDeliveryAt` uses when it quotes from the
+ * zone matrix, so an override and a quote are never on different calendars.
+ */
+export const orderSetExpectedDeliverySchema = z.object({
+  date: z
+    .string({ error: "A delivery date is required" })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Delivery date must be YYYY-MM-DD"),
 })
 
 export const orderPickedUpSchema = z.object({
@@ -445,14 +482,14 @@ const riderVehicleTypeSchema = z.enum(RIDER_VEHICLE_TYPES, {
 
 /**
  * Registration number. Upper-cased and space-stripped so "dhaka 12-3456" and
- * "DHAKA-123456" are the same plate â€” the same value typed two ways is one
+ * "DHAKA-123456" are the same plate — the same value typed two ways is one
  * vehicle, and an admin comparing it against a photo should not have to guess.
  * A blank value clears the plate, which is a real state (a foot or bicycle
  * rider has no plate).
  *
  * The `undefined` passthrough in the transform is load-bearing, not defensive.
  * Zod's `.nullish()` alone would leave an absent key absent, but attaching a
- * plain `.transform()` makes the key materialise on EVERY parse â€” so
+ * plain `.transform()` makes the key materialise on EVERY parse — so
  * `parse({ name: "New" })` would come back carrying `vehiclePlate: null` and a
  * PATCH that only renames a rider would silently erase its vehicle. Returning
  * `undefined` for an absent input is what keeps "not mentioned" distinct from
@@ -486,7 +523,7 @@ export const riderApplySchema = z.object({
   // vehicles (see `VEHICLE_TYPES_REQUIRING_PLATE`), so no applicant can satisfy
   // it universally, and someone without a motorbike yet is a legitimate
   // applicant. The approver sees whatever is submitted rather than a blank
-  // field â€” see `rider-application-detail-dialog`.
+  // field — see `rider-application-detail-dialog`.
   vehicleType: riderVehicleTypeSchema.nullish(),
   vehiclePlate: riderVehiclePlateSchema,
   termsAccepted: termsAcceptedField,
@@ -497,7 +534,7 @@ export const riderApproveSchema = z.object({
   warehouseId: z.string().trim().optional(),
   // Captured at approval rather than left for later. This is the one moment the
   // admin is guaranteed to be looking at the rider's details and thinking about
-  // what they can carry â€” ask then or the field sits unset until someone
+  // what they can carry — ask then or the field sits unset until someone
   // remembers, which for most fleets is never. Both stay optional so approving
   // is never blocked on a detail that does not apply (a bicycle has no plate).
   vehicleType: riderVehicleTypeSchema.nullish(),
@@ -597,7 +634,7 @@ export const teamCreateSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
-// â”€â”€â”€ Merchant moderators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Merchant moderators ─────────────────────────────────────
 
 export const moderatorCreateSchema = z.object({
   name: requiredString("Name"),
@@ -625,7 +662,7 @@ export const activationSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
-/** SUPER_ADMIN-managed moderator quota (0â€“20) on the merchant detail page. */
+/** SUPER_ADMIN-managed moderator quota (0–20) on the merchant detail page. */
 export const merchantModeratorQuotaSchema = z.object({
   maxModerators: z
     .number()
@@ -740,6 +777,23 @@ export const zonePricingUpdateSchema = z.object({
   cancellationFee: z.number().nonnegative().optional(),
 })
 
+/**
+ * A lane's delivery time, in days from order creation.
+ *
+ * `0` is allowed — same-day is a real answer for a hub and its own city — and
+ * the ceiling exists only to catch a fat-fingered year rather than to encode a
+ * business limit.
+ */
+export const zoneDeliveryTimeCreateSchema = z.object({
+  fromZoneId: requiredString("Origin zone"),
+  toZoneId: requiredString("Destination zone"),
+  deliveryDays: z
+    .number()
+    .int("Delivery days must be a whole number")
+    .min(0, "Delivery days cannot be negative")
+    .max(365, "Delivery days must be 365 or fewer"),
+})
+
 // ---------------------------------------------------------------------------
 // Support tickets
 // ---------------------------------------------------------------------------
@@ -820,7 +874,7 @@ export const resendVerificationSchema = z.object({
 
 /**
  * Bulk assign a rider to a set of orders. Shared by the dispatch and
- * assign-pickup-rider endpoints â€” the bodies are identical.
+ * assign-pickup-rider endpoints — the bodies are identical.
  */
 export const bulkAssignRiderSchema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(100),

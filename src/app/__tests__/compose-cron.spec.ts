@@ -72,15 +72,14 @@ describe("cron configuration (ROADMAP P2.5)", () => {
 })
 
 // Docker is what production actually runs (.github/workflows/deploy.yml), so a
-// cron route that nobody schedules there is a job that simply never executes —
-// which is how `stale-orders`, the only alerting job in the app, shipped with
-// No production schedule at all.
+// cron route that nobody schedules there is a job that simply never executes.
+// This guard is what stops one being shipped silently: every route on disk must
+// have a crontab line in both compose files, and both must stay in step.
 describe("every cron route runs in production (ROADMAP R0.5)", () => {
   const routes = cronRoutes()
 
   it("finds the routes it is meant to guard", () => {
-    expect(routes.length).toBeGreaterThanOrEqual(6)
-    expect(routes).toContain("stale-orders")
+    expect(routes.length).toBeGreaterThanOrEqual(5)
   })
 
   for (const file of [

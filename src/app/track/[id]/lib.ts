@@ -51,6 +51,11 @@ export const STATUS_COPY: Record<
     sub: "A rider will collect your parcel from the merchant soon.",
     color: "text-chart-1",
   },
+  OUT_FOR_PICKUP: {
+    headline: "Rider is on the way!",
+    sub: "A rider is heading to the merchant to collect your parcel.",
+    color: "text-chart-1",
+  },
   PICKED_UP: {
     headline: "Parcel collected",
     sub: "Your parcel is on its way to the sorting hub.",
@@ -114,8 +119,17 @@ export const fetchOrderData = cache(async (idOrToken: string) => {
     .where(or(eq(order.trackingToken, raw), eq(order.id, normalized)))
     .limit(1)
 
-  const o = rows[0] ?? null
-  if (!o) return null
+  const row = rows[0] ?? null
+  if (!row) return null
+
+  // The recipient's email is personal data and this is a public page, so it is
+  // dropped here rather than merely left un-rendered. Removing it from the
+  // object alone would not be enough — the return below casts to `Order`, which
+  // would re-declare the field and type a future `order.recipientMail` read as
+  // present while it was actually `undefined`. So it is stripped from both the
+  // value and the type, and any later attempt to render it fails to compile
+  // instead of quietly publishing the address to anyone holding the link.
+  const { recipientMail: _recipientMail, ...o } = row
 
   const matchedByToken = Boolean(o.trackingToken) && o.trackingToken === raw
 
@@ -142,7 +156,8 @@ export const fetchOrderData = cache(async (idOrToken: string) => {
     ])
 
   return {
-    order: o as Order,
+    // See the strip above: `Order` minus the one field the public must not get.
+    order: o as Omit<Order, "recipientMail">,
     merchant: merchantRows[0] ?? null,
     pickupRider: pickupRiderRows[0] ?? null,
     deliveryRider: deliveryRiderRows[0] ?? null,

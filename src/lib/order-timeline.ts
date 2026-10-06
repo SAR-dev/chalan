@@ -2,6 +2,7 @@ import {
   Bike,
   CheckCircle2,
   ClipboardCheck,
+  Navigation,
   PackageCheck,
   Truck,
   Warehouse,
@@ -11,7 +12,7 @@ import { formatDateTime } from "@/lib/format"
 import type { Order, OrderStatus } from "@/lib/types"
 
 /**
- * The delivery timeline: one definition of the six steps, their ranks, their
+ * The delivery timeline: one definition of the steps, their ranks, their
  * icons and their timestamps.
  *
  * This exists because the public tracking page and the admin order table each
@@ -28,6 +29,7 @@ import type { Order, OrderStatus } from "@/lib/types"
 export type StepKey =
   | "PLACED"
   | "APPROVED"
+  | "OUT_FOR_PICKUP"
   | "PICKED_UP"
   | "IN_WAREHOUSE"
   | "OUT_FOR_DELIVERY"
@@ -37,13 +39,14 @@ export type StepKey =
 export const STATUS_RANK: Record<OrderStatus, number> = {
   PENDING: 0,
   APPROVED: 1,
-  PICKED_UP: 2,
-  IN_WAREHOUSE: 3,
-  IN_TRANSIT: 3,
-  OUT_FOR_DELIVERY: 4,
-  DELIVERED: 5,
-  FAILED_ATTEMPT: 4,
-  RETURNED: 4,
+  OUT_FOR_PICKUP: 2,
+  PICKED_UP: 3,
+  IN_WAREHOUSE: 4,
+  IN_TRANSIT: 4,
+  OUT_FOR_DELIVERY: 5,
+  DELIVERED: 6,
+  FAILED_ATTEMPT: 5,
+  RETURNED: 5,
   CANCELLED: 0,
 }
 
@@ -81,11 +84,23 @@ export const STEPS: TimelineStep[] = [
     timestamp: (o) => o.approvedAt,
   },
   {
+    key: "OUT_FOR_PICKUP",
+    label: "Out for pickup",
+    description: "Rider is heading to the merchant",
+    // The tracking page is read by the person waiting for the parcel, so it
+    // speaks to them directly — the same courtesy the Out-for-delivery step
+    // below extends.
+    descriptionForRecipient: "Rider is heading to collect your parcel",
+    icon: Navigation,
+    rank: 2,
+    timestamp: (o) => o.outForPickupAt,
+  },
+  {
     key: "PICKED_UP",
     label: "Picked up",
     description: "Rider collected from merchant",
     icon: Bike,
-    rank: 2,
+    rank: 3,
     timestamp: (o) => o.pickedUpAt,
   },
   {
@@ -93,7 +108,7 @@ export const STEPS: TimelineStep[] = [
     label: "At sorting hub",
     description: "Arrived at the delivery hub",
     icon: Warehouse,
-    rank: 3,
+    rank: 4,
     timestamp: (o) => o.receivedAtWarehouseAt,
   },
   {
@@ -104,7 +119,7 @@ export const STEPS: TimelineStep[] = [
     // speaks to them directly.
     descriptionForRecipient: "Rider is heading to you now",
     icon: Truck,
-    rank: 4,
+    rank: 5,
     timestamp: (o) => o.outForDeliveryAt ?? o.dispatchedAt,
   },
   {
@@ -112,7 +127,7 @@ export const STEPS: TimelineStep[] = [
     label: "Delivered",
     description: "Handed to the recipient",
     icon: CheckCircle2,
-    rank: 5,
+    rank: 6,
     timestamp: (o) => o.deliveredAt,
   },
 ]
@@ -153,4 +168,39 @@ export function formatStamp(iso?: string | Date | null) {
     hour: "numeric",
     minute: "2-digit",
   })
+}
+
+/** How far along its route a parcel is, for a progress bar. */
+export interface DeliveryProgress {
+  /** 0–100, inclusive. */
+  percent: number
+  /** 1-based step number, for "Step 3 of 7". */
+  step: number
+  total: number
+  /**
+   * False for `CANCELLED`. Showing 4 of 7 toward a destination the parcel will
+   * never reach is not progress, it is a misreading waiting to happen — the bar
+   * is withheld rather than shown at a meaningless value.
+   */
+  visible: boolean
+}
+
+/**
+ * The single source of "how far along is this parcel".
+ *
+ * The public tracking page and the internal order details both render a
+ * progress bar, and this is why neither computes it: two copies of the
+ * arithmetic is exactly how one screen ends up saying step 5 of 8 while the
+ * other says 6 of 8 for the same order. Same reasoning as `formatStamp` above.
+ */
+export function deliveryProgress(status: OrderStatus): DeliveryProgress {
+  const total = STEPS.length
+  const maxRank = total - 1
+  const currentRank = Math.min(STATUS_RANK[status], maxRank)
+  return {
+    percent: Math.round((currentRank / maxRank) * 100),
+    step: Math.min(currentRank + 1, total),
+    total,
+    visible: status !== "CANCELLED",
+  }
 }

@@ -119,6 +119,26 @@ export function addBusinessDays(date: string, days: number): string {
 }
 
 /**
+ * Whole days from one business date to another (negative when `to` is earlier).
+ *
+ * Both ends are `YYYY-MM-DD` already, so this is pure calendar arithmetic — no
+ * zone offset enters, and neither end's time of day can shift the count by one.
+ * That is the point: an order created at 23:30 Dhaka and delivered two days
+ * later at 01:00 took two days, not one, and not three.
+ *
+ * Distinguished from a timestamp difference by using `businessDayStart`-style
+ * date parsing rather than `Date` subtraction, which would compare instants in
+ * whatever zone the values happened to carry.
+ */
+export function businessDaysBetween(from: string, to: string): number {
+  if (!isDateOnly(from) || !isDateOnly(to)) return 0
+  const [fy, fm, fd] = from.split("-").map(Number)
+  const [ty, tm, td] = to.split("-").map(Number)
+  const ms = Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)
+  return Math.round(ms / 86_400_000)
+}
+
+/**
  * Inclusive business-day range for a quick-filter preset.
  *
  * Returns `YYYY-MM-DD` strings, not instants: the server expands each end

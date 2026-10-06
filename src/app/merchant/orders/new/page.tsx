@@ -20,6 +20,7 @@ import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-
 import { pickTierForCount } from "@/lib/packages"
 import { pricingUnavailableMessage } from "@/lib/pricing"
 import type { CreateOrderInput } from "@/lib/types"
+import { isValidEmail } from "@/lib/validation"
 import {
   InactiveAccountCard,
   VerificationCard,
@@ -33,6 +34,7 @@ function emptyParcel(pickupLocationId = ""): ParcelState {
     pickupLocationId,
     recipientName: "",
     recipientPhone: "",
+    recipientMail: "",
     deliveryCityId: "",
     deliveryAddress: "",
     parcelWeightKg: "1",
@@ -255,6 +257,17 @@ export default function NewOrderPage() {
       need("deliveryCityId", "Delivery city", p.deliveryCityId)
       need("deliveryAddress", "Delivery address", p.deliveryAddress)
 
+      // Optional by design, so there is deliberately no `need()` here — but a
+      // typo still has to fail on this side. Reaching the server with one turns
+      // into a 400 that discards every other field typed on the card, which is
+      // a much worse way to learn the same thing.
+      const mail = p.recipientMail.trim()
+      if (mail && !isValidEmail(mail)) {
+        fieldErrors.recipientMail =
+          "Recipient email must be a valid email address."
+        blocked = true
+      }
+
       if ((Number(p.parcelWeightKg) || 0) <= 0) {
         fieldErrors.parcelWeightKg = "Weight must be greater than 0."
         blocked = true
@@ -277,6 +290,8 @@ export default function NewOrderPage() {
       pickupLocationId: p.pickupLocationId,
       recipientName: p.recipientName.trim(),
       recipientPhone: p.recipientPhone.trim(),
+      // Blank becomes null, not "" — same reasoning as itemType below.
+      recipientMail: p.recipientMail.trim() || null,
       deliveryCityId: p.deliveryCityId.trim(),
       deliveryAddress: p.deliveryAddress.trim(),
       deliveryMapLink: p.deliveryMapLink.trim() || null,

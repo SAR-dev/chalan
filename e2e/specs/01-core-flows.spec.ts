@@ -12,8 +12,8 @@ import {
   riderApplication,
 } from "../selectors"
 
-// ─── S1. Full Order Lifecycle ────────────────────────────────────────────────
-test.describe("S1. Full Order Lifecycle", () => {
+// ─── 0101. Full Order Lifecycle ────────────────────────────────────────────────
+test.describe("0101. Full Order Lifecycle", () => {
   test("merchant creates order → admin views orders", async ({ page }) => {
     await login(page, CREDS.merchant)
 
@@ -54,8 +54,8 @@ test.describe("S1. Full Order Lifecycle", () => {
   })
 })
 
-// ─── S6. Merchant Suspend & Reactivate ───────────────────────────────────────
-test.describe("S6. Merchant Suspend & Reactivate", () => {
+// ─── 0102. Merchant Suspend & Reactivate ───────────────────────────────────────
+test.describe("0102. Merchant Suspend & Reactivate", () => {
   test("admin views merchant list", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/merchants")
@@ -64,8 +64,8 @@ test.describe("S6. Merchant Suspend & Reactivate", () => {
   })
 })
 
-// ─── S8. Warehouse Operations ────────────────────────────────────────────────
-test.describe("S8. Warehouse Operations", () => {
+// ─── 0103. Warehouse Operations ────────────────────────────────────────────────
+test.describe("0103. Warehouse Operations", () => {
   test("warehouse admin lands on the stats-only overview", async ({ page }) => {
     await login(page, CREDS.warehouseAdmin)
 
@@ -84,11 +84,17 @@ test.describe("S8. Warehouse Operations", () => {
     await expect(page.getByText("Pending", { exact: true })).toBeVisible()
     await expect(page.getByText("Failed attempt")).toBeVisible()
     await expect(page.getByText("Waiting to be settled")).toBeVisible()
+    // The pre-collection leg is actionable work, so it earns a tile — the guard
+    // against a new status silently having no home on the homepage. (The
+    // absence of DELIVERED/RETURNED tiles is already pinned in
+    // `overview.spec.tsx`, where it can be asserted without a substring that
+    // would also match the page's prose.)
+    await expect(page.getByText("Out for pickup")).toBeVisible()
   })
 })
 
-// ─── S10. Payout Lifecycle ───────────────────────────────────────────────────
-test.describe("S10. Payout Lifecycle", () => {
+// ─── 0104. Payout Lifecycle ───────────────────────────────────────────────────
+test.describe("0104. Payout Lifecycle", () => {
   test("admin views payout queue", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/payouts")
@@ -97,8 +103,8 @@ test.describe("S10. Payout Lifecycle", () => {
   })
 })
 
-// ─── S12. Zone Pricing Management ────────────────────────────────────────────
-test.describe("S12. Zone Pricing Management", () => {
+// ─── 0105. Zone Pricing Management ────────────────────────────────────────────
+test.describe("0105. Zone Pricing Management", () => {
   test("admin views zones and pricing", async ({ page }) => {
     await login(page, CREDS.superAdmin)
 
@@ -116,8 +122,8 @@ test.describe("S12. Zone Pricing Management", () => {
   })
 })
 
-// ─── S16. Rider Dashboard ────────────────────────────────────────────────────
-test.describe("S16. Rider Dashboard", () => {
+// ─── 0106. Rider Dashboard ────────────────────────────────────────────────────
+test.describe("0106. Rider Dashboard", () => {
   test("rider sees stats and task sections", async ({ page }) => {
     await login(page, CREDS.rider)
     await waitForAppReady(page)
@@ -129,8 +135,8 @@ test.describe("S16. Rider Dashboard", () => {
   })
 })
 
-// ─── S17. Rider Pickup Flow ──────────────────────────────────────────────────
-test.describe("S17. Rider Pickup Flow", () => {
+// ─── 0107. Rider Pickup Flow ──────────────────────────────────────────────────
+test.describe("0107. Rider Pickup Flow", () => {
   test("rider views pickup queue", async ({ page }) => {
     await login(page, CREDS.rider)
     await page.goto("/rider/pickup")
@@ -139,8 +145,8 @@ test.describe("S17. Rider Pickup Flow", () => {
   })
 })
 
-// ─── S18. Rider Delivery Flow ────────────────────────────────────────────────
-test.describe("S18. Rider Delivery Flow", () => {
+// ─── 0108. Rider Delivery Flow ────────────────────────────────────────────────
+test.describe("0108. Rider Delivery Flow", () => {
   test("rider views delivery queue", async ({ page }) => {
     await login(page, CREDS.rider)
     await page.goto("/rider/delivery")
@@ -149,8 +155,8 @@ test.describe("S18. Rider Delivery Flow", () => {
   })
 })
 
-// ─── S19. Landing Page ───────────────────────────────────────────────────────
-test.describe("S19. Landing Page", () => {
+// ─── 0109. Landing Page ───────────────────────────────────────────────────────
+test.describe("0109. Landing Page", () => {
   test("renders hero, features, and calculator", async ({ page }) => {
     await page.goto("/")
     await waitForAppReady(page)
@@ -162,8 +168,8 @@ test.describe("S19. Landing Page", () => {
   })
 })
 
-// ─── S55. Public Pricing Page ────────────────────────────────────────────────
-test.describe("S55. Public Pricing Rate Card", () => {
+// ─── 0110. Public Pricing Page ────────────────────────────────────────────────
+test.describe("0110. Public Pricing Rate Card", () => {
   test("landing links to the city-to-city rate card", async ({ page }) => {
     await page.goto("/")
     await waitForAppReady(page)
@@ -190,16 +196,16 @@ test.describe("S55. Public Pricing Rate Card", () => {
   })
 })
 
-// ─── S21. Public Tracking ────────────────────────────────────────────────────
-test.describe("S21. Public Tracking", () => {
+// ─── 0111. Public Tracking ────────────────────────────────────────────────────
+test.describe("0111. Public Tracking", () => {
   test("user can access tracking page", async ({ page }) => {
     await page.goto("/track")
     await expect(page.getByRole("heading", { name: /track/i })).toBeVisible()
   })
 })
 
-// ─── S22. Delivery Fee Calculator ────────────────────────────────────────────
-test.describe("S22. Delivery Fee Calculator", () => {
+// ─── 0112. Delivery Fee Calculator ────────────────────────────────────────────
+test.describe("0112. Delivery Fee Calculator", () => {
   test("calculator shows estimates", async ({ page }) => {
     await page.goto("/")
     await waitForAppReady(page)
@@ -212,12 +218,12 @@ test.describe("S22. Delivery Fee Calculator", () => {
   })
 })
 
-// ─── S25. Help Center ────────────────────────────────────────────────────────
+// ─── 0113. Help Center ────────────────────────────────────────────────────────
 // The FAQ page was removed: the role guides under /help are the only answer
-// surface now, and every inbound link to /faq was taken out. S25 keeps its id —
-// suite ids are a unique serial, not a name — and swaps the old render test for
+// surface now, and every inbound link to /faq was taken out. The scenario keeps its identity —
+// suite ids name a scenario, not its copy — and swaps the old render test for
 // a guard so the route cannot come back without someone noticing.
-test.describe("S25. Help Center", () => {
+test.describe("0113. Help Center", () => {
   test("the retired FAQ route returns 404", async ({ page }) => {
     const res = await page.goto("/faq")
     expect(res?.status()).toBe(404)
@@ -237,8 +243,8 @@ test.describe("S25. Help Center", () => {
   })
 })
 
-// ─── S9. Team Management ─────────────────────────────────────────────────────
-test.describe("S9. Team Management", () => {
+// ─── 0114. Team Management ─────────────────────────────────────────────────────
+test.describe("0114. Team Management", () => {
   test("admin views team list", async ({ page }) => {
     await login(page, CREDS.superAdmin)
     await page.goto("/dashboard/team")
@@ -248,7 +254,7 @@ test.describe("S9. Team Management", () => {
 })
 
 // ─── Merchant Navigation ─────────────────────────────────────────────────────
-test.describe("S26. Merchant Dashboard", () => {
+test.describe("0115. Merchant Dashboard", () => {
   test("merchant can access all sections", async ({ page }) => {
     await login(page, CREDS.merchant)
 
@@ -267,7 +273,7 @@ test.describe("S26. Merchant Dashboard", () => {
 })
 
 // ─── Rider Application ───────────────────────────────────────────────────────
-test.describe("S27. Rider Application", () => {
+test.describe("0116. Rider Application", () => {
   test("application page has print button", async ({ page }) => {
     await page.goto("/apply/rider")
     await expect(page.locator(riderApplication.print)).toBeVisible()
@@ -275,7 +281,7 @@ test.describe("S27. Rider Application", () => {
 })
 
 // ─── Auth Flows ──────────────────────────────────────────────────────────────
-test.describe("S28. Auth", () => {
+test.describe("0117. Auth", () => {
   test("login page renders correctly", async ({ page }) => {
     await page.goto("/login")
     await expect(page.locator(auth.loginEmail)).toBeVisible()
@@ -325,7 +331,7 @@ test.describe("S28. Auth", () => {
   })
 })
 
-// ─── S57. Rider corrects the parcel weight at pickup ─────────────────────────
+// ─── 0118. Rider corrects the parcel weight at pickup ─────────────────────────
 const BASE_URL = "http://localhost:3000"
 
 async function loginContext(cred: {
@@ -362,7 +368,7 @@ async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   }
 }
 
-test.describe("S57. Rider corrects the parcel weight at pickup", () => {
+test.describe("0118. Rider corrects the parcel weight at pickup", () => {
   test("re-prices the delivery and adjusts the ledger", async () => {
     // Merchant creates an order with a declared 1 kg parcel.
     const merchant = await loginContext(CREDS.merchant)
@@ -410,8 +416,14 @@ test.describe("S57. Rider corrects the parcel weight at pickup", () => {
     ).toBeTruthy()
     await warehouse.dispose()
 
-    // Rider picks up and corrects the weight upward.
+    // The rider must declare they are on the way before collecting — `picked-up`
+    // refuses an APPROVED parcel, which is exactly what the previous line left.
     const rider = await loginContext(CREDS.rider)
+    expect(
+      (await rider.patch(`/api/orders/${order.id}/out-for-pickup`)).ok(),
+    ).toBeTruthy()
+
+    // Rider picks up and corrects the weight upward.
     const pickRes = await rider.patch(`/api/orders/${order.id}/picked-up`, {
       data: { proofRefs: ["https://example.com/proof.png"], parcelWeightKg: 3 },
     })

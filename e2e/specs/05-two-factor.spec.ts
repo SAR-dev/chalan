@@ -50,7 +50,7 @@ async function disableIfEnrolled(page: Page) {
   }
 }
 
-test.describe("S37. Two-factor authentication", () => {
+test.describe("0501. Two-factor authentication", () => {
   test.afterEach(async ({ page }) => {
     await disableIfEnrolled(page)
   })

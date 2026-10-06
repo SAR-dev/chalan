@@ -2,11 +2,11 @@ import { expect, test } from "@playwright/test"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import { nav } from "../selectors"
 
-// ─── S35. Merchant Registration & Verification ───────────────────────────────
+// ─── 0301. Merchant Registration & Verification ───────────────────────────────
 // Registration, email verification and landing. The setup wizard is gone (the
 // support page documents pricing instead), so there is nothing between a
 // verified merchant and their dashboard — these tests pin that down.
-test.describe("S35. Merchant Registration & Verification", () => {
+test.describe("0301. Merchant Registration & Verification", () => {
   test("verified merchant lands on /merchant with no setup wizard", async ({
     page,
   }) => {

@@ -3,7 +3,7 @@ import { CREDS, login, waitForAppReady } from "../helpers"
 import { support } from "../selectors"
 
 // ─── Support ticket lifecycle ────────────────────────────────────────────────
-test.describe("S24. Support tickets", () => {
+test.describe("0601. Support tickets", () => {
   test("merchant submits a ticket and super admin replies", async ({
     page,
   }) => {

@@ -135,4 +135,55 @@ describe("Track detail page", () => {
     expect(screen.queryByText(/shipment details/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/cash on delivery/i)).not.toBeInTheDocument()
   })
+
+  it("strips the email in the loader, not merely from the render", async () => {
+    // The stronger half of the R8 guarantee: even if someone later rendered
+    // every field the loader hands over, this one is already gone. Asserted on
+    // the returned object rather than the DOM, because a component simply not
+    // using a field is a much weaker promise than the field not being there.
+    dbQueue.reset()
+    dbQueue.enqueue(
+      [
+        makeOrder({
+          warehouseId: undefined,
+          pickupRiderId: null,
+          deliveryRiderId: null,
+          recipientMail: "recipient-secret@example.com",
+        }),
+      ],
+      merchantRow(),
+    )
+    const { fetchOrderData } = await import("./lib")
+    const data = await fetchOrderData("ORD-PRIVACY-STRIP")
+
+    expect(data).not.toBeNull()
+    expect(data?.order).not.toHaveProperty("recipientMail")
+    // Everything the page still needs is untouched by the strip.
+    expect(data?.order.id).toBeDefined()
+    expect(data?.merchant).not.toBeNull()
+  })
+
+  it("never exposes the recipient's email on the public page", async () => {
+    // Personal data (ROADMAP R8): whoever holds the tracking link may see where
+    // the parcel is, never how to reach the person it belongs to. The loader
+    // strips the column before it reaches this component — this is the proof
+    // that it stays gone even when the row carries one.
+    dbQueue.reset()
+    dbQueue.enqueue(
+      [
+        makeOrder({
+          warehouseId: undefined,
+          pickupRiderId: null,
+          deliveryRiderId: null,
+          recipientMail: "recipient-secret@example.com",
+        }),
+      ],
+      merchantRow(),
+    )
+    await importPage("ORD-PRIVACY-1")
+
+    expect(document.body.textContent ?? "").not.toContain(
+      "recipient-secret@example.com",
+    )
+  })
 })
