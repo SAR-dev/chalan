@@ -36,6 +36,34 @@
       "when": 1791210207736,
       "tag": "0004_early_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791220854889,
+      "tag": "0005_bitter_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791248964152,
+      "tag": "0006_opposite_ted_forrester",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791249072008,
+      "tag": "0007_concerned_green_goblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791257851513,
+      "tag": "0008_perfect_jack_murdock",
+      "breakpoints": true
     }
   ]
 }

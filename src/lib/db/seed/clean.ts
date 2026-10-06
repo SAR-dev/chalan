@@ -35,6 +35,7 @@ export const SEED_CLEAN_TABLES = [
   "email_outbox",
   "announcement",
   "zone_pricing",
+  "zone_delivery_time",
   "delivery_city",
   "delivery_zone",
   "support_ticket",

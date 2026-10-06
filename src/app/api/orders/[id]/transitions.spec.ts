@@ -13,6 +13,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // Imports must come after the vi.mock calls (which are hoisted regardless).
 import { applyBulkOrderTransition } from "@/features/orders/transitions"
 import { logAudit } from "@/lib/audit"
+import {
+  businessDateString,
+  businessDayEnd,
+  businessDaysBetween,
+} from "@/lib/timezone"
 import { PATCH as approve } from "./approve/route"
 import { PATCH as assignPickupRider } from "./assign-pickup-rider/route"
 import { PATCH as cancel } from "./cancel/route"
@@ -25,6 +30,7 @@ import { PATCH as pickedUp } from "./picked-up/route"
 import { PATCH as reattempt } from "./reattempt/route"
 import { PATCH as receive } from "./receive/route"
 import { PATCH as returnRoute } from "./return/route"
+import { PATCH as setExpectedDelivery } from "./set-expected-delivery/route"
 import { PATCH as settleCod } from "./settle-cod/route"
 
 // --- Controllable mock of the Drizzle data layer ----------------------------
@@ -214,6 +220,13 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     deliveryAttempts: 0,
     productCost: 500,
     codSettledAt: null,
+    // NOT NULL in the schema, and the delivery-date transition reads it to work
+    // out the promised day. A *fixed* instant rather than `new Date()`: this
+    // spec spies on `Date.prototype.toISOString` to prove a batch shares one
+    // clock, and a fixture that stamped its own value on every render would
+    // consume ticks the assertion is counting. It also keeps every derived
+    // promise deterministic across runs.
+    createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   }
 }
@@ -1441,6 +1454,92 @@ describe("PATCH /orders/:id/settle-cod", () => {
 })
 
 // ---------------------------------------------------------------------------
+describe("PATCH /orders/:id/set-expected-delivery", () => {
+  it("403 for a rider", async () => {
+    sessionState.value = riderSession("rider_1")
+    const { status } = await call(setExpectedDelivery, { date: "2030-01-01" })
+    expect(status).toBe(403)
+  })
+
+  it("403 for a warehouse admin whose warehouse does not hold it", async () => {
+    sessionState.value = warehouseAdmin()
+    dbState.selectQueue = [
+      [makeOrder({ status: "PENDING", warehouseId: "wh_other" })],
+    ]
+    const { status, json } = await call(setExpectedDelivery, {
+      date: "2030-01-01",
+    })
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "This parcel is held at a different warehouse.",
+    })
+  })
+
+  it("refuses to move the date once delivered", async () => {
+    // The date is finalized on delivery — rewriting it afterwards would let the
+    // record claim a promise the parcel never met.
+    sessionState.value = admin
+    dbState.selectQueue = [
+      [
+        makeOrder({
+          status: "DELIVERED",
+          deliveredAt: new Date().toISOString(),
+        }),
+      ],
+    ]
+    const { status, json } = await call(setExpectedDelivery, {
+      date: "2030-01-01",
+    })
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "The delivery date is final once the parcel is delivered.",
+    })
+  })
+
+  it("refuses a date that predates the order", async () => {
+    sessionState.value = admin
+    dbState.selectQueue = [[makeOrder({ status: "PENDING" })]]
+    const { status, json } = await call(setExpectedDelivery, {
+      date: "2000-01-01",
+    })
+    expect(status).toBe(400)
+    expect(json).toEqual({
+      error: "Delivery date cannot be before the order was created.",
+    })
+  })
+
+  it("rejects anything that is not a plain YYYY-MM-DD", async () => {
+    sessionState.value = admin
+    const { status } = await call(setExpectedDelivery, {
+      date: "next Tuesday",
+    })
+    expect(status).toBe(400)
+  })
+
+  it("sets the date to end of that day and keeps the day count in step", async () => {
+    sessionState.value = warehouseAdmin()
+    const order = makeOrder({ status: "PENDING", warehouseId: "wh_1" })
+    dbState.selectQueue = [[order]]
+    dbState.updateResult = [makeOrder({ status: "PENDING" })]
+
+    const { status, payload } = await call(setExpectedDelivery, {
+      date: "2030-01-01",
+    })
+    expect(status).toBe(200)
+    expect(payload?.expectedDeliveryAt).toBe(
+      businessDayEnd("2030-01-01").toISOString(),
+    )
+    // The two must move together — a count that disagreed with the date would
+    // let "2 days" sit next to a promise three weeks out.
+    expect(payload?.expectedDeliveryDays).toBe(
+      businessDaysBetween(
+        businessDateString(new Date(order.createdAt)),
+        "2030-01-01",
+      ),
+    )
+  })
+})
+
 describe("PATCH /orders/:id/cancel", () => {
   it("401 when unauthenticated", async () => {
     const { status } = await call(cancel)

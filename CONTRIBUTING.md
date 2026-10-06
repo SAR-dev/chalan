@@ -49,6 +49,8 @@ src/app/
   api/admin/delivery-cities/[id]/route.ts  PATCH + DELETE — city update/delete
   api/admin/zone-pricing/route.ts          GET + POST — pricing CRUD (upsert on zone pair)
   api/admin/zone-pricing/[id]/route.ts     PATCH + DELETE — pricing update/delete
+  api/admin/zone-delivery-time/route.ts    GET + POST — delivery-days CRUD (upsert on zone pair)
+  api/admin/zone-delivery-time/[id]/route.ts DELETE — clear a lane's estimate
   api/riders/[id]/active/route.ts     PATCH — toggle rider active status
   api/payouts/route.ts                GET list, POST request (merchant self-service)
   api/payouts/[id]/approve/route.ts   PATCH — super admin approves
@@ -280,10 +282,10 @@ const transitions = {
     },
     buildUpdate: ({ body, now }) => ({ status: "APPROVED", approvedAt: now }),
   },
-  // ...13 transitions total:
+  // ...14 transitions total:
   // approve, assign-pickup-rider, dispatch, out-for-pickup, picked-up, receive,
   // out-for-delivery, delivered, failed, reattempt, return,
-  // settle-cod, cancel
+  // set-expected-delivery, settle-cod, cancel
 }
 ```
 
@@ -964,6 +966,7 @@ order → deliveryCityId (FK) → delivery_city → zone (destination)
 
 - **Delivery Zones** page (`/dashboard/delivery-zones`) — CRUD for zones
 - **Zone Pricing** page (`/dashboard/zone-pricing`) — manage N×N pricing matrix
+- **Zone Delivery Times** page (`/dashboard/zone-delivery-time`) — days from order creation to delivery, per zone pair; an unconfigured lane shows no estimate rather than blocking an order
 - **Delivery Cities** page (`/dashboard/delivery-cities`) — assign cities to zones and warehouses
 
 ### Fallback
@@ -2021,6 +2024,56 @@ pnpm db:studio
 - `pnpm db:admin` creates a superadmin account — run after `pnpm db:migrate`.
 - **After every schema edit**, run `pnpm ci:check` and `pnpm ci:test` (typecheck,
   lint, format, unit tests, build, E2E tests) to catch any errors from the schema change.
+
+### Database invariants
+
+What the database enforces, and what it deliberately does not.
+
+**Enforced in the schema, proved in `src/lib/db/integration.spec.ts`:**
+
+- **Uniqueness** — unique indexes/partial indexes (one active bundle per
+  merchant, one `zone_pricing` row per zone pair, deduped tokens).
+- **Referential actions** — `ON DELETE RESTRICT` on anything whose loss is a
+  data-loss trap (ledger rows, rate cards); `CASCADE` only for derived or auth
+  state that is *supposed* to die with its parent (`merchant_balance`,
+  `profile`, `session`).
+- **Conditional CHECKs** — pairings that name one specific value, e.g.
+  `status <> 'DELIVERED' OR deliveredAt IS NOT NULL`, and `money >= 0`.
+
+**Deliberately not enforced:**
+
+- **A `status IN (…)` whitelist.** Status is free text by design — a new status
+  needs no DDL beyond its own columns, so it costs zero DDL. The database trusts
+  the writer: the app is the only process allowed to write `order`. Adding a
+  whitelist would cost a migration per status to restate a rule the transition
+  guards already enforce. This is why the CHECKs are *conditional* and never
+  generic: adding a status cannot invalidate any of them, so their cost per
+  status stays at zero.
+- **Business rules.** Guards read the session, call `resolveRoutePricing` and
+  post to the ledger — they live in `src/features/orders/transitions.ts`.
+  Nothing in `order` may depend on who is making the request.
+- **Signed columns are exempt from `>= 0`.** `balance_transaction.amount` is
+  signed by design; ~15% of live rows are negative reversals.
+
+**Before adding a CHECK, measure.** `ALTER TABLE … ADD CONSTRAINT` validates
+every existing row, so run `pnpm db:audit-invariants` against the target
+database first. A rule that measures violations gets a data decision — fix the
+rows or drop the rule — *before* any DDL. Never rewrite history to satisfy a
+constraint.
+
+**Measuring existing rows is not the same as proving every writer is
+consistent.** Unit tests mock `@/lib/db`, so they cannot trip a constraint; only
+real SQL does. Application writes go through `transitions.ts`, but E2E fixtures
+write raw SQL — after adding a CHECK, grep the `e2e/` specs for hand-written
+`UPDATE`s that set the constrained columns, and make them reproduce what the
+transition writes. (This is how `order_out_for_delivery_needs_out_for_delivery_at`
+first fired: a fixture set the status without its timestamp.)
+
+**Proofs are opt-in locally.** `integration.spec.ts` is skipped unless
+`INTEGRATION_DATABASE_URL` points at a migrated database
+(`pnpm db:migrate && pnpm test:integration`); `pnpm test:unit:run` does not run
+it. CI's `integration` job does — it starts a postgres service, migrates, then
+runs the suite — so these constraints are exercised on every push.
 
 ---
 

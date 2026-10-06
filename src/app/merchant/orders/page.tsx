@@ -19,6 +19,7 @@ import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { Order, OrderStatus } from "@/lib/types"
 
@@ -207,6 +208,25 @@ export default function MerchantOrdersPage() {
         }
         return <Badge variant="outline">Pending</Badge>
       },
+    },
+    {
+      id: "expectedDelivery",
+      header: columnLabels.order.expectedDelivery,
+      sortable: true,
+      // Sorted as a string: ISO instants sort chronologically, and an
+      // unquoted lane (null) must sort after every real date rather than
+      // before it — hence the space-prefixed fallback.
+      sortValue: (o) => o.expectedDeliveryAt ?? " ",
+      cell: (o) =>
+        o.expectedDeliveryAt ? (
+          <CellContent>
+            {formatDateTime(o.expectedDeliveryAt, { dateStyle: "medium" })}
+          </CellContent>
+        ) : (
+          // No configured delivery time for the lane: shown as absent, never
+          // as a guessed date.
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       id: "collectible",

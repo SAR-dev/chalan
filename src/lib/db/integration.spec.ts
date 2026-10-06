@@ -954,3 +954,488 @@ suite("cron heartbeat + new indexes (ROADMAP R0.8, R3.8, R3.9)", () => {
     }
   })
 })
+
+// =============================================================================
+// DBREFACTOR Phase B — referential actions
+//
+// Three child tables moved from ON DELETE CASCADE to ON DELETE RESTRICT. Both
+// parents are undeletable through any API route today, so this changes no
+// behaviour: the point is that the mistake becomes impossible rather than
+// merely absent.
+//
+// Each test asserts the catalog *and* the refusal. Catalog alone would pass
+// against a constraint nothing exercised; the refusal alone would pass for the
+// wrong reason (an unrelated FK refusing first). Together they pin "this FK,
+// this action".
+// =============================================================================
+
+suite("referential actions (DBREFACTOR Phase B)", () => {
+  /** The delete actions of every FK from `childTable` to `parentTable`. */
+  async function fkActions(
+    childTable: string,
+    parentTable: string,
+  ): Promise<string[]> {
+    const { rows } = await client.query<{ confdeltype: string }>(
+      `SELECT confdeltype
+         FROM pg_constraint
+        WHERE contype = 'f'
+          AND conrelid = $1::regclass
+          AND confrelid = $2::regclass`,
+      [childTable, parentTable],
+    )
+    return rows.map((r) => r.confdeltype)
+  }
+
+  it("refuses to delete a merchant that has ledger rows", async () => {
+    const merchant = await insertMerchant("ledger")
+    await insertLedgerRow(merchant, { type: "ORDER_CHARGE", amount: 100 })
+
+    expect(await fkActions("balance_transaction", "merchant")).toEqual([
+      ON_DELETE_RESTRICT,
+    ])
+
+    await expect(
+      client.query(`DELETE FROM merchant WHERE id = $1`, [merchant]),
+    ).rejects.toMatchObject({ code: expect.stringMatching(FK_DELETE_REFUSAL) })
+
+    // The ledger row survived — a cascade would have erased an append-only
+    // financial record with no ADJUSTMENT row to explain the gap.
+    const { rows } = await client.query<{ count: string }>(
+      `SELECT count(*) AS count FROM balance_transaction WHERE "merchantId" = $1`,
+      [merchant],
+    )
+    expect(rows[0].count).toBe("1")
+  })
+
+  it("still deletes a merchant with no ledger rows", async () => {
+    // RESTRICT must not be misread as "merchants are undeletable". If this ever
+    // fails, the refusal above has become a blanket prohibition rather than a
+    // reference check.
+    const merchant = await insertMerchant("noledger")
+    // stop tracking it: this test deletes the row itself, and leaving it in the
+    // cleanup queue would make afterEach delete a row that is already gone.
+    created.pop()
+
+    await client.query(`DELETE FROM merchant WHERE id = $1`, [merchant])
+    const { rows } = await client.query<{ count: string }>(
+      `SELECT count(*) AS count FROM merchant WHERE id = $1`,
+      [merchant],
+    )
+    expect(rows[0].count).toBe("0")
+  })
+
+  it("refuses to delete a zone that has pricing rows", async () => {
+    const zoneA = await insertZone("price-a")
+    const zoneB = await insertZone("price-b")
+
+    // Tracked, because `afterEach` deletes in reverse insertion order and these
+    // rows are what the refused DELETE leaves behind. Without `track` the cleanup
+    // itself trips the very constraint under test and the suite cascades into
+    // unrelated failures.
+    await client.query(
+      `INSERT INTO zone_pricing (id, "fromZoneId", "toZoneId") VALUES ($1, $2, $3)`,
+      [`itest-zp-${RUN}-a`, zoneA, zoneB],
+    )
+    track("zone_pricing", "id", `itest-zp-${RUN}-a`)
+    await client.query(
+      `INSERT INTO zone_pricing (id, "fromZoneId", "toZoneId") VALUES ($1, $2, $3)`,
+      [`itest-zp-${RUN}-b`, zoneB, zoneA],
+    )
+    track("zone_pricing", "id", `itest-zp-${RUN}-b`)
+
+    // Both endpoints of the matrix are protected — a cascade on only one side
+    // would still destroy a lane from the other direction.
+    expect(await fkActions("zone_pricing", "delivery_zone")).toEqual([
+      ON_DELETE_RESTRICT,
+      ON_DELETE_RESTRICT,
+    ])
+
+    await expect(
+      client.query(`DELETE FROM delivery_zone WHERE id = $1`, [zoneA]),
+    ).rejects.toMatchObject({ code: expect.stringMatching(FK_DELETE_REFUSAL) })
+
+    const { rows } = await client.query<{ count: string }>(
+      `SELECT count(*) AS count FROM zone_pricing WHERE id = $1`,
+      [`itest-zp-${RUN}-a`],
+    )
+    expect(rows[0].count).toBe("1")
+  })
+
+  it("refuses to delete a zone that has delivery-time rows", async () => {
+    // `zone_delivery_time` was added after Phase B was drafted and carried the
+    // same cascade hole. Covered here so the two matrices cannot drift apart
+    // again: one being protected and the other not would be indefensible.
+    const zoneA = await insertZone("time-a")
+    const zoneB = await insertZone("time-b")
+
+    await client.query(
+      `INSERT INTO zone_delivery_time (id, "fromZoneId", "toZoneId", "deliveryDays")
+       VALUES ($1, $2, $3, 2)`,
+      [`itest-zdt-${RUN}-a`, zoneA, zoneB],
+    )
+    track("zone_delivery_time", "id", `itest-zdt-${RUN}-a`)
+
+    expect(await fkActions("zone_delivery_time", "delivery_zone")).toEqual([
+      ON_DELETE_RESTRICT,
+      ON_DELETE_RESTRICT,
+    ])
+
+    await expect(
+      client.query(`DELETE FROM delivery_zone WHERE id = $1`, [zoneA]),
+    ).rejects.toMatchObject({ code: expect.stringMatching(FK_DELETE_REFUSAL) })
+  })
+
+  it("leaves derived and auth tables cascading", async () => {
+    // The other half of Decision #4: hardening must not be uniform.
+    // `merchant_balance` is a cache of the ledger and `profile`/`session`
+    // belong to `user` — all three are *supposed* to die with their parent.
+    expect(await fkActions("merchant_balance", "merchant")).toEqual(["c"])
+    expect(await fkActions("profile", "user")).toEqual(["c"])
+    expect(await fkActions("session", "user")).toEqual(["c"])
+  })
+})
+
+// =============================================================================
+// DBREFACTOR Phase C/D — order CHECK constraints
+//
+// Twelve conditional CHECKs on `order`: six lifecycle pairings (this status
+// happened, so its timestamp exists) and six money columns (never negative).
+//
+// Every constraint gets a test that a violating row is **rejected**, not merely
+// that a valid row passes. The table is generated from the same source as
+// `pnpm db:audit-invariants`, so a constraint cannot be added to the schema
+// without also being asserted here.
+//
+// Each test also confirms the valid row still inserts — a constraint that
+// rejected everything would satisfy a rejection-only test.
+// =============================================================================
+
+suite("order CHECK constraints (DBREFACTOR Phase C/D)", () => {
+  /** SQLSTATE for check_violation. Stable across server majors. */
+  const CHECK_VIOLATION = "23514"
+
+  interface CheckCase {
+    constraint: string
+    /** Columns beyond the minimum order row. */
+    extra: Record<string, string | number | null>
+  }
+
+  /**
+   * Each case is a lifecycle pairing: the status is set but its timestamp is
+   * omitted (null), which is exactly what the constraint exists to reject.
+   */
+  const LIFECYCLE_CASES: CheckCase[] = [
+    {
+      constraint: "order_delivered_needs_delivered_at",
+      extra: { status: "DELIVERED" },
+    },
+    {
+      constraint: "order_cancelled_needs_cancelled_at",
+      extra: { status: "CANCELLED" },
+    },
+    {
+      constraint: "order_returned_needs_returned_at",
+      extra: { status: "RETURNED" },
+    },
+    {
+      constraint: "order_picked_up_needs_picked_up_at",
+      extra: { status: "PICKED_UP" },
+    },
+    {
+      constraint: "order_out_for_pickup_needs_out_for_pickup_at",
+      extra: { status: "OUT_FOR_PICKUP" },
+    },
+    {
+      constraint: "order_out_for_delivery_needs_out_for_delivery_at",
+      extra: { status: "OUT_FOR_DELIVERY" },
+    },
+  ]
+
+  const MONEY_CASES: CheckCase[] = [
+    {
+      constraint: "order_product_cost_nonneg",
+      extra: { productCost: -1 },
+    },
+    {
+      constraint: "order_delivery_fee_nonneg",
+      extra: { deliveryFee: -0.01 },
+    },
+    {
+      constraint: "order_cod_fee_nonneg",
+      extra: { codFee: -5 },
+    },
+    {
+      constraint: "order_cancellation_fee_nonneg",
+      extra: { cancellationFee: -65 },
+    },
+    {
+      constraint: "order_merchant_earnings_nonneg",
+      extra: { merchantEarnings: -1 },
+    },
+    {
+      constraint: "order_amount_collected_nonneg",
+      extra: { amountCollected: -100 },
+    },
+  ]
+
+  /**
+   * Build an `order` INSERT with arbitrary extra columns.
+   *
+   * Defaults are merged into a single row object rather than prepended to a
+   * separate list, so a case can *override* `productCost`/`deliveryFee`/
+   * `codFee` instead of emitting them twice — which Postgres rejects as
+   * "column specified more than once", before the CHECK under test ever runs.
+   */
+  function orderInsert(
+    base: {
+      merchantId: string
+      pickupLocationId: string
+      warehouseId: string
+    },
+    extra: Record<string, string | number | null>,
+  ) {
+    const row: Record<string, string | number | null> = {
+      id: `itest-ord-${RUN}-${randomUUID().slice(0, 8)}`,
+      merchantId: base.merchantId,
+      pickupLocationId: base.pickupLocationId,
+      recipientName: "ITest Recipient",
+      recipientPhone: "+8801700000001",
+      deliveryAddress: "n/a street",
+      parcelWeightKg: 1,
+      productCost: 100,
+      deliveryFee: 60,
+      codFee: 0,
+      warehouseId: base.warehouseId,
+      ...extra,
+    }
+    const cols = Object.keys(row)
+    const values = Object.values(row)
+    const placeholders = cols.map((_, i) => `$${i + 1}`)
+    const quoted = cols.map((c) => `"${c}"`).join(", ")
+    return {
+      id: row.id as string,
+      sql: `INSERT INTO "order" (${quoted}) VALUES (${placeholders.join(", ")})`,
+      values,
+    }
+  }
+
+  /** Fixtures for a minimum order row, registered for cleanup. */
+  async function orderBase(suffix: string) {
+    const zone = await insertZone(`chk-${suffix}`)
+    const warehouse = await insertWarehouse(`chk-${suffix}`)
+    const city = await insertCity(`chk-${suffix}`, zone, warehouse)
+    const merchant = await insertMerchant(`chk-${suffix}`)
+    const pickupLocation = await insertPickupLocation(merchant, city)
+    return {
+      merchantId: merchant,
+      pickupLocationId: pickupLocation,
+      warehouseId: warehouse,
+    }
+  }
+
+  for (const testCase of [...LIFECYCLE_CASES, ...MONEY_CASES]) {
+    it(`rejects a row violating ${testCase.constraint}`, async () => {
+      const base = await orderBase(testCase.constraint.slice(-8))
+      const { sql, values } = orderInsert(base, testCase.extra)
+
+      await expect(client.query(sql, values)).rejects.toMatchObject({
+        code: CHECK_VIOLATION,
+      })
+
+      // The message must name the constraint, or an operator staring at
+      // "violates check constraint" learns nothing about which pairing broke.
+      await expect(client.query(sql, values)).rejects.toThrow(
+        testCase.constraint,
+      )
+
+      // Nothing was written — the insert is rejected, not coerced.
+      const { rows } = await client.query<{ count: string }>(
+        `SELECT count(*) AS count FROM "order" WHERE id = $1`,
+        [values[0]],
+      )
+      expect(rows[0].count).toBe("0")
+    })
+  }
+
+  it("accepts a lifecycle status that carries its timestamp", async () => {
+    // The other half: a correct row must still insert, or the constraint has
+    // simply forbidden a status rather than describing it.
+    const base = await orderBase("ok")
+    const { id, sql, values } = orderInsert(base, {
+      status: "DELIVERED",
+      deliveredAt: new Date().toISOString(),
+    })
+    await client.query(sql, values)
+    track("order", "id", id)
+
+    const { rows } = await client.query<{ status: string }>(
+      `SELECT status FROM "order" WHERE id = $1`,
+      [id],
+    )
+    expect(rows[0].status).toBe("DELIVERED")
+  })
+
+  it("accepts a zero fee and a null amountCollected", async () => {
+    // The boundary cases. `0` is legitimate (free delivery) and `NULL` means
+    // "no cash collected yet" — a constraint written as `> 0` or without the
+    // NULL branch would reject both.
+    const base = await orderBase("zero")
+    const { id, sql, values } = orderInsert(base, {
+      deliveryFee: 0,
+      codFee: 0,
+      cancellationFee: 0,
+      merchantEarnings: 0,
+      amountCollected: null,
+    })
+    await client.query(sql, values)
+    track("order", "id", id)
+
+    const { rows } = await client.query<{ deliveryFee: string }>(
+      `SELECT "deliveryFee" FROM "order" WHERE id = $1`,
+      [id],
+    )
+    expect(rows[0].deliveryFee).toBe("0.00")
+  })
+
+  it("leaves status unconstrained, so a new status needs no DDL", async () => {
+    // The regression guard for DBREFACTOR Decision #1. If a `status IN (…)`
+    // CHECK is ever added, this fails and the cost-per-status property is gone.
+    // A status nobody has heard of yet must be storable.
+    const { rows } = await client.query<{ n: number }>(
+      `SELECT count(*)::int AS n
+         FROM pg_constraint
+        WHERE contype = 'c'
+          AND conrelid = '"order"'::regclass
+          AND pg_get_constraintdef(oid) LIKE '%status%IN%'`,
+    )
+    expect(rows[0].n).toBe(0)
+  })
+
+  it("still accepts a status the application has never heard of", async () => {
+    // Belt and braces for the same property, behaviourally: the database trusts
+    // the writer rather than duplicating the enum.
+    const base = await orderBase("future")
+    const { id, sql, values } = orderInsert(base, { status: "QUANTUM_ENTERED" })
+    await client.query(sql, values)
+    track("order", "id", id)
+
+    const { rows } = await client.query<{ status: string }>(
+      `SELECT status FROM "order" WHERE id = $1`,
+      [id],
+    )
+    expect(rows[0].status).toBe("QUANTUM_ENTERED")
+  })
+})
+
+// =============================================================================
+// ROADMAP R8 — recipient email (`order.recipientMail`)
+//
+// Nullability is the load-bearing property here, not a detail. Every order
+// created before this column existed, every bulk row that omits the column and
+// every merchant who only ever collects a phone number writes NULL — making it
+// NOT NULL (or giving it a "helpful" default) would break all three at once.
+// `profile.announcementsSeenAt` already taught exactly this lesson.
+// =============================================================================
+
+suite("recipient email (R8)", () => {
+  /** Fixtures for one order, registered for cleanup by `afterEach`. */
+  async function r8Base(suffix: string) {
+    const zone = await insertZone(`r8-${suffix}`)
+    const warehouse = await insertWarehouse(`r8-${suffix}`)
+    const city = await insertCity(`r8-${suffix}`, zone, warehouse)
+    const merchant = await insertMerchant(`r8-${suffix}`)
+    const pickupLocation = await insertPickupLocation(merchant, city)
+    return {
+      merchantId: merchant,
+      pickupLocationId: pickupLocation,
+      warehouseId: warehouse,
+    }
+  }
+
+  async function insertR8Order(
+    base: Awaited<ReturnType<typeof r8Base>>,
+    recipientMail: string | null | undefined,
+  ): Promise<string> {
+    const id = `itest-ord-${RUN}-${randomUUID().slice(0, 8)}`
+    // Column omitted entirely when undefined — the case that breaks if the
+    // column is ever made NOT NULL without a default.
+    const cols = [
+      "id",
+      "merchantId",
+      "pickupLocationId",
+      "warehouseId",
+      "recipientName",
+      "recipientPhone",
+      "deliveryAddress",
+      "parcelWeightKg",
+      "productCost",
+      "deliveryFee",
+      "codFee",
+    ]
+    const values: (string | number | null)[] = [
+      id,
+      base.merchantId,
+      base.pickupLocationId,
+      base.warehouseId,
+      "ITest Recipient",
+      "+8801700000001",
+      "n/a street",
+      1,
+      100,
+      60,
+      0,
+    ]
+    if (recipientMail !== undefined) {
+      cols.push("recipientMail")
+      values.push(recipientMail)
+    }
+    const placeholders = cols.map((_, i) => `$${i + 1}`)
+    await client.query(
+      `INSERT INTO "order" (${cols.map((c) => `"${c}"`).join(", ")})
+       VALUES (${placeholders.join(", ")})`,
+      values,
+    )
+    track("order", "id", id)
+    return id
+  }
+
+  it("leaves the column nullable in the catalog", async () => {
+    // Asserted against the catalog rather than inferred from a passing insert:
+    // an insert succeeding only proves today's path works, not that the
+    // constraint is absent.
+    const { rows } = await client.query<{ is_nullable: string }>(
+      `SELECT is_nullable
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'order'
+          AND column_name = 'recipientMail'`,
+    )
+    expect(rows, "order.recipientMail must exist").toHaveLength(1)
+    expect(rows[0].is_nullable).toBe("YES")
+  })
+
+  it("accepts an order that omits the column entirely", async () => {
+    const base = await r8Base("omit")
+    const id = await insertR8Order(base, undefined)
+
+    const { rows } = await client.query<{ mail: string | null }>(
+      `SELECT "recipientMail" AS mail FROM "order" WHERE id = $1`,
+      [id],
+    )
+    expect(rows[0].mail).toBeNull()
+  })
+
+  it("stores a real address when one is given", async () => {
+    // Note the empty-string guarantee lives in `validation.spec.ts`, not here:
+    // the database stores `""` as `""` and would happily do so, so converting
+    // blank to NULL is the schema transform's job and is asserted there.
+    const base = await r8Base("given")
+    const id = await insertR8Order(base, "recipient@example.com")
+
+    const { rows } = await client.query<{ mail: string | null }>(
+      `SELECT "recipientMail" AS mail FROM "order" WHERE id = $1`,
+      [id],
+    )
+    expect(rows[0].mail).toBe("recipient@example.com")
+  })
+})

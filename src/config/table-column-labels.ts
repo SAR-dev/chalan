@@ -36,6 +36,7 @@ export const columnLabels = {
     resolvedBy: "Resolved by",
     deliveryAttempts: "Delivery attempts",
     closedAt: "Closed",
+    expectedDelivery: "Expected by",
   },
   merchant: {
     business: "Business",

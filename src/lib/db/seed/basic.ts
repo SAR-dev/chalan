@@ -25,6 +25,7 @@ import { seedRiders } from "./riders"
 import { assertSeedAllowedInDev } from "./seed-content/credentials"
 import { seedUsers } from "./users"
 import { seedWarehouses } from "./warehouses"
+import { seedZoneDeliveryTime } from "./zone-delivery-time"
 import { seedZonePricing } from "./zone-pricing"
 
 export async function seedBasicDatabase(): Promise<void> {
@@ -35,6 +36,7 @@ export async function seedBasicDatabase(): Promise<void> {
   await seedDeliveryZones()
   await seedDeliveryCities()
   await seedZonePricing()
+  await seedZoneDeliveryTime()
   await seedPlatformConfig()
   await seedRiders()
   await seedMerchants()

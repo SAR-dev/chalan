@@ -68,6 +68,15 @@ export const balanceTxStatuses = [
 
 export const orderDeliveryTypes = ["STANDARD", "FRAGILE"] as const
 
+// Status is free text in the database by design — a new status needs no DDL,
+// so `order` has no PG enum and no `status IN (…)` CHECK. The database trusts
+// the writer: the app is the only process allowed to write `order`.
+//
+// This list is therefore the app's vocabulary, not the database's. It drives
+// the transition guards, labels and tabs; it is not replicated as a constraint,
+// because a whitelist that cost a migration per status would have made
+// OUT_FOR_PICKUP a migration to a data type instead of a migration to a column.
+// See "On the CHECK constraints below" in `orders.ts`.
 export const orderStatuses = [
   "PENDING",
   "APPROVED",

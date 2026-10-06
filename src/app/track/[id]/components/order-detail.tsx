@@ -2,6 +2,7 @@ import {
   Ban,
   Banknote,
   Bike,
+  CalendarDays,
   CheckCircle2,
   Clock,
   HandCoins,
@@ -20,6 +21,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { ReceiverNoteWidget } from "@/features/orders/components/receiver-note-widget"
+import { deliveryOutcome } from "@/lib/delivery-promise"
+import { deliveryProgress } from "@/lib/order-timeline"
 import { formatTk } from "@/lib/pricing"
 import type { OrderStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -29,8 +32,6 @@ import {
   generalArea,
   maskPhone,
   STATUS_COPY,
-  STATUS_RANK,
-  STEPS,
 } from "../lib"
 import { Timeline } from "./timeline"
 
@@ -69,14 +70,23 @@ function DetailRow({
   label,
   value,
   mono,
+  testId,
 }: {
   icon: LucideIcon
   label: string
   value: string
   mono?: boolean
+  /**
+   * Test hook. A label/value pair has no natural id, and a spec reading the
+   * label's text would break on any copy edit — so the row can carry one.
+   */
+  testId?: string
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-2.5">
+    <div
+      data-testid={testId}
+      className="flex items-start justify-between gap-4 py-2.5"
+    >
       <dt className="text-muted-foreground inline-flex items-center gap-2 text-xs">
         <Icon className="size-3.5 shrink-0" />
         {label}
@@ -110,12 +120,13 @@ export function OrderDetail({
   const StatusIcon = STATUS_ICON[o.status]
   const tint = STATUS_TINT[o.status]
 
-  const isCancelled = o.status === "CANCELLED"
-  const maxRank = STEPS.length - 1
-  const currentRank = Math.min(STATUS_RANK[o.status], maxRank)
-  const progressPct = Math.round((currentRank / maxRank) * 100)
-  const stepNumber = Math.min(currentRank + 1, STEPS.length)
+  const progress = deliveryProgress(o.status)
   const placedAt = formatStamp(o.createdAt)
+  // The promise, and how the parcel did against it. Both are snapshotted on the
+  // order, so the recipient reads the same numbers the hub does — and `null`
+  // (no promise configured, or not yet delivered) renders as "not shown" rather
+  // than as a zero-day promise.
+  const outcome = deliveryOutcome(o.actualDeliveryDays, o.expectedDeliveryDays)
 
   return (
     <div className="space-y-4">
@@ -151,14 +162,14 @@ export function OrderDetail({
         </div>
 
         {/* Progress */}
-        {!isCancelled && (
+        {progress.visible && (
           <div className="border-border/60 border-t px-5 py-4 sm:px-6">
             <div className="mb-2 flex items-center justify-between gap-2 text-xs">
               <span className="text-muted-foreground font-medium">
                 Delivery progress
               </span>
               <span className="text-muted-foreground tabular-nums">
-                Step {stepNumber} of {STEPS.length}
+                Step {progress.step} of {progress.total}
               </span>
             </div>
             <div
@@ -167,11 +178,11 @@ export function OrderDetail({
               aria-label="Delivery progress"
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={progressPct}
+              aria-valuenow={progress.percent}
             >
               <div
                 className="bg-primary h-full rounded-full transition-[width] duration-500"
-                style={{ width: `${progressPct}%` }}
+                style={{ width: `${progress.percent}%` }}
               />
             </div>
           </div>
@@ -248,6 +259,25 @@ export function OrderDetail({
                 Shipment details
               </p>
               <dl className="divide-border/60 mt-2 divide-y">
+                {o.expectedDeliveryAt && (
+                  <DetailRow
+                    icon={CalendarDays}
+                    label="Expected by"
+                    testId="track-expected-by"
+                    // `formatStamp` is null-safe and can return null for junk;
+                    // the field is non-null here, but the em-dash keeps the type
+                    // honest rather than asserting something TS cannot see.
+                    value={formatStamp(o.expectedDeliveryAt) ?? "—"}
+                  />
+                )}
+                {outcome && (
+                  <DetailRow
+                    icon={Clock}
+                    label="Outcome"
+                    testId="track-outcome"
+                    value={outcome}
+                  />
+                )}
                 <DetailRow
                   icon={User}
                   label="Recipient"

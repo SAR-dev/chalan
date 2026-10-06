@@ -3,6 +3,7 @@ import {
   Banknote,
   BarChart3,
   Bike,
+  CalendarClock,
   CircleHelp,
   FileText,
   LayoutDashboard,
@@ -172,6 +173,12 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       href: "/dashboard/zone-pricing",
       label: "Zone Pricing",
       icon: Tag,
+      group: "Coverage & pricing",
+    },
+    {
+      href: "/dashboard/zone-delivery-time",
+      label: "Zone Delivery Times",
+      icon: CalendarClock,
       group: "Coverage & pricing",
     },
     {

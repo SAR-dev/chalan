@@ -331,6 +331,18 @@ export const riderPickup = {
   confirmStart: "[data-testid='out-for-pickup-confirm']",
 }
 
+// ─── Expected delivery (promise + admin override) ─────────────────────────────
+export const deliveryPromise = {
+  // The tracking page's read of the promise: a label/value row, so it carries a
+  // testid rather than a spec matching on its label text.
+  trackExpectedBy: "[data-testid='track-expected-by']",
+  trackOutcome: "[data-testid='track-outcome']",
+  // The override control, its date input, and the confirm button.
+  setExpectedDate: "[data-testid='set-expected-delivery-open']",
+  dateInput: "[data-testid='expected-delivery-date']",
+  confirm: "[data-testid='set-expected-delivery-confirm']",
+}
+
 // ─── Completed orders (warehouse) ────────────────────────────────────────────
 // Read-only, so the only things worth addressing are the tabs and the table.
 export const completed = {

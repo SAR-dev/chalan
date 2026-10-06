@@ -24,6 +24,22 @@ export interface ZoneRef {
 }
 
 /**
+ * Why a route's *zones* could not be resolved.
+ *
+ * Split out of `PricingUnavailableReason` because zone resolution is shared by
+ * two matrices — `zone_pricing` and `zone_delivery_time`. An unmapped city is
+ * the same admin problem whichever matrix is being read, so it gets one name
+ * rather than two copies that can drift apart.
+ */
+export type ZoneResolutionReason =
+  /** The pickup city's zone is unknown (no matching city, or no zone on it). */
+  | "origin-zone-unknown"
+  /** No delivery city was chosen, or it matches no `delivery_city`. */
+  | "destination-city-unknown"
+  /** The delivery city exists but has no zone assigned. */
+  | "destination-zone-unknown"
+
+/**
  * Why a route could not be priced.
  *
  * These are distinct admin problems with distinct fixes, so they are reported
@@ -34,13 +50,7 @@ export interface ZoneRef {
  */
 export type PricingUnavailableReason =
   /** Both zones resolved, but no `zone_pricing` row exists for the pair. */
-  | "no-pricing-for-lane"
-  /** The pickup city's zone is unknown (no matching city, or no zone on it). */
-  | "origin-zone-unknown"
-  /** No delivery city was chosen, or it matches no `delivery_city`. */
-  | "destination-city-unknown"
-  /** The delivery city exists but has no zone assigned. */
-  | "destination-zone-unknown"
+  "no-pricing-for-lane" | ZoneResolutionReason
 
 /**
  * A one-line, actionable explanation for a lane that cannot be priced.

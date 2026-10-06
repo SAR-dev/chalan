@@ -48,6 +48,10 @@ export const GET = withErrorHandler(
     const [row] = await db
       .select({
         ...ORDER_CORE_COLUMNS,
+        // Detail-only, and deliberately not added to `ORDER_CORE_COLUMNS`: the
+        // list endpoints share that projection and have no reason to carry a
+        // recipient's email. Personal data gets the narrower surface.
+        recipientMail: order.recipientMail,
         approvedBy: order.approvedBy,
         approvedAt: order.approvedAt,
         assignedAt: order.assignedAt,
@@ -58,6 +62,9 @@ export const GET = withErrorHandler(
         receivedByWarehouse: order.receivedByWarehouse,
         dispatchedAt: order.dispatchedAt,
         dispatchedBy: order.dispatchedBy,
+        expectedDeliveryDays: order.expectedDeliveryDays,
+        expectedDeliveryAt: order.expectedDeliveryAt,
+        actualDeliveryDays: order.actualDeliveryDays,
         outForDeliveryAt: order.outForDeliveryAt,
         deliveredAt: order.deliveredAt,
         deliveryProofRef: order.deliveryProofRef,

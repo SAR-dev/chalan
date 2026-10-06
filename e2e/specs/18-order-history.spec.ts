@@ -46,7 +46,8 @@ test.describe("S51. Order status history", () => {
   }) => {
     const setup = await withDb(async (client) => {
       const sel = await client.query(
-        `SELECT id, status, "deliveryRiderId", "warehouseId", "failureNote", "failedAttemptAt"
+        `SELECT id, status, "deliveryRiderId", "warehouseId", "failureNote",
+                "failedAttemptAt", "outForDeliveryAt"
            FROM "order" ORDER BY id LIMIT 1`,
       )
       const row = sel.rows[0] as Record<string, unknown> | undefined
@@ -59,6 +60,13 @@ test.describe("S51. Order status history", () => {
       )
       // Put the order OUT_FOR_DELIVERY with rider1 as its delivery rider and
       // the order held at warehouse.admin1's warehouse.
+      //
+      // `outForDeliveryAt` must be set alongside the status: the DB CHECK
+      // `order_out_for_delivery_needs_out_for_delivery_at` rejects a row that
+      // claims the state without the timestamp that records it. This raw UPDATE
+      // bypasses the app, so it has to reproduce what the `out-for-delivery`
+      // transition writes — otherwise it forges a row the application itself
+      // cannot produce.
       await client.query(
         `UPDATE "order"
             SET status = 'OUT_FOR_DELIVERY',
@@ -66,7 +74,8 @@ test.describe("S51. Order status history", () => {
                 "warehouseId" = $3,
                 "failureNote" = NULL,
                 "failedAttemptAt" = NULL,
-                "deliveryAttempts" = 1
+                "deliveryAttempts" = 1,
+                "outForDeliveryAt" = NOW()
           WHERE id = $1`,
         [id, RIDER1_ID, WAREHOUSE_ID],
       )
@@ -131,7 +140,8 @@ test.describe("S51. Order status history", () => {
                   "deliveryRiderId" = $3,
                   "warehouseId" = $4,
                   "failureNote" = $5,
-                  "failedAttemptAt" = $6
+                  "failedAttemptAt" = $6,
+                  "outForDeliveryAt" = $7
             WHERE id = $1`,
           [
             setup.id,
@@ -140,6 +150,7 @@ test.describe("S51. Order status history", () => {
             setup.original.warehouseId,
             setup.original.failureNote,
             setup.original.failedAttemptAt,
+            setup.original.outForDeliveryAt,
           ],
         )
       })

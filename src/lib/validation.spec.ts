@@ -386,6 +386,106 @@ describe("orderCreateSchema — itemType", () => {
 })
 
 // ---------------------------------------------------------------------------
+// orderCreateSchema — recipientMail (R8)
+// ---------------------------------------------------------------------------
+
+describe("orderCreateSchema — recipientMail", () => {
+  const base = {
+    pickupLocationId: "pl_1",
+    recipientName: "John",
+    recipientPhone: "01712345678",
+    deliveryAddress: "Road 11, Banani",
+    deliveryCityId: "city_1",
+    parcelWeightKg: 1,
+    productCost: 500,
+  }
+
+  it("stays optional — a merchant who only collects a phone number keeps working", () => {
+    // The whole point of nullable: existing orders, bulk rows and merchants who
+    // never ask for an address must not start failing validation.
+    const result = orderCreateSchema.safeParse({ ...base })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.recipientMail).toBeNull()
+  })
+
+  it("normalizes blank and whitespace-only to null, not an empty string", () => {
+    // "" and null look identical in a text input. Null is what the future
+    // unsubscribe path needs, so that it can skip rather than attempt a send.
+    for (const blank of ["", "   "]) {
+      const result = orderCreateSchema.safeParse({
+        ...base,
+        recipientMail: blank,
+      })
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.recipientMail).toBeNull()
+    }
+  })
+
+  it("trims a real address", () => {
+    const result = orderCreateSchema.safeParse({
+      ...base,
+      recipientMail: "  john@example.com  ",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.recipientMail).toBe("john@example.com")
+    }
+  })
+
+  it("rejects a malformed address rather than storing it for R3 to bounce off", () => {
+    // An address captured here is only ever used to send mail later; accepting
+    // "john at example" now turns into a delivery failure three features away.
+    for (const bad of [
+      "john",
+      "john@",
+      "@example.com",
+      "john@example",
+      "a b@c.com",
+    ]) {
+      const result = orderCreateSchema.safeParse({
+        ...base,
+        recipientMail: bad,
+      })
+      expect(result.success, `should reject "${bad}"`).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues[0].message).toMatch(/valid email address/i)
+      }
+    }
+  })
+
+  it("caps the address at the RFC 5321 limit", () => {
+    // 254 = 64 (local part) + 253 (domain) + "@". Anything longer cannot be a
+    // real address, so it fails on length before it is even checked for shape.
+    const result = orderCreateSchema.safeParse({
+      ...base,
+      recipientMail: "x".repeat(255),
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].message).toMatch(/254 characters/)
+    }
+  })
+
+  it("keeps the address out of every other field's value", () => {
+    // Same shape as the itemType guard: adding a field must not perturb how the
+    // rest of the order is parsed.
+    const a = orderCreateSchema.safeParse({
+      ...base,
+      recipientMail: "a@example.com",
+    })
+    const b = orderCreateSchema.safeParse({
+      ...base,
+      recipientMail: "b@example.com",
+    })
+    expect(a.success && b.success).toBe(true)
+    if (!a.success || !b.success) return
+    const { recipientMail: _a, ...restA } = a.data
+    const { recipientMail: _b, ...restB } = b.data
+    expect(restA).toEqual(restB)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // riderUpdateSchema / riderApproveSchema — vehicle
 // ---------------------------------------------------------------------------
 

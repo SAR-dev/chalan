@@ -324,6 +324,11 @@ export function useOrders({
     (orderId: string) => patchOrder(orderId, "out-for-pickup"),
     [patchOrder],
   )
+  const setExpectedDelivery = useCallback(
+    (orderId: string, date: string) =>
+      patchOrder(orderId, "set-expected-delivery", { date }),
+    [patchOrder],
+  )
   const markOutForDelivery = useCallback(
     (orderId: string) => patchOrder(orderId, "out-for-delivery"),
     [patchOrder],
@@ -510,6 +515,7 @@ export function useOrders({
     receiveOrderAtWarehouse,
     assignDeliveryRider,
     markOutForPickup,
+    setExpectedDelivery,
     markOutForDelivery,
     markDelivered,
     markDeliveryFailed,

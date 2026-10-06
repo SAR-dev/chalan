@@ -19,10 +19,12 @@ import {
   merchantPackage,
   order,
   warehouse,
+  zoneDeliveryTime,
   zonePricing,
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
 import { hasNavPermission } from "@/lib/nav-config"
+import { computeExpectedDeliveryAt } from "@/lib/order-delivery-time"
 import { lockAndResolveMerchantPackageRule } from "@/lib/order-pricing"
 import { applyPackageRule, pickTierForCount } from "@/lib/packages"
 import {
@@ -174,6 +176,16 @@ export const POST = withErrorHandler(async (req: Request) => {
         .where(inArray(zonePricing.fromZoneId, allZoneIds))
     : []
 
+  // The delivery-time matrix, prefetched the same way and over the same zone
+  // set. Never a blocker: an unpriced lane rejects the batch, an un-timed lane
+  // simply gets no estimate (`expectedDeliveryAt` null).
+  const allZoneDeliveryTime = allZoneIds.length
+    ? await dbRead
+        .select()
+        .from(zoneDeliveryTime)
+        .where(inArray(zoneDeliveryTime.fromZoneId, allZoneIds))
+    : []
+
   type PricingInput = {
     baseRate: number
     extraRatePerKg: number
@@ -184,6 +196,27 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
 
   /**
+   * The zone ids behind one input row — origin from the pickup warehouse's city,
+   * destination from the delivery city.
+   *
+   * This derivation used to be written out inside both `pricingFor` and
+   * `laneOf`, which is two places that could disagree about what a lane is; the
+   * delivery-time lookup would have made three. One function, three callers.
+   */
+  const zonePairOf = (input: (typeof inputs)[number]) => {
+    const origWarehouseCity =
+      warehouseCityMap[warehouseByPickup[input.pickupLocationId]]
+    return {
+      fromZoneId: origWarehouseCity
+        ? origZoneByName[origWarehouseCity]
+        : undefined,
+      toZoneId: input.deliveryCityId
+        ? destZoneMap[input.deliveryCityId]
+        : undefined,
+    }
+  }
+
+  /**
    * Zone pricing is the single source of these rates — there is no platform
    * fallback, so a row whose lane has no `zone_pricing` row cannot be priced and
    * is reported per-row rather than silently inheriting a default. Mirrors
@@ -191,36 +224,35 @@ export const POST = withErrorHandler(async (req: Request) => {
    * path batches the lookup instead of calling per row.
    */
   const pricingFor = (input: (typeof inputs)[number]): PricingInput | null => {
-    const origWarehouseCity =
-      warehouseCityMap[warehouseByPickup[input.pickupLocationId]]
-    const destZoneId = input.deliveryCityId
-      ? destZoneMap[input.deliveryCityId]
-      : undefined
-    const origZoneId = origWarehouseCity
-      ? origZoneByName[origWarehouseCity]
-      : undefined
-    if (!origZoneId || !destZoneId) return null
+    const { fromZoneId, toZoneId } = zonePairOf(input)
+    if (!fromZoneId || !toZoneId) return null
     return (
       allZonePricing.find(
-        (z) => z.fromZoneId === origZoneId && z.toZoneId === destZoneId,
+        (z) => z.fromZoneId === fromZoneId && z.toZoneId === toZoneId,
       ) ?? null
     )
   }
 
+  /**
+   * The quoted delivery days for a row, or null when the lane has no
+   * `zone_delivery_time` row. Null is not an error — it means "no promise",
+   * which the single-create path expresses the same way.
+   */
+  const deliveryDaysFor = (input: (typeof inputs)[number]): number | null => {
+    const { fromZoneId, toZoneId } = zonePairOf(input)
+    if (!fromZoneId || !toZoneId) return null
+    return (
+      allZoneDeliveryTime.find(
+        (t) => t.fromZoneId === fromZoneId && t.toZoneId === toZoneId,
+      )?.deliveryDays ?? null
+    )
+  }
+
   const laneOf = (input: (typeof inputs)[number]) => {
-    const origZoneId = warehouseCityMap[
-      warehouseByPickup[input.pickupLocationId]
-    ]
-      ? origZoneByName[
-          warehouseCityMap[warehouseByPickup[input.pickupLocationId]]
-        ]
-      : undefined
-    const destZoneId = input.deliveryCityId
-      ? destZoneMap[input.deliveryCityId]
-      : undefined
+    const { fromZoneId, toZoneId } = zonePairOf(input)
     return {
-      fromZone: origZoneId ? (zoneNameById[origZoneId] ?? null) : null,
-      toZone: destZoneId ? (zoneNameById[destZoneId] ?? null) : null,
+      fromZone: fromZoneId ? (zoneNameById[fromZoneId] ?? null) : null,
+      toZone: toZoneId ? (zoneNameById[toZoneId] ?? null) : null,
     }
   }
 
@@ -257,6 +289,10 @@ export const POST = withErrorHandler(async (req: Request) => {
     )
   }
 
+  // One clock for the creation instant and for every promise derived from it —
+  // see the same comment on the single-create path.
+  const createdAtIso = new Date().toISOString()
+
   const created = await db.transaction(async (tx) => {
     // Lock the merchant's active bundle once. Each order resolves its own tier
     // against the cumulative count, so a batch that crosses a tier boundary is
@@ -292,6 +328,10 @@ export const POST = withErrorHandler(async (req: Request) => {
         trackingToken: generateTrackingToken(),
         recipientName: input.recipientName,
         recipientPhone: input.recipientPhone,
+        // Already trimmed and null-on-blank by `orderCreateSchema`, exactly
+        // like `itemType` below — a CSV with no recipient_mail column lands
+        // here as null rather than as "".
+        recipientMail: input.recipientMail ?? null,
         deliveryCityId: input.deliveryCityId ?? null,
         deliveryAddress: input.deliveryAddress,
         deliveryMapLink: mapLink ? mapLink : null,
@@ -315,6 +355,13 @@ export const POST = withErrorHandler(async (req: Request) => {
         status: "PENDING" as const,
         deliveryAttempts: 0,
         merchantNote: input.merchantNote?.trim() || null,
+        // The quoted delivery promise, snapshotted per row.
+        createdAt: createdAtIso,
+        expectedDeliveryDays: deliveryDaysFor(input),
+        expectedDeliveryAt: computeExpectedDeliveryAt(
+          createdAtIso,
+          deliveryDaysFor(input),
+        ),
       }
     })
 
@@ -325,6 +372,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       warehouseId: order.warehouseId,
       recipientName: order.recipientName,
       recipientPhone: order.recipientPhone,
+      recipientMail: order.recipientMail,
       deliveryAddress: order.deliveryAddress,
       deliveryMapLink: order.deliveryMapLink,
       parcelWeightKg: order.parcelWeightKg,

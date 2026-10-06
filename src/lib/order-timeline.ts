@@ -169,3 +169,38 @@ export function formatStamp(iso?: string | Date | null) {
     minute: "2-digit",
   })
 }
+
+/** How far along its route a parcel is, for a progress bar. */
+export interface DeliveryProgress {
+  /** 0–100, inclusive. */
+  percent: number
+  /** 1-based step number, for "Step 3 of 7". */
+  step: number
+  total: number
+  /**
+   * False for `CANCELLED`. Showing 4 of 7 toward a destination the parcel will
+   * never reach is not progress, it is a misreading waiting to happen — the bar
+   * is withheld rather than shown at a meaningless value.
+   */
+  visible: boolean
+}
+
+/**
+ * The single source of "how far along is this parcel".
+ *
+ * The public tracking page and the internal order details both render a
+ * progress bar, and this is why neither computes it: two copies of the
+ * arithmetic is exactly how one screen ends up saying step 5 of 8 while the
+ * other says 6 of 8 for the same order. Same reasoning as `formatStamp` above.
+ */
+export function deliveryProgress(status: OrderStatus): DeliveryProgress {
+  const total = STEPS.length
+  const maxRank = total - 1
+  const currentRank = Math.min(STATUS_RANK[status], maxRank)
+  return {
+    percent: Math.round((currentRank / maxRank) * 100),
+    step: Math.min(currentRank + 1, total),
+    total,
+    visible: status !== "CANCELLED",
+  }
+}

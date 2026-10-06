@@ -29,6 +29,7 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx src/lib/db/migrate.ts",
     "db:admin": "tsx scripts/setup.ts",
+    "db:audit-invariants": "tsx scripts/db-invariant-audit.ts",
     "db:seed:basic": "tsx src/lib/db/seed/index-basic.ts",
     "db:seed:full": "tsx src/lib/db/seed/index-full.ts",
     "db:push:e2e": "dotenv -e .env.e2e -e .env -- drizzle-kit push",

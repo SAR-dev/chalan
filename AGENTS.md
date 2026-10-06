@@ -173,7 +173,7 @@ describes continue the serial from the current maximum (check the existing
 specs first); numbers must stay unique (a removed scenario leaves its serial
 unused rather than renumbering every later file). The summary below is
 asserted by `src/app/__tests__/docs-drift.spec.ts`, which fails on either a
-duplicate serial or stale counts: **currently S1-S80 across 36 files / 146
+duplicate serial or stale counts: **currently S1-S81 across 37 files / 149
 tests**.
 
 ## Coding Patterns
@@ -295,7 +295,7 @@ function formatOrderError(data: {
 
 - `pnpm test:coverage` runs the unit suite under `@vitest/coverage-v8` and
   fails if statements/branches/functions/lines drop below the floors in
-  `vitest.config.ts` (49 / 42 / 37 / 50). A CI `coverage` job enforces it.
+  `vitest.config.ts` (50 / 45 / 40 / 52). A CI `coverage` job enforces it.
 - Raise the floors as tests land — they are a regression guard, not a target.
   New code should come with tests, not with a lowered threshold.
 

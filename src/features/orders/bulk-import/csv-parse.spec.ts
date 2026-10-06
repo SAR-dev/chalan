@@ -18,7 +18,7 @@ function file(name: string, text: string) {
 describe("parseImportText", () => {
   it("parses a happy-path file with physical line numbers", () => {
     const result = parseImportText(
-      `${HEADER}\nShop A,John,01712345678,Dhaka,Addr,1.5,Cotton saree,1200,STANDARD,,note\nShop B,Jane,01712345679,Chittagong,Addr 2,2,Charger,500,STANDARD,,`,
+      `${HEADER}\nShop A,John,01712345678,john@example.com,Dhaka,Addr,1.5,Cotton saree,1200,STANDARD,,note\nShop B,Jane,01712345679,,Chittagong,Addr 2,2,Charger,500,STANDARD,,`,
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -28,6 +28,7 @@ describe("parseImportText", () => {
       pickup_location: "Shop A",
       recipient_name: "John",
       recipient_phone: "01712345678",
+      recipient_mail: "john@example.com",
       delivery_city: "Dhaka",
       delivery_address: "Addr",
       parcel_weight_kg: "1.5",
@@ -37,6 +38,11 @@ describe("parseImportText", () => {
       delivery_map_link: "",
       merchant_note: "note",
     })
+    // A row with no email still lands every later value in its own column — the
+    // empty optional cell must not shift the rest of the row left.
+    expect(result.rows[1].values.recipient_mail).toBe("")
+    expect(result.rows[1].values.delivery_city).toBe("Chittagong")
+    expect(result.rows[1].values.product_cost).toBe("500")
   })
 
   it("leaves item_type empty when a file predates the column", () => {
@@ -49,18 +55,19 @@ describe("parseImportText", () => {
       .filter((h) => h !== "item_type")
       .join(",")
     const result = parseImportText(
-      `${legacyHeader}\nShop A,John,01712345678,Dhaka,Addr,1.5,1200`,
+      `${legacyHeader}\nShop A,John,01712345678,,Dhaka,Addr,1.5,1200`,
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
     const values = result.rows[0].values
     expect(values.item_type).toBe("")
+    expect(values.recipient_mail).toBe("")
     expect(values.product_cost).toBe("1200")
   })
 
   it("keeps quoted commas and newlines inside one row", () => {
     const result = parseImportText(
-      `${HEADER}\n"Shop A",John,01712345678,Dhaka,"House 1, Road 1\nDhanmondi Dhaka",1.5,1200\nShop B,Jane,01712345679,Chittagong,Addr,2,500`,
+      `${HEADER}\n"Shop A",John,01712345678,,Dhaka,"House 1, Road 1\nDhanmondi Dhaka",1.5,1200\nShop B,Jane,01712345679,,Chittagong,Addr,2,500`,
     )
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -127,14 +134,16 @@ describe("parseImportText", () => {
   it("auto-detects TSV from pasted spreadsheet rows", () => {
     const tsv = [
       orderImportHeaders.join("\t"),
-      "Shop A\tJohn\t01712345678\tDhaka\tAddr\t1.5\t1200",
-      "Shop B\tJane\t01712345679\tChittagong\tAddr 2\t2\t500",
+      "Shop A\tJohn\t01712345678\tjohn@example.com\tDhaka\tAddr\t1.5\t1200",
+      "Shop B\tJane\t01712345679\t\tChittagong\tAddr 2\t2\t500",
     ].join("\n")
     const result = parseImportText(tsv)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.rows).toHaveLength(2)
     expect(result.rows.map((r) => r.__line)).toEqual([2, 3])
+    expect(result.rows[0].values.recipient_mail).toBe("john@example.com")
+    expect(result.rows[1].values.recipient_mail).toBe("")
     expect(result.rows[1].values.delivery_city).toBe("Chittagong")
   })
 

@@ -46,6 +46,7 @@ const INPUT_HEADERS: Record<string, OrderImportHeader> = {
   pickupLocationId: "pickup_location",
   recipientName: "recipient_name",
   recipientPhone: "recipient_phone",
+  recipientMail: "recipient_mail",
   deliveryCityId: "delivery_city",
   deliveryAddress: "delivery_address",
   deliveryMapLink: "delivery_map_link",
@@ -201,6 +202,10 @@ export function resolveRow(
     pickupLocationId,
     recipientName: values.recipient_name.trim(),
     recipientPhone: normalizePhone(values.recipient_phone),
+    // Optional, and left to `orderCreateSchema` for shape: a blank cell is a
+    // real "no email", while a malformed one is reported back against the
+    // `recipient_mail` column through `INPUT_HEADERS`.
+    recipientMail: values.recipient_mail.trim() || null,
     deliveryCityId,
     deliveryAddress: values.delivery_address.trim(),
     deliveryMapLink: deliveryMapLink || null,

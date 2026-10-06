@@ -60,6 +60,26 @@ function pricedLane(baseRate = 80, cancellationFee = 0) {
 }
 
 /**
+ * The four reads `resolveRouteDeliveryTime` issues, immediately after
+ * `pricedLane` on every create.
+ *
+ * They sit *after* pricing in the queue because that is the order the route
+ * issues them, so a test that queues anything further (the bundle lookup) must
+ * queue these in between or the next read gets a delivery-time row instead of
+ * what it asked for. An exhausted queue here is not an error — it yields "no
+ * estimate" and the order is still created — but it silently shifts every read
+ * after it, which is worse than failing loudly.
+ */
+function configuredDeliveryLane(days = 3) {
+  return [
+    [{ city: "Dhaka" }], // warehouse
+    [{ zone: { id: "ZN-1", name: "Dhaka Metro" } }], // origin city → zone
+    [{ zone: { id: "ZN-2", name: "Gazipur" } }], // delivery city → zone
+    [{ fromZoneId: "ZN-1", toZoneId: "ZN-2", deliveryDays: days }], // matrix
+  ]
+}
+
+/**
  * The same, for `POST /api/orders/bulk`, which batches its lookups instead of
  * calling the resolver. `wh_1` sits in Dhaka (ZN-1) and `city_1` is in ZN-2.
  */
@@ -303,6 +323,7 @@ describe("POST /api/orders", () => {
         },
       ], // merchant
       ...pricedLane(50),
+      ...configuredDeliveryLane(),
     )
     insertResult.push({ id: "o_new", status: "PENDING" })
     const res = await createOrder(req("POST", undefined, validOrderBody))
@@ -364,6 +385,7 @@ describe("POST /api/orders", () => {
       ], // merchant
       // resolveRoutePricing: a lane that has a configured rate.
       ...pricedLane(80),
+      ...configuredDeliveryLane(),
       // lockAndResolveMerchantPackageRule: bundle, package, tiers
       [{ merchantPackageId: "mp_1", packageId: "pk_1", ordersUsed: 120 }],
       [{ isActive: true }],
@@ -419,6 +441,7 @@ describe("POST /api/orders", () => {
         },
       ], // merchant
       ...pricedLane(80),
+      ...configuredDeliveryLane(),
       [], // no active bundle
     )
     insertResult.push({ id: "o_plain", status: "PENDING" })
@@ -469,6 +492,7 @@ describe("POST /api/orders", () => {
       ], // merchant
       // resolveRoutePricing: a lane with an explicit cancellation fee.
       ...pricedLane(100, 25),
+      ...configuredDeliveryLane(),
     )
     insertResult.push({ id: "o_new", status: "PENDING" })
 
@@ -892,6 +916,7 @@ describe("POST /api/orders/bulk", () => {
           cancellationFee: 0,
         },
       ], // zone pricing (100 Tk for a 1 kg parcel)
+      [{ fromZoneId: "ZN-1", toZoneId: "ZN-2", deliveryDays: 3 }], // zone delivery time (issued straight after the pricing read)
       [{ merchantPackageId: "mp_1", packageId: "pk_1", ordersUsed: 99 }], // bundle
       [{ isActive: true }], // package
       [

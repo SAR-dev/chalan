@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { formatDateTime } from "@/lib/format"
 import {
+  deliveryProgress,
   formatStamp,
   STATUS_RANK,
   STEPS,
@@ -99,12 +100,57 @@ describe("order timeline (ROADMAP R5.2)", () => {
     expect(formatStamp("")).toBeNull()
     expect(formatStamp("not a date")).toBeNull()
   })
+
+  describe("deliveryProgress", () => {
+    it("runs from 0% at placement to 100% at delivery", () => {
+      expect(deliveryProgress("PENDING")).toEqual({
+        percent: 0,
+        step: 1,
+        total: STEPS.length,
+        visible: true,
+      })
+      expect(deliveryProgress("DELIVERED")).toEqual({
+        percent: 100,
+        step: STEPS.length,
+        total: STEPS.length,
+        visible: true,
+      })
+    })
+
+    it("never reports a step beyond the count, for every status", () => {
+      // Terminal and exception statuses all have ranks, but a future status
+      // added without one would otherwise read as step 1 of 7 and silently
+      // reset a bar to the left. Clamped rather than assumed.
+      for (const status of Object.keys(STATUS_RANK) as OrderStatus[]) {
+        const p = deliveryProgress(status)
+        expect(p.step, status).toBeGreaterThanOrEqual(1)
+        expect(p.step, status).toBeLessThanOrEqual(p.total)
+        expect(p.percent, status).toBeGreaterThanOrEqual(0)
+        expect(p.percent, status).toBeLessThanOrEqual(100)
+      }
+    })
+
+    it("withholds the bar for a cancelled order", () => {
+      // Progress toward a destination the parcel will never reach is not
+      // progress. Both surfaces read `visible`, so this is decided once.
+      expect(deliveryProgress("CANCELLED").visible).toBe(false)
+      for (const status of Object.keys(STATUS_RANK) as OrderStatus[]) {
+        if (status === "CANCELLED") continue
+        expect(deliveryProgress(status).visible, status).toBe(true)
+      }
+    })
+  })
 })
 
 describe("the timeline has exactly one definition (ROADMAP R5.2)", () => {
   const consumers = [
     "src/app/track/[id]/lib.ts",
     "src/features/orders/components/tracking-timeline.tsx",
+    // The two progress bars. Both call `deliveryProgress`; neither derives its
+    // own, because two copies of the arithmetic is how one screen says step 5
+    // of 8 while the other says 6 of 8 for the same order.
+    "src/app/track/[id]/components/order-detail.tsx",
+    "src/features/orders/components/order-details-content.tsx",
   ]
 
   /**
@@ -117,6 +163,7 @@ describe("the timeline has exactly one definition (ROADMAP R5.2)", () => {
     /(^|\n)\s*const STATUS_RANK\s*:/,
     /(^|\n)\s*(const|export const) STEPS\s*[:=]/,
     /(^|\n)\s*(function|export function) formatStamp\s*\(/,
+    /(^|\n)\s*(function|export function) deliveryProgress\s*\(/,
   ]
 
   for (const file of consumers) {

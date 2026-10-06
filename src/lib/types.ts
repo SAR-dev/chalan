@@ -17,6 +17,7 @@ import type {
   supportTicket,
   user,
   warehouse,
+  zoneDeliveryTime,
   zonePricing,
 } from "@/lib/db/schema"
 
@@ -204,6 +205,8 @@ export interface CreateOrderInput {
   pickupLocationId: string
   recipientName: string
   recipientPhone: string
+  /** Recipient email. Optional — absent or blank is a valid, meaningful "no". */
+  recipientMail?: string | null
   deliveryAddress: string
   deliveryCityId: string
   deliveryMapLink?: string | null
@@ -219,6 +222,7 @@ export type Announcement = Loosen<typeof announcement.$inferSelect>
 export type DeliveryCity = typeof deliveryCity.$inferSelect
 export type DeliveryZone = typeof deliveryZone.$inferSelect
 export type ZonePricing = typeof zonePricing.$inferSelect
+export type ZoneDeliveryTime = typeof zoneDeliveryTime.$inferSelect
 
 // --- Analytics types ---------------------------------------------------------
 

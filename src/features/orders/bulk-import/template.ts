@@ -15,6 +15,7 @@ export const orderImportHeaders = [
   "pickup_location",
   "recipient_name",
   "recipient_phone",
+  "recipient_mail",
   "delivery_city",
   "delivery_address",
   "parcel_weight_kg",
@@ -27,7 +28,7 @@ export const orderImportHeaders = [
 
 export type OrderImportHeader = (typeof orderImportHeaders)[number]
 
-/** The first seven columns are mandatory in every imported file. */
+/** These seven columns are mandatory in every imported file. */
 export const requiredImportHeaders: readonly OrderImportHeader[] = [
   "pickup_location",
   "recipient_name",
@@ -51,6 +52,15 @@ export const headerAliases: Record<string, OrderImportHeader> = {
   mobile: "recipient_phone",
   recipient_mobile: "recipient_phone",
   customer_phone: "recipient_phone",
+  // Optional — a sheet with no email column still imports fine. Aliases exist
+  // because nobody names this one consistently: it is "email", "mail" or
+  // "customer_email" about as often as it is "recipient_mail". (No alias for
+  // `recipient_mail` itself: `resolveImportHeader` matches the canonical list
+  // before it ever consults this map.)
+  email: "recipient_mail",
+  mail: "recipient_mail",
+  recipient_email: "recipient_mail",
+  customer_email: "recipient_mail",
   city: "delivery_city",
   address: "delivery_address",
   recipient_address: "delivery_address",
@@ -113,6 +123,9 @@ export function buildTemplateCsv(sample?: TemplateSample): string {
       sample?.pickupLocation?.trim() || PLACEHOLDER_PICKUP_LOCATION,
     recipient_name: "John Doe",
     recipient_phone: "01712345678",
+    // Prefilled for the reason given on `item_type` below: an empty optional
+    // column reads as "this import does not support it".
+    recipient_mail: "johndoe@example.com",
     delivery_city: sample?.deliveryCity?.trim() || "Dhaka",
     delivery_address: "House 1 Road 1 Dhanmondi Dhaka",
     parcel_weight_kg: "1.5",
