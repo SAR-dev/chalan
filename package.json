@@ -19,7 +19,7 @@
     "test:unit:run": "vitest run",
     "test:unit:ui": "vitest --ui",
     "test:unit:report": "vitest run --reporter=html",
-    "test:coverage": "vitest run --coverage --no-isolate",
+    "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run src/lib/db/integration.spec.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
