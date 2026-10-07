@@ -58,6 +58,16 @@ test.describe("3801. Parcel label quick-print", () => {
     // The QR is rendered from the same order id, so the scan target and the
     // printed reference cannot disagree.
     await expect(sheet.locator("svg title")).toHaveText(`Parcel ${orderId}`)
+
+    // 3. The order detail page offers single-label print / reprint for a parcel
+    //    already in flight.
+    await page.goto(`/warehouse/orders/${orderId}`)
+    await waitForAppReady(page)
+    const detailButton = page.locator(orderLabel.button(orderId))
+    await expect(detailButton).toBeVisible({ timeout: 15_000 })
+    await detailButton.click()
+    await expect(sheet).toHaveCount(1)
+    await expect(sheet).toContainText(orderId)
   })
 
   test("a rider prints from the pickup queue", async ({ page }) => {

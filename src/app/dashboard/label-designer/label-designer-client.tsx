@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
+import { siteConfig } from "@/config/site"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { LabelBlockEditor } from "@/features/platform-config/components/label-block-editor"
 import {
@@ -29,6 +30,14 @@ import {
 import { LABEL_TEMPLATE_MAX_MM, LABEL_TEMPLATE_MIN_MM } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
 import { DEFAULT_LABEL_TEMPLATE, SAMPLE_LABEL_DATA } from "@/lib/label-layout"
+
+// The sample order values, plus the platform's real identity so the preview's
+// brand-name / website / icon blocks show what will actually print.
+const PREVIEW_DATA = {
+  ...SAMPLE_LABEL_DATA,
+  siteName: siteConfig.name,
+  siteUrl: siteConfig.siteUrl,
+}
 
 // =============================================================================
 // Label designer (R5)
@@ -322,20 +331,21 @@ export function LabelDesignerPageClient() {
               <CardHeader>
                 <CardTitle>Preview</CardTitle>
                 <CardDescription>
-                  Sample data on the real label, at true physical size. This is
-                  exactly what the print action produces.
+                  Sample data on the real label. It scales to fit this panel;
+                  the print action always uses the true physical size.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex justify-center overflow-auto py-6">
+              <CardContent className="py-6">
                 <LabelRenderer
                   widthMm={form.widthMm}
                   heightMm={form.heightMm}
                   blocks={form.blocks}
                   data={{
-                    ...SAMPLE_LABEL_DATA,
+                    ...PREVIEW_DATA,
                     logoUrl: form.logoRef,
                   }}
                   scale={2}
+                  fit
                   data-testid="label-preview"
                 />
               </CardContent>
@@ -440,13 +450,14 @@ function LabelPreview({
           {widthMm}×{heightMm}mm · sample data
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex justify-center overflow-auto">
+      <CardContent className="overflow-hidden">
         <LabelRenderer
           widthMm={widthMm}
           heightMm={heightMm}
           blocks={blocks}
-          data={{ ...SAMPLE_LABEL_DATA, logoUrl: logoRef }}
+          data={{ ...PREVIEW_DATA, logoUrl: logoRef }}
           scale={scale}
+          fit
           data-testid="label-preview-inline"
         />
       </CardContent>

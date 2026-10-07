@@ -189,6 +189,7 @@ export const labelDesigner = {
   tabPreview: "[data-testid='label-tab-preview']",
   tabHistory: "[data-testid='label-tab-history']",
   addBlock: (type: string) => `[data-testid='label-add-${type}']`,
+  textBlock: (index: number) => `[data-testid='label-text-${index}']`,
   blockRowPrefix: "[data-testid^='label-block-row-']",
   inlinePreview: "[data-testid='label-preview-inline']",
   previewRenderer: "[data-testid='label-preview']",

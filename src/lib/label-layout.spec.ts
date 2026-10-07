@@ -76,6 +76,23 @@ describe("resolveLabelField", () => {
       resolveLabelField({ ...data, destinationCity: null }, "destinationCity"),
     ).toBe("")
   })
+
+  it("resolves the platform identity fields", () => {
+    const withSite: LabelData = {
+      ...data,
+      siteName: "Chalan",
+      siteUrl: "https://chalan.sarn.top",
+    }
+    expect(resolveLabelField(withSite, "siteName")).toBe("Chalan")
+    expect(resolveLabelField(withSite, "siteUrl")).toBe(
+      "https://chalan.sarn.top",
+    )
+  })
+
+  it("renders an absent site identity as an empty string", () => {
+    expect(resolveLabelField(data, "siteName")).toBe("")
+    expect(resolveLabelField(data, "siteUrl")).toBe("")
+  })
 })
 
 describe("labelBlockKey", () => {

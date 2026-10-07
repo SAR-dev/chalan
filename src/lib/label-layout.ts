@@ -32,6 +32,13 @@ export interface LabelData {
   qrValue: string
   /** Optional logo source (storage URL) for a `logo` block. */
   logoUrl?: string | null
+  /**
+   * Platform identity from `src/config/site.ts`, surfaced as `field` values so
+   * a label can carry the brand. Supplied by the constructor (print action or
+   * designer preview), not baked into this pure module.
+   */
+  siteName?: string | null
+  siteUrl?: string | null
 }
 
 /** Font size per scale step, in millimetres — physical, so print equals screen. */
@@ -108,7 +115,8 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateStructure = {
     { type: "field", field: "weight", scale: "s", bold: false, width: "half" },
     // COD prints small at the foot on purpose: the label is on the outside of
     // the box, so a large figure advertises what is inside to anyone who can see
-    // the parcel. See `WORKLOG.md` → *The admin label designer*.
+    // the parcel. See `ROADMAP.md` → *R5 Printable parcel labels and the label
+    // designer*.
     {
       type: "field",
       field: "codAmount",
@@ -171,6 +179,10 @@ export function resolveLabelField(
       return `${data.weightKg} kg`
     case "codAmount":
       return `COD ${formatMoney(data.codAmount)}`
+    case "siteName":
+      return data.siteName ?? ""
+    case "siteUrl":
+      return data.siteUrl ?? ""
   }
 }
 

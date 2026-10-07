@@ -196,18 +196,18 @@ a later add-on.
   that same template (its `widthMm`/`heightMm`), not a second layout. See *One
   template, scaled to the paper* below. Reprint lives on the order detail page
   for merchant and warehouse, alongside the existing history view.
-- **How it prints - browser print API is fine to start.** Two things to get
+- **How it prints - the browser print API, and no PDF.** Two things to get
   right early, because retrofitting them later means reprinting every parcel:
   1. **Set the physical page size with CSS `@page`** to the template's
      configured dimensions (`size: 100mm 150mm` for the default, or the browser
      quietly rescales to A4). A scaled QR is a blurry QR, and a QR the camera
      cannot read is precisely the failure R9 is built to avoid - the print step
      is where the scan is won or lost.
-  2. **Prefer generating a PDF over `window.print()`** where the merchant does
-     not need to choose printer settings interactively. A PDF is a
-     reprintable artifact rather than a transient dialog, it can be produced
-     headless in e2e, and it does not leave a dialog the merchant has to
-     dismiss. `window.print()` stays for the "print now" path.
+  2. **`window.print()` is the shipping path; a PDF generator is not planned.**
+     A PDF would need a second, vector-emitting renderer to keep the QR crisp
+     (see *Never rasterize a label*), and quick-print plus reprint from the
+     order detail page already covers the merchant's "print it again" need
+     without an extra artifact to store and secure.
 - **Admin label designer.** Decisions closed: **platform-wide only** (no
   per-merchant templates and no fallback chain until a merchant actually asks —
   matching how the rest of `platform-config` works), **one template, scaled to
@@ -267,9 +267,10 @@ truth, and everything else renders it.**
   it is why the print bullet above matters: the renderer is where the QR code's
   minimum size and quiet zone are actually enforced, whatever the admin picked.
 - **Never rasterize a label.** `html2canvas` + `jsPDF` produces a bitmap, which
-  blurs the QR code and breaks R9 outright. A future PDF generator must consume
-  the *block array* and emit vector text — the model is the contract, the
-  renderer is swappable.
+  blurs the QR code and breaks R9 outright. The label prints from the live block
+  array (HTML/CSS), so the QR stays vector-crisp; any future PDF work must
+  consume the *block array* and emit vector text — the model is the contract,
+  the renderer is swappable.
 - **A block list, not a drag-drop canvas.** A delivery label is a vertical
   stack; absolute positioning means collision handling, mm-precise dragging and
   resize handles for a shape that does not need them — plus drag-drop

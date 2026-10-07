@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { makeOrder } from "@/app/__tests__/test-utils"
+import { siteConfig } from "@/config/site"
 import { OrderLabelButton, orderToLabelData } from "./order-label-button"
 
 describe("orderToLabelData", () => {
@@ -27,6 +28,9 @@ describe("orderToLabelData", () => {
     expect(data.destinationCity).toBe("Dhaka")
     expect(data.weightKg).toBe(1.5)
     expect(data.codAmount).toBe(1250)
+    // Platform identity travels with the label so brand blocks resolve on print.
+    expect(data.siteName).toBe(siteConfig.name)
+    expect(data.siteUrl).toBe(siteConfig.siteUrl)
   })
 
   it("renders an absent city as an empty destination, not 'null'", () => {

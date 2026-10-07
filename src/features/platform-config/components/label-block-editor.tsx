@@ -12,15 +12,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import {
   LABEL_BLOCK_WIDTHS,
   LABEL_FIELD_KEYS,
   LABEL_FIELD_LABELS,
   LABEL_FONT_SCALES,
+  LABEL_ICON_DEFAULT_MM,
+  LABEL_ICON_MIN_MM,
   LABEL_MAX_BLOCKS,
   LABEL_QR_MIN_MM,
   LABEL_SPACER_MAX_MM,
   LABEL_TEMPLATE_MAX_MM,
+  LABEL_TEXT_DEFAULT,
+  LABEL_TEXT_MAX,
   type LabelBlockWidth,
 } from "@/lib/constants"
 import type { LabelBlock } from "@/lib/validation"
@@ -40,12 +45,22 @@ const BLOCK_LABELS: Record<BlockType, string> = {
   logo: "Logo",
   qr: "QR code",
   field: "Field",
+  text: "Custom text",
+  icon: "Brand icon",
   separator: "Separator",
   spacer: "Spacer",
 }
 
 /** The order the "Add block" buttons appear in — most common first. */
-const ADD_ORDER: BlockType[] = ["field", "qr", "logo", "separator", "spacer"]
+const ADD_ORDER: BlockType[] = [
+  "field",
+  "text",
+  "qr",
+  "icon",
+  "logo",
+  "separator",
+  "spacer",
+]
 
 function newBlock(type: BlockType): LabelBlock {
   switch (type) {
@@ -59,6 +74,20 @@ function newBlock(type: BlockType): LabelBlock {
         field: "recipientName",
         scale: "m",
         bold: false,
+        width: "full",
+      }
+    case "text":
+      return {
+        type: "text",
+        text: LABEL_TEXT_DEFAULT,
+        scale: "m",
+        bold: false,
+        width: "full",
+      }
+    case "icon":
+      return {
+        type: "icon",
+        heightMm: LABEL_ICON_DEFAULT_MM,
         width: "full",
       }
     case "separator":
@@ -194,7 +223,15 @@ export function LabelBlockEditor({ blocks, onChange }: LabelBlockEditorProps) {
 function blockTypeLabel(block: LabelBlock): string {
   if (block.type === "field")
     return `Field · ${LABEL_FIELD_LABELS[block.field]}`
+  if (block.type === "text") return `Custom text · ${labelSnippet(block.text)}`
   return BLOCK_LABELS[block.type]
+}
+
+/** One-line preview of a custom-text block, quoted and clipped for the header. */
+function labelSnippet(text: string): string {
+  const trimmed = text.trim()
+  if (trimmed.length === 0) return "“”"
+  return `“${trimmed.length > 40 ? `${trimmed.slice(0, 40)}…` : trimmed}”`
 }
 
 function BlockControls({
@@ -326,6 +363,113 @@ function BlockControls({
             <WidthSelect
               id={`block-width-${index}`}
               testId={`label-width-select-${index}`}
+              value={block.width}
+              onChange={(width) => onUpdate({ ...block, width })}
+            />
+          </div>
+        </div>
+      )
+
+    case "text":
+      return (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label htmlFor={`block-text-${index}`}>Custom text</Label>
+            <Textarea
+              id={`block-text-${index}`}
+              value={block.text}
+              maxLength={LABEL_TEXT_MAX}
+              rows={2}
+              data-testid={`label-text-${index}`}
+              onChange={(e) => onUpdate({ ...block, text: e.target.value })}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`block-text-scale-${index}`}>Size</Label>
+            <Select
+              value={block.scale}
+              onValueChange={(v) =>
+                onUpdate({ ...block, scale: v ?? block.scale })
+              }
+            >
+              <SelectTrigger
+                id={`block-text-scale-${index}`}
+                className="w-full"
+                data-testid={`label-text-scale-${index}`}
+              >
+                <SelectValue>
+                  {(value) => String(value ?? block.scale).toUpperCase()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {LABEL_FONT_SCALES.map((scale) => (
+                  <SelectItem key={scale} value={scale}>
+                    {scale.toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`block-text-bold-${index}`}>Bold</Label>
+            <Switch
+              id={`block-text-bold-${index}`}
+              data-testid={`label-text-bold-${index}`}
+              checked={block.bold}
+              onCheckedChange={(checked) =>
+                onUpdate({ ...block, bold: checked })
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`block-text-width-${index}`}>Width</Label>
+            <WidthSelect
+              id={`block-text-width-${index}`}
+              testId={`label-text-width-${index}`}
+              value={block.width}
+              onChange={(width) => onUpdate({ ...block, width })}
+            />
+          </div>
+        </div>
+      )
+
+    case "icon":
+      return (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`block-icon-height-${index}`}>
+              Height (mm, min {LABEL_ICON_MIN_MM})
+            </Label>
+            <Input
+              id={`block-icon-height-${index}`}
+              type="number"
+              min={LABEL_ICON_MIN_MM}
+              max={LABEL_SPACER_MAX_MM}
+              value={block.heightMm}
+              className="w-24"
+              data-testid={`label-icon-height-${index}`}
+              onChange={(e) =>
+                onUpdate({
+                  ...block,
+                  heightMm: clampNumber(
+                    e.target.value,
+                    LABEL_ICON_MIN_MM,
+                    LABEL_SPACER_MAX_MM,
+                    block.heightMm,
+                  ),
+                })
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`block-icon-width-${index}`}>Width</Label>
+            <WidthSelect
+              id={`block-icon-width-${index}`}
+              testId={`label-icon-width-${index}`}
               value={block.width}
               onChange={(width) => onUpdate({ ...block, width })}
             />

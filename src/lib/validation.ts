@@ -4,12 +4,15 @@ import {
   LABEL_BLOCK_WIDTHS,
   LABEL_FIELD_KEYS,
   LABEL_FONT_SCALES,
+  LABEL_ICON_DEFAULT_MM,
+  LABEL_ICON_MIN_MM,
   LABEL_MAX_BLOCKS,
   LABEL_NAME_MAX,
   LABEL_QR_MIN_MM,
   LABEL_SPACER_MAX_MM,
   LABEL_TEMPLATE_MAX_MM,
   LABEL_TEMPLATE_MIN_MM,
+  LABEL_TEXT_MAX,
   MAX_BULK_ORDERS,
   MAX_TABLE_ROWS_PER_PAGE,
   ORDER_DELIVERY_TYPES,
@@ -954,6 +957,33 @@ export const labelBlockSchema = z.discriminatedUnion("type", [
     field: z.enum(LABEL_FIELD_KEYS),
     scale: z.enum(LABEL_FONT_SCALES).default("m"),
     bold: z.boolean().default(false),
+    width: labelWidthSchema.default("full"),
+  }),
+  // The one free-form block. Length-clamped so it still fits the sheet; the
+  // renderer wraps and scales it like a field.
+  z.object({
+    type: z.literal("text"),
+    text: z
+      .string()
+      .trim()
+      .min(1, "Custom text cannot be empty")
+      .max(
+        LABEL_TEXT_MAX,
+        `Custom text cannot exceed ${LABEL_TEXT_MAX} characters`,
+      ),
+    scale: z.enum(LABEL_FONT_SCALES).default("m"),
+    bold: z.boolean().default(false),
+    width: labelWidthSchema.default("full"),
+  }),
+  // The platform's own brand mark (`src/config/site.ts` -> `SiteIcon`), so a
+  // label can carry the sender identity without an uploaded logo.
+  z.object({
+    type: z.literal("icon"),
+    heightMm: z
+      .number()
+      .min(LABEL_ICON_MIN_MM)
+      .max(LABEL_SPACER_MAX_MM)
+      .default(LABEL_ICON_DEFAULT_MM),
     width: labelWidthSchema.default("full"),
   }),
   z.object({ type: z.literal("separator") }),

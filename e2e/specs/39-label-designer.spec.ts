@@ -29,13 +29,36 @@ test.describe("3901. Label designer", () => {
       "ORD-100001",
     )
 
+    // The inline preview shrinks to its panel instead of overflowing it — a
+    // fixed-size render is wider than the design column.
+    await expect
+      .poll(() =>
+        page.locator(labelDesigner.inlinePreview).evaluate((el) => {
+          const panel = el.closest('[data-slot="card-content"]')
+          return panel
+            ? el.getBoundingClientRect().width <=
+                panel.getBoundingClientRect().width + 1
+            : false
+        }),
+      )
+      .toBe(true)
+
     // Add a block: the stack is the label, so an edit must add a row.
     const rows = page.locator(labelDesigner.blockRowPrefix)
     const before = await rows.count()
     await page.locator(labelDesigner.addBlock("spacer")).click()
     await expect(rows).toHaveCount(before + 1)
 
-    // Preview renders the same blocks at true physical size.
+    // A custom-text block carries free text onto the label; its body shows in
+    // the live preview immediately.
+    await page.locator(labelDesigner.addBlock("text")).click()
+    await expect(rows).toHaveCount(before + 2)
+    await page.locator(labelDesigner.textBlock(before + 1)).fill("This side up")
+    await expect(page.locator(labelDesigner.inlinePreview)).toContainText(
+      "This side up",
+    )
+
+    // The full preview tab renders the same blocks, fitted to the panel too.
     await page.locator(labelDesigner.tabPreview).click()
     const preview = page.locator(labelDesigner.previewRenderer)
     await expect(preview).toBeVisible()

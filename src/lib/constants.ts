@@ -267,13 +267,18 @@ export const USER_STATUS_TONES: Record<UserAccountStatus, BadgeTone> = {
 // Parcel labels (R5)
 //
 // The label template is a JSON array of typed blocks (see `LabelBlock` in
-// `src/lib/validation.ts`). Everything the admin can pick is an enum drawn from
-// these lists — never free text or free pixels — so the designer can compose a
-// label but cannot produce one the renderer can't lay out or a scanner can't
-// read. `LABEL_FIELD_KEYS` is a whitelist of fields that exist on `order`.
+// `src/lib/validation.ts`). Every option is an enum or a clamped number — never
+// free pixels — so the designer can compose a label but cannot produce one the
+// renderer can't lay out or a scanner can't read. `LABEL_FIELD_KEYS` is a
+// whitelist of order fields and site-identity values (see `src/config/site.ts`).
+// The one genuinely free-form input is a `text` block, and even it is length-
+// clamped; it is the escape hatch for a sender note or a "fragile" label.
 // ---------------------------------------------------------------------------
 
-/** Order fields a `field` block may render. Whitelist, never free text. */
+/**
+ * Values a `field` block may render — order fields plus the platform's own
+ * identity (brand name, website). Whitelist, never free text.
+ */
 export const LABEL_FIELD_KEYS = [
   "orderId",
   "recipientName",
@@ -283,6 +288,8 @@ export const LABEL_FIELD_KEYS = [
   "destinationCity",
   "weight",
   "codAmount",
+  "siteName",
+  "siteUrl",
 ] as const
 export type LabelFieldKey = (typeof LABEL_FIELD_KEYS)[number]
 
@@ -296,6 +303,8 @@ export const LABEL_FIELD_LABELS: Record<LabelFieldKey, string> = {
   destinationCity: "Destination city",
   weight: "Weight",
   codAmount: "COD amount",
+  siteName: "Brand name",
+  siteUrl: "Website URL",
 }
 
 /** Font-size steps a `field` block may use, plus the `bold` toggle. */
@@ -327,3 +336,11 @@ export const LABEL_QR_MIN_MM = 30
 export const LABEL_MAX_BLOCKS = 40
 export const LABEL_SPACER_MAX_MM = 40
 export const LABEL_NAME_MAX = 80
+
+/** Longest custom text a `text` block may carry, in characters. */
+export const LABEL_TEXT_MAX = 200
+export const LABEL_TEXT_DEFAULT = "Handle with care"
+
+/** Brand-icon (`icon` block) printed height, in millimetres. */
+export const LABEL_ICON_MIN_MM = 4
+export const LABEL_ICON_DEFAULT_MM = 12

@@ -18,8 +18,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { OrderDetailsContent } from "@/features/orders/components/order-details-content"
+import { OrderLabelButton } from "@/features/orders/components/order-label-button"
 import { TrackingTimeline } from "@/features/orders/components/tracking-timeline"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
+import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-label-template"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
@@ -53,6 +55,8 @@ export function OrderDetailView({
   const { merchants: swrMerchants } = useMerchants()
   const { riders: swrRiders } = useRiders()
   const { warehouses: swrWarehouses } = useWarehouses()
+  // The published parcel label, so a reprint from here matches the designer.
+  const { template: labelTemplate } = usePublishedLabelTemplate()
 
   const order = orderData ?? initialOrder
   const riders = initialRiders ?? swrRiders
@@ -102,13 +106,24 @@ export function OrderDetailView({
     <div className="flex flex-col gap-8">
       {/* Header */}
       <div className="flex flex-col gap-5">
-        <Link
-          href={backHref}
-          className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors"
-        >
-          <ArrowLeft className="size-3.5" />
-          Orders
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href={backHref}
+            className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm transition-colors"
+          >
+            <ArrowLeft className="size-3.5" />
+            Orders
+          </Link>
+          {/* Single-label print / reprint: the same renderer the tables use, so
+              a parcel reprinted here carries the published template. */}
+          <OrderLabelButton
+            order={order}
+            merchantName={merchant?.businessName ?? "Unknown"}
+            template={labelTemplate}
+            showLabel
+            variant="outline"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

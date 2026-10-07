@@ -6,6 +6,7 @@ import { createPortal } from "react-dom"
 import { LabelRenderer } from "@/components/label-renderer"
 import { Button } from "@/components/ui/button"
 import { formLabels } from "@/config/content"
+import { siteConfig } from "@/config/site"
 import {
   DEFAULT_LABEL_TEMPLATE,
   type LabelData,
@@ -46,6 +47,8 @@ export function orderToLabelData(
     weightKg: order.parcelWeightKg,
     codAmount: order.productCost,
     qrValue: order.id,
+    siteName: siteConfig.name,
+    siteUrl: siteConfig.siteUrl,
   }
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
+import { LABEL_ICON_DEFAULT_MM } from "@/lib/constants"
 import { merchant } from "@/lib/db/schema"
 import {
   deliveryCityCreateSchema,
@@ -625,6 +626,50 @@ describe("labelBlockSchema", () => {
 
   it("rejects an unknown block type", () => {
     expect(labelBlockSchema.safeParse({ type: "barcode" }).success).toBe(false)
+  })
+
+  it("applies custom-text defaults", () => {
+    const result = labelBlockSchema.safeParse({ type: "text", text: "Fragile" })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data).toEqual({
+      type: "text",
+      text: "Fragile",
+      scale: "m",
+      bold: false,
+      width: "full",
+    })
+  })
+
+  it("rejects empty or blank custom text", () => {
+    expect(labelBlockSchema.safeParse({ type: "text", text: "" }).success).toBe(
+      false,
+    )
+    expect(
+      labelBlockSchema.safeParse({ type: "text", text: "   " }).success,
+    ).toBe(false)
+  })
+
+  it("applies brand-icon defaults and a clamped height", () => {
+    const result = labelBlockSchema.safeParse({ type: "icon" })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data).toEqual({
+      type: "icon",
+      heightMm: LABEL_ICON_DEFAULT_MM,
+      width: "full",
+    })
+    expect(
+      labelBlockSchema.safeParse({ type: "icon", heightMm: 1 }).success,
+    ).toBe(false)
+  })
+
+  it("accepts the site identity field keys", () => {
+    for (const field of ["siteName", "siteUrl"] as const) {
+      expect(labelBlockSchema.safeParse({ type: "field", field }).success).toBe(
+        true,
+      )
+    }
   })
 })
 

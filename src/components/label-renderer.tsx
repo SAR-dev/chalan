@@ -1,6 +1,8 @@
 "use client"
 
 import { QRCodeSVG } from "qrcode.react"
+import { useEffect, useRef, useState } from "react"
+import { SiteIcon } from "@/config/site"
 import {
   clampQrSizeMm,
   LABEL_SCALE_MM,
@@ -28,8 +30,14 @@ export interface LabelRendererProps {
   heightMm: number
   blocks: LabelBlock[]
   data: LabelData
-  /** On-screen zoom; print always uses the true physical size (1). */
+  /** On-screen zoom ceiling; `fit` only ever shrinks below it. */
   scale?: number
+  /**
+   * Scale the on-screen label down to its container's width instead of letting
+   * it overflow. Never passed on the print path, where the label must render at
+   * its true physical size.
+   */
+  fit?: boolean
   className?: string
   "data-testid"?: string
 }
@@ -40,9 +48,39 @@ export function LabelRenderer({
   blocks,
   data,
   scale = 1,
+  fit = false,
   className,
   "data-testid": testId,
 }: LabelRendererProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = useState<number | null>(null)
+
+  // Preview panels opt into `fit`; the print caller never does, so a printed
+  // label is always its true physical size.
+  useEffect(() => {
+    if (!fit) return
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => {
+      const next = el.clientWidth
+      setContainerWidth((prev) => (prev === next ? prev : next))
+    }
+    measure()
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [fit])
+
+  // `scale` is the ceiling; `fit` only shrinks toward the container width.
+  const naturalWidthPx = widthMm * (96 / 25.4)
+  const effectiveScale = Math.max(
+    0.05,
+    fit && containerWidth !== null && naturalWidthPx > 0
+      ? Math.min(scale, containerWidth / naturalWidthPx)
+      : scale,
+  )
+
   const label = (
     <div
       className={className}
@@ -72,23 +110,35 @@ export function LabelRenderer({
     </div>
   )
 
-  if (scale === 1) return label
+  const scaled =
+    effectiveScale === 1 ? (
+      label
+    ) : (
+      <div
+        style={{
+          width: `${widthMm * effectiveScale}mm`,
+          height: `${heightMm * effectiveScale}mm`,
+        }}
+      >
+        <div
+          style={{
+            transform: `scale(${effectiveScale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          {label}
+        </div>
+      </div>
+    )
+
+  if (!fit) return scaled
 
   return (
     <div
-      style={{
-        width: `${widthMm * scale}mm`,
-        height: `${heightMm * scale}mm`,
-      }}
+      ref={containerRef}
+      style={{ width: "100%", minWidth: 0, overflow: "hidden" }}
     >
-      <div
-        style={{
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
-        {label}
-      </div>
+      {scaled}
     </div>
   )
 }
@@ -158,6 +208,34 @@ function LabelBlockView({
           }}
         >
           {resolveLabelField(data, block.field)}
+        </span>
+      )
+
+    case "text":
+      return (
+        <span
+          style={{
+            width: block.width === "half" ? "50%" : "100%",
+            fontSize: `${LABEL_SCALE_MM[block.scale]}mm`,
+            fontWeight: block.bold ? 700 : 400,
+            lineHeight: 1.25,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {block.text}
+        </span>
+      )
+
+    case "icon":
+      return (
+        <span
+          style={{
+            width: block.width === "half" ? "50%" : "100%",
+            display: "flex",
+          }}
+        >
+          <SiteIcon style={{ height: `${block.heightMm}mm`, width: "auto" }} />
         </span>
       )
 
