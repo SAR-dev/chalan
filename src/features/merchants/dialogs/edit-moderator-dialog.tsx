@@ -2,13 +2,13 @@
 
 import { CheckCircle2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import {
   type ModeratorAccount,
   useMerchantModerators,
 } from "@/features/merchants/hooks/use-merchant-moderators"
 import { merchantGrantableNavItems } from "@/lib/nav-config"
+import { toast } from "@/lib/notify"
 
 const GRANTABLE = merchantGrantableNavItems()
 

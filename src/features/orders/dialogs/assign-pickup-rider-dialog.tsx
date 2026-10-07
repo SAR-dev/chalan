@@ -2,7 +2,6 @@
 
 import { Bike, MapPin, Package, Phone, ShieldCheck } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Label } from "@/components/ui/label"
 import {
@@ -16,6 +15,7 @@ import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { canPickup, useRiders } from "@/features/riders/hooks/use-riders"
 import { riderVehicleLabel } from "@/features/riders/vehicle-label"
+import { toast } from "@/lib/notify"
 import type { Order } from "@/lib/types"
 
 export function AssignPickupRiderDialog({

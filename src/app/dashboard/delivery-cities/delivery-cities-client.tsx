@@ -2,7 +2,6 @@
 
 import { MoreHorizontal, Pencil, Plus, ShieldCheck } from "lucide-react"
 import { useMemo, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellContent,
@@ -25,6 +24,7 @@ import { EditDeliveryCityDialog } from "@/features/platform-config/dialogs/edit-
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { toast } from "@/lib/notify"
 import type { DeliveryCity } from "@/lib/types"
 
 export function DeliveryCitiesPageClient() {

@@ -3,7 +3,6 @@
 import { Loader2, MailPlus, Warehouse } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import {
   CellTwoRow,
   DataTable,
@@ -19,6 +18,7 @@ import { useAuth } from "@/features/account/hooks/use-auth"
 import { ChangeWarehouseDialog } from "@/features/team/dialogs/change-warehouse-dialog"
 import { CreateAccountDialog } from "@/features/team/dialogs/create-account-dialog"
 import { useTeam } from "@/features/team/hooks/use-team"
+import { toast } from "@/lib/notify"
 import type { TeamMember } from "@/lib/types"
 
 const UNASSIGNED = "__unassigned__"

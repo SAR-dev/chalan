@@ -2,7 +2,6 @@
 
 import { Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
@@ -12,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { SupportStatusBadge } from "@/features/support/components/support-status-badge"
 import { useSupport } from "@/features/support/hooks/use-support"
+import { toast } from "@/lib/notify"
 import type { SupportTicket } from "@/lib/types"
 import { supportReplySchema, validateFormData } from "@/lib/validation"
 

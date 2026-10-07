@@ -2,7 +2,6 @@
 
 import { History, Loader2, Save, Send } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { LabelRenderer } from "@/components/label-renderer"
 import { PageHeader } from "@/components/page-header"
@@ -30,6 +29,7 @@ import {
 import { LABEL_TEMPLATE_MAX_MM, LABEL_TEMPLATE_MIN_MM } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
 import { DEFAULT_LABEL_TEMPLATE, SAMPLE_LABEL_DATA } from "@/lib/label-layout"
+import { toast } from "@/lib/notify"
 
 // The sample order values, plus the platform's real identity so the preview's
 // brand-name / website / icon blocks show what will actually print.

@@ -2,7 +2,6 @@
 
 import { AlertTriangle, ShieldCheck } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Separator } from "@/components/ui/separator"
 import { useOrders } from "@/features/orders/hooks/use-orders"
@@ -11,6 +10,7 @@ import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { toast } from "@/lib/notify"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 

@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
+import { toast } from "@/lib/notify"
 
 export function CreateDeliveryZoneDialog({
   open,

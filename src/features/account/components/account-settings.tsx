@@ -13,7 +13,6 @@ import {
   UserRound,
 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
 import { ImageUpload } from "@/components/image-upload"
 import { PageHeader } from "@/components/page-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -36,6 +35,7 @@ import {
   DEFAULT_TABLE_ROWS_PER_PAGE,
   MAX_TABLE_ROWS_PER_PAGE,
 } from "@/lib/constants"
+import { toast } from "@/lib/notify"
 import { initials } from "@/lib/utils"
 
 interface Session {

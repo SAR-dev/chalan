@@ -3,7 +3,6 @@
 import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import {
@@ -26,6 +25,7 @@ import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { downloadCsv } from "@/lib/csv"
+import { toast } from "@/lib/notify"
 import { formatError } from "@/lib/validation"
 import type { ParcelState } from "../new/types"
 import { buildImportParcelRows } from "./build-parcel-rows"

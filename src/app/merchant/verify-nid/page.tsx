@@ -11,7 +11,6 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ImageUpload } from "@/components/image-upload"
 import { ImageZoom } from "@/components/image-zoom"
 import { PageHeader } from "@/components/page-header"
@@ -27,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 
 function formatDate(dateStr: string) {
   return formatDateTime(dateStr, {

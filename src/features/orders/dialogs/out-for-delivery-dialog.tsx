@@ -2,11 +2,11 @@
 
 import { MapPin, Navigation, Phone, User } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Separator } from "@/components/ui/separator"
 import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { toast } from "@/lib/notify"
 import type { Order } from "@/lib/types"
 
 export function OutForDeliveryDialog({

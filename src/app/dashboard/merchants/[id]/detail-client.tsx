@@ -14,7 +14,6 @@ import {
   XCircle,
 } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ImageZoom } from "@/components/image-zoom"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import type { Merchant } from "@/lib/types"
 
 function VerificationBadge({ verified }: { verified: boolean }) {

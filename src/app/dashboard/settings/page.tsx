@@ -9,7 +9,6 @@ import {
   Trash2,
 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
@@ -41,6 +40,7 @@ import {
   useMailConfigs,
 } from "@/features/platform-config/hooks/use-mail-configs"
 import { usePlatformConfig } from "@/features/platform-config/hooks/use-platform-config"
+import { toast } from "@/lib/notify"
 import { isValidEmail } from "@/lib/validation"
 
 const emptyForm = {

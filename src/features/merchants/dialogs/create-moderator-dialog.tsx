@@ -2,7 +2,6 @@
 
 import { UserPlus } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
@@ -13,6 +12,7 @@ import {
   useMerchantModerators,
 } from "@/features/merchants/hooks/use-merchant-moderators"
 import { merchantGrantableNavItems } from "@/lib/nav-config"
+import { toast } from "@/lib/notify"
 
 const GRANTABLE = merchantGrantableNavItems()
 

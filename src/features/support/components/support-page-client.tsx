@@ -2,7 +2,6 @@
 
 import { MessageSquareReply, MoreHorizontal, X } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellContent,
@@ -31,6 +30,7 @@ import { ReplyTicketDialog } from "@/features/support/dialogs/reply-ticket-dialo
 import { useSupport } from "@/features/support/hooks/use-support"
 import { ROLE_LABELS } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import type { SupportTicket } from "@/lib/types"
 
 type FilterTab = "ALL" | "OPEN" | "ANSWERED" | "CLOSED"

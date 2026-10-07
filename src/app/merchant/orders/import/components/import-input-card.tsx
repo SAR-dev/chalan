@@ -3,7 +3,6 @@
 import { ChevronDown, Copy, Download, FileText, Upload } from "lucide-react"
 import Link from "next/link"
 import { useRef, useState } from "react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { MAX_BULK_ORDERS } from "@/lib/constants"
+import { toast } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 import type { ImportPhase } from "../types"
 

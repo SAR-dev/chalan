@@ -21,12 +21,14 @@ import { pageContent } from "@/config/content"
 import { statCardLabels } from "@/config/stat-card-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import { OrderLabelButton } from "@/features/orders/components/order-label-button"
 import { DeliveryAttemptDialog } from "@/features/orders/dialogs/delivery-attempt-dialog"
 import { OutForDeliveryDialog } from "@/features/orders/dialogs/out-for-delivery-dialog"
 import { OutForPickupDialog } from "@/features/orders/dialogs/out-for-pickup-dialog"
 import { PickupConfirmDialog } from "@/features/orders/dialogs/pickup-confirm-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-label-template"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { formatTk } from "@/lib/pricing"
 import { businessDateString, businessToday } from "@/lib/timezone"
@@ -82,6 +84,8 @@ export default function RiderTodoPage() {
   const { orders } = useOrders()
   const { merchants } = useMerchants()
   const { pickupLocations } = usePickupLocations()
+  // The published parcel label, so the rider's print action matches the designer.
+  const { template: labelTemplate } = usePublishedLabelTemplate()
 
   const [pickupTarget, setPickupTarget] = useState<Order | null>(null)
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false)
@@ -286,6 +290,12 @@ export default function RiderTodoPage() {
                           Picked up
                         </Button>
                       )}
+                      <OrderLabelButton
+                        order={o}
+                        merchantName={merchantName(o.merchantId)}
+                        template={labelTemplate}
+                        variant="outline"
+                      />
                     </div>
                   </div>
                 )
@@ -363,6 +373,12 @@ export default function RiderTodoPage() {
                           Record
                         </Button>
                       )}
+                      <OrderLabelButton
+                        order={o}
+                        merchantName={merchantName(o.merchantId)}
+                        template={labelTemplate}
+                        variant="outline"
+                      />
                     </div>
                   </div>
                 )

@@ -2,7 +2,6 @@
 
 import { Bike, MapPin, Package, Phone, Truck } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Label } from "@/components/ui/label"
 import {
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/select"
 import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { toast } from "@/lib/notify"
 import type { Order, Rider } from "@/lib/types"
 
 export function WarehouseDispatchDialog({

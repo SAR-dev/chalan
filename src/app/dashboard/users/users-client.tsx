@@ -2,7 +2,6 @@
 
 import { Ban, KeyRound, MoreHorizontal, ShieldCheck } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import {
   CellContent,
   CellTwoRow,
@@ -31,6 +30,7 @@ import { ResetPasswordDialog } from "@/features/users/dialogs/reset-password-dia
 import { type AdminUser, useUsers } from "@/features/users/hooks/use-users"
 import { USER_STATUS_LABELS } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 
 const TAB_ROLES = ["ALL", "SUPER_ADMIN", "WAREHOUSE_ADMIN", "MERCHANT", "RIDER"]
 

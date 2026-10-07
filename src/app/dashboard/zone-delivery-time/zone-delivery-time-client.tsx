@@ -2,7 +2,6 @@
 
 import { LayoutGrid, List, MoreHorizontal, Pencil, Plus } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellContent,
@@ -23,6 +22,7 @@ import { ZoneDeliveryTimeMatrix } from "@/features/platform-config/components/zo
 import { CreateZoneDeliveryTimeDialog } from "@/features/platform-config/dialogs/create-zone-delivery-time-dialog"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useZoneDeliveryTime } from "@/features/platform-config/hooks/use-zone-delivery-time"
+import { toast } from "@/lib/notify"
 import type { ZoneDeliveryTime } from "@/lib/types"
 
 /**

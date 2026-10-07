@@ -2,13 +2,13 @@
 
 import { Warehouse as WarehouseIcon } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { toast } from "@/lib/notify"
 import type { Warehouse } from "@/lib/types"
 import { validateFormData, warehouseUpdateSchema } from "@/lib/validation"
 

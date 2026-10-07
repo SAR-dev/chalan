@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +14,7 @@ import {
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { toast } from "@/lib/notify"
 
 export function CreateDeliveryCityDialog({
   open,

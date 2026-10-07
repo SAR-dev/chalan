@@ -3,7 +3,6 @@
 import { Copy, Download, Loader2, ShieldCheck, ShieldOff } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { type FormEvent, useState } from "react"
-import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { authClient } from "@/lib/auth-client"
+import { toast } from "@/lib/notify"
 import { totpSecretFromUri } from "@/lib/two-factor"
 
 type Panel = "none" | "password" | "verify" | "codes" | "disable"

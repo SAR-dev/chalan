@@ -2,7 +2,6 @@
 
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellTwoRow,
@@ -31,6 +30,7 @@ import {
   type PackageTier,
   usePackages,
 } from "@/features/packages/hooks/use-packages"
+import { toast } from "@/lib/notify"
 import { tierLabel } from "@/lib/packages"
 import { formatTk } from "@/lib/pricing"
 

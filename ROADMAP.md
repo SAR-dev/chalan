@@ -7,7 +7,7 @@
 > band, **R5 (parcel labels) has shipped** and **R9 (QR scanning)** leads next.
 > **SMS has been withdrawn from planning** - see Decisions.
 >
-> **Health:** `pnpm ci:check` green (929 files) · Unit **2455 pass** (2498
+> **Health:** `pnpm ci:check` green (931 files) · Unit **2455 pass** (2498
 > total, 232 spec files) · coverage **55.4 / 49.69 / 44.02 / 56.29** against
 > floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **152
 > tests / 39 files / 80 scenarios**, run locally only
@@ -46,7 +46,7 @@
 | **R5** Printable parcel labels + QR code, admin label designer | none | **shipped** - see git history. Was the blocker for R9; its QR encodes `order.id`, and print is browser `window.print()` only (no PDF) |
 | **R9** Parcel QR-code scanning at pickup + delivery | **R5** | a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
 | **R2** API keys, webhooks, OpenAPI | none | docs page and error copy follow R1's writing rule. `/api/v1/orders` should accept the order's `recipientMail` |
-| **R3** Notifications (in-app, preferences) | none — its R8 prerequisite is **shipped**: `recipientMail` is on the order | copy follows R1's writing rule. Shares R2's event source (`src/features/orders/transitions.ts`) - emit once, fan out to both sinks |
+| **R3** Notifications (in-app, preferences) | none — its R8 prerequisite is **shipped**: `recipientMail` is on the order | copy follows R1's writing rule. Shares R2's event source (`src/features/orders/transitions.ts`) - emit once, fan out to both sinks. Toast sounds use howler.js (see Decisions) |
 | **P2** items (R4 · R6 · R7) | none | copy follows R1's writing rule |
 
 **One item blocks another:** R9 cannot start until R5 prints something scannable,
@@ -127,6 +127,7 @@ left the plan.
 | **`style-src` keeps `'unsafe-inline'`** | Investigated and rejected. ~50 React `style={{...}}` bindings need `style-src-attr 'unsafe-inline'`, and `nextjs-toploader`'s `<style>` cannot be nonced: it renders the nonce without `suppressHydrationWarning`, so server value and client render disagree and hydration breaks. The reasoning is at `src/app/layout.tsx:94-97`. The only real hardening left is splitting `style-src-elem` (nonce) from `style-src-attr`; do not "simplify" the directive away. |
 | **The Docker runner keeps the full dependency tree** | Investigated and rejected. The monolith's `migrate` service runs `node_modules/.bin/tsx` out of this same image, so a `--prod` install would break migrations. A `deps-prod` stage already existed and was removed as dead work, and `dockerfile-stages.spec.ts` asserts `COPY --from=deps ...node_modules` and forbids `pnpm install --prod`. Reducing image weight means moving `tsx` into `dependencies` first, not adding a stage. |
 | **`biome.json` must stay strict JSON** | Biome rejects comments in it. JSONC goes in `biome.jsonc`. Its `files.includes` scopes it to `src/`, `e2e/`, `env/`, `scripts/` and root files (`.next/**` is excluded by omission). Pinned by `biome-config.spec.ts`. |
+| **Notification sounds use howler.js directly** | Toast/notification sounds use `howler` (~10KB gzipped) with a thin `useHowl()` hook in `src/lib/hooks/`, not a React wrapper library. Sound assets live in `public/sounds/` as mp3 + ogg for cross-browser coverage (especially mobile Safari). The hook auto-unloads on unmount. Sound is opt-in per toast type (success/error/info) and respects the OS-level silent/mute preference where detectable. |
 
 ---
 

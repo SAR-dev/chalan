@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { toast } from "sonner"
 import { Field } from "@/components/field"
 import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
@@ -13,6 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { MarkdownEditor } from "@/features/announcements/components/markdown-editor"
 import { useAnnouncements } from "@/features/announcements/hooks/use-announcements"
 import { ANNOUNCEMENT_TARGET_ROLE_LABELS } from "@/lib/constants"
+import { toast } from "@/lib/notify"
 import type { Announcement } from "@/lib/types"
 import {
   announcementCreateSchema,

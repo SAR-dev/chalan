@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Input } from "@/components/ui/input"
@@ -12,6 +11,7 @@ import {
   type PackageRow,
   usePackages,
 } from "@/features/packages/hooks/use-packages"
+import { toast } from "@/lib/notify"
 import { packageUpsertSchema, validateFormData } from "@/lib/validation"
 
 interface Props {

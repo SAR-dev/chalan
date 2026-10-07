@@ -2,7 +2,6 @@
 
 import { LifeBuoy, Loader2 } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
@@ -11,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useSupport } from "@/features/support/hooks/use-support"
+import { toast } from "@/lib/notify"
 import { supportCreateSchema, validateFormData } from "@/lib/validation"
 
 const EMPTY = { subject: "", message: "" }

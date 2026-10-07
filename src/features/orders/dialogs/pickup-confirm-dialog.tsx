@@ -8,7 +8,6 @@ import {
   Store,
 } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { ImageGalleryUpload } from "@/components/image-upload"
 import { Input } from "@/components/ui/input"
@@ -16,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { toast } from "@/lib/notify"
 import type { Order, PickupLocation } from "@/lib/types"
 
 export function PickupConfirmDialog({

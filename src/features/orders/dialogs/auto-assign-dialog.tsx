@@ -2,11 +2,11 @@
 
 import { Route, Sparkles, TriangleAlert } from "lucide-react"
 import { useEffect, useMemo } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Badge } from "@/components/ui/badge"
 import { useOrderAutoAssign } from "@/features/orders/hooks/use-order-auto-assign"
 import { groupAssignmentsByRider } from "@/lib/auto-assign"
+import { toast } from "@/lib/notify"
 
 /**
  * One rider's block in the plan.
