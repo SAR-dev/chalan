@@ -22,6 +22,27 @@
       "when": 1791333172902,
       "tag": "0002_flat_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791383190448,
+      "tag": "0003_short_wonder_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791401396428,
+      "tag": "0004_steep_robin_chapel",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791402267982,
+      "tag": "0005_chubby_lester",
+      "breakpoints": true
     }
   ]
 }

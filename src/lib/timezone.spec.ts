@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import { describe, expect, it } from "vitest"
 import {
   addBusinessDays,
@@ -153,26 +156,32 @@ describe("businessPresetRange (ROADMAP R0.3)", () => {
   })
 
   // The presets previously used `setHours(0,0,0,0)` on the device clock, so the
-  // answer depended on where the browser was. Pinning TZ proves the result does
-  // not move with the host.
+  // answer depended on where the browser was. Proving it stays put used to
+  // mutate `process.env.TZ` at runtime — a knob modern Node ignores: V8/ICU
+  // reads the zone once at process startup, so the old self-check compared three
+  // identical environments and turned red on every recent runtime (skipped on
+  // win32, failed on Linux CI). Each zone now runs in its own fresh Node
+  // process, where `TZ` is read at startup — a mechanism every platform honors.
   it("does not move with the host timezone", () => {
-    const previous = process.env.TZ
-    try {
-      const results = new Set<string>()
-      const localDays = new Set<string>()
-      for (const tz of ["America/New_York", "Asia/Tokyo", "UTC"]) {
-        process.env.TZ = tz
-        results.add(businessPresetRange("today", instant).from)
-        // Self-check: if these three agree the host zone never changed, and the
-        // assertion below would be proving nothing. For 20:00Z New York and UTC
-        // see the 1st while Tokyo already sees the 2nd.
-        localDays.add(instant.getDate().toString())
-      }
-      expect(localDays.size).toBeGreaterThan(1)
-      expect([...results]).toEqual(["2026-07-02"])
-    } finally {
-      if (previous === undefined) delete process.env.TZ
-      else process.env.TZ = previous
-    }
+    const moduleUrl = pathToFileURL(
+      join(process.cwd(), "src/lib/timezone.ts"),
+    ).href
+    // Each child prints `<localDay>:<presetFrom>` for the fixed instant. The
+    // local day proves the zone really moved (New York and UTC see the 1st,
+    // Tokyo the 2nd), so the comparison is meaningful; the preset answer must
+    // be the Dhaka day, 2026-07-02, in every zone.
+    const script = `import(${JSON.stringify(moduleUrl)}).then((m) => {
+      const i = new Date(${JSON.stringify(instant.toISOString())})
+      process.stdout.write(
+        i.getDate() + ":" + m.businessPresetRange("today", i).from,
+      )
+    })`
+    const answers = ["America/New_York", "Asia/Tokyo", "UTC"].map((tz) =>
+      execFileSync(process.execPath, ["--no-warnings", "-e", script], {
+        env: { ...process.env, TZ: tz },
+        encoding: "utf8",
+      }).trim(),
+    )
+    expect(answers).toEqual(["1:2026-07-02", "2:2026-07-02", "1:2026-07-02"])
   })
 })

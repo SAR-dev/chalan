@@ -176,12 +176,35 @@ export interface PlatformConfig {
   minCodFeePercentage: number
   maxCodFeePercentage: number
   refundOnCancel: boolean
+  /** R9: require a QR scan at the `picked-up` transition (rider UI only). */
+  pickupScanRequired: boolean
+  /** R9: require a QR scan at the `delivered` outcome (rider UI only). */
+  deliveryScanRequired: boolean
+  /** R9: require a QR scan at the `out-for-delivery` transition — the rider
+   * collecting the parcel from the warehouse (rider UI only). */
+  warehouseScanRequired: boolean
+  /** R9: require a QR scan at the `receive` transition — the warehouse admin
+   * taking the parcel in from the rider (warehouse UI only). */
+  warehouseReceiveScanRequired: boolean
   updatedAt: string
 }
 
 /** The PATCH body for `PUT`/`PATCH /api/platform-config`. */
 export interface PlatformConfigInput {
   refundOnCancel?: boolean
+  pickupScanRequired?: boolean
+  deliveryScanRequired?: boolean
+  warehouseScanRequired?: boolean
+  warehouseReceiveScanRequired?: boolean
+}
+
+/** Response of `GET /api/scan-policy` — the rider- and warehouse-facing read
+ * path. */
+export interface ScanPolicy {
+  pickupScanRequired: boolean
+  deliveryScanRequired: boolean
+  warehouseScanRequired: boolean
+  warehouseReceiveScanRequired: boolean
 }
 
 /** A lane that has no `zone_pricing` row and therefore cannot be ordered on. */

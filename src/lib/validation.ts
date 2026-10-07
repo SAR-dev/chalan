@@ -246,6 +246,10 @@ export const warehouseUpdateSchema = z
  */
 export const platformConfigSchema = z.object({
   refundOnCancel: z.boolean().optional(),
+  pickupScanRequired: z.boolean().optional(),
+  deliveryScanRequired: z.boolean().optional(),
+  warehouseScanRequired: z.boolean().optional(),
+  warehouseReceiveScanRequired: z.boolean().optional(),
 })
 
 // Disabling 2FA requires a *current* second factor — a live TOTP

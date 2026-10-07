@@ -15,7 +15,9 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { InfoRow } from "@/features/orders/components/info-row"
+import { ScanGate } from "@/features/orders/components/scan-gate"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { useScanPolicy } from "@/features/platform-config/hooks/use-scan-policy"
 import { toast } from "@/lib/notify"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
@@ -32,10 +34,14 @@ export function DeliveryAttemptDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const { markDelivered, markDeliveryFailed } = useOrders()
+  const { deliveryScanRequired } = useScanPolicy()
   const [outcome, setOutcome] = useState<Outcome>("DELIVERED")
   const [note, setNote] = useState("")
   const [proofUrl, setProofUrl] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // R9: parcel-label verification, reset with the dialog's existing reset()
+  // so a reopened dialog always starts unverified.
+  const [verified, setVerified] = useState(false)
 
   if (!order) return null
 
@@ -43,6 +49,7 @@ export function DeliveryAttemptDialog({
     setOutcome("DELIVERED")
     setNote("")
     setProofUrl(null)
+    setVerified(false)
   }
 
   function handleOpenChange(next: boolean) {
@@ -79,7 +86,12 @@ export function DeliveryAttemptDialog({
 
   const failedNeedsNote = outcome === "FAILED" && !note.trim()
   const deliveredNeedsProof = outcome === "DELIVERED" && !proofUrl
-  const submitBlocked = failedNeedsNote || deliveredNeedsProof
+  // The scan point is `delivered` only — switching to FAILED hides the gate
+  // and unblocks the submit; the request body is identical either way.
+  const submitBlocked =
+    failedNeedsNote ||
+    deliveredNeedsProof ||
+    (deliveryScanRequired && outcome === "DELIVERED" && !verified)
 
   return (
     <FormDialog
@@ -104,6 +116,14 @@ export function DeliveryAttemptDialog({
       }
     >
       <div className="grid grid-cols-1 gap-4">
+        {deliveryScanRequired && outcome === "DELIVERED" ? (
+          <ScanGate
+            orderId={order.id}
+            verified={verified}
+            onVerify={() => setVerified(true)}
+          />
+        ) : null}
+
         <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
           <InfoRow icon={User} label="Recipient" value={order.recipientName} />
           <InfoRow icon={Phone} label="Phone" value={order.recipientPhone} />
@@ -153,23 +173,30 @@ export function DeliveryAttemptDialog({
         </div>
 
         {outcome === "DELIVERED" ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-muted-foreground text-sm">
-              Confirm you collected {formatTk(order.productCost)} from{" "}
-              {order.recipientName.split(" ")[0]} and capture proof of delivery.
-            </p>
-            <Label>
-              Proof of delivery photo{" "}
-              <span className="text-destructive">*</span>
-            </Label>
-            <ImageUpload
-              value={proofUrl}
-              onChange={setProofUrl}
-              folder="delivery-proofs"
-              label="Capture / upload proof photo"
-              className="h-28"
-            />
-          </div>
+          /* R9 two-step: the delivered proof waits for the label — scanning is
+             the first step of confirming a delivery. The outcome choice stays
+             visible above because it decides whether a scan applies at all,
+             and the FAILED path has none. */
+          !deliveryScanRequired || verified ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground text-sm">
+                Confirm you collected {formatTk(order.productCost)} from{" "}
+                {order.recipientName.split(" ")[0]} and capture proof of
+                delivery.
+              </p>
+              <Label>
+                Proof of delivery photo{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+              <ImageUpload
+                value={proofUrl}
+                onChange={setProofUrl}
+                folder="delivery-proofs"
+                label="Capture / upload proof photo"
+                className="h-28"
+              />
+            </div>
+          ) : null
         ) : (
           <div className="flex flex-col gap-2">
             <Label htmlFor="failure-note">

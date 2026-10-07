@@ -579,8 +579,8 @@ export const RIDER_SIDEBAR: SidebarConfig = {
   brandIcon: SiteIcon,
   roleLabel: "Rider",
   // Work-first: the queue is the landing page, then the two queues, then money,
-  // then system. `Earnings` was documented in the rider guide but had no sidebar
-  // entry — it was reachable only by typing the URL.
+  // then system. `Cash collections` (formerly `Earnings`) was documented in the
+  // rider guide but had no sidebar entry — reachable only by typing the URL.
   items: [
     { href: "/rider", label: "To-do", icon: ListChecks, exact: true },
     {
@@ -598,8 +598,8 @@ export const RIDER_SIDEBAR: SidebarConfig = {
       group: "Queues",
     },
     {
-      href: "/rider/earnings",
-      label: "Earnings",
+      href: "/rider/cash",
+      label: "Cash collections",
       icon: Wallet,
       exact: true,
       group: "Money",

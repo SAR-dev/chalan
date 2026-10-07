@@ -138,7 +138,7 @@ describe("RIDER_SIDEBAR", () => {
     expect(labels).toContain("Deliveries")
     // Documented in the rider guide but had no sidebar entry; reachable only by
     // typing the URL until it was added here.
-    expect(labels).toContain("Earnings")
+    expect(labels).toContain("Cash collections")
     expect(labels).toContain("Announcements")
     expect(labels).toContain("Account")
   })

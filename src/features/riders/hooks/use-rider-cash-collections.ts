@@ -29,13 +29,13 @@ export interface CashTransaction {
   confirmedAt: string | null
 }
 
-export interface RiderEarnings {
+export interface RiderCashCollections {
   cash: CashSummary
   transactions: CashTransaction[]
 }
 
 /**
- * The rider's cash summary and transaction list for `/rider/earnings`.
+ * The rider's cash summary and transaction list for `/rider/cash`.
  *
  * SWR rather than `useState` + `useEffect` + bare `fetch`, which is what this
  * page used. That shape gated an *early return* on local `loading`, so any
@@ -50,12 +50,12 @@ export interface RiderEarnings {
  * load and goes quiet during a revalidation, so a consumer reading `isLoading`
  * alone cannot tell "still fetching" from "settled".
  */
-export function useRiderEarnings() {
+export function useRiderCashCollections() {
   const { currentUser } = useAuth()
   const riderId = currentUser?.riderId ?? null
 
   const { data, error, isLoading, isValidating, mutate } =
-    useSWR<RiderEarnings>(
+    useSWR<RiderCashCollections>(
       riderId ? `${KEY}/${riderId}/cash` : null,
       jsonFetcher,
       swrOptions,

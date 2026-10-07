@@ -64,6 +64,15 @@ export default function DashboardSettingsPage() {
   const [refundOnCancel, setRefundOnCancel] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // R9 scan toggles — same optimistic-default + skeleton pattern as
+  // refundOnCancel: the switches render `true` until the config resolves.
+  const [pickupScanRequired, setPickupScanRequired] = useState(true)
+  const [deliveryScanRequired, setDeliveryScanRequired] = useState(true)
+  const [warehouseScanRequired, setWarehouseScanRequired] = useState(true)
+  const [warehouseReceiveScanRequired, setWarehouseReceiveScanRequired] =
+    useState(true)
+  const [scanSaving, setScanSaving] = useState(false)
+
   // Mail config state
   const {
     mailConfigs,
@@ -92,6 +101,12 @@ export default function DashboardSettingsPage() {
   useEffect(() => {
     if (!config) return
     setRefundOnCancel(config.refundOnCancel !== false)
+    setPickupScanRequired(config.pickupScanRequired !== false)
+    setDeliveryScanRequired(config.deliveryScanRequired !== false)
+    setWarehouseScanRequired(config.warehouseScanRequired !== false)
+    setWarehouseReceiveScanRequired(
+      config.warehouseReceiveScanRequired !== false,
+    )
   }, [config])
 
   async function handleSave() {
@@ -100,6 +115,22 @@ export default function DashboardSettingsPage() {
     setSaving(false)
     if (result.ok) {
       toast.success("Cancellation policy updated.")
+    } else {
+      toast.error(result.error ?? "Failed to update.")
+    }
+  }
+
+  async function handleSaveScan() {
+    setScanSaving(true)
+    const result = await updatePlatformConfig({
+      pickupScanRequired,
+      deliveryScanRequired,
+      warehouseScanRequired,
+      warehouseReceiveScanRequired,
+    })
+    setScanSaving(false)
+    if (result.ok) {
+      toast.success("Scan policy updated.")
     } else {
       toast.error(result.error ?? "Failed to update.")
     }
@@ -323,6 +354,149 @@ export default function DashboardSettingsPage() {
             data-testid="save-policy"
           >
             {saving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Saving
+              </>
+            ) : (
+              "Save policy"
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <Card data-testid="scan-policy-card">
+        <CardHeader>
+          <CardTitle>Parcel QR scanning</CardTitle>
+          <CardDescription>
+            Ask the rider or the warehouse admin to scan the parcel label QR
+            code at each possession change. Manual code entry is always
+            available either way.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            // Same withheld-not-blanked pattern as the card above: the header
+            // and description are true immediately, the switches wait for the
+            // server so we never show a policy the server may not hold.
+            <>
+              <div
+                className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                data-testid="scan-policy-loading"
+              >
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-6 w-11" />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-6 w-11" />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-6 w-11" />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-6 w-11" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Rider</p>
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div>
+                    <Label htmlFor="pickup-scan-required">Scan at pickup</Label>
+                    <p className="text-muted-foreground text-xs">
+                      Rider scans the label when marking the parcel picked up.
+                    </p>
+                  </div>
+                  <Switch
+                    id="pickup-scan-required"
+                    data-testid="pickup-scan-required-switch"
+                    checked={pickupScanRequired}
+                    onCheckedChange={(v) => setPickupScanRequired(v)}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div>
+                    <Label htmlFor="warehouse-scan-required">
+                      Scan at warehouse handoff
+                    </Label>
+                    <p className="text-muted-foreground text-xs">
+                      Rider scans the label when taking the parcel out for
+                      delivery.
+                    </p>
+                  </div>
+                  <Switch
+                    id="warehouse-scan-required"
+                    data-testid="warehouse-scan-required-switch"
+                    checked={warehouseScanRequired}
+                    onCheckedChange={(v) => setWarehouseScanRequired(v)}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div>
+                    <Label htmlFor="delivery-scan-required">
+                      Scan at delivery
+                    </Label>
+                    <p className="text-muted-foreground text-xs">
+                      Rider scans the label when marking the parcel delivered.
+                    </p>
+                  </div>
+                  <Switch
+                    id="delivery-scan-required"
+                    data-testid="delivery-scan-required-switch"
+                    checked={deliveryScanRequired}
+                    onCheckedChange={(v) => setDeliveryScanRequired(v)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Warehouse admin</p>
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div>
+                    <Label htmlFor="warehouse-receive-scan-required">
+                      Scan at warehouse receive
+                    </Label>
+                    <p className="text-muted-foreground text-xs">
+                      Warehouse admin scans the label when receiving the parcel
+                      from the rider.
+                    </p>
+                  </div>
+                  <Switch
+                    id="warehouse-receive-scan-required"
+                    data-testid="warehouse-receive-scan-required-switch"
+                    checked={warehouseReceiveScanRequired}
+                    onCheckedChange={(v) => setWarehouseReceiveScanRequired(v)}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+        <CardFooter className="justify-end">
+          <Button
+            onClick={handleSaveScan}
+            // A save before the config arrives would write a value the client
+            // guessed rather than one the admin read off the switches.
+            disabled={scanSaving || isLoading}
+            data-testid="save-scan-policy"
+          >
+            {scanSaving ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 Saving
