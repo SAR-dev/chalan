@@ -106,64 +106,71 @@ export function PickupConfirmDialog({
           />
         ) : null}
 
-        <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
-          <InfoRow icon={Store} label="Merchant" value={merchantName} />
-          <InfoRow
-            icon={MapPin}
-            label="Pickup location"
-            value={`${pickupLabel} — ${pickupAddress}`}
-          />
+        {/* R9 two-step: while a scan is required the body is just the gate —
+            the pickup details, weight correction and proof upload wait for the
+            label to be verified. */}
+        {!pickupScanRequired || verified ? (
+          <>
+            <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
+              <InfoRow icon={Store} label="Merchant" value={merchantName} />
+              <InfoRow
+                icon={MapPin}
+                label="Pickup location"
+                value={`${pickupLabel} — ${pickupAddress}`}
+              />
 
-          {mapLink ? (
-            <a
-              href={mapLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary ml-7 inline-flex w-fit items-center gap-1.5 text-sm hover:underline"
-            >
-              <ExternalLink className="size-3.5 shrink-0" />
-              Open in maps
-            </a>
-          ) : null}
+              {mapLink ? (
+                <a
+                  href={mapLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary ml-7 inline-flex w-fit items-center gap-1.5 text-sm hover:underline"
+                >
+                  <ExternalLink className="size-3.5 shrink-0" />
+                  Open in maps
+                </a>
+              ) : null}
 
-          <Separator className="my-1" />
-          <InfoRow
-            icon={Package}
-            label="Parcel"
-            value={`${order.parcelWeightKg} KG · ${order.deliveryType}`}
-          />
-        </div>
+              <Separator className="my-1" />
+              <InfoRow
+                icon={Package}
+                label="Parcel"
+                value={`${order.parcelWeightKg} KG · ${order.deliveryType}`}
+              />
+            </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="pickup-weight">Actual parcel weight (KG)</Label>
-          <p className="text-muted-foreground text-xs">
-            Correct this if it differs from the declared {order.parcelWeightKg}{" "}
-            KG — the delivery fee is recalculated.
-          </p>
-          <Input
-            id="pickup-weight"
-            type="number"
-            min="0.1"
-            step="0.1"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-          />
-        </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="pickup-weight">Actual parcel weight (KG)</Label>
+              <p className="text-muted-foreground text-xs">
+                Correct this if it differs from the declared{" "}
+                {order.parcelWeightKg} KG — the delivery fee is recalculated.
+              </p>
+              <Input
+                id="pickup-weight"
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+              />
+            </div>
 
-        <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-sm">
-            Capture photos of the parcel as proof you collected it from the
-            merchant.
-          </p>
-          <Label>
-            Pickup proof photos <span className="text-destructive">*</span>
-          </Label>
-          <ImageGalleryUpload
-            value={proofUrls}
-            onChange={setProofUrls}
-            folder="pickups"
-          />
-        </div>
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground text-sm">
+                Capture photos of the parcel as proof you collected it from the
+                merchant.
+              </p>
+              <Label>
+                Pickup proof photos <span className="text-destructive">*</span>
+              </Label>
+              <ImageGalleryUpload
+                value={proofUrls}
+                onChange={setProofUrls}
+                folder="pickups"
+              />
+            </div>
+          </>
+        ) : null}
       </div>
     </FormDialog>
   )

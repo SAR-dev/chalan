@@ -60,7 +60,7 @@ How to run your hub on {{APP_NAME}}. Sign in at **{{APP_URL}}/login** and open t
 3. The table gives one row per rider with the same three figures and a **Status** badge — **High** when a rider is carrying more cash than the panel's threshold, **Normal** otherwise.
 4. **Collected** is every COD delivery the rider has made. **Submitted** is the part already settled. **Cash on Hand** is the difference: what the rider is still carrying.
 5. There is no confirm action on this page. Cash leaves a rider's hand on **COD Settlement** (`/warehouse/cod-settlement`) — settling there is what marks the cash submitted and makes the order payable to the merchant.
-6. If a rider's totals look wrong, compare them against that rider's **Earnings** list and raise it with them first. Settle only once the figures agree.
+6. If a rider's totals look wrong, compare them against that rider's **Cash collections** list and raise it with them first. Settle only once the figures agree.
 
 ## 9. Manage your riders
 

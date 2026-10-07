@@ -173,23 +173,30 @@ export function DeliveryAttemptDialog({
         </div>
 
         {outcome === "DELIVERED" ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-muted-foreground text-sm">
-              Confirm you collected {formatTk(order.productCost)} from{" "}
-              {order.recipientName.split(" ")[0]} and capture proof of delivery.
-            </p>
-            <Label>
-              Proof of delivery photo{" "}
-              <span className="text-destructive">*</span>
-            </Label>
-            <ImageUpload
-              value={proofUrl}
-              onChange={setProofUrl}
-              folder="delivery-proofs"
-              label="Capture / upload proof photo"
-              className="h-28"
-            />
-          </div>
+          /* R9 two-step: the delivered proof waits for the label — scanning is
+             the first step of confirming a delivery. The outcome choice stays
+             visible above because it decides whether a scan applies at all,
+             and the FAILED path has none. */
+          !deliveryScanRequired || verified ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground text-sm">
+                Confirm you collected {formatTk(order.productCost)} from{" "}
+                {order.recipientName.split(" ")[0]} and capture proof of
+                delivery.
+              </p>
+              <Label>
+                Proof of delivery photo{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+              <ImageUpload
+                value={proofUrl}
+                onChange={setProofUrl}
+                folder="delivery-proofs"
+                label="Capture / upload proof photo"
+                className="h-28"
+              />
+            </div>
+          ) : null
         ) : (
           <div className="flex flex-col gap-2">
             <Label htmlFor="failure-note">

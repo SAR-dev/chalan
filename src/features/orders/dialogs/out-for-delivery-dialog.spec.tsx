@@ -35,12 +35,16 @@ describe("OutForDeliveryDialog — warehouse-handoff scan gate (R9)", () => {
 
     expect(screen.getByTestId("scan-gate")).toBeInTheDocument()
     expect(screen.getByTestId("out-for-delivery-submit")).toBeDisabled()
+    // Two-step: while the label is unverified the body is just the gate.
+    expect(screen.queryByText("Dhaka")).not.toBeInTheDocument()
 
     fireEvent.change(screen.getByTestId("scan-gate-manual"), {
       target: { value: order.id },
     })
 
     expect(screen.getByTestId("scan-gate-verified")).toHaveTextContent(order.id)
+    // The destination details are revealed once the label matches.
+    expect(screen.getByText("Dhaka")).toBeInTheDocument()
     expect(screen.getByTestId("out-for-delivery-submit")).toBeEnabled()
   })
 
@@ -66,6 +70,8 @@ describe("OutForDeliveryDialog — warehouse-handoff scan gate (R9)", () => {
     )
 
     expect(screen.queryByTestId("scan-gate")).not.toBeInTheDocument()
+    // No gate → the body is shown directly, never withheld.
+    expect(screen.getByText("Dhaka")).toBeInTheDocument()
     expect(screen.getByTestId("out-for-delivery-submit")).toBeEnabled()
   })
 })

@@ -84,35 +84,39 @@ export function WarehouseReceiveDialog({
           />
         ) : null}
 
-        <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
-          <InfoRow
-            icon={WarehouseIcon}
-            label="Receiving warehouse"
-            value={warehouseName}
-          />
-          <InfoRow icon={Bike} label="Delivered by rider" value={riderName} />
-          <Separator className="my-1" />
-          <InfoRow
-            icon={Package}
-            label="Parcel"
-            value={`${order.parcelWeightKg} KG · ${order.deliveryType} · from ${merchantName}`}
-          />
-          <InfoRow
-            icon={MapPin}
-            label="Final destination"
-            value={
-              <>
-                {order.deliveryCity}
-                <span className="block">{order.deliveryAddress}</span>
-              </>
-            }
-          />
-          <InfoRow
-            icon={Phone}
-            label="Recipient"
-            value={`${order.recipientName} · ${order.recipientPhone}`}
-          />
-        </div>
+        {/* R9 two-step: while a scan is required the body is just the gate —
+            the parcel details wait for the label to be verified. */}
+        {!warehouseReceiveScanRequired || verified ? (
+          <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
+            <InfoRow
+              icon={WarehouseIcon}
+              label="Receiving warehouse"
+              value={warehouseName}
+            />
+            <InfoRow icon={Bike} label="Delivered by rider" value={riderName} />
+            <Separator className="my-1" />
+            <InfoRow
+              icon={Package}
+              label="Parcel"
+              value={`${order.parcelWeightKg} KG · ${order.deliveryType} · from ${merchantName}`}
+            />
+            <InfoRow
+              icon={MapPin}
+              label="Final destination"
+              value={
+                <>
+                  {order.deliveryCity}
+                  <span className="block">{order.deliveryAddress}</span>
+                </>
+              }
+            />
+            <InfoRow
+              icon={Phone}
+              label="Recipient"
+              value={`${order.recipientName} · ${order.recipientPhone}`}
+            />
+          </div>
+        ) : null}
       </div>
     </FormDialog>
   )

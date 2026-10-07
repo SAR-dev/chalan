@@ -73,21 +73,29 @@ export function OutForDeliveryDialog({
           />
         ) : null}
 
-        <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
-          <InfoRow icon={User} label="Recipient" value={order.recipientName} />
-          <InfoRow icon={Phone} label="Phone" value={order.recipientPhone} />
-          <Separator className="my-1" />
-          <InfoRow
-            icon={MapPin}
-            label="Destination"
-            value={
-              <>
-                {order.deliveryCity}
-                <span className="block">{order.deliveryAddress}</span>
-              </>
-            }
-          />
-        </div>
+        {/* R9 two-step: while a scan is required the body is just the gate —
+            the parcel details wait for the label to be verified. */}
+        {!warehouseScanRequired || verified ? (
+          <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
+            <InfoRow
+              icon={User}
+              label="Recipient"
+              value={order.recipientName}
+            />
+            <InfoRow icon={Phone} label="Phone" value={order.recipientPhone} />
+            <Separator className="my-1" />
+            <InfoRow
+              icon={MapPin}
+              label="Destination"
+              value={
+                <>
+                  {order.deliveryCity}
+                  <span className="block">{order.deliveryAddress}</span>
+                </>
+              }
+            />
+          </div>
+        ) : null}
       </div>
     </FormDialog>
   )

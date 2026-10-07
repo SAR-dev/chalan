@@ -347,6 +347,9 @@ device acceptance criteria below still open)
   the rider.
   On a match the existing transition proceeds unchanged; on a mismatch it
   refuses and names the parcel that was actually read.
+  **The scan-bearing dialogs run two-step:** the body shows just the scan gate
+  first, and the parcel details / confirm step are withheld until a match —
+  the validation, not a wall, comes first.
   **Each scan point is independently toggled by the superadmin** (see
   Decisions). When a toggle is off, the rider or warehouse admin skips the
   scan and the transition proceeds without verification — the scan is an
@@ -534,7 +537,7 @@ piece, not the machinery.
 CSV is wired generically in the DataTable, but there is no curated report
 (per-merchant performance, cash reconciliation, rider productivity) and no
 scheduled email report. `delivery-performance`, `cod-settlement`, `finance`
-and `earnings` dashboards all exist - they are not exportable.
+and `cash` dashboards all exist - they are not exportable.
 
 ---
 

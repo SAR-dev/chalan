@@ -44,12 +44,16 @@ describe("WarehouseReceiveDialog — warehouse-receive scan gate (R9)", () => {
 
     expect(screen.getByTestId("scan-gate")).toBeInTheDocument()
     expect(screen.getByTestId("warehouse-receive-submit")).toBeDisabled()
+    // Two-step: while the label is unverified the body is just the gate.
+    expect(screen.queryByText("Warehouse One")).not.toBeInTheDocument()
 
     fireEvent.change(screen.getByTestId("scan-gate-manual"), {
       target: { value: order.id },
     })
 
     expect(screen.getByTestId("scan-gate-verified")).toHaveTextContent(order.id)
+    // The warehouse and parcel details are revealed once the label matches.
+    expect(screen.getByText("Warehouse One")).toBeInTheDocument()
     expect(screen.getByTestId("warehouse-receive-submit")).toBeEnabled()
   })
 
@@ -89,6 +93,8 @@ describe("WarehouseReceiveDialog — warehouse-receive scan gate (R9)", () => {
     )
 
     expect(screen.queryByTestId("scan-gate")).not.toBeInTheDocument()
+    // No gate → the body is shown directly, never withheld.
+    expect(screen.getByText("Warehouse One")).toBeInTheDocument()
     expect(screen.getByTestId("warehouse-receive-submit")).toBeEnabled()
   })
 })

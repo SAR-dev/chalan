@@ -35,9 +35,9 @@ How to work your pickup and delivery queues on {{APP_NAME}}. Sign in at **{{APP_
 3. Always photograph the parcel — proof photos are mandatory at pickup and on delivery, and they protect you in disputes.
 4. Record honest failure notes; they drive the warehouse's reattempt/return decision.
 
-## 5. Check your earnings and cash
+## 5. Check your cash collections
 
-1. Open **Earnings** (`/rider/earnings`) from the **Money** section of the sidebar.
+1. Open **Cash collections** (`/rider/cash`) from the **Money** section of the sidebar.
 2. Review **Cash on Hand** (collected but not yet handed over), **Total Collected**, and **Total Submitted**.
 3. Scroll the transaction list: each entry is a **Collected** delivery or a **Confirmed** one, with the order it belongs to and who confirmed it.
 4. Hand collected cash to your hub as instructed. **Confirmed** means your warehouse has settled that order — settled cash is what reaches merchant payouts.
@@ -54,7 +54,7 @@ How to work your pickup and delivery queues on {{APP_NAME}}. Sign in at **{{APP_
 1. **The order is not in my queue** — it is not assigned to you, it is in the wrong status, or your task type does not cover it. Queues only show work assigned to your rider account.
 2. **The pickup button is disabled** — you have not added the required parcel photo yet.
 3. **I cannot record an outcome** — the parcel must be marked **Out for delivery** first; **In transit** parcels only offer the "out for delivery" action.
-4. **Cash totals do not match** — compare the **Earnings** transaction list with what you handed to the hub, then raise it with your warehouse supervisor before the cash is confirmed.
+4. **Cash totals do not match** — compare the **Cash collections** transaction list with what you handed to the hub, then raise it with your warehouse supervisor before the cash is confirmed.
 5. **Nothing loads or my account is blocked** — check the **Inbox** for announcements, then raise it on **Support** (`/rider/support`) with your rider name.
 
 ## 8. Account, announcements, and support

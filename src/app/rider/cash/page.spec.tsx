@@ -113,26 +113,24 @@ beforeEach(() => {
   revalidate = null
 })
 
-describe("RiderEarningsPage", () => {
+describe("RiderCashPage", () => {
   it("shows the summary and activity rather than a spinner", async () => {
     const Page = await importPage()
     renderIsolated(<Page />)
 
     await waitFor(() =>
-      expect(screen.getByTestId("rider-earnings-activity")).toBeInTheDocument(),
+      expect(screen.getByTestId("rider-cash-activity")).toBeInTheDocument(),
     )
-    expect(screen.getByTestId("rider-earnings-cash-on-hand")).toHaveTextContent(
+    expect(screen.getByTestId("rider-cash-cash-on-hand")).toHaveTextContent(
       "7,000",
     )
-    expect(screen.getByTestId("rider-earnings-collected")).toHaveTextContent(
+    expect(screen.getByTestId("rider-cash-collected")).toHaveTextContent(
       "9,000",
     )
-    expect(screen.getByTestId("rider-earnings-submitted")).toHaveTextContent(
+    expect(screen.getByTestId("rider-cash-submitted")).toHaveTextContent(
       "2,000",
     )
-    expect(
-      screen.queryByTestId("rider-earnings-loading"),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId("rider-cash-loading")).not.toBeInTheDocument()
   })
 
   // The regression. This page held its response in `useState` behind a local
@@ -145,7 +143,7 @@ describe("RiderEarningsPage", () => {
     const Page = await importPage()
     const { unmount } = renderIsolated(<Page />)
     await waitFor(() =>
-      expect(screen.getByTestId("rider-earnings-activity")).toBeInTheDocument(),
+      expect(screen.getByTestId("rider-cash-activity")).toBeInTheDocument(),
     )
     unmount()
 
@@ -156,14 +154,12 @@ describe("RiderEarningsPage", () => {
     renderIsolated(<Page />)
 
     // Present on the very first commit, with no request needed.
-    expect(screen.getByTestId("rider-earnings-page")).toBeInTheDocument()
-    expect(screen.getByTestId("rider-earnings-cash-on-hand")).toHaveTextContent(
+    expect(screen.getByTestId("rider-cash-page")).toBeInTheDocument()
+    expect(screen.getByTestId("rider-cash-cash-on-hand")).toHaveTextContent(
       "7,000",
     )
-    expect(screen.getByTestId("rider-earnings-activity")).toBeInTheDocument()
-    expect(
-      screen.queryByTestId("rider-earnings-loading"),
-    ).not.toBeInTheDocument()
+    expect(screen.getByTestId("rider-cash-activity")).toBeInTheDocument()
+    expect(screen.queryByTestId("rider-cash-loading")).not.toBeInTheDocument()
   })
 
   it("keeps the summary on screen while a refresh is in flight", async () => {
@@ -175,7 +171,7 @@ describe("RiderEarningsPage", () => {
       </>,
     )
     await waitFor(() =>
-      expect(screen.getByTestId("rider-earnings-activity")).toBeInTheDocument(),
+      expect(screen.getByTestId("rider-cash-activity")).toBeInTheDocument(),
     )
 
     // Revalidation of an already-mounted tree. The old code's early return made
@@ -184,14 +180,10 @@ describe("RiderEarningsPage", () => {
     act(() => revalidate?.())
 
     await waitFor(() =>
-      expect(screen.getByTestId("rider-earnings-activity")).toBeInTheDocument(),
+      expect(screen.getByTestId("rider-cash-activity")).toBeInTheDocument(),
     )
-    expect(
-      screen.getByTestId("rider-earnings-cash-on-hand"),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByTestId("rider-earnings-loading"),
-    ).not.toBeInTheDocument()
+    expect(screen.getByTestId("rider-cash-cash-on-hand")).toBeInTheDocument()
+    expect(screen.queryByTestId("rider-cash-loading")).not.toBeInTheDocument()
   })
 
   // The old code swallowed failures into `setLoading(false)` with `data` still
@@ -202,11 +194,9 @@ describe("RiderEarningsPage", () => {
     renderIsolated(<Page />)
 
     await waitFor(() =>
-      expect(screen.getByTestId("rider-earnings-error")).toBeInTheDocument(),
+      expect(screen.getByTestId("rider-cash-error")).toBeInTheDocument(),
     )
-    expect(
-      screen.queryByTestId("rider-earnings-loading"),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId("rider-cash-loading")).not.toBeInTheDocument()
   })
 
   it("says so plainly when there are no transactions yet", async () => {
@@ -218,8 +208,8 @@ describe("RiderEarningsPage", () => {
     renderIsolated(<Page />)
 
     await waitFor(() =>
-      expect(screen.getByTestId("rider-earnings-empty")).toBeInTheDocument(),
+      expect(screen.getByTestId("rider-cash-empty")).toBeInTheDocument(),
     )
-    expect(screen.queryByTestId("rider-earnings-error")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("rider-cash-error")).not.toBeInTheDocument()
   })
 })
