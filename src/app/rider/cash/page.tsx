@@ -188,7 +188,7 @@ export default function RiderCashPage() {
               ) : (
                 <div className="space-y-4" data-testid="rider-cash-activity">
                   {transactions.map((tx) => (
-                    <div key={tx.id} data-testid={`rider-earnings-tx-${tx.id}`}>
+                    <div key={tx.id} data-testid={`rider-cash-tx-${tx.id}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <TransactionIcon type={tx.type} />
