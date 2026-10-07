@@ -128,6 +128,7 @@ left the plan.
 | **The Docker runner keeps the full dependency tree** | Investigated and rejected. The monolith's `migrate` service runs `node_modules/.bin/tsx` out of this same image, so a `--prod` install would break migrations. A `deps-prod` stage already existed and was removed as dead work, and `dockerfile-stages.spec.ts` asserts `COPY --from=deps ...node_modules` and forbids `pnpm install --prod`. Reducing image weight means moving `tsx` into `dependencies` first, not adding a stage. |
 | **`biome.json` must stay strict JSON** | Biome rejects comments in it. JSONC goes in `biome.jsonc`. Its `files.includes` scopes it to `src/`, `e2e/`, `env/`, `scripts/` and root files (`.next/**` is excluded by omission). Pinned by `biome-config.spec.ts`. |
 | **Notification sounds use howler.js directly** | Toast/notification sounds use `howler` (~10KB gzipped) with a thin `useHowl()` hook in `src/lib/hooks/`, not a React wrapper library. Sound assets live in `public/sounds/` as mp3 + ogg for cross-browser coverage (especially mobile Safari). The hook auto-unloads on unmount. Sound is opt-in per toast type (success/error/info) and respects the OS-level silent/mute preference where detectable. |
+| **QR scanning is superadmin-configurable per scan point** | Two independent toggles — one for pickup (`picked-up`), one for delivery (`delivered`) — stored in platform config. When a toggle is off, the rider skips the scan and proceeds directly with the existing transition. Default is **on** for both. This lets the platform owner roll out scanning incrementally (e.g. enable delivery first, pickup later) or disable it for a subset of riders during a pilot without a code change. |
 
 ---
 
@@ -344,6 +345,10 @@ start.
   a QR read. **Settle this in the spec before building.**
   On a match the existing transition proceeds unchanged; on a mismatch it
   refuses and names the parcel that was actually read.
+  **Each scan point is independently toggled by the superadmin** (see
+  Decisions). When a toggle is off, the rider skips the scan and the
+  transition proceeds without verification — the scan is an accelerator,
+  not a gate.
 - **A camera-dead path that always works.** Permission denied, no camera,
   non-secure origin, poor light, broken lens - every one falls through to
   manual code entry. The scan is an accelerator, never a gate: a rider must not
