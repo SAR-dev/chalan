@@ -173,6 +173,19 @@ describe("CSP nonce and request correlation", () => {
     expect(res.status).toBe(200)
   })
 
+  // qr-scanner (R9) builds its decode worker from a blob: URL — without an
+  // explicit worker-src, worker creation falls back to script-src, which is
+  // nonce-only and would block it.
+  it("grants qr-scanner's blob worker and nothing else", async () => {
+    const { proxy } = await loadProxy()
+    const csp = proxy(req("/dashboard")).headers.get("content-security-policy")
+    expect(csp).toContain("worker-src 'self' blob:")
+    // Workers only: no WASM eval anywhere, and no blob: in script-src itself.
+    expect(csp).not.toContain("wasm-unsafe-eval")
+    const scriptSrc = csp?.split("; ").find((d) => d.startsWith("script-src "))
+    expect(scriptSrc).not.toContain("blob:")
+  })
+
   it("mints a request id when none is supplied", async () => {
     const { proxy } = await loadProxy()
     const res = proxy(req("/dashboard"))

@@ -227,6 +227,20 @@ export const platformConfig = pgTable("platform_config", {
   // Whether a cancelled order is refunded its creation charge.
   // true = refund (default); false = the merchant keeps the fee.
   refundOnCancel: boolean("refundOnCancel").notNull().default(true),
+  // R9 scan gates: platform-wide toggles for the three QR-scan points. The scan
+  // is an accelerator, never a gate — turning these off removes the scan UI
+  // from the rider flow entirely; the transition body never changes either way.
+  pickupScanRequired: boolean("pickupScanRequired").notNull().default(true),
+  deliveryScanRequired: boolean("deliveryScanRequired").notNull().default(true),
+  // Rider collects the parcel from the warehouse for delivery
+  // (`out-for-delivery` transition).
+  warehouseScanRequired: boolean("warehouseScanRequired")
+    .notNull()
+    .default(true),
+  // Warehouse admin receives the parcel from the rider (`receive` transition).
+  warehouseReceiveScanRequired: boolean("warehouseReceiveScanRequired")
+    .notNull()
+    .default(true),
   updatedAt: ts("updatedAt").notNull().defaultNow(),
 })
 

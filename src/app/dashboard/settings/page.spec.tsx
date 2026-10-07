@@ -7,7 +7,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { makeUser, renderPage } from "@/app/__tests__/test-utils"
 
 let mockIsLoading = true
-let mockConfig: { refundOnCancel?: boolean } | null = null
+let mockConfig: {
+  refundOnCancel?: boolean
+  pickupScanRequired?: boolean
+  deliveryScanRequired?: boolean
+  warehouseScanRequired?: boolean
+  warehouseReceiveScanRequired?: boolean
+} | null = null
+
+const updateConfigMock = vi.fn(async (_patch: Record<string, unknown>) => ({
+  ok: true,
+}))
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -15,7 +25,7 @@ vi.mock("@/features/platform-config/hooks/use-platform-config", () => ({
   usePlatformConfig: () => ({
     config: mockConfig,
     isLoading: mockIsLoading,
-    updatePlatformConfig: vi.fn(async () => ({ ok: true })),
+    updatePlatformConfig: updateConfigMock,
   }),
 }))
 
@@ -29,6 +39,7 @@ vi.mock("@/features/account/hooks/use-auth", () => ({
 beforeEach(() => {
   mockIsLoading = true
   mockConfig = null
+  updateConfigMock.mockClear()
   globalThis.fetch = vi.fn(
     async () =>
       new Response(JSON.stringify([]), {
@@ -105,6 +116,98 @@ describe("DashboardSettingsPage loading", () => {
     expect(toggle).toHaveAttribute("aria-checked", "false")
     await user.click(screen.getByTestId("save-policy"))
     expect(toggle).toBeInTheDocument()
+  })
+})
+
+describe("DashboardSettingsPage scan policy card (R9)", () => {
+  it("keeps the scan card on screen while the config loads", async () => {
+    const Page = await importPage()
+    renderPage(<Page />)
+
+    expect(screen.getByTestId("scan-policy-card")).toBeInTheDocument()
+    expect(screen.getByTestId("scan-policy-loading")).toBeInTheDocument()
+    expect(
+      screen.queryByTestId("pickup-scan-required-switch"),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId("delivery-scan-required-switch"),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId("warehouse-scan-required-switch"),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId("warehouse-receive-scan-required-switch"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("disables scanning save until the value it would write has been read", async () => {
+    const Page = await importPage()
+    renderPage(<Page />)
+
+    expect(screen.getByTestId("save-scan-policy")).toBeDisabled()
+  })
+
+  it("swaps in all four scan switches grouped by role once loaded", async () => {
+    mockIsLoading = false
+    mockConfig = {
+      refundOnCancel: true,
+      pickupScanRequired: false,
+      deliveryScanRequired: true,
+      warehouseScanRequired: false,
+      warehouseReceiveScanRequired: true,
+    }
+    const Page = await importPage()
+    renderPage(<Page />)
+
+    expect(screen.queryByTestId("scan-policy-loading")).not.toBeInTheDocument()
+    // The two actor groups both get a heading when the switches appear.
+    expect(screen.getByText("Rider")).toBeInTheDocument()
+    expect(screen.getByText("Warehouse admin")).toBeInTheDocument()
+    expect(screen.getByTestId("pickup-scan-required-switch")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+    expect(
+      screen.getByTestId("warehouse-scan-required-switch"),
+    ).toHaveAttribute("aria-checked", "false")
+    expect(screen.getByTestId("delivery-scan-required-switch")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+    expect(
+      screen.getByTestId("warehouse-receive-scan-required-switch"),
+    ).toHaveAttribute("aria-checked", "true")
+    await waitFor(() =>
+      expect(screen.getByTestId("save-scan-policy")).toBeEnabled(),
+    )
+  })
+
+  it("saves all four scan toggles in one payload", async () => {
+    mockIsLoading = false
+    mockConfig = {
+      refundOnCancel: true,
+      pickupScanRequired: true,
+      deliveryScanRequired: true,
+      warehouseScanRequired: true,
+      warehouseReceiveScanRequired: true,
+    }
+    const user = userEvent.setup()
+    const Page = await importPage()
+    renderPage(<Page />)
+
+    const pickup = screen.getByTestId("pickup-scan-required-switch")
+    await user.click(pickup)
+    expect(pickup).toHaveAttribute("aria-checked", "false")
+
+    await user.click(screen.getByTestId("save-scan-policy"))
+    await waitFor(() =>
+      expect(updateConfigMock).toHaveBeenCalledWith({
+        pickupScanRequired: false,
+        deliveryScanRequired: true,
+        warehouseScanRequired: true,
+        warehouseReceiveScanRequired: true,
+      }),
+    )
   })
 })
 

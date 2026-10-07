@@ -19,6 +19,10 @@ export const GET = withErrorHandler(async () => {
       minCodFeePercentage: platformConfig.minCodFeePercentage,
       maxCodFeePercentage: platformConfig.maxCodFeePercentage,
       refundOnCancel: platformConfig.refundOnCancel,
+      pickupScanRequired: platformConfig.pickupScanRequired,
+      deliveryScanRequired: platformConfig.deliveryScanRequired,
+      warehouseScanRequired: platformConfig.warehouseScanRequired,
+      warehouseReceiveScanRequired: platformConfig.warehouseReceiveScanRequired,
       updatedAt: platformConfig.updatedAt,
     })
     .from(platformConfig)
@@ -55,6 +59,10 @@ export const PATCH = withErrorHandler(async (req: Request) => {
       minCodFeePercentage: platformConfig.minCodFeePercentage,
       maxCodFeePercentage: platformConfig.maxCodFeePercentage,
       refundOnCancel: platformConfig.refundOnCancel,
+      pickupScanRequired: platformConfig.pickupScanRequired,
+      deliveryScanRequired: platformConfig.deliveryScanRequired,
+      warehouseScanRequired: platformConfig.warehouseScanRequired,
+      warehouseReceiveScanRequired: platformConfig.warehouseReceiveScanRequired,
       updatedAt: platformConfig.updatedAt,
     })
     .from(platformConfig)

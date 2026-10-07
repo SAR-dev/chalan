@@ -63,6 +63,7 @@
     "nodemailer": "^10.0.13",
     "papaparse": "^5.7.0",
     "pg": "8.23.1",
+    "qr-scanner": "^1.4.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

@@ -78,6 +78,9 @@ function buildCsp(nonce: string): string {
     "img-src 'self' blob: data: https:",
     "font-src 'self'",
     "connect-src 'self' https:",
+    // qr-scanner (R9) builds its decode worker from a blob: URL. Workers
+    // only — no blob: in script-src, no 'wasm-unsafe-eval' anywhere.
+    "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

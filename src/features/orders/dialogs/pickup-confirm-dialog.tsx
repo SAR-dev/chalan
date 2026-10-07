@@ -14,7 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { InfoRow } from "@/features/orders/components/info-row"
+import { ScanGate } from "@/features/orders/components/scan-gate"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { useScanPolicy } from "@/features/platform-config/hooks/use-scan-policy"
 import { toast } from "@/lib/notify"
 import type { Order, PickupLocation } from "@/lib/types"
 
@@ -32,14 +34,19 @@ export function PickupConfirmDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const { markOrderPickedUp } = useOrders()
+  const { pickupScanRequired } = useScanPolicy()
   const [submitting, setSubmitting] = useState(false)
   const [proofUrls, setProofUrls] = useState<string[]>([])
   const [weight, setWeight] = useState("")
   const [syncedId, setSyncedId] = useState<string | null>(null)
+  // R9: parcel-label verification lives with the order-change re-sync, so a
+  // different order can never inherit a scan from the previous one.
+  const [verified, setVerified] = useState(false)
 
   if (order && order.id !== syncedId) {
     setSyncedId(order.id)
     setWeight(String(order.parcelWeightKg))
+    setVerified(false)
   }
 
   if (!order) return null
@@ -84,11 +91,21 @@ export function PickupConfirmDialog({
       onConfirm={handleConfirm}
       submitting={submitting}
       submittingLabel="Updating"
-      submitDisabled={proofUrls.length === 0}
+      submitDisabled={
+        proofUrls.length === 0 || (pickupScanRequired && !verified)
+      }
       submitLabel="Confirm pickup"
       submitIcon={<PackageCheck className="size-4" />}
     >
       <div className="grid grid-cols-1 gap-4">
+        {pickupScanRequired ? (
+          <ScanGate
+            orderId={order.id}
+            verified={verified}
+            onVerify={() => setVerified(true)}
+          />
+        ) : null}
+
         <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
           <InfoRow icon={Store} label="Merchant" value={merchantName} />
           <InfoRow

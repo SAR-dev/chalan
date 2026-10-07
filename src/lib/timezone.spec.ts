@@ -155,24 +155,32 @@ describe("businessPresetRange (ROADMAP R0.3)", () => {
   // The presets previously used `setHours(0,0,0,0)` on the device clock, so the
   // answer depended on where the browser was. Pinning TZ proves the result does
   // not move with the host.
-  it("does not move with the host timezone", () => {
-    const previous = process.env.TZ
-    try {
-      const results = new Set<string>()
-      const localDays = new Set<string>()
-      for (const tz of ["America/New_York", "Asia/Tokyo", "UTC"]) {
-        process.env.TZ = tz
-        results.add(businessPresetRange("today", instant).from)
-        // Self-check: if these three agree the host zone never changed, and the
-        // assertion below would be proving nothing. For 20:00Z New York and UTC
-        // see the 1st while Tokyo already sees the 2nd.
-        localDays.add(instant.getDate().toString())
+  // Windows can't play: Node's ICU reads `TZ` once at startup there, so a
+  // runtime mutation never changes the host zone (POSIX picks it up via
+  // `tzset()`). The self-check below would then assert nothing, so the test is
+  // skipped on Windows rather than failing — the fixed-instant tests above
+  // still pin the Dhaka day. CI runs on Linux and keeps it exercised.
+  it.skipIf(process.platform === "win32")(
+    "does not move with the host timezone",
+    () => {
+      const previous = process.env.TZ
+      try {
+        const results = new Set<string>()
+        const localDays = new Set<string>()
+        for (const tz of ["America/New_York", "Asia/Tokyo", "UTC"]) {
+          process.env.TZ = tz
+          results.add(businessPresetRange("today", instant).from)
+          // Self-check: if these three agree the host zone never changed, and the
+          // assertion below would be proving nothing. For 20:00Z New York and UTC
+          // see the 1st while Tokyo already sees the 2nd.
+          localDays.add(instant.getDate().toString())
+        }
+        expect(localDays.size).toBeGreaterThan(1)
+        expect([...results]).toEqual(["2026-07-02"])
+      } finally {
+        if (previous === undefined) delete process.env.TZ
+        else process.env.TZ = previous
       }
-      expect(localDays.size).toBeGreaterThan(1)
-      expect([...results]).toEqual(["2026-07-02"])
-    } finally {
-      if (previous === undefined) delete process.env.TZ
-      else process.env.TZ = previous
-    }
-  })
+    },
+  )
 })

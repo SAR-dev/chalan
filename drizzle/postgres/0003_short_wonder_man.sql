@@ -1,0 +1,2 @@
+ALTER TABLE "platform_config" ADD COLUMN "pickupScanRequired" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "platform_config" ADD COLUMN "deliveryScanRequired" boolean DEFAULT true NOT NULL;

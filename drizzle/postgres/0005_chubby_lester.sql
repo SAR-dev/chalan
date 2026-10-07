@@ -1,0 +1,1 @@
+ALTER TABLE "platform_config" ADD COLUMN "warehouseReceiveScanRequired" boolean DEFAULT true NOT NULL;

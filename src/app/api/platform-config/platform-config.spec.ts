@@ -149,6 +149,32 @@ describe("GET /api/platform-config", () => {
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ id: "default" })
   })
+
+  // The projection is explicit, so a column left out of the select is silently
+  // dropped from the response — the reader would fall back to its `?? true`
+  // default and an admin's "off" would never reach the rider.
+  it("returns the R9 scan toggles", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([
+      {
+        id: "default",
+        refundOnCancel: true,
+        pickupScanRequired: false,
+        deliveryScanRequired: true,
+        warehouseScanRequired: false,
+        warehouseReceiveScanRequired: true,
+      },
+    ])
+    const res = await getConfig()
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({
+      pickupScanRequired: false,
+      deliveryScanRequired: true,
+      warehouseScanRequired: false,
+      warehouseReceiveScanRequired: true,
+    })
+  })
 })
 
 describe("PATCH /api/platform-config", () => {
@@ -180,6 +206,57 @@ describe("PATCH /api/platform-config", () => {
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "PLATFORM_CONFIG_UPDATED" }),
     )
+  })
+
+  // Validation strips unknown keys, so a schema that never gained the fields
+  // would 400 ("No fields to update") here instead of persisting them.
+  it("accepts the R9 scan toggles and audits them", async () => {
+    sessionState.value = superAdmin
+    selectQueue.push([{ id: "default", refundOnCancel: true }])
+    updateResult.push({
+      id: "default",
+      pickupScanRequired: false,
+      deliveryScanRequired: false,
+      warehouseScanRequired: false,
+      warehouseReceiveScanRequired: false,
+    })
+    const res = await updateConfig(
+      req("PATCH", {
+        pickupScanRequired: false,
+        deliveryScanRequired: false,
+        warehouseScanRequired: false,
+        warehouseReceiveScanRequired: false,
+      }),
+    )
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json).toMatchObject({
+      pickupScanRequired: false,
+      deliveryScanRequired: false,
+      warehouseScanRequired: false,
+      warehouseReceiveScanRequired: false,
+    })
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "PLATFORM_CONFIG_UPDATED",
+        metadata: {
+          pickupScanRequired: false,
+          deliveryScanRequired: false,
+          warehouseScanRequired: false,
+          warehouseReceiveScanRequired: false,
+        },
+      }),
+    )
+  })
+
+  it("rejects a non-boolean scan toggle", async () => {
+    sessionState.value = superAdmin
+    const res = await updateConfig(req("PATCH", { pickupScanRequired: "yes" }))
+    expect(res.status).toBe(400)
+    const res2 = await updateConfig(
+      req("PATCH", { warehouseReceiveScanRequired: "yes" }),
+    )
+    expect(res2.status).toBe(400)
   })
 
   it("creates the config row when missing", async () => {

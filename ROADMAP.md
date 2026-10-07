@@ -4,16 +4,17 @@
 >
 > **Open work:** R4 Product only. R0-R3 closed earlier, and R5 Polish is
 > closed - see the ledger in git history and the decisions below. Within that
-> band, **R5 (parcel labels) has shipped** and **R9 (QR scanning)** leads next.
+> band, **R5 (parcel labels) has shipped** and **R9 (QR scanning)** is built
+> (unit-tested; device acceptance open).
 > **SMS has been withdrawn from planning** - see Decisions.
 >
-> **Health:** `pnpm ci:check` green (931 files) · Unit **2455 pass** (2498
-> total, 232 spec files) · coverage **55.4 / 49.69 / 44.02 / 56.29** against
+> **Health:** `pnpm ci:check` green (939 files) · Unit **2487 pass** (2531
+> total, 236 spec files) · coverage **55.68 / 49.88 / 44.17 / 56.59** against
 > floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **152
 > tests / 39 files / 80 scenarios**, run locally only
 > (`pnpm test:e2e`, ~8 min) by decision - CI runs quality · build · security ·
 > coverage · integration jobs and nothing else · `route-auth-guard.spec.ts`
-> enforces server-side auth on all 133 API route files · `pnpm build` green.
+> enforces server-side auth on all 134 API route files · `pnpm build` green.
 >
 > The coverage floors, the spec-file count and the E2E summary in this block are
 > asserted by `src/app/__tests__/docs-drift.spec.ts` and fail when they drift.
@@ -35,7 +36,7 @@
 
 | Priority | Items | Status |
 |---|---|---|
-| **P1 - High-leverage product work** | R9 · R2 · R3 | open (R5 shipped · R1 decided · R8 shipped) |
+| **P1 - High-leverage product work** | R2 · R3 (**R9 built** — device acceptance open) | open (R9 built · R5 shipped · R1 decided · R8 shipped) |
 | **P2 - Later product bets** | R4 · R6 · R7 | open |
 
 ### Dependencies
@@ -44,15 +45,15 @@
 |---|---|---|
 | **R1** i18n decision | none | **Decided - deferred** (see Decisions). New user-facing copy in R2 / R3 / R5 / R9 / P2 goes in `src/config/content.ts`, not new inline literals |
 | **R5** Printable parcel labels + QR code, admin label designer | none | **shipped** - see git history. Was the blocker for R9; its QR encodes `order.id`, and print is browser `window.print()` only (no PDF) |
-| **R9** Parcel QR-code scanning at pickup + delivery | **R5** | a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
+| **R9** Parcel QR-code scanning at pickup + delivery | **R5** (satisfied) | **built** — a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
 | **R2** API keys, webhooks, OpenAPI | none | docs page and error copy follow R1's writing rule. `/api/v1/orders` should accept the order's `recipientMail` |
 | **R3** Notifications (in-app, preferences) | none — its R8 prerequisite is **shipped**: `recipientMail` is on the order | copy follows R1's writing rule. Shares R2's event source (`src/features/orders/transitions.ts`) - emit once, fan out to both sinks. Toast sounds use howler.js (see Decisions) |
 | **P2** items (R4 · R6 · R7) | none | copy follows R1's writing rule |
 
-**One item blocks another:** R9 cannot start until R5 prints something scannable,
-so R5 sits ahead of R2/R3 rather than last. Everything else here is ordered by
-leverage and cost, not necessity — and the one other dependency this plan
-carried, R3's customer-email step needing the recipient's address, is now
+**One item blocks another:** R9 could not start until R5 printed something
+scannable, so R5 sat ahead of R2/R3 rather than last. Everything else here is
+ordered by leverage and cost, not necessity — and the one other dependency this
+plan carried, R3's customer-email step needing the recipient's address, is now
 satisfied by the shipped `recipientMail` field.
 
 P1 and P2 are the only groups left; earlier priorities were R5 polish work and
@@ -98,17 +99,17 @@ closed bands stay in the table because their bars still apply if one reopens: a
 newly discovered R0-class defect jumps the queue, and nothing in R4 ships while
 an R0 item is open.
 
-**The P groups carry the order of work; ids are only identifiers.** R5 sits in
-P1 ahead of R4 on purpose, and now also ahead of R2/R3 - R9 is blocked on it.
+**The P groups carry the order of work; ids are only identifiers.** R5 sat in
+P1 ahead of R4 on purpose, and ahead of R2/R3 because R9 was blocked on it.
 What decides where an item sits is what it blocks and what it costs to land,
 not when it was written down.
 
-**Order:** **R5 has shipped**, so **R9** - parcel QR-code scanning at pickup and
-delivery - leads now; it was blocked on R5 only for something scannable to
-exist. Then R2 and R3, which are independent of each other and can be reordered
-or run in parallel. R1 is already decided (deferred i18n) and needs no turn in
-the order - it only shapes the copy in what follows. R8 and R5 have shipped and
-left the plan.
+**Order:** **R5 has shipped, and R9 is now built** - parcel QR-code scanning at
+pickup and delivery, unit-tested; its device acceptance criteria (below) are the
+open part. Then R2 and R3, which are
+independent of each other and can be reordered or run in parallel. R1 is
+already decided (deferred i18n) and needs no turn in the order - it only shapes
+the copy in what follows. R8 and R5 have shipped and left the plan.
 
 ### Decisions already made (recorded so they are not re-opened)
 
@@ -128,7 +129,7 @@ left the plan.
 | **The Docker runner keeps the full dependency tree** | Investigated and rejected. The monolith's `migrate` service runs `node_modules/.bin/tsx` out of this same image, so a `--prod` install would break migrations. A `deps-prod` stage already existed and was removed as dead work, and `dockerfile-stages.spec.ts` asserts `COPY --from=deps ...node_modules` and forbids `pnpm install --prod`. Reducing image weight means moving `tsx` into `dependencies` first, not adding a stage. |
 | **`biome.json` must stay strict JSON** | Biome rejects comments in it. JSONC goes in `biome.jsonc`. Its `files.includes` scopes it to `src/`, `e2e/`, `env/`, `scripts/` and root files (`.next/**` is excluded by omission). Pinned by `biome-config.spec.ts`. |
 | **Notification sounds use howler.js directly** | Toast/notification sounds use `howler` (~10KB gzipped) with a thin `useHowl()` hook in `src/lib/hooks/`, not a React wrapper library. Sound assets live in `public/sounds/` as mp3 + ogg for cross-browser coverage (especially mobile Safari). The hook auto-unloads on unmount. Sound is opt-in per toast type (success/error/info) and respects the OS-level silent/mute preference where detectable. |
-| **QR scanning is superadmin-configurable per scan point** | Two independent toggles — one for pickup (`picked-up`), one for delivery (`delivered`) — stored in platform config. When a toggle is off, the rider skips the scan and proceeds directly with the existing transition. Default is **on** for both. This lets the platform owner roll out scanning incrementally (e.g. enable delivery first, pickup later) or disable it for a subset of riders during a pilot without a code change. |
+| **QR scanning is superadmin-configurable per scan point** | Four independent toggles — pickup (`picked-up`), warehouse handoff (`out-for-delivery`), delivery (`delivered`) for the rider, plus warehouse receive (`receive`) for the warehouse admin — stored in platform config. When a toggle is off, the rider or warehouse admin skips the scan and proceeds directly with the existing transition. Default is **on** for all four. This lets the platform owner roll out scanning incrementally (e.g. enable delivery first, pickups later) without a code change. Per-rider overrides ("a subset of riders during a pilot" — earlier wording) are **out of v1**: the toggles are platform-wide. |
 
 ---
 
@@ -139,9 +140,9 @@ item in this group and is now decided (deferred i18n - see Decisions), so what
 survives of it is a writing rule rather than a build: copy in R2 / R3 / R9 / P2
 goes through `config/content.ts`. R8 - recipient email - has shipped too.
 
-The one dependency that shaped this order is now satisfied: R9 (QR-code
-scanning) can start because R5 prints a scannable label. R3's prerequisite - the
-recipient's address, which its customer emails need - shipped with R8, so
+The one dependency that shaped this order was R9 waiting on R5 to print a
+scannable label - satisfied, and R9 has since been built. R3's prerequisite -
+the recipient's address, which its customer emails need - shipped with R8, so
 nothing waits on it any more.
 
 ### R1 Bangla / i18n - **decided: deferred to a later phase**
@@ -331,32 +332,39 @@ app confirm it is the parcel on screen.
 **Dependency: R5 - now satisfied.** A labelled QR code prints, so this can
 start.
 
-**Ship:**
+**Ship:** (settled and **built**, unit-tested;
+device acceptance criteria below still open)
 
-- **A scanner surface in the rider app**, opened at the two possession changes.
-  The delivery side is unambiguous: **`delivered`**. The pickup side needs one
-  decision at spec time, because there are two candidates and they are not the
-  same moment - **`out-for-pickup`** is the rider *starting* the pickup leg
-  (before reaching the merchant, so there is no parcel in hand to scan), while
-  **`picked-up`** is where the rider actually takes possession. Scanning
-  implies the label is already in front of you, so `picked-up` is the
-  technically consistent choice; if "pickup starts" is meant as the leg
-  beginning, the scan has to become a read-back of what was loaded rather than
-  a QR read. **Settle this in the spec before building.**
+- **A scanner surface**, opened at the four possession changes. The rider side
+  has the three it already did: the delivery side is unambiguous —
+  **`delivered`**; the pickup side is **settled on `picked-up`** —
+  `out-for-pickup` is the rider *starting* the pickup leg (before reaching the
+  merchant, so there is no parcel in hand to scan), while `picked-up` is where
+  the rider actually takes possession, so the label is physically there; and
+  the warehouse handoff is **`out-for-delivery`**, when the rider collects the
+  parcel from the warehouse for the delivery run. The warehouse-admin side has
+  the fourth: **`receive`**, when the warehouse takes the parcel back in from
+  the rider.
   On a match the existing transition proceeds unchanged; on a mismatch it
   refuses and names the parcel that was actually read.
   **Each scan point is independently toggled by the superadmin** (see
-  Decisions). When a toggle is off, the rider skips the scan and the
-  transition proceeds without verification — the scan is an accelerator,
-  not a gate.
-- **A camera-dead path that always works.** Permission denied, no camera,
-  non-secure origin, poor light, broken lens - every one falls through to
-  manual code entry. The scan is an accelerator, never a gate: a rider must not
-  be unable to deliver because a camera failed.
-- **Offline first.** Riders work on weak connectivity, so the expected code
-  travels with the order payload they already loaded and the match is decided
-  on the device, sent when the connection returns. Manual entry is the offline
-  route too.
+  Decisions). When a toggle is off, the rider or warehouse admin skips the
+  scan and the transition proceeds without verification — the scan is an
+  accelerator, not a gate.
+- **v1 interaction is photo-capture, not live streaming:** a file input with
+  `capture="environment"` opens the OS camera, and the captured image is
+  decoded once (`QrScanner.scanImage`). No `<video>`, no `getUserMedia`, no
+  in-page permission flow. A streaming scanner is a documented upgrade path,
+  not a v1 requirement.
+- **A camera-dead path that always works.** No camera, cancelled capture,
+  unreadable photo, broken lens - manual code entry is always visible and
+  always completes the transition. The scan is an accelerator, never a gate:
+  a rider must not be unable to deliver because a camera failed.
+- **Offline first.** The expected code travels with the order payload they
+  already loaded and the match is decided on the device; the transition PATCH
+  keeps today's behaviour (toast on failure, **no offline mutation queue in
+  v1** — the earlier "sent when the connection returns" wording is
+  superseded by the spec). Manual entry is the offline route too.
 
 #### The scanner wrapper - its own deliverable, shipped inside R9
 
@@ -367,7 +375,8 @@ own acceptance criteria, and because getting it wrong fails *silently* on part
 of the fleet - a rider whose camera "doesn't work" reports a broken phone, not a
 missing decoder.
 
-**Decision: native first, WASM fallback, behind one interface.**
+**Decision: `qr-scanner` (nimiq, MIT) v1.4.x — native `BarcodeDetector`
+first, pure-JS Web Worker fallback — behind one interface.**
 
 `BarcodeDetector` is Chromium-only today - Firefox has never implemented it, and
 Safari has it **disabled by default** on macOS *and* iOS. On iOS no other engine
@@ -375,47 +384,41 @@ is possible, so "Safari has it off" means **no browser on iOS can scan natively
 at all**. That is not a long tail; for a field workforce it is half the fleet.
 MDN marks the API Limited availability (not Baseline), and Shape Detection is
 not on the W3C standards track - so treat it as a fast path, not a foundation.
+`qr-scanner` feature-detects it and falls back to its own JS worker (a ZXing
+port), so the fleet splits into "native fast path" and "worker fallback"
+rather than "works" and "doesn't".
 
-Native is nonetheless tried first: ~2-3x faster than ZXing, no download, works
-the moment the page loads, and **requires no CSP change** - which the WASM path
-does. Skipping it for the sake of one consistent path would buy uniformity at
-the cost of speed, offline behaviour and a policy relaxation on most devices.
-
-Use the **`barcode-detector` ponyfill** (wraps `zxing-wasm`): it exposes the
-*same* `BarcodeDetector` API, so the app keeps **one code path** and only the
-constructor is swapped. Feature-detect (`"BarcodeDetector" in globalThis`);
-never sniff a user agent. Call `BarcodeDetector.getSupportedFormats()` at
-runtime, since the symbology list varies by platform, and ask only for what is
-actually offered.
+Why not `barcode-detector` ponyfill + `zxing-wasm` (the earlier lean): it
+needs `script-src 'wasm-unsafe-eval'` in the CSP, ~1.4 MB of self-hosted,
+SW-cached `.wasm`, and a `locateFile` override to defeat its CDN default.
+`qr-scanner` needs neither - no WASM anywhere, its worker is a string inside
+the bundled chunk (~16 KB gz) - and its own camera/stream plumbing is simply
+unused in v1 (photo capture only). The cost: its JS fallback decoder is
+weaker than zxing-wasm on damaged/glare labels (it only runs on iOS/Firefox),
+and upstream is dormant (last npm release 2022-11). Both costs are contained
+by the one-module rule: swapping decoders later touches `src/lib/scan.ts`
+only. `zxing-wasm` stays the documented escape hatch if field reports say
+reads fail.
 
 **Acceptance criteria:**
 
-- [ ] one wrapper module; no call site constructs a detector itself
-- [ ] feature detection only - no user-agent string anywhere in the scanner
-- [ ] a Chromium device takes the native path (the WASM module is not loaded)
-- [ ] an iOS or Firefox device reaches the WASM path and reads a code
-- [ ] the `.wasm` is self-hosted and decodes with the network offline
-- [ ] CSP passes with `'wasm-unsafe-eval'` added, and nothing else loosened
-
-**The two blockers, both already in this repo:**
-
-1. **The CSP will block the WASM decoder.** `script-src` is
-   `'self' 'nonce-…'` with no `'wasm-unsafe-eval'` (`src/proxy.ts:74`), and
-   Chrome refuses WebAssembly compilation without it. The fix is the narrow
-   `'wasm-unsafe-eval'` (it permits compiling `.wasm` only - it is *not*
-   `'unsafe-eval'`, which would also unlock `eval()`), and it needs the same
-   review as the `style-src` decision in Decisions.
-2. **The `.wasm` must be self-hosted.** The `barcode-detector` ponyfill
-   defaults to fetching `zxing-wasm` from a CDN, which `script-src 'self'`
-   rejects - and riders need it offline anyway.
+- [x] one wrapper module (`src/lib/scan.ts`); no call site imports
+      `qr-scanner` itself (grep-enforced by a unit test)
+- [x] our code feature-detects only - no user-agent string anywhere we wrote
+      (`qr-scanner` itself carries one internal Ventura workaround - upstream's)
+- [ ] Chromium takes the native path (the worker is never constructed); iOS /
+      Firefox reaches the worker path and reads a code
+- [ ] decode works with the network offline (chunk is SW-cached)
+- [x] CSP additive line `worker-src 'self' blob:` added and asserted, since
+      `script-src` is `'self' 'nonce-…'` (`src/proxy.ts:74`) and a `blob:`
+      worker is neither. Workers only; explicitly **no** `'wasm-unsafe-eval'`
 
 **Ruled out, so nobody re-litigates it:**
 
 | Option | Why not |
 |---|---|
 | `html5-qrcode` | ships its own scanner UI that would fight ours; its `BarcodeDetector` path is experimental |
-| `@zxing/browser` (pure JS) | slower than the WASM build, for no benefit |
-| `qr-scanner` (nimiq) | same native-first shape, but its fallback decoder is `jsqr-es6` (a JS port of ZXing) — weaker than `zxing-wasm` on glare, blur and creases, which *is* the parcel condition; also ships its own `<video>` / overlay UI, and its npm release is old. Its one edge — no `'wasm-unsafe-eval'` change — is convenience, not capability. Kept `zxing-wasm`; revisit only if relaxing CSP becomes unacceptable |
+| `barcode-detector` ponyfill + `zxing-wasm` | strongest decoder, but forces `wasm-unsafe-eval` + self-hosting ~1.4 MB of `.wasm` - kept as the escape hatch if `qr-scanner`'s JS fallback reads fail in the field |
 | Commercial SDKs (Dynamsoft, Scanbot) | good, and paid for capability this does not need yet |
 | WebHID / WebUSB hardware scanners | right for a warehouse floor, wrong for field riders - revisit only if that appears |
 
@@ -541,7 +544,7 @@ and `earnings` dashboards all exist - they are not exportable.
 
 | Area | Status |
 |---|---|
-| **Auth on every API route** | enforced by `src/app/api/route-auth-guard.spec.ts` over all 129 route files, with a minimal allowlist it also asserts stays minimal (the spec pins a floor of 100, so this count is prose — recount when editing this row) |
+| **Auth on every API route** | enforced by `src/app/api/route-auth-guard.spec.ts` over all 134 route files, with a minimal allowlist it also asserts stays minimal (the spec pins a floor of 100, so this count is prose — recount when editing this row) |
 | **E2E selector policy** | `data-testid` first, centralised in `e2e/selectors.ts` |
 | **Docs drift** | `src/app/__tests__/docs-drift.spec.ts`, `ci-workflow.spec.ts`, `compose-cron.spec.ts` already exist - extend them rather than starting new ones |
 | **E2E suite serials** | **scoped to the file**: `<fileNN><index>`, so `2901` is the first scenario in `29-sign-out.spec.ts`. File prefixes run `01`…`39` and are unique, so ids never collide, and deleting a scenario renumbers one file only — there are no retired gaps to preserve any more. `docs-drift.spec.ts` asserts uniqueness, that every serial matches its filename and runs `01…` in sequence, and the suite summary in **both** AGENTS.md (`80 scenarios across 39 files / 152 tests`) and ROADMAP.md (`152 tests / 39 files / 80 scenarios`), plus the coverage floors and ROADMAP's unit spec-file count |
