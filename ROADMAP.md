@@ -8,7 +8,7 @@
 > (unit-tested; device acceptance open).
 > **SMS has been withdrawn from planning** - see Decisions.
 >
-> **Health:** `pnpm ci:check` green (939 files) · Unit **2487 pass** (2531
+> **Health:** `pnpm ci:check` green (939 files) · Unit **2488 pass** (2531
 > total, 236 spec files) · coverage **55.68 / 49.88 / 44.17 / 56.59** against
 > floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **152
 > tests / 39 files / 80 scenarios**, run locally only
