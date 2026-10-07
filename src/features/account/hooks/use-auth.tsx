@@ -9,10 +9,10 @@ import {
   useEffect,
   useState,
 } from "react"
-import { toast } from "sonner"
 import { useSWRConfig } from "swr"
 import { authClient } from "@/lib/auth-client"
 import { homeForRole } from "@/lib/nav-config"
+import { toast } from "@/lib/notify"
 import type { User } from "@/lib/types"
 
 // Re-export so client components can keep importing from use-auth while the

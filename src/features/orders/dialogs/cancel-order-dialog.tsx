@@ -2,13 +2,13 @@
 
 import { Ban, MapPin, Package, Phone, User } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { InfoRow } from "@/features/orders/components/info-row"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { toast } from "@/lib/notify"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 

@@ -2,7 +2,6 @@
 
 import { Ban, Check, MoreHorizontal, ShieldCheck, X } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -42,6 +41,7 @@ import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
+import { toast } from "@/lib/notify"
 import type { Order } from "@/lib/types"
 
 /**

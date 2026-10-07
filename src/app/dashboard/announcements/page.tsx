@@ -11,7 +11,6 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { FormDialog } from "@/components/form-dialog"
@@ -33,6 +32,7 @@ import { AnnouncementStatusBadge } from "@/features/announcements/components/ann
 import { useAnnouncements } from "@/features/announcements/hooks/use-announcements"
 import { ANNOUNCEMENT_TARGET_ROLE_LABELS } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import type { Announcement } from "@/lib/types"
 
 type TabFilter = "ALL" | "ACTIVE" | "INACTIVE"

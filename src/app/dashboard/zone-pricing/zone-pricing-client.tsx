@@ -2,7 +2,6 @@
 
 import { LayoutGrid, List, MoreHorizontal, Pencil, Plus } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellContent,
@@ -23,6 +22,7 @@ import { ZoneRateMatrix } from "@/features/platform-config/components/zone-rate-
 import { CreateZonePricingDialog } from "@/features/platform-config/dialogs/create-zone-pricing-dialog"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useZonePricing } from "@/features/platform-config/hooks/use-zone-pricing"
+import { toast } from "@/lib/notify"
 import type { ZonePricing } from "@/lib/types"
 
 /**

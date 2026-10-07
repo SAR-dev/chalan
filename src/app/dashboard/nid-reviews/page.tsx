@@ -3,7 +3,6 @@
 import { CheckCircle2, FileText, XCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellTwoRow,
@@ -20,6 +19,7 @@ import { columnLabels } from "@/config/table-column-labels"
 import { RejectNidDialog } from "@/features/merchants/dialogs/reject-nid-dialog"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import type { Merchant } from "@/lib/types"
 
 type NidFilter = "all" | "pending" | "verified" | "rejected"

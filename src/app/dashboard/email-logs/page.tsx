@@ -9,7 +9,6 @@ import {
   Send,
 } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import {
   CellContent,
   DataTable,
@@ -38,6 +37,7 @@ import {
   EMAIL_LOG_STATUS_TONES,
 } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import type { EmailLogListItem } from "@/lib/types"
 
 type TabFilter = "ALL" | "SENT" | "FAILED"

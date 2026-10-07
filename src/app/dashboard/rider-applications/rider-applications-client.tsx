@@ -2,7 +2,6 @@
 
 import { Bike, CheckCircle2, Clock, Eye, XCircle } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
-import { toast } from "sonner"
 import {
   CellTwoRow,
   DataTable,
@@ -22,6 +21,7 @@ import type { RiderApplication } from "@/features/riders/hooks/use-rider-applica
 import { useRiderApplications } from "@/features/riders/hooks/use-rider-applications"
 import { RIDER_STATUS_LABELS, RIDER_STATUS_TONES } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import type { RiderStatus } from "@/lib/types"
 
 type FilterTab = "ALL" | RiderStatus

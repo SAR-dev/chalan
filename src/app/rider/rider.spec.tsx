@@ -129,6 +129,26 @@ describe("Rider dashboard", () => {
     expect(buttons.length).toBeGreaterThanOrEqual(1)
   })
 
+  it("offers a print-label action on each task row", async () => {
+    mockOrdersState = createMockOrders({
+      orders: [
+        makeOrder({
+          id: "ORD-0001",
+          pickupRiderId: "rider_1",
+          status: "APPROVED",
+        }),
+        makeOrder({
+          id: "ORD-0002",
+          deliveryRiderId: "rider_1",
+          status: "OUT_FOR_DELIVERY",
+        }),
+      ],
+    })
+    await importPage()
+    expect(screen.getByTestId("order-label-ORD-0001")).toBeInTheDocument()
+    expect(screen.getByTestId("order-label-ORD-0002")).toBeInTheDocument()
+  })
+
   it("shows stat cards", async () => {
     mockOrdersState = createMockOrders({
       orders: [

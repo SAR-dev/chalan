@@ -2,7 +2,6 @@
 
 import { Check, X } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellTwoRow,
@@ -16,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RejectRequestDialog } from "@/features/packages/dialogs/reject-request-dialog"
 import { usePackageRequests } from "@/features/packages/hooks/use-package-requests"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import { formatTk } from "@/lib/pricing"
 
 type TabFilter = "PENDING" | "APPROVED" | "REJECTED" | "ALL"

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/select"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
 import { useZoneDeliveryTime } from "@/features/platform-config/hooks/use-zone-delivery-time"
+import { toast } from "@/lib/notify"
 import type { ZoneDeliveryTime } from "@/lib/types"
 
 /**

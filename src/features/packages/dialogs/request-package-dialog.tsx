@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -9,6 +8,7 @@ import {
   type PackageRow,
   usePackages,
 } from "@/features/packages/hooks/use-packages"
+import { toast } from "@/lib/notify"
 import { formatTk } from "@/lib/pricing"
 
 interface Props {

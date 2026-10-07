@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { FormErrors } from "@/components/form-errors"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
@@ -41,6 +40,7 @@ import { ModeratorsCard } from "@/features/merchants/components/moderators-card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { PickupLocationsManager } from "@/features/pickup-locations/components/pickup-locations-manager"
 import { formatDateTime } from "@/lib/format"
+import { toast } from "@/lib/notify"
 import { merchantProfileSchema, validateFormData } from "@/lib/validation"
 
 function formatDate(dateStr: string) {

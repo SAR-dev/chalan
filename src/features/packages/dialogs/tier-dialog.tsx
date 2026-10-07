@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Input } from "@/components/ui/input"
@@ -19,6 +18,7 @@ import {
   usePackages,
 } from "@/features/packages/hooks/use-packages"
 import { PACKAGE_RULE_TYPES } from "@/lib/constants"
+import { toast } from "@/lib/notify"
 import type { PackageRuleType } from "@/lib/types"
 import {
   packageTierUpsertSchema,

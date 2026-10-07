@@ -11,7 +11,6 @@ import {
   Warehouse,
 } from "lucide-react"
 import { useMemo, useState } from "react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -42,6 +41,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { toast } from "@/lib/notify"
 import type { PickupLocation } from "@/lib/types"
 
 interface FormState {

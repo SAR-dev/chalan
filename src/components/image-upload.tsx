@@ -2,9 +2,9 @@
 
 import { ImageIcon, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 import { useRef, useState } from "react"
-import { toast } from "sonner"
 import { ImageZoom } from "@/components/image-zoom"
 import { Button } from "@/components/ui/button"
+import { toast } from "@/lib/notify"
 import type { UploadFolder } from "@/lib/storage/config"
 import { uploadImage } from "@/lib/upload-image"
 import { cn } from "@/lib/utils"

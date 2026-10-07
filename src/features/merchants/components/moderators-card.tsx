@@ -10,7 +10,6 @@ import {
   Users,
 } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,6 +27,7 @@ import {
   useMerchantModerators,
 } from "@/features/merchants/hooks/use-merchant-moderators"
 import { merchantGrantableNavItems } from "@/lib/nav-config"
+import { toast } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 
 const LABEL_BY_HREF = new Map(

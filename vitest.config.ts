@@ -35,6 +35,17 @@ export default defineConfig({
     // at module scope, and unstubbing before each test removes that stub.
     clearMocks: true,
     restoreMocks: true,
+    // Use worker threads instead of child processes. Threads share the same
+    // V8 isolate, so startup is near-instant and coverage instrumentation
+    // (which rewrites every module) does not pay a per-fork penalty. The
+    // default `forks` pool timed out on 2-core CI runners under coverage.
+    //
+    // Cap at 4 workers so the machine is never saturated — on a 2-core
+    // runner this means 2 workers (min(4, cores)); on a dev laptop with 16
+    // cores it means 4, which is enough parallelism to finish the suite in
+    // ~45s while leaving headroom for the OS and coverage I/O.
+    pool: "threads",
+    maxWorkers: 4,
     // Coverage tooling (ROADMAP P3). `pnpm test:coverage` writes a summary +
     // LCOV report; thresholds are enforced there and in CI so coverage cannot
     // silently regress.

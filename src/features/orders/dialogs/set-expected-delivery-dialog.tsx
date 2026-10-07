@@ -2,11 +2,11 @@
 
 import { CalendarDays } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { toast } from "@/lib/notify"
 import { businessDateString } from "@/lib/timezone"
 import type { Order } from "@/lib/types"
 

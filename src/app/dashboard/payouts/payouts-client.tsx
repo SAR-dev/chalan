@@ -10,7 +10,6 @@ import {
   X,
 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
@@ -29,6 +28,7 @@ import { statCardLabels } from "@/config/stat-card-labels"
 import { usePayoutRequestColumns } from "@/features/payouts/components/payout-table-columns"
 import { RejectPayoutDialog } from "@/features/payouts/dialogs/reject-payout-dialog"
 import { usePayouts } from "@/features/payouts/hooks/use-payouts"
+import { toast } from "@/lib/notify"
 import type { PayoutRequest } from "@/lib/types"
 
 type FilterTab = "PENDING" | "APPROVED" | "HISTORY"

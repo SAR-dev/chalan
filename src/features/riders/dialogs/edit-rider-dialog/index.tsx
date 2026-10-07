@@ -2,7 +2,6 @@
 
 import { UserPen } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Input } from "@/components/ui/input"
@@ -17,6 +16,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { toast } from "@/lib/notify"
 import type { RiderTaskType, RiderVehicleType } from "@/lib/types"
 import { riderUpdateSchema, validateFormData } from "@/lib/validation"
 import {

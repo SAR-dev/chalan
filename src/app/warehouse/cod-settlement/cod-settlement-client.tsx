@@ -8,7 +8,6 @@ import {
   Wallet,
 } from "lucide-react"
 import { useMemo, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellContent,
@@ -41,6 +40,7 @@ import {
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { toast } from "@/lib/notify"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 

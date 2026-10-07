@@ -2,7 +2,6 @@
 
 import { UserPlus } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { useTeam } from "@/features/team/hooks/use-team"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import { toast } from "@/lib/notify"
 import type { Role } from "@/lib/types"
 import { teamCreateSchema, validateFormData } from "@/lib/validation"
 

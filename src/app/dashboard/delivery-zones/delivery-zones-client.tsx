@@ -2,7 +2,6 @@
 
 import { MoreHorizontal, Pencil, Plus, ShieldCheck } from "lucide-react"
 import { useMemo, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellContent,
@@ -23,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreateDeliveryZoneDialog } from "@/features/platform-config/dialogs/create-delivery-zone-dialog"
 import { EditDeliveryZoneDialog } from "@/features/platform-config/dialogs/edit-delivery-zone-dialog"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
+import { toast } from "@/lib/notify"
 import type { DeliveryZone } from "@/lib/types"
 
 export function DeliveryZonesPageClient() {

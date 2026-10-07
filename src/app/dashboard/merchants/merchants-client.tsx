@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   CellTwoRow,
@@ -41,6 +40,7 @@ import { columnLabels } from "@/config/table-column-labels"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { AssignPackageDialog } from "@/features/packages/dialogs/assign-package-dialog"
+import { toast } from "@/lib/notify"
 import { formatTk } from "@/lib/pricing"
 import type { Merchant } from "@/lib/types"
 

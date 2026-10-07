@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
 import { FormDialog } from "@/components/form-dialog"
 import { FormErrors } from "@/components/form-errors"
 import { Button } from "@/components/ui/button"
@@ -10,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { usePackages } from "@/features/packages/hooks/use-packages"
+import { toast } from "@/lib/notify"
 import { packageUpsertSchema, validateFormData } from "@/lib/validation"
 
 const EMPTY = { name: "", description: "", price: "", isActive: true }

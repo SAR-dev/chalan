@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
-import { toast } from "sonner"
 import { DataTable, type DataTableColumn } from "@/components/data-table"
 import { PageHeader } from "@/components/page-header"
 import { QuickFilters } from "@/components/quick-filters"
@@ -35,6 +34,7 @@ import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
+import { toast } from "@/lib/notify"
 import { businessPresetRange } from "@/lib/timezone"
 import type { Order } from "@/lib/types"
 
