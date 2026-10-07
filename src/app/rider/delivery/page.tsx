@@ -11,11 +11,16 @@ import { Card, CardContent } from "@/components/ui/card"
 import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
-import { riderParcelColumn } from "@/features/orders/components/order-table-columns"
+import { useMerchants } from "@/features/merchants/hooks/use-merchants"
+import {
+  orderLabelColumn,
+  riderParcelColumn,
+} from "@/features/orders/components/order-table-columns"
 import { DeliveryAttemptDialog } from "@/features/orders/dialogs/delivery-attempt-dialog"
 import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
 import { OutForDeliveryDialog } from "@/features/orders/dialogs/out-for-delivery-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-label-template"
 import { RunSheetCard } from "@/features/riders/components/run-sheet-card"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { formatTk } from "@/lib/pricing"
@@ -54,6 +59,9 @@ export default function RiderDeliveryQueuePage() {
     setDateTo,
     mutate: refresh,
   } = useOrders({ queue: "delivery" })
+  const { merchants } = useMerchants()
+  // The published parcel label, so the rider's print action matches the designer.
+  const { template: labelTemplate } = usePublishedLabelTemplate()
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [startTarget, setStartTarget] = useState<Order | null>(null)
@@ -67,6 +75,9 @@ export default function RiderDeliveryQueuePage() {
 
   // Rows come pre-filtered to this queue by the API (`?queue=delivery`), so the
   // Table and the footer's `total` count the same set.
+
+  const merchantName = (id: string) =>
+    merchants.find((m) => m.id === id)?.businessName ?? "Merchant"
 
   const dateFilterLabel =
     dateFrom || dateTo
@@ -185,6 +196,7 @@ export default function RiderDeliveryQueuePage() {
         )
       },
     },
+    orderLabelColumn(merchantName, labelTemplate),
     {
       id: "actions",
       sticky: true,

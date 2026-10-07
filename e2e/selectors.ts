@@ -165,6 +165,37 @@ export const orders = {
   bulkImportConfirm: "[data-testid='bulk-import-confirm']",
 }
 
+// ─── Quick-print parcel label (R5) ───────────────────────────────────────────
+// The one reusable label action, dropped into the warehouse/rider order tables
+// and the ongoing board cards. One button per order (tagged with the order id);
+// the printed label is portaled to `printRoot` only while the dialog is open.
+export const orderLabel = {
+  button: (id: string) => `[data-testid='order-label-${id}']`,
+  printRoot: "#parcel-label-print",
+}
+
+// ─── Parcel label designer (R5) ──────────────────────────────────────────────
+// The superadmin design/preview/publish screen at /dashboard/label-designer.
+// `blockRowPrefix` is deliberately distinct from the block action buttons
+// (`label-block-up-*`, `-down-*`, `-remove-*`) so a block count does not also
+// count its own controls.
+export const labelDesigner = {
+  name: "[data-testid='label-name']",
+  width: "[data-testid='label-width']",
+  height: "[data-testid='label-height']",
+  saveDraft: "[data-testid='label-save-draft']",
+  publish: "[data-testid='label-publish']",
+  tabDesign: "[data-testid='label-tab-design']",
+  tabPreview: "[data-testid='label-tab-preview']",
+  tabHistory: "[data-testid='label-tab-history']",
+  addBlock: (type: string) => `[data-testid='label-add-${type}']`,
+  textBlock: (index: number) => `[data-testid='label-text-${index}']`,
+  blockRowPrefix: "[data-testid^='label-block-row-']",
+  inlinePreview: "[data-testid='label-preview-inline']",
+  previewRenderer: "[data-testid='label-preview']",
+  versionPrefix: "[data-testid^='label-version-']",
+}
+
 // ─── Order Form ──────────────────────────────────────────────────────────────
 export const orderForm = {
   card: "[data-testid='parcel-card']",
@@ -461,11 +492,25 @@ export const zones = {
   listView: "[data-testid='zone-pricing-list-view']",
 }
 
+// ─── Delivery Zones ──────────────────────────────────────────────────────────
+// The admin management page at /dashboard/delivery-zones. The status tabs and
+// the DataTable search input are the two filters.
+export const deliveryZones = {
+  tabAll: "[data-testid='delivery-zones-tab-ALL']",
+  tabActive: "[data-testid='delivery-zones-tab-ACTIVE']",
+  tabInactive: "[data-testid='delivery-zones-tab-INACTIVE']",
+  search: "[data-testid='table-search-delivery-zones']",
+}
+
 // ─── Delivery Cities ─────────────────────────────────────────────────────────
 // `table`/`addButton` are the admin management page; the `merchant*` selectors
 // are the read-only merchant view at /merchant/delivery-cities.
 export const deliveryCities = {
   addButton: "[data-testid='add-city']",
+  tabAll: "[data-testid='delivery-cities-tab-ALL']",
+  tabActive: "[data-testid='delivery-cities-tab-ACTIVE']",
+  tabInactive: "[data-testid='delivery-cities-tab-INACTIVE']",
+  search: "[data-testid='table-search-delivery-cities']",
   merchantPage: "[data-testid='delivery-cities-page']",
   merchantSearch: "[data-testid='delivery-city-search']",
   merchantZone: (zoneId: string) => `[data-testid='delivery-zone-${zoneId}']`,

@@ -57,6 +57,12 @@ const PUBLIC_ALLOWLIST = new Set<string>([
   "delivery-cities/route.ts",
   "delivery-zones/route.ts",
   "zone-pricing/route.ts",
+  // The published parcel-label template (R5), read by every quick-print
+  // surface for warehouse admins and riders. The block layout carries no
+  // personal data — per-parcel values come from the order at print time — and
+  // the admin designer's draft/published management lives under the
+  // authenticated `admin/label-template` routes instead.
+  "label-template/route.ts",
 ])
 
 function collectRouteFiles(dir: string): string[] {

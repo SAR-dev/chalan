@@ -1,7 +1,11 @@
 import { ImageResponse } from "next/og"
 import { siteConfig } from "@/config/site"
+import {
+  BRAND_ICON_FILL,
+  BRAND_ICON_PATH,
+  BRAND_ICON_VIEWBOX,
+} from "@/icons/SiteIcon"
 
-export const runtime = "edge"
 export const alt = siteConfig.name
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
@@ -29,20 +33,16 @@ export default function OgImage() {
           marginBottom: "40px",
         }}
       >
-        <div
-          style={{
-            width: "72px",
-            height: "72px",
-            borderRadius: "16px",
-            background: "#3b82f6",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "36px",
-          }}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox={BRAND_ICON_VIEWBOX}
+          fill={BRAND_ICON_FILL}
+          width={72}
+          height={72}
+          aria-hidden="true"
         >
-          📦
-        </div>
+          <path fillRule="evenodd" d={BRAND_ICON_PATH} />
+        </svg>
         <span style={{ fontSize: "48px", fontWeight: 700, color: "#f8fafc" }}>
           {siteConfig.name}
         </span>

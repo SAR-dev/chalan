@@ -31,7 +31,7 @@
  * is how any HTML already written by v24 gets dropped.
  */
 
-const VERSION = "v27"
+const VERSION = "v28"
 const SHELL_CACHE = `chalan-shell-${VERSION}`
 const STATIC_CACHE = `chalan-static-${VERSION}`
 

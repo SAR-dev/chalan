@@ -12,12 +12,16 @@ import { pageContent } from "@/config/content"
 import { columnLabels } from "@/config/table-column-labels"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
-import { riderParcelColumn } from "@/features/orders/components/order-table-columns"
+import {
+  orderLabelColumn,
+  riderParcelColumn,
+} from "@/features/orders/components/order-table-columns"
 import { OrderDetailsDialog } from "@/features/orders/dialogs/order-details-dialog"
 import { OutForPickupDialog } from "@/features/orders/dialogs/out-for-pickup-dialog"
 import { PickupConfirmDialog } from "@/features/orders/dialogs/pickup-confirm-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
+import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-label-template"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import type { Order } from "@/lib/types"
 
@@ -58,6 +62,8 @@ export default function RiderPickupQueuePage() {
   } = useOrders({ queue: "pickup" })
   const { merchants } = useMerchants()
   const { pickupLocations } = usePickupLocations()
+  // The published parcel label, so the rider's print action matches the designer.
+  const { template: labelTemplate } = usePublishedLabelTemplate()
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [startPickupOrder, setStartPickupOrder] = useState<Order | null>(null)
@@ -184,6 +190,7 @@ export default function RiderPickupQueuePage() {
         )
       },
     },
+    orderLabelColumn(merchantNameFn, labelTemplate),
     {
       id: "actions",
       sticky: true,

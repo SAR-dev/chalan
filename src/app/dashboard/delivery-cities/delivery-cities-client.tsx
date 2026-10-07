@@ -1,7 +1,7 @@
 "use client"
 
 import { MoreHorizontal, Pencil, Plus, ShieldCheck } from "lucide-react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreateDeliveryCityDialog } from "@/features/platform-config/dialogs/create-delivery-city-dialog"
 import { EditDeliveryCityDialog } from "@/features/platform-config/dialogs/edit-delivery-city-dialog"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
@@ -41,6 +42,22 @@ export function DeliveryCitiesPageClient() {
   const [editing, setEditing] = useState<DeliveryCity | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryCity | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  // Client-side status filter. The hook loads every city (active and inactive),
+  // so the tab narrows the already-loaded list; "All" keeps the old behaviour
+  // of showing everything, which is what an admin expects when landing here.
+  const [statusTab, setStatusTab] = useState<"ALL" | "ACTIVE" | "INACTIVE">(
+    "ALL",
+  )
+
+  const filteredCities = useMemo(
+    () =>
+      statusTab === "ALL"
+        ? cities
+        : cities.filter((c) =>
+            statusTab === "ACTIVE" ? c.isActive : !c.isActive,
+          ),
+    [cities, statusTab],
+  )
 
   function zoneName(id: string) {
     return zones.find((z) => z.id === id)?.name ?? id
@@ -170,8 +187,39 @@ export function DeliveryCitiesPageClient() {
           <DataTable
             pinnedColumns={["name"]}
             id="delivery-cities"
+            searchable
+            searchColumns={["name"]}
+            toolbarLeft={
+              <Tabs
+                value={statusTab}
+                onValueChange={(v) =>
+                  setStatusTab(v as "ALL" | "ACTIVE" | "INACTIVE")
+                }
+              >
+                <TabsList>
+                  <TabsTrigger
+                    value="ALL"
+                    data-testid="delivery-cities-tab-ALL"
+                  >
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="ACTIVE"
+                    data-testid="delivery-cities-tab-ACTIVE"
+                  >
+                    Active
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="INACTIVE"
+                    data-testid="delivery-cities-tab-INACTIVE"
+                  >
+                    Inactive
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            }
             columns={columns}
-            data={cities}
+            data={filteredCities}
             getRowKey={(o) => o.id}
             loading={isLoading || isRefreshing}
             onRefresh={refresh}

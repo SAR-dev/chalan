@@ -262,3 +262,85 @@ export const USER_STATUS_TONES: Record<UserAccountStatus, BadgeTone> = {
   BANNED: "danger",
   INACTIVE: "neutral",
 }
+
+// ---------------------------------------------------------------------------
+// Parcel labels (R5)
+//
+// The label template is a JSON array of typed blocks (see `LabelBlock` in
+// `src/lib/validation.ts`). Every option is an enum or a clamped number — never
+// free pixels — so the designer can compose a label but cannot produce one the
+// renderer can't lay out or a scanner can't read. `LABEL_FIELD_KEYS` is a
+// whitelist of order fields and site-identity values (see `src/config/site.ts`).
+// The one genuinely free-form input is a `text` block, and even it is length-
+// clamped; it is the escape hatch for a sender note or a "fragile" label.
+// ---------------------------------------------------------------------------
+
+/**
+ * Values a `field` block may render — order fields plus the platform's own
+ * identity (brand name, website). Whitelist, never free text.
+ */
+export const LABEL_FIELD_KEYS = [
+  "orderId",
+  "recipientName",
+  "recipientPhone",
+  "recipientAddress",
+  "merchantName",
+  "destinationCity",
+  "weight",
+  "codAmount",
+  "siteName",
+  "siteUrl",
+] as const
+export type LabelFieldKey = (typeof LABEL_FIELD_KEYS)[number]
+
+/** Human labels for the designer's field picker. */
+export const LABEL_FIELD_LABELS: Record<LabelFieldKey, string> = {
+  orderId: "Order reference",
+  recipientName: "Recipient name",
+  recipientPhone: "Recipient phone",
+  recipientAddress: "Delivery address",
+  merchantName: "Merchant",
+  destinationCity: "Destination city",
+  weight: "Weight",
+  codAmount: "COD amount",
+  siteName: "Brand name",
+  siteUrl: "Website URL",
+}
+
+/** Font-size steps a `field` block may use, plus the `bold` toggle. */
+export const LABEL_FONT_SCALES = ["xs", "s", "m", "l", "xl"] as const
+export type LabelFontScale = (typeof LABEL_FONT_SCALES)[number]
+
+/** Block widths the renderer understands. */
+export const LABEL_BLOCK_WIDTHS = ["full", "half"] as const
+export type LabelBlockWidth = (typeof LABEL_BLOCK_WIDTHS)[number]
+
+/** Physical size clamp for the single template, in millimetres. */
+export const LABEL_TEMPLATE_MIN_MM = 20
+export const LABEL_TEMPLATE_MAX_MM = 400
+
+/** Default thermal parcel label — the one template, scaled to other paper. */
+export const LABEL_DEFAULT_WIDTH_MM = 100
+export const LABEL_DEFAULT_HEIGHT_MM = 150
+
+/**
+ * The QR code's minimum printed edge, in millimetres.
+ *
+ * Enforced by the renderer, not the admin: a QR smaller than this is the
+ * failure R9 exists to avoid. `minSizeMm` on a `qr` block may be larger, never
+ * smaller.
+ */
+export const LABEL_QR_MIN_MM = 30
+
+/** Guardrails for a hand-wavy block stack. */
+export const LABEL_MAX_BLOCKS = 40
+export const LABEL_SPACER_MAX_MM = 40
+export const LABEL_NAME_MAX = 80
+
+/** Longest custom text a `text` block may carry, in characters. */
+export const LABEL_TEXT_MAX = 200
+export const LABEL_TEXT_DEFAULT = "Handle with care"
+
+/** Brand-icon (`icon` block) printed height, in millimetres. */
+export const LABEL_ICON_MIN_MM = 4
+export const LABEL_ICON_DEFAULT_MM = 12

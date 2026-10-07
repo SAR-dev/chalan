@@ -5,6 +5,8 @@ import { Client } from "pg"
 import { CREDS, login, waitForAppReady } from "../helpers"
 import {
   auth,
+  deliveryCities,
+  deliveryZones,
   help,
   merchants,
   orderForm,
@@ -111,6 +113,9 @@ test.describe("0105. Zone Pricing Management", () => {
     await page.goto("/dashboard/delivery-zones")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
+    // The status filter and name search are the two controls this page adds.
+    await expect(page.locator(deliveryZones.tabActive)).toBeVisible()
+    await expect(page.locator(deliveryZones.search)).toBeVisible()
 
     await page.goto("/dashboard/zone-pricing")
     await waitForAppReady(page)
@@ -119,6 +124,8 @@ test.describe("0105. Zone Pricing Management", () => {
     await page.goto("/dashboard/delivery-cities")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
+    await expect(page.locator(deliveryCities.tabInactive)).toBeVisible()
+    await expect(page.locator(deliveryCities.search)).toBeVisible()
   })
 })
 

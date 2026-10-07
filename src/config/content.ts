@@ -28,6 +28,9 @@ export const formLabels = {
     // absence of a red asterisk.
     recipientMail: "Recipient email (optional)",
   },
+  // The quick-print action on the order tables and the warehouse board. Placed
+  // here per R1: this is a new user-facing control string, not a page header.
+  printLabel: "Print label",
 } as const
 
 export const pageContent = {
@@ -123,6 +126,11 @@ export const pageContent = {
       title: "Platform settings",
       description:
         "Configure default pricing, SMTP mail settings, and platform-wide parameters.",
+    },
+    labelDesigner: {
+      title: "Label designer",
+      description:
+        "Design the parcel label every warehouse admin and rider prints, preview it against sample data, then publish it as a new version.",
     },
     support: {
       title: "Support tickets",

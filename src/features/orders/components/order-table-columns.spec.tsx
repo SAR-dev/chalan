@@ -3,7 +3,11 @@
 import { render, renderHook, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { makeOrder } from "@/app/__tests__/test-utils"
-import { riderParcelColumn, useOrderColumns } from "./order-table-columns"
+import {
+  orderLabelColumn,
+  riderParcelColumn,
+  useOrderColumns,
+} from "./order-table-columns"
 
 vi.mock("@/features/merchants/hooks/use-merchants", () => ({
   useMerchants: () => ({ merchants: [] }),
@@ -16,6 +20,9 @@ vi.mock("@/features/pickup-locations/hooks/use-pickup-locations", () => ({
 }))
 vi.mock("@/features/platform-config/hooks/use-delivery-cities", () => ({
   useDeliveryCities: () => ({ cities: [] }),
+}))
+vi.mock("@/features/platform-config/hooks/use-label-template", () => ({
+  usePublishedLabelTemplate: () => ({ template: undefined, isLoading: false }),
 }))
 vi.mock("@/features/platform-config/hooks/use-zone-pricing-public", () => ({
   useZonePricingPublic: () => ({ pricing: [] }),
@@ -52,6 +59,14 @@ describe("item type is absent from the shared order lists", () => {
     for (const id of ["order", "weight", "status"]) {
       expect(ids).toContain(id)
     }
+  })
+})
+
+describe("orderLabelColumn", () => {
+  it("renders one print action per order, tagged with the order id", () => {
+    const col = orderLabelColumn((id) => `Merchant ${id}`)
+    render(col.cell?.(makeOrder({ id: "ORD-100042" })))
+    expect(screen.getByTestId("order-label-ORD-100042")).toBeInTheDocument()
   })
 })
 
