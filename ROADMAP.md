@@ -3,11 +3,12 @@
 > Forward-looking only - shipped work lives in git history.
 >
 > **Open work:** R4 Product only. R0-R3 closed earlier, and R5 Polish is
-> closed - see the ledger in git history and the decisions below.
+> closed - see the ledger in git history and the decisions below. Within that
+> band, **R5 (parcel labels) has shipped** and **R9 (QR scanning)** leads next.
 > **SMS has been withdrawn from planning** - see Decisions.
 >
-> **Health:** `pnpm ci:check` green (929 files) · Unit **2446 pass** (2489
-> total, 232 spec files) · coverage **55.3 / 49.75 / 43.79 / 56.2** against
+> **Health:** `pnpm ci:check` green (929 files) · Unit **2455 pass** (2498
+> total, 232 spec files) · coverage **55.4 / 49.69 / 44.02 / 56.29** against
 > floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **152
 > tests / 39 files / 80 scenarios**, run locally only
 > (`pnpm test:e2e`, ~8 min) by decision - CI runs quality · build · security ·
@@ -34,7 +35,7 @@
 
 | Priority | Items | Status |
 |---|---|---|
-| **P1 - High-leverage product work** | R5 · R9 · R2 · R3 | open (R1 decided · R8 shipped) |
+| **P1 - High-leverage product work** | R9 · R2 · R3 | open (R5 shipped · R1 decided · R8 shipped) |
 | **P2 - Later product bets** | R4 · R6 · R7 | open |
 
 ### Dependencies
@@ -42,7 +43,7 @@
 | Item | Hard dependency | Soft constraint |
 |---|---|---|
 | **R1** i18n decision | none | **Decided - deferred** (see Decisions). New user-facing copy in R2 / R3 / R5 / R9 / P2 goes in `src/config/content.ts`, not new inline literals |
-| **R5** Printable parcel labels + QR code, admin label designer | none | label and design-tool copy follow R1's writing rule. **Blocks R9** - the label has to print before anything can scan it, which is why R5 is pulled ahead of R2/R3 |
+| **R5** Printable parcel labels + QR code, admin label designer | none | **shipped** - see git history. Was the blocker for R9; its QR encodes `order.id`, and print is browser `window.print()` only (no PDF) |
 | **R9** Parcel QR-code scanning at pickup + delivery | **R5** | a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
 | **R2** API keys, webhooks, OpenAPI | none | docs page and error copy follow R1's writing rule. `/api/v1/orders` should accept the order's `recipientMail` |
 | **R3** Notifications (in-app, preferences) | none — its R8 prerequisite is **shipped**: `recipientMail` is on the order | copy follows R1's writing rule. Shares R2's event source (`src/features/orders/transitions.ts`) - emit once, fan out to both sinks |
@@ -102,12 +103,11 @@ P1 ahead of R4 on purpose, and now also ahead of R2/R3 - R9 is blocked on it.
 What decides where an item sits is what it blocks and what it costs to land,
 not when it was written down.
 
-**Order:** **R5** first - label generation, printing and the admin label
-designer - because **R9**, parcel QR-code scanning at pickup and delivery,
-cannot start until there is something scannable on the parcel. Then R2 and R3,
-which are independent of each other and can be reordered or run in parallel.
-R1 is already decided (deferred i18n) and needs no turn in the order - it only
-shapes the copy in what follows. R8 used to lead this order; it has shipped and
+**Order:** **R5 has shipped**, so **R9** - parcel QR-code scanning at pickup and
+delivery - leads now; it was blocked on R5 only for something scannable to
+exist. Then R2 and R3, which are independent of each other and can be reordered
+or run in parallel. R1 is already decided (deferred i18n) and needs no turn in
+the order - it only shapes the copy in what follows. R8 and R5 have shipped and
 left the plan.
 
 ### Decisions already made (recorded so they are not re-opened)
@@ -118,6 +118,7 @@ left the plan.
 | **R1 i18n — Bangla ships in a later phase** | Decided, so R1 is no longer open. This is *not* an English-only lock-in: the framework is simply deferred. Until that phase, all new user-facing copy goes through `src/config/content.ts` (page copy) and `src/config/table-column-labels.ts` (table headers) instead of new inline literals — that is where a future `messages/*` catalog starts, and it is the only part of this decision that constrains R2/R3/R5/P2. `lang="en"` at `src/app/layout.tsx:87`, `src/app/global-error.tsx:18` and `src/lib/email/templates.tsx:86` stays as-is; no `next-intl`/`i18next` dependency is added now. |
 | **The label template is platform-wide and singular** | One `label_template` row, platform-wide — never per-merchant, and never one row per paper size. The per-merchant migration stays additive if it is ever needed: a nullable `merchantId` plus a lookup that falls back to the default. Printing on non-thermal paper is a **scale** change on the same template, not a second layout (see next row). |
 | **One label template, scaled to the paper** | The parcel label is a **single** platform-wide template, authored once at the 100×150mm thermal default. Printing on different paper is a **scale** change on that same template (`widthMm`/`heightMm`), not a second layout — the block stack reflows inside whatever size is set. This supersedes the earlier *A4 label sheet (8-up)* decision: the sheet preset, the multi-up "select N orders → render a sheet" flow and the fixed packing slip / invoice are all **withdrawn**, on the owner's call that one template plus a scale knob is enough. The renderer still enforces the **QR code's minimum size and quiet zone** at any scale, so shrinking the label cannot produce an unscannable code; width/height stay clamped 20–400mm. Record **dimensions, never an Avery part number** — L7160/L7163/L7165 disagree across suppliers, so a part code in the schema would be a latent bug. |
+| **No PDF generation path** | The label prints with the browser's `window.print()` only. A PDF generator was considered and dropped: rasterizing (`html2canvas` + `jsPDF`) blurs the QR and breaks R9, so a PDF would need its own vector-emitting renderer to be worth doing - more surface than the need justifies. Quick-print plus reprint from the order detail page cover the "print it again" case without a stored artifact; the block array stays the contract if a PDF path is ever revisited. |
 | **The COD amount prints as small type at the label's foot** | The label is on the *outside* of the box, so a prominent COD figure advertises cash inside and is a theft risk on a doorstep. It renders as an `xs`-scale, toggleable block at the foot — legible to the rider and the recipient for reconciliation, not from arm's length by a bystander. The amount stays authoritative in the app. |
 | **E2E runs locally, not in CI** | `pnpm test:e2e` (152 tests, ~8 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost - do not "helpfully" re-add an `e2e` job. The commented block in `ci.yml:170-217` stays commented; `ci-workflow.spec.ts` still validates its step ordering by stripping comment markers, so re-enabling must keep that order. |
 | **Coverage floors are a floor, not a target** | Raise them as tests land; never lower them to make CI pass. Current measurement sits ~5-6 points above the floors; a drop toward them is a signal, not headroom. |
@@ -131,15 +132,15 @@ left the plan.
 
 # P1 - High-leverage product work
 
-R5 leads: it is the label work R9 is blocked on. R1 was an item in this group
-and is now decided (deferred i18n - see Decisions), so what survives of it is a
-writing rule rather than a build: copy in R2 / R3 / R5 / R9 / P2 goes through
-`config/content.ts`. R8 - recipient email - has shipped and left this group.
+R5 - the label work - has shipped and left this group, unblocking R9. R1 was an
+item in this group and is now decided (deferred i18n - see Decisions), so what
+survives of it is a writing rule rather than a build: copy in R2 / R3 / R9 / P2
+goes through `config/content.ts`. R8 - recipient email - has shipped too.
 
-One dependency remains, and it is the reason for the order: R9 (QR-code
-scanning) cannot start until R5 prints a scannable label. R3's other
-prerequisite - the recipient's address, which its customer emails need - shipped
-with R8, so nothing waits on it any more.
+The one dependency that shaped this order is now satisfied: R9 (QR-code
+scanning) can start because R5 prints a scannable label. R3's prerequisite - the
+recipient's address, which its customer emails need - shipped with R8, so
+nothing waits on it any more.
 
 ### R1 Bangla / i18n - **decided: deferred to a later phase**
 
@@ -167,21 +168,20 @@ future catalog has a single place to start instead of ~500 scattered sites.
 `lang="en"` and the empty framework stay untouched until that phase. Full detail
 is in Decisions above.
 
-### R5 Printable parcel labels and the label designer
+### R5 Printable parcel labels and the label designer — **shipped**
 
-No QR or label-printing code exists today. The rider apply page's
-`rider-apply-print` button is the only print flow in the product. Photo proof of
-delivery exists (`deliveryProofRef`, set by the delivered transition, displayed
-on the public track timeline), but **there is no signature capture** (the old
-claim that `signature` was present was wrong - verified absent 2026-10-04) and
-no scannable parcel label. Merchants need a scannable label; POD is covered, the
-label is not.
+Delivered (source in git history): the `label_template` table and block-array
+model, the shared `<LabelRenderer>` (screen + `@media print`, QR min-size and
+quiet-zone enforced), quick-print from the warehouse/superadmin tables and the
+rider queues, single-label **print + reprint on the order detail page**, and the
+Super-Admin Design / Preview / Publish designer. A built-in default template
+means printing works before an admin publishes anything. The QR encodes
+`order.id`, and print is browser `window.print()` only - no PDF.
 
-**Scope grew, and that is why this moved up the order:** R9 has nothing to scan
-unless R5 prints it, so the QR code ships *as part of* the label rather than as
-a later add-on.
+The detail below is kept as the shipped record because R9's contract builds on
+it; what was planned is now implemented.
 
-**Ship:**
+**Shipped:**
 
 - **Label generation** - a per-order label carrying order reference, merchant,
   destination, recipient name, **recipient phone**, weight, COD amount and a
@@ -317,7 +317,7 @@ overwrite — one insert, and the history survives.
 - **The QR block is not freely scalable** — `minSizeMm` and the quiet zone are
   enforced by the renderer, not by the admin's discretion.
 
-Band **R4 Product** - spec first, then build. **Blocks R9.**
+Band **R4 Product** — shipped; unblocks R9.
 
 ### R9 Parcel QR-code scanning at pickup and delivery
 
@@ -326,8 +326,8 @@ points where taking the wrong parcel is expensive - *starting a pickup* and
 *handing one over as delivered* - the rider should scan the label and have the
 app confirm it is the parcel on screen.
 
-**Hard dependency: R5.** Nothing exists to scan until a labelled QR code
-prints. Do not start this first.
+**Dependency: R5 - now satisfied.** A labelled QR code prints, so this can
+start.
 
 **Ship:**
 
