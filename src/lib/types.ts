@@ -5,6 +5,7 @@ import type {
   deliveryCity,
   deliveryZone,
   emailLog,
+  labelTemplate,
   merchant,
   merchantBalance,
   order,
@@ -223,6 +224,7 @@ export type DeliveryCity = typeof deliveryCity.$inferSelect
 export type DeliveryZone = typeof deliveryZone.$inferSelect
 export type ZonePricing = typeof zonePricing.$inferSelect
 export type ZoneDeliveryTime = typeof zoneDeliveryTime.$inferSelect
+export type LabelTemplate = Loosen<typeof labelTemplate.$inferSelect>
 
 // --- Analytics types ---------------------------------------------------------
 

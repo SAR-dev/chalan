@@ -6,13 +6,13 @@
 > closed - see the ledger in git history and the decisions below.
 > **SMS has been withdrawn from planning** - see Decisions.
 >
-> **Health:** `pnpm ci:check` green (911 files) · Unit **2386 pass** (2429
-> total, 228 spec files) · coverage **55.3 / 49.75 / 43.79 / 56.2** against
-> floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **149
-> tests / 37 files / 78 scenarios**, run locally only
+> **Health:** `pnpm ci:check` green (929 files) · Unit **2446 pass** (2489
+> total, 232 spec files) · coverage **55.3 / 49.75 / 43.79 / 56.2** against
+> floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **152
+> tests / 39 files / 80 scenarios**, run locally only
 > (`pnpm test:e2e`, ~8 min) by decision - CI runs quality · build · security ·
 > coverage · integration jobs and nothing else · `route-auth-guard.spec.ts`
-> enforces server-side auth on all 129 API route files · `pnpm build` green.
+> enforces server-side auth on all 133 API route files · `pnpm build` green.
 >
 > The coverage floors, the spec-file count and the E2E summary in this block are
 > asserted by `src/app/__tests__/docs-drift.spec.ts` and fail when they drift.
@@ -42,8 +42,8 @@
 | Item | Hard dependency | Soft constraint |
 |---|---|---|
 | **R1** i18n decision | none | **Decided - deferred** (see Decisions). New user-facing copy in R2 / R3 / R5 / R9 / P2 goes in `src/config/content.ts`, not new inline literals |
-| **R5** Invoices, printable parcel labels + barcode, admin label designer | none | label, invoice and design-tool copy follow R1's writing rule. **Blocks R9** - the label has to print before anything can scan it, which is why R5 is pulled ahead of R2/R3 |
-| **R9** Parcel barcode scanning at pickup + delivery | **R5** | a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
+| **R5** Printable parcel labels + QR code, admin label designer | none | label and design-tool copy follow R1's writing rule. **Blocks R9** - the label has to print before anything can scan it, which is why R5 is pulled ahead of R2/R3 |
+| **R9** Parcel QR-code scanning at pickup + delivery | **R5** | a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
 | **R2** API keys, webhooks, OpenAPI | none | docs page and error copy follow R1's writing rule. `/api/v1/orders` should accept the order's `recipientMail` |
 | **R3** Notifications (in-app, preferences) | none — its R8 prerequisite is **shipped**: `recipientMail` is on the order | copy follows R1's writing rule. Shares R2's event source (`src/features/orders/transitions.ts`) - emit once, fan out to both sinks |
 | **P2** items (R4 · R6 · R7) | none | copy follows R1's writing rule |
@@ -64,14 +64,14 @@ are closed. The open items and priority groups were renumbered in order of work
 | R2 | Merchant integration surface | R4.3 |
 | R3 | Notification system | R4.1 |
 | R4 | Delivery windows and time slots | R4.6 |
-| R5 | Invoices, printable parcel labels and the label designer | R4.7 |
+| R5 | Printable parcel labels and the label designer | R4.7 |
 | R6 | Promotional and volume-based pricing | R4.8 |
 | R7 | Reporting exports | R4.9 |
 
 Priority groups: P1 (was P3) and P2 (was P4). The old P1 and P2 were closed
 R5 polish work and have no entry, so an old reference to either means that.
 
-R9 is new and has no earlier id: parcel barcode scanning (there was no earlier
+R9 is new and has no earlier id: parcel QR-code scanning (there was no earlier
 scanning item - the old R4.4 SMS was a different thing entirely). R8 was also
 new and has since shipped, so it no longer appears above; its field is
 `recipientMail` on the order.
@@ -103,7 +103,7 @@ What decides where an item sits is what it blocks and what it costs to land,
 not when it was written down.
 
 **Order:** **R5** first - label generation, printing and the admin label
-designer - because **R9**, parcel barcode scanning at pickup and delivery,
+designer - because **R9**, parcel QR-code scanning at pickup and delivery,
 cannot start until there is something scannable on the parcel. Then R2 and R3,
 which are independent of each other and can be reordered or run in parallel.
 R1 is already decided (deferred i18n) and needs no turn in the order - it only
@@ -116,10 +116,10 @@ left the plan.
 |---|---|
 | **SMS is out of scope** | Withdrawn from this roadmap (it was R4.4 in the earlier numbering). The platform sends no SMS and none is planned. The two `SMS` strings at `src/app/track/page.tsx:49` and `:205` are deliberately untouched — line 205 attributes the message to *the merchant* ("the SMS or email your merchant sent"), who may text their own customer outside the platform. Do not "fix" this copy by wiring an SMS provider; that needs a new roadmap item. |
 | **R1 i18n — Bangla ships in a later phase** | Decided, so R1 is no longer open. This is *not* an English-only lock-in: the framework is simply deferred. Until that phase, all new user-facing copy goes through `src/config/content.ts` (page copy) and `src/config/table-column-labels.ts` (table headers) instead of new inline literals — that is where a future `messages/*` catalog starts, and it is the only part of this decision that constrains R2/R3/R5/P2. `lang="en"` at `src/app/layout.tsx:87`, `src/app/global-error.tsx:18` and `src/lib/email/templates.tsx:86` stays as-is; no `next-intl`/`i18next` dependency is added now. |
-| **Label templates are platform-wide, one row per size** | No per-merchant templates and no fallback chain until a merchant actually asks for one — the alternative taxes day one with a merchant picker, precedence rules and a "why is my label different" support load, for zero merchants who have requested it. *Platform-wide does not mean one row:* the thermal label and the A4 sheet are different physical sizes with different layouts, so `label_template` holds **one row per size** and `isDefault` marks the default. The per-merchant migration stays additive — a nullable `merchantId` plus a lookup that falls back to the default. |
-| **The A4 sheet ships one preset; the packing slip keeps a fixed layout** | Sheet stock is a **preset list, never free dimensions** — a free-form width/height lets an admin author labels there is no paper for (the same failure class the font-size enum prevents), and the layout must match a buyable sheet. **Launch preset: 99.1 × 67.7 mm, 2×4, 8-up** — the only common A4 stock with room for a ~35mm QR plus a full address plus the COD line; 99.1 × 38.1 (14-up) crowds the address into two lines and 63.5 × 38.1 (21-up) cannot carry a scannable code with an address at all. Record **dimensions and row/column layout, never an Avery part number** — L7160/L7163/L7165 disagree across suppliers, so a part code in the schema would be a latent bug. Adding stock later is an enum value, not a redesign. The packing slip / invoice is a document rather than a stick-on, so it keeps a fixed A4 layout and stays out of the designer until a merchant asks for it. |
-| **The COD amount prints as small type at the label's foot** | The label is on the *outside* of the box, so a prominent COD figure advertises cash inside and is a theft risk on a doorstep. It renders as an `xs`-scale, toggleable block at the foot — legible to the rider and the recipient for reconciliation, not from arm's length by a bystander. The amount stays authoritative in the app and on the packing slip. |
-| **E2E runs locally, not in CI** | `pnpm test:e2e` (149 tests, ~8 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost - do not "helpfully" re-add an `e2e` job. The commented block in `ci.yml:170-217` stays commented; `ci-workflow.spec.ts` still validates its step ordering by stripping comment markers, so re-enabling must keep that order. |
+| **The label template is platform-wide and singular** | One `label_template` row, platform-wide — never per-merchant, and never one row per paper size. The per-merchant migration stays additive if it is ever needed: a nullable `merchantId` plus a lookup that falls back to the default. Printing on non-thermal paper is a **scale** change on the same template, not a second layout (see next row). |
+| **One label template, scaled to the paper** | The parcel label is a **single** platform-wide template, authored once at the 100×150mm thermal default. Printing on different paper is a **scale** change on that same template (`widthMm`/`heightMm`), not a second layout — the block stack reflows inside whatever size is set. This supersedes the earlier *A4 label sheet (8-up)* decision: the sheet preset, the multi-up "select N orders → render a sheet" flow and the fixed packing slip / invoice are all **withdrawn**, on the owner's call that one template plus a scale knob is enough. The renderer still enforces the **QR code's minimum size and quiet zone** at any scale, so shrinking the label cannot produce an unscannable code; width/height stay clamped 20–400mm. Record **dimensions, never an Avery part number** — L7160/L7163/L7165 disagree across suppliers, so a part code in the schema would be a latent bug. |
+| **The COD amount prints as small type at the label's foot** | The label is on the *outside* of the box, so a prominent COD figure advertises cash inside and is a theft risk on a doorstep. It renders as an `xs`-scale, toggleable block at the foot — legible to the rider and the recipient for reconciliation, not from arm's length by a bystander. The amount stays authoritative in the app. |
+| **E2E runs locally, not in CI** | `pnpm test:e2e` (152 tests, ~8 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost - do not "helpfully" re-add an `e2e` job. The commented block in `ci.yml:170-217` stays commented; `ci-workflow.spec.ts` still validates its step ordering by stripping comment markers, so re-enabling must keep that order. |
 | **Coverage floors are a floor, not a target** | Raise them as tests land; never lower them to make CI pass. Current measurement sits ~5-6 points above the floors; a drop toward them is a signal, not headroom. |
 | **CI is quality, build, security, coverage and integration** | `.github/workflows/` holds `ci.yml` and `deploy.yml` only. Code scanning is not part of the gate - `ci.yml`'s `security` job covers `pnpm audit` plus the advisory dependency review, and nothing more. |
 | **Rows per page is one persisted preference, not a per-table control** | It lives on the user row (capped by `MAX_TABLE_ROWS_PER_PAGE`), is edited in Account Settings, and `DataTable` applies it as every table's default size. A second, unpersisted control in the footer would only have disagreed with the first. Do not add a rows-per-page `<select>` back to `TableFooter`. |
@@ -136,7 +136,7 @@ and is now decided (deferred i18n - see Decisions), so what survives of it is a
 writing rule rather than a build: copy in R2 / R3 / R5 / R9 / P2 goes through
 `config/content.ts`. R8 - recipient email - has shipped and left this group.
 
-One dependency remains, and it is the reason for the order: R9 (barcode
+One dependency remains, and it is the reason for the order: R9 (QR-code
 scanning) cannot start until R5 prints a scannable label. R3's other
 prerequisite - the recipient's address, which its customer emails need - shipped
 with R8, so nothing waits on it any more.
@@ -167,40 +167,42 @@ future catalog has a single place to start instead of ~500 scattered sites.
 `lang="en"` and the empty framework stay untouched until that phase. Full detail
 is in Decisions above.
 
-### R5 Invoices, printable parcel labels and the label designer
+### R5 Printable parcel labels and the label designer
 
-No `invoice` or `barcode` code - the only hits are prose in `src/content/terms.md`
-and the merchant help doc. The rider apply page's `rider-apply-print` button is
-the only print flow in the product. Photo proof of delivery exists
-(`deliveryProofRef`, set by the delivered transition, displayed on the public
-track timeline), but **there is no signature capture** (the old claim that
-`signature` was present was wrong - verified absent 2026-10-04) and no
-scannable parcel label. Merchants need a printable packing slip and a label;
-POD is covered, the label is not.
+No QR or label-printing code exists today. The rider apply page's
+`rider-apply-print` button is the only print flow in the product. Photo proof of
+delivery exists (`deliveryProofRef`, set by the delivered transition, displayed
+on the public track timeline), but **there is no signature capture** (the old
+claim that `signature` was present was wrong - verified absent 2026-10-04) and
+no scannable parcel label. Merchants need a scannable label; POD is covered, the
+label is not.
 
 **Scope grew, and that is why this moved up the order:** R9 has nothing to scan
-unless R5 prints it, so the barcode ships *as part of* the label rather than as
+unless R5 prints it, so the QR code ships *as part of* the label rather than as
 a later add-on.
 
 **Ship:**
 
 - **Label generation** - a per-order label carrying order reference, merchant,
-  destination, recipient name, weight, COD amount and a **barcode**.
+  destination, recipient name, **recipient phone**, weight, COD amount and a
+  **QR code**. The phone is not decoration: on a COD doorstep the rider calls
+  ahead, and an address alone is often not enough to find the recipient.
 - **One durable code per order**, stored on the order row rather than derived at
   print time, so a reprint is still the same parcel (and a code never silently
   changes under a label that is already stuck to a box). R9 defines what it
   encodes and what it must never contain.
-- **Print flows**: three templates — a single thermal label, an A4 label sheet
-  for merchants without a thermal printer, and a packing slip / invoice. See
-  *The three templates* below. 100x150mm thermal is the default. Reprint lives
-  on the order detail page for merchant and warehouse, alongside the existing
-  history view.
+- **One label template, scaled to the paper.** A single thermal layout at
+  100×150mm by default; printing on a different paper is a **scale** change on
+  that same template (its `widthMm`/`heightMm`), not a second layout. See *One
+  template, scaled to the paper* below. Reprint lives on the order detail page
+  for merchant and warehouse, alongside the existing history view.
 - **How it prints - browser print API is fine to start.** Two things to get
   right early, because retrofitting them later means reprinting every parcel:
-  1. **Set the physical page size with CSS `@page`** (`size: 100mm 150mm` for
-     thermal, or the browser quietly rescales to A4). A scaled barcode is a
-     blurry barcode, and a blurry barcode is precisely the failure R9 is built
-     to avoid - the print step is where the scan is won or lost.
+  1. **Set the physical page size with CSS `@page`** to the template's
+     configured dimensions (`size: 100mm 150mm` for the default, or the browser
+     quietly rescales to A4). A scaled QR is a blurry QR, and a QR the camera
+     cannot read is precisely the failure R9 is built to avoid - the print step
+     is where the scan is won or lost.
   2. **Prefer generating a PDF over `window.print()`** where the merchant does
      not need to choose printer settings interactively. A PDF is a
      reprintable artifact rather than a transient dialog, it can be produced
@@ -208,59 +210,38 @@ a later add-on.
      dismiss. `window.print()` stays for the "print now" path.
 - **Admin label designer.** Decisions closed: **platform-wide only** (no
   per-merchant templates and no fallback chain until a merchant actually asks —
-  matching how the rest of `platform-config` works), **one A4 sheet preset at
-  launch with the stock list kept extensible**, **the packing slip keeps a fixed
-  layout and stays out of the designer**, and **the COD amount prints as small
-  type at the foot of the label**, as a toggleable block, never in the main
-  body.
+  matching how the rest of `platform-config` works), **one template, scaled to
+  the paper rather than duplicated per stock**, and **the COD amount prints as
+  small type at the foot of the label**, as a toggleable block, never in the
+  main body.
 
-  *Platform-wide does not mean one row.* The thermal label and the A4 sheet are
-  physically different sizes with different layouts, so `label_template` holds
-  **one row per size** — still platform-wide, never per-merchant — and
-  `isDefault` marks the one the plain *Print* action reaches for.
+  *One row, not one per size.* `label_template` holds exactly one platform-wide
+  row (draft and published versions aside); `isDefault` marks the one the plain
+  *Print* action reaches for.
 
-#### The three templates
+#### One template, scaled to the paper
 
 | Template | Physical size | Contents | Admin-designed? |
 |---|---|---|---|
-| **Parcel label — thermal** | 100×150mm (default) | QR + order id + recipient + merchant + weight + COD at the foot | **yes** |
-| **Parcel label — A4 sheet** | 99.1 × 67.7 mm, 2×4 (**8-up**) | the same content at sheet scale | **yes** (its own layout) |
-| **Packing slip / invoice** | A4, one page | order lines, merchant, totals, order ids | **no** — fixed layout |
+| **Parcel label** | 100×150mm (default) | QR + order id + recipient name + recipient phone + merchant + weight + COD at the foot | **yes** |
 
-**A 100×150mm label does not tile on A4** (210×297 — you get one and a bit), so
-"multi-up" only means anything on a *smaller* stock: 99.1×38.1mm is 16-up,
-105×74mm is 8-up, 63.5×38.1mm is 24-up. The sheet is therefore **not the thermal
-label rescaled** — at 99.1mm the QR has far less room, the address collapses to
-two lines and the COD block may not fit. Sharing one layout across both sizes
-would mean a reflow engine that silently drops content, which is how a label
-gets printed without its barcode.
+The label is a **single** admin-authored template. To print onto different paper
+you change its **scale** — the `widthMm`/`heightMm` on the same template —
+rather than maintain a second, separately laid out sheet; the block stack
+reflows inside whatever size is set.
 
-Three consequences:
+This supersedes the earlier *A4 label sheet (8-up)* decision. The sheet preset,
+the multi-up "select N orders → render a sheet" flow and the fixed packing slip
+/ invoice are all **withdrawn**, on the owner's call that one template plus a
+scale knob is enough. (A 100×150mm label does not tile on A4 anyway — you get
+one and a bit — so the sheet was never this layout at a different `@page` size,
+but maintaining a second layout is not worth it.)
 
-1. **The stock list is a preset, not a free dimension.** The admin picks from a
-   list of buyable sheets. A free-form width/height lets someone author labels
-   there is no paper for — the same failure class the font-size enum prevents.
-   **Launch preset: `99.1 × 67.7 mm`, 2 × 4, 8-up.** It is the only common A4
-   stock with room for a ~35mm QR *and* a full recipient address *and* the COD
-   line without crowding; `99.1 × 38.1` (14-up) is more widely stocked but its
-   38.1mm height forces a dense layout where the address collapses to two lines,
-   and `63.5 × 38.1` (21-up) is simply too small to carry a scannable code and
-   an address together. Adding another stock later is an enum value, not a
-   redesign.
-
-   *Record dimensions + row/column layout, never an Avery part number.* L7160,
-   L7163 and L7165 each map to different dimensions depending on the supplier
-   — verified across four sources that disagreed — so a part code in the schema
-   would be a bug waiting to happen.
-2. **Single-label print and sheet print are different code paths.** A single
-   label is one order onto one page; a sheet is **a batch of *different*
-   orders**, tiled N-up, each tile carrying *its own* order's QR. So the sheet
-   needs a "select N orders → render sheet" entry point (the orders table
-   already has bulk selection) rather than just a different `@page` size.
-3. **The packing slip stays out of the designer.** It is a document, not a
-   stick-on: nobody needs to reposition a packing slip, and folding it in would
-   add a third block model to maintain for no request. Fixed A4 layout, promote
-   it later if a merchant asks.
+**The guardrail that survives:** the renderer still enforces the QR code's
+**minimum size and quiet zone** at any scale, so shrinking the label cannot
+produce an unscannable code. Width/height stay clamped (20–400mm), and
+dimensions — never an Avery part number, which maps to different dimensions per
+supplier — remain the source of truth.
 
 #### How the designer works
 
@@ -270,8 +251,9 @@ truth, and everything else renders it.**
 ```jsonc
 [
   { "type": "logo",     "width": "half" },
-  { "type": "barcode",  "minWidthMm": 30, "caption": true },
+  { "type": "qr",       "minSizeMm": 30, "caption": true },
   { "type": "field",    "field": "recipientName", "scale": "l", "bold": true },
+  { "type": "field",    "field": "recipientPhone", "scale": "m" },
   { "type": "field",    "field": "recipientAddress", "width": "full" },
   { "type": "separator" },
   { "type": "field",    "field": "codAmount", "scale": "xs" },
@@ -282,10 +264,10 @@ truth, and everything else renders it.**
 - **One renderer.** `blocks → <LabelRenderer>` renders on screen (CSS-scaled to
   fit the panel) *and* under `@media print` at the true `@page` size. Same
   component both times, so WYSIWYG is structural rather than aspirational — and
-  it is why the print bullet above matters: the renderer is where the barcode's
+  it is why the print bullet above matters: the renderer is where the QR code's
   minimum size and quiet zone are actually enforced, whatever the admin picked.
 - **Never rasterize a label.** `html2canvas` + `jsPDF` produces a bitmap, which
-  blurs the barcode and breaks R9 outright. A future PDF generator must consume
+  blurs the QR code and breaks R9 outright. A future PDF generator must consume
   the *block array* and emit vector text — the model is the contract, the
   renderer is swappable.
 - **A block list, not a drag-drop canvas.** A delivery label is a vertical
@@ -303,18 +285,18 @@ truth, and everything else renders it.**
 
 ```ts
 { id, name,
-  widthMm, heightMm,                    // clamped 20–400mm — and a *preset* for
-                                        // sheet stock, never a free dimension
+  widthMm, heightMm,                    // the "scale": clamped 20–400mm and
+                                        // applied to the single template
   logoRef: text | null,                 // via src/lib/storage/*
   blocks: jsonb().$type<LabelBlock[]>(),
   version: integer,                     // bumps on publish
   publishedAt: ts | null,               // null = draft
   isDefault: boolean,                   // partial unique index → exactly one
-                                        // default, across the per-size rows
+                                        // default, for the platform
   createdBy, updatedBy, createdAt, updatedAt }
 ```
 
-One row per size, never per merchant — see *The three templates* above.
+One row, never per merchant — see *One template, scaled to the paper* above.
 
 `$type<T>()` is the pattern `announcement.targetRoles` and `bulkCancel.orderIds`
 already use; `LabelBlock` gets a Zod schema in `src/lib/validation.ts` like
@@ -323,26 +305,27 @@ overwrite — one insert, and the history survives.
 
 **Stored config, not code — the rules that make that true:**
 
-- **Field keys are a whitelist** (`recipientName`, `codAmount`, `weight`, …)
-  drawn from what exists on `order`, never free text.
+- **Field keys are a whitelist** (`recipientName`, `recipientPhone`,
+  `recipientAddress`, `codAmount`, `weight`, …) drawn from what exists on
+  `order`, never free text.
 - **React escapes by default; never `dangerouslySetInnerHTML`.**
 - **Font size is an enum** (`xs`–`xl` + bold), not free px — enough to compose a
   label, not enough to produce an unscannable one.
 - **Logo uploads** go through the existing storage abstraction; validate MIME and
   size on the way in.
-- **The barcode block is not freely scalable** — `minWidthMm` and the quiet zone
-  are enforced by the renderer, not by the admin's discretion.
+- **The QR block is not freely scalable** — `minSizeMm` and the quiet zone are
+  enforced by the renderer, not by the admin's discretion.
 
 Band **R4 Product** - spec first, then build. **Blocks R9.**
 
-### R9 Parcel barcode scanning at pickup and delivery
+### R9 Parcel QR-code scanning at pickup and delivery
 
 Riders identify parcels by eye or by typing an order reference. At the two
 points where taking the wrong parcel is expensive - *starting a pickup* and
 *handing one over as delivered* - the rider should scan the label and have the
 app confirm it is the parcel on screen.
 
-**Hard dependency: R5.** Nothing exists to scan until a labelled barcode
+**Hard dependency: R5.** Nothing exists to scan until a labelled QR code
 prints. Do not start this first.
 
 **Ship:**
@@ -356,7 +339,7 @@ prints. Do not start this first.
   implies the label is already in front of you, so `picked-up` is the
   technically consistent choice; if "pickup starts" is meant as the leg
   beginning, the scan has to become a read-back of what was loaded rather than
-  a barcode read. **Settle this in the spec before building.**
+  a QR read. **Settle this in the spec before building.**
   On a match the existing transition proceeds unchanged; on a mismatch it
   refuses and names the parcel that was actually read.
 - **A camera-dead path that always works.** Permission denied, no camera,
@@ -425,6 +408,7 @@ actually offered.
 |---|---|
 | `html5-qrcode` | ships its own scanner UI that would fight ours; its `BarcodeDetector` path is experimental |
 | `@zxing/browser` (pure JS) | slower than the WASM build, for no benefit |
+| `qr-scanner` (nimiq) | same native-first shape, but its fallback decoder is `jsqr-es6` (a JS port of ZXing) — weaker than `zxing-wasm` on glare, blur and creases, which *is* the parcel condition; also ships its own `<video>` / overlay UI, and its npm release is old. Its one edge — no `'wasm-unsafe-eval'` change — is convenience, not capability. Kept `zxing-wasm`; revisit only if relaxing CSP becomes unacceptable |
 | Commercial SDKs (Dynamsoft, Scanbot) | good, and paid for capability this does not need yet |
 | WebHID / WebUSB hardware scanners | right for a warehouse floor, wrong for field riders - revisit only if that appears |
 
@@ -553,7 +537,7 @@ and `earnings` dashboards all exist - they are not exportable.
 | **Auth on every API route** | enforced by `src/app/api/route-auth-guard.spec.ts` over all 129 route files, with a minimal allowlist it also asserts stays minimal (the spec pins a floor of 100, so this count is prose — recount when editing this row) |
 | **E2E selector policy** | `data-testid` first, centralised in `e2e/selectors.ts` |
 | **Docs drift** | `src/app/__tests__/docs-drift.spec.ts`, `ci-workflow.spec.ts`, `compose-cron.spec.ts` already exist - extend them rather than starting new ones |
-| **E2E suite serials** | **scoped to the file**: `<fileNN><index>`, so `2901` is the first scenario in `29-sign-out.spec.ts`. File prefixes run `01`…`37` and are unique, so ids never collide, and deleting a scenario renumbers one file only — there are no retired gaps to preserve any more. `docs-drift.spec.ts` asserts uniqueness, that every serial matches its filename and runs `01…` in sequence, and the suite summary in **both** AGENTS.md (`78 scenarios across 37 files / 149 tests`) and ROADMAP.md (`149 tests / 37 files / 78 scenarios`), plus the coverage floors and ROADMAP's unit spec-file count |
+| **E2E suite serials** | **scoped to the file**: `<fileNN><index>`, so `2901` is the first scenario in `29-sign-out.spec.ts`. File prefixes run `01`…`39` and are unique, so ids never collide, and deleting a scenario renumbers one file only — there are no retired gaps to preserve any more. `docs-drift.spec.ts` asserts uniqueness, that every serial matches its filename and runs `01…` in sequence, and the suite summary in **both** AGENTS.md (`80 scenarios across 39 files / 152 tests`) and ROADMAP.md (`152 tests / 39 files / 80 scenarios`), plus the coverage floors and ROADMAP's unit spec-file count |
 | **Workflow shape** | `ci-workflow.spec.ts` and `deploy-workflow.spec.ts` (both `src/app/__tests__/`) read `ci.yml` / `deploy.yml` and pin job shape, step order and the required env union |
 | **Source-level invariants** | `biome-config.spec.ts`, `p2-polish.spec.ts`, `dockerfile-stages.spec.ts`, `dependency-security.spec.ts` (all in `src/app/__tests__/`) read the source rather than rendering it - structural claims have no other way to fail |
 

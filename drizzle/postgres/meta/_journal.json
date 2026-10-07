@@ -15,6 +15,13 @@
       "when": 1791266382792,
       "tag": "0001_spotty_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791333172902,
+      "tag": "0002_flat_deadpool",
+      "breakpoints": true
     }
   ]
 }

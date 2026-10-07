@@ -7,6 +7,9 @@ import {
   formatError,
   idsSchema,
   isValidBdPhone,
+  labelBlockSchema,
+  labelTemplateCreateSchema,
+  labelTemplateUpdateSchema,
   normalizePhone,
   orderCreateSchema,
   parseBody,
@@ -562,5 +565,124 @@ describe("rider vehicle fields", () => {
       expect(withVehicle.data.vehicleType).toBe("VAN")
       expect(withVehicle.data.vehiclePlate).toBe("BA-11-1111")
     }
+  })
+})
+
+describe("labelBlockSchema", () => {
+  it("applies the QR floor and caption defaults", () => {
+    const result = labelBlockSchema.safeParse({ type: "qr" })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data).toEqual({
+      type: "qr",
+      minSizeMm: 30,
+      caption: true,
+    })
+  })
+
+  it("rejects a QR block below the scannable floor", () => {
+    const result = labelBlockSchema.safeParse({ type: "qr", minSizeMm: 10 })
+    expect(result.success).toBe(false)
+  })
+
+  it("allows a QR block larger than the floor", () => {
+    const result = labelBlockSchema.safeParse({ type: "qr", minSizeMm: 60 })
+    expect(result.success).toBe(true)
+    if (result.success && result.data.type === "qr") {
+      expect(result.data.minSizeMm).toBe(60)
+    }
+  })
+
+  it("applies field block defaults", () => {
+    const result = labelBlockSchema.safeParse({
+      type: "field",
+      field: "recipientPhone",
+    })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data).toEqual({
+      type: "field",
+      field: "recipientPhone",
+      scale: "m",
+      bold: false,
+      width: "full",
+    })
+  })
+
+  it("rejects a field key that is not on the whitelist", () => {
+    const result = labelBlockSchema.safeParse({
+      type: "field",
+      field: "recipientPassword",
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a spacer of zero height", () => {
+    expect(
+      labelBlockSchema.safeParse({ type: "spacer", heightMm: 0 }).success,
+    ).toBe(false)
+  })
+
+  it("rejects an unknown block type", () => {
+    expect(labelBlockSchema.safeParse({ type: "barcode" }).success).toBe(false)
+  })
+})
+
+describe("labelTemplateCreateSchema", () => {
+  const valid = {
+    name: "Thermal parcel label",
+    widthMm: 100,
+    heightMm: 150,
+    blocks: [{ type: "field", field: "orderId" }],
+  }
+
+  it("accepts a minimal valid template", () => {
+    const result = labelTemplateCreateSchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects a width below the 20mm clamp", () => {
+    expect(
+      labelTemplateCreateSchema.safeParse({ ...valid, widthMm: 10 }).success,
+    ).toBe(false)
+  })
+
+  it("rejects a height above the 400mm clamp", () => {
+    expect(
+      labelTemplateCreateSchema.safeParse({ ...valid, heightMm: 401 }).success,
+    ).toBe(false)
+  })
+
+  it("rejects an empty block stack", () => {
+    expect(
+      labelTemplateCreateSchema.safeParse({ ...valid, blocks: [] }).success,
+    ).toBe(false)
+  })
+
+  it("rejects more than the block ceiling", () => {
+    const blocks = Array.from({ length: 41 }, () => ({
+      type: "field" as const,
+      field: "orderId" as const,
+    }))
+    expect(
+      labelTemplateCreateSchema.safeParse({ ...valid, blocks }).success,
+    ).toBe(false)
+  })
+})
+
+describe("labelTemplateUpdateSchema", () => {
+  it("accepts a single-field change", () => {
+    const result = labelTemplateUpdateSchema.safeParse({ widthMm: 120 })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an empty update", () => {
+    expect(labelTemplateUpdateSchema.safeParse({}).success).toBe(false)
+  })
+
+  it("still clamps a changed dimension", () => {
+    expect(labelTemplateUpdateSchema.safeParse({ heightMm: 5 }).success).toBe(
+      false,
+    )
   })
 })

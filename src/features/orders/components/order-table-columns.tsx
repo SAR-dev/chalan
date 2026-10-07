@@ -12,12 +12,15 @@ import { useMerchants } from "@/features/merchants/hooks/use-merchants"
 import { exceedsLaneWeightLimit } from "@/features/orders/lane-weight"
 import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery-cities"
+import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-label-template"
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { formatDateTime } from "@/lib/format"
+import type { LabelTemplateStructure } from "@/lib/label-layout"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
+import { OrderLabelButton } from "./order-label-button"
 import { OrderStatusBadge } from "./order-status-badge"
 
 // ---------------------------------------------------------------------------
@@ -537,6 +540,40 @@ export function settledByColumn(): DataTableColumn<Order> {
 }
 
 // ---------------------------------------------------------------------------
+// Quick-print label action
+// ---------------------------------------------------------------------------
+
+/**
+ * The quick-print label column.
+ *
+ * A standalone right-aligned column rather than an entry in a per-page actions
+ * menu: printing a label is a per-row, no-dialog action a warehouse admin does
+ * for a whole batch, so it stays one click away on every order table. The
+ * merchant name is resolved by the caller, the same way the other columns get
+ * it. `order.id` is the QR payload — see `order-label-button.tsx` for why.
+ */
+export function orderLabelColumn(
+  merchantName: (id: string) => string = () => "",
+  template?: LabelTemplateStructure,
+): DataTableColumn<Order> {
+  return {
+    id: "label",
+    header: "",
+    align: "right",
+    headClassName: "w-12",
+    cell: (o) => (
+      <div className="flex justify-end">
+        <OrderLabelButton
+          order={o}
+          merchantName={merchantName(o.merchantId)}
+          template={template}
+        />
+      </div>
+    ),
+  }
+}
+
+// ---------------------------------------------------------------------------
 // useOrderColumns — convenience hook for dashboard/orders/page.tsx
 // ---------------------------------------------------------------------------
 
@@ -547,6 +584,9 @@ export function useOrderColumns(): DataTableColumn<Order>[] {
   const { warehouses } = useWarehouses()
   const { cities: deliveryCities } = useDeliveryCities()
   const { pricing: zonePricing } = useZonePricingPublic()
+  // The published parcel label, so this table's print action matches the
+  // designer. Falls back to the built-in default when nothing is published.
+  const { template: labelTemplate } = usePublishedLabelTemplate()
 
   // The weight limit is a property of the route, so resolving it needs the
   // same three inputs `resolveRoutePricing` uses server-side.
@@ -636,5 +676,6 @@ export function useOrderColumns(): DataTableColumn<Order>[] {
     statusColumn(),
     pickupRiderColumn(riderNameFn),
     deliveryRiderColumn(riderNameFn),
+    orderLabelColumn(merchantNameFn, labelTemplate),
   ]
 }

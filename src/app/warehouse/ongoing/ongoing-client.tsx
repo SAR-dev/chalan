@@ -22,6 +22,7 @@ import {
   type BoardCity,
   OngoingFilterBar,
 } from "@/features/orders/components/ongoing-filter-bar"
+import { OrderLabelButton } from "@/features/orders/components/order-label-button"
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge"
 import { AssignPickupRiderDialog } from "@/features/orders/dialogs/assign-pickup-rider-dialog"
 import { AutoAssignDialog } from "@/features/orders/dialogs/auto-assign-dialog"
@@ -41,8 +42,10 @@ import {
   NO_ONGOING_FILTERS,
   type OngoingFilters,
 } from "@/features/orders/ongoing-filters"
+import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-label-template"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
+import type { LabelTemplateStructure } from "@/lib/label-layout"
 import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 
@@ -63,14 +66,18 @@ const NO_MATCHES_NOTICE =
  */
 function OrderCard({
   order,
+  merchantName,
   holderName,
+  labelTemplate,
   onOpen,
   onReceive,
   onAssignPickup,
   onDispatch,
 }: {
   order: Order
+  merchantName: string
   holderName: string
+  labelTemplate: LabelTemplateStructure
   onOpen: () => void
   onReceive: () => void
   onAssignPickup: () => void
@@ -127,6 +134,17 @@ function OrderCard({
         </div>
       </dl>
 
+      {/* Always available, whatever the status: a label belongs on the parcel
+          before it moves, and the warehouse admin prints it from the board. */}
+      <OrderLabelButton
+        order={order}
+        merchantName={merchantName}
+        template={labelTemplate}
+        showLabel
+        variant="outline"
+        className="w-full"
+      />
+
       {showsPickupAction && (
         <Button
           size="sm"
@@ -182,6 +200,8 @@ export function WarehouseOngoingPageClient({
   const { currentWarehouse } = useWarehouses()
   const { riders, warehouseDeliveryRiders } = useRiders()
   const { merchants } = useMerchants()
+  // The published parcel label, so the board's print action matches the designer.
+  const { template: labelTemplate } = usePublishedLabelTemplate()
   const [mode, setMode] = useState<GroupMode>("status")
   const [filters, setFilters] = useState<OngoingFilters>(NO_ONGOING_FILTERS)
   const [receiveTarget, setReceiveTarget] = useState<Order | null>(null)
@@ -349,7 +369,9 @@ export function WarehouseOngoingPageClient({
                   <OrderCard
                     key={order.id}
                     order={order}
+                    merchantName={merchantName(order.merchantId)}
                     holderName={holderOf(order)}
+                    labelTemplate={labelTemplate}
                     onOpen={() => setViewOrderCode(order.id)}
                     onReceive={() => setReceiveTarget(order)}
                     onAssignPickup={() => setAssignTarget(order)}

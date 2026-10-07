@@ -247,6 +247,12 @@ export const SUPER_ADMIN_SIDEBAR: SidebarConfig = {
       group: "System",
     },
     {
+      href: "/dashboard/label-designer",
+      label: "Label designer",
+      icon: Tag,
+      group: "System",
+    },
+    {
       href: "/dashboard/account",
       label: "Account",
       icon: UserCog,

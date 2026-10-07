@@ -1,7 +1,7 @@
 "use client"
 
 import { MoreHorizontal, Pencil, Plus, ShieldCheck } from "lucide-react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreateDeliveryZoneDialog } from "@/features/platform-config/dialogs/create-delivery-zone-dialog"
 import { EditDeliveryZoneDialog } from "@/features/platform-config/dialogs/edit-delivery-zone-dialog"
 import { useDeliveryZones } from "@/features/platform-config/hooks/use-delivery-zones"
@@ -37,6 +38,22 @@ export function DeliveryZonesPageClient() {
   const [editing, setEditing] = useState<DeliveryZone | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryZone | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  // Client-side status filter. The hook loads every zone (active and inactive),
+  // so the tab narrows the already-loaded list; "All" keeps the old behaviour
+  // of showing everything, which is what an admin expects when landing here.
+  const [statusTab, setStatusTab] = useState<"ALL" | "ACTIVE" | "INACTIVE">(
+    "ALL",
+  )
+
+  const filteredZones = useMemo(
+    () =>
+      statusTab === "ALL"
+        ? zones
+        : zones.filter((z) =>
+            statusTab === "ACTIVE" ? z.isActive : !z.isActive,
+          ),
+    [zones, statusTab],
+  )
 
   async function handleToggleActive(zone: DeliveryZone) {
     const result = await updateZone(zone.id, { isActive: !zone.isActive })
@@ -139,8 +156,36 @@ export function DeliveryZonesPageClient() {
           <DataTable
             pinnedColumns={["name"]}
             id="delivery-zones"
+            searchable
+            searchColumns={["name"]}
+            toolbarLeft={
+              <Tabs
+                value={statusTab}
+                onValueChange={(v) =>
+                  setStatusTab(v as "ALL" | "ACTIVE" | "INACTIVE")
+                }
+              >
+                <TabsList>
+                  <TabsTrigger value="ALL" data-testid="delivery-zones-tab-ALL">
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="ACTIVE"
+                    data-testid="delivery-zones-tab-ACTIVE"
+                  >
+                    Active
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="INACTIVE"
+                    data-testid="delivery-zones-tab-INACTIVE"
+                  >
+                    Inactive
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            }
             columns={columns}
-            data={zones}
+            data={filteredZones}
             getRowKey={(o) => o.id}
             loading={isLoading || isRefreshing}
             onRefresh={refresh}

@@ -28,6 +28,7 @@ import {
   merchantColumn,
   merchantNoteColumn,
   orderCodeColumn,
+  orderLabelColumn,
   parcelWeightColumn,
   pickupRiderWithPhoneColumn,
   recipientNameColumn,
@@ -37,6 +38,7 @@ import {
 import { ApproveOrderDialog } from "@/features/orders/dialogs/approve-order-dialog"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { useOrders } from "@/features/orders/hooks/use-orders"
+import { usePublishedLabelTemplate } from "@/features/platform-config/hooks/use-label-template"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
@@ -82,6 +84,8 @@ export function WarehouseOrdersPageClient({
   } = useOrders({ initialData, initialTotal, includeAllOrders: true })
   const { merchants } = useMerchants()
   const { riders } = useRiders()
+  // The published parcel label, so this queue's print action matches the designer.
+  const { template: labelTemplate } = usePublishedLabelTemplate()
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
@@ -146,6 +150,7 @@ export function WarehouseOrdersPageClient({
     statusColumn(),
     deliveryRiderWithPhoneColumn(riderName, riderPhone),
     createdAtColumn(),
+    orderLabelColumn(merchantName, labelTemplate),
     {
       id: "actions",
       sticky: true,

@@ -116,6 +116,9 @@ test.describe("0208. Delivery City Management", () => {
     await page.goto("/dashboard/delivery-cities")
     await waitForAppReady(page)
     await expect(page.getByRole("heading").first()).toBeVisible()
+    // Status tabs + name search are the filters this page adds.
+    await expect(page.locator(deliveryCities.tabActive)).toBeVisible()
+    await expect(page.locator(deliveryCities.search)).toBeVisible()
 
     // Click Add City button
     const addBtn = page.locator(deliveryCities.addButton)
