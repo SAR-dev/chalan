@@ -1439,3 +1439,31 @@ suite("recipient email (R8)", () => {
     expect(rows[0].mail).toBe("recipient@example.com")
   })
 })
+
+suite("label template — pdfme only (R5)", () => {
+  it("dropped the `blocks` engine columns for good", async () => {
+    // Asserted against the catalog, not inferred from a passing query: a
+    // leftover `engine` column would let a legacy row back in through a
+    // direct write, which is exactly what the removal is meant to prevent.
+    const { rows } = await client.query<{ column_name: string }>(
+      `SELECT column_name
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'label_template'`,
+    )
+    const cols = rows.map((r) => r.column_name)
+    expect(cols, "label_template.template must exist").toContain("template")
+    expect(cols, "the blocks engine is gone").not.toContain("engine")
+    expect(cols, "the blocks engine is gone").not.toContain("blocks")
+  })
+
+  it("still enforces the single live default", async () => {
+    const { rows } = await client.query<{ indexname: string }>(
+      `SELECT indexname FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename = 'label_template'
+          AND indexname = 'label_template_one_default_uniq'`,
+    )
+    expect(rows).toHaveLength(1)
+  })
+})

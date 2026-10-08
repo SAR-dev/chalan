@@ -43,6 +43,13 @@ export const HELP_GUIDES: HelpGuide[] = [
       "Approve merchants, orders, and payouts; manage warehouses, riders, and zone pricing; settle COD and read audit logs.",
     file: "admin.md",
   },
+  {
+    slug: "api",
+    title: "Merchant API",
+    description:
+      "Programmatic order booking, webhook events, and the OpenAPI spec — keys live at /merchant/settings.",
+    file: "api.md",
+  },
 ]
 
 export function helpGuideFor(slug: string): HelpGuide | undefined {

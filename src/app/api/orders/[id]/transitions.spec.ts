@@ -112,7 +112,8 @@ vi.mock("@/lib/db", () => {
     }
     return chain
   }
-  const db: MockDb = {
+  const db: MockDb & { __isMock: boolean } = {
+    __isMock: true,
     select: () => makeSelectChain(),
     update: () => makeUpdateChain(),
     // Ledger + balance writes (balance_transaction / merchant_balance).

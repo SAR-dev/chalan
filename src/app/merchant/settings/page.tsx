@@ -35,6 +35,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { pageContent } from "@/config/content"
 import { useAuth } from "@/features/account/hooks/use-auth"
+import { ApiKeysCard } from "@/features/integrations/components/api-keys-card"
 import { MerchantStatusBadge } from "@/features/merchants/components/merchant-status-badge"
 import { ModeratorsCard } from "@/features/merchants/components/moderators-card"
 import { useMerchants } from "@/features/merchants/hooks/use-merchants"
@@ -234,6 +235,8 @@ export default function MerchantSettingsPage() {
             <ModeratorsCard merchantId={currentMerchant.id} />
 
             <PickupLocationsManager merchantId={currentMerchant.id} />
+
+            <ApiKeysCard />
           </div>
         </div>
 

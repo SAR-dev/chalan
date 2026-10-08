@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 const SITE = "https://app.example.com"
 
-async function loadIsAllowedOrigin(siteUrl?: string) {
+async function loadIsAllowedOrigin(siteUrl?: string, allowedUrls?: string) {
   vi.resetModules()
   if (siteUrl === undefined) delete process.env.NEXT_PUBLIC_SITE_URL
   else process.env.NEXT_PUBLIC_SITE_URL = siteUrl
+  if (allowedUrls === undefined) delete process.env.BETTER_AUTH_ALLOWED_URLS
+  else process.env.BETTER_AUTH_ALLOWED_URLS = allowedUrls
   return (await import("./csrf")).isAllowedOrigin
 }
 
@@ -15,6 +17,7 @@ function req(url: string, headers: Record<string, string> = {}) {
 
 afterEach(() => {
   delete process.env.NEXT_PUBLIC_SITE_URL
+  delete process.env.BETTER_AUTH_ALLOWED_URLS
 })
 
 describe("isAllowedOrigin", () => {
@@ -106,6 +109,62 @@ describe("isAllowedOrigin", () => {
     const isAllowed = await loadIsAllowedOrigin(SITE)
     expect(
       isAllowed(req("https://app.example.com/api/x", { origin: "not-a-url" })),
+    ).toBe(false)
+  })
+
+  // A second reachable origin (a LAN IP, a preview host) has to work, and
+  // `NEXT_PUBLIC_SITE_URL` is singular — so the operator names the extras in
+  // BETTER_AUTH_ALLOWED_URLS and CSRF has to honour them too.
+  it("also trusts origins named in BETTER_AUTH_ALLOWED_URLS", async () => {
+    const isAllowed = await loadIsAllowedOrigin(
+      SITE,
+      "http://192.168.1.10:3000,http://192.168.1.10:3000/path",
+    )
+    expect(
+      isAllowed(
+        req("http://192.168.1.10:3000/api/x", {
+          origin: "http://192.168.1.10:3000",
+        }),
+      ),
+    ).toBe(true)
+    // A path in the entry must not widen it past the origin.
+    expect(
+      isAllowed(
+        req("http://192.168.1.10:3000/api/x", {
+          origin: "http://192.168.1.10:3000/path",
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it("still rejects an origin that is only in neither list", async () => {
+    const isAllowed = await loadIsAllowedOrigin(
+      SITE,
+      "http://192.168.1.10:3000",
+    )
+    expect(
+      isAllowed(
+        req("http://192.168.1.10:3000/api/x", {
+          origin: "http://evil.example",
+        }),
+      ),
+    ).toBe(false)
+  })
+
+  it("ignores unparseable entries instead of throwing", async () => {
+    const isAllowed = await loadIsAllowedOrigin(
+      SITE,
+      "not-a-url, ,http://ok.test",
+    )
+    expect(
+      isAllowed(
+        req("https://app.example.com/api/x", { origin: "http://ok.test" }),
+      ),
+    ).toBe(true)
+    expect(
+      isAllowed(
+        req("https://app.example.com/api/x", { origin: "http://no.test" }),
+      ),
     ).toBe(false)
   })
 })

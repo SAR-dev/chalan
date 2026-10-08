@@ -1,14 +1,16 @@
 "use client"
 
+import type { Template } from "@pdfme/common"
 import { useCallback } from "react"
 import useSWR from "swr"
 import { useAuth } from "@/features/account/hooks/use-auth"
-import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 import {
-  DEFAULT_LABEL_TEMPLATE,
-  type LabelTemplateStructure,
-} from "@/lib/label-layout"
-import type { LabelBlock } from "@/lib/validation"
+  LABEL_DEFAULT_HEIGHT_MM,
+  LABEL_DEFAULT_WIDTH_MM,
+} from "@/lib/constants"
+import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
+import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
+import type { LabelTemplateStructure } from "@/lib/label-layout"
 import { formatError } from "@/lib/validation"
 
 // =============================================================================
@@ -16,7 +18,7 @@ import { formatError } from "@/lib/validation"
 //
 // Two readers, one source of truth:
 // - `usePublishedLabelTemplate` is what every print surface uses. It reads the
-//   public endpoint and falls back to the built-in `DEFAULT_LABEL_TEMPLATE`
+//   public endpoint and falls back to the built-in `DEFAULT_LABEL_TEMPLATE_PDFME`
 //   before an admin has published anything, so quick-print works from day one.
 // - `useLabelTemplates` is the designer's own reader/writer. It only runs for
 //   Super Admins and owns the draft → publish → history lifecycle.
@@ -32,7 +34,7 @@ export interface LabelTemplateRecord {
   widthMm: number
   heightMm: number
   logoRef: string | null
-  blocks: LabelBlock[]
+  template: Template | null
   version: number
   publishedAt: string | null
   isDefault: boolean
@@ -45,7 +47,7 @@ type PublishedResponse = {
   widthMm: number
   heightMm: number
   logoRef: string | null
-  blocks: LabelBlock[]
+  template: Template | null
   version: number
 } | null
 
@@ -60,10 +62,26 @@ export function usePublishedLabelTemplate(): {
     swrOptions,
   )
 
+  const fallback: LabelTemplateStructure = {
+    widthMm: LABEL_DEFAULT_WIDTH_MM,
+    heightMm: LABEL_DEFAULT_HEIGHT_MM,
+    logoRef: null,
+    template: DEFAULT_LABEL_TEMPLATE_PDFME,
+  }
+
+  // A published row with no `template` is not something the print path can
+  // generate, so it falls back to the built-in default rather than handing a
+  // null into `generateLabelPdf`.
   return {
-    template: data
-      ? { widthMm: data.widthMm, heightMm: data.heightMm, blocks: data.blocks }
-      : DEFAULT_LABEL_TEMPLATE,
+    template:
+      data && data.template
+        ? {
+            widthMm: data.widthMm,
+            heightMm: data.heightMm,
+            logoRef: data.logoRef,
+            template: data.template,
+          }
+        : fallback,
     isLoading,
   }
 }
@@ -73,7 +91,7 @@ export interface LabelTemplateSaveInput {
   widthMm: number
   heightMm: number
   logoRef: string | null
-  blocks: LabelBlock[]
+  template: Template | null
 }
 
 type Result = { ok: boolean; error?: string }

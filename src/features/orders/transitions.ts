@@ -52,6 +52,7 @@ import {
   orderSetExpectedDeliverySchema,
   parseBody,
 } from "@/lib/validation"
+import { emitWebhookEvent, type WebhookEvent } from "@/lib/webhooks"
 
 type Session = NonNullable<Awaited<ReturnType<typeof requireSession>>>
 type OrderRow = typeof order.$inferSelect
@@ -813,6 +814,55 @@ const TRANSITION_LABELS: Record<TransitionName, string> = {
   cancel: "Cancelled",
 }
 
+/**
+ * Which webhook event a transition produces (R2).
+ */
+const TRANSITION_WEBHOOK_EVENT: Partial<Record<TransitionName, WebhookEvent>> =
+  {
+    approve: "order.approved",
+    dispatch: "order.dispatched",
+    "picked-up": "order.picked-up",
+    "out-for-delivery": "order.out-for-delivery",
+    delivered: "order.delivered",
+    failed: "order.failed",
+    return: "order.returned",
+    cancel: "order.cancelled",
+  }
+
+async function emitOrderWebhook(
+  tx: OrderTx,
+  name: TransitionName,
+  before: OrderRow,
+  after: OrderRow,
+  now?: string,
+): Promise<void> {
+  const event = TRANSITION_WEBHOOK_EVENT[name]
+  if (!event) return
+  await emitWebhookEvent({
+    tx,
+    merchantId: after.merchantId,
+    event,
+    orderId: after.id,
+    data: {
+      id: after.id,
+      status: after.status,
+      previousStatus: before.status,
+      trackingToken: after.trackingToken,
+      recipientName: after.recipientName,
+      recipientPhone: after.recipientPhone,
+      deliveryCityId: after.deliveryCityId,
+      parcelWeightKg: after.parcelWeightKg,
+      productCost: after.productCost,
+      deliveryFee: after.deliveryFee,
+      merchantEarnings: after.merchantEarnings,
+      updatedAt:
+        (after.updatedAt as unknown as string) ??
+        now ??
+        new Date().toISOString(),
+    },
+  })
+}
+
 /** Free-text reason a transition carries, stored on its history row. */
 function transitionNote(name: TransitionName, body: unknown): string | null {
   const b = (body ?? {}) as { note?: string; reason?: string }
@@ -1134,6 +1184,8 @@ export async function applyOrderTransition(
       note: transitionNote(name, body),
     })
 
+    await emitOrderWebhook(tx, name, orderRow, updated, ctx.now)
+
     return NextResponse.json(updated)
   })
 
@@ -1310,6 +1362,16 @@ export async function applyBulkOrderTransition(
     await logAuditMany(auditInputs, tx)
     if (historyRows.length > 0) {
       await tx.insert(orderStatusHistory).values(historyRows)
+    }
+
+    for (const row of updated) {
+      await emitOrderWebhook(
+        tx,
+        name,
+        beforeById.get(row.id) ?? row,
+        row,
+        batchNow,
+      )
     }
 
     return NextResponse.json({ ok: true, count: updated.length })
