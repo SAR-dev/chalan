@@ -8,10 +8,9 @@ import { GET, POST } from "./route"
 // Parcel label template routes (R5)
 //
 // Covers the designer's whole write path: create/read/update/discard the
-// working draft, and publish it as an append-only version. The pure block
-// semantics live in `src/lib/label-layout.spec.ts`; these assert the route
-// contract — auth, validation, the draft/published state machine, and that
-// publishing appends rather than overwrites.
+// working draft, and publish it as an append-only version. These assert the
+// route contract — auth, validation, the draft/published state machine, and
+// that publishing appends rather than overwrites.
 // =============================================================================
 
 const sessionState: { value: Record<string, unknown> | null } = { value: null }
@@ -108,17 +107,12 @@ function req(method: string, url: string, body?: unknown): Request {
   })
 }
 
-const validBlocks = [
-  { type: "qr", minSizeMm: 30, caption: true },
-  { type: "field", field: "orderId", scale: "l", bold: true, width: "full" },
-]
-
 const validBody = {
   name: "Default parcel label",
   widthMm: 100,
   heightMm: 150,
   logoRef: null,
-  blocks: validBlocks,
+  template: DEFAULT_LABEL_TEMPLATE_PDFME,
 }
 
 const draftRow = {
@@ -430,8 +424,8 @@ describe("POST /api/admin/label-template/:id/publish", () => {
 })
 
 // =============================================================================
-// pdfme engine (PDF.md §5): engine derivation, server-side template
-// validation, paper size from basePdf, and publish copying the engine.
+// pdfme engine: server-side template validation, paper size from basePdf,
+// and publish copying the template.
 // =============================================================================
 
 /** The default template's paper size (narrowed — BasePdf is a union type). */
@@ -456,8 +450,8 @@ function undersizedQrTemplate(): typeof DEFAULT_LABEL_TEMPLATE_PDFME {
   return t
 }
 
-describe("pdfme engine routes (PDF.md §5)", () => {
-  it("creates an engine 'pdfme' draft without blocks, taking paper size from basePdf", async () => {
+describe("pdfme engine routes", () => {
+  it("creates a draft, taking paper size from basePdf", async () => {
     sessionState.value = admin
     selectQueue.push([]) // no draft exists
     insertResult.push({ id: "lt_pdfme" })
@@ -472,24 +466,10 @@ describe("pdfme engine routes (PDF.md §5)", () => {
     )
     expect(res.status).toBe(201)
     const payload = insertPayloads[0]
-    expect(payload.engine).toBe("pdfme")
     expect(payload.template).toEqual(validPdfmeTemplate())
-    expect(payload.blocks).toEqual([])
     // Rule 7: widthMm/heightMm come from basePdf, never the client values.
     expect(payload.widthMm).toBe(PAPER.width)
     expect(payload.heightMm).toBe(PAPER.height)
-  })
-
-  it("rejects engine 'pdfme' when no template is supplied", async () => {
-    sessionState.value = admin
-    const res = await POST(
-      req("POST", "/api/admin/label-template", {
-        ...validBody,
-        engine: "pdfme",
-      }),
-    )
-    expect(res.status).toBe(400)
-    expect((await res.json()).error).toMatch(/template/i)
   })
 
   it("rejects a template whose QR is under the scannable floor", async () => {
@@ -506,7 +486,7 @@ describe("pdfme engine routes (PDF.md §5)", () => {
     expect((await res.json()).error).toMatch(/invalid pdfme template/i)
   })
 
-  it("still rejects a blocks draft with no blocks", async () => {
+  it("rejects a draft with no template", async () => {
     sessionState.value = admin
     const res = await POST(
       req("POST", "/api/admin/label-template", {
@@ -533,7 +513,6 @@ describe("pdfme engine routes (PDF.md §5)", () => {
     )
     expect(res.status).toBe(200)
     expect(updatePayloads[0]).toMatchObject({
-      engine: "pdfme",
       template: validPdfmeTemplate(),
       widthMm: PAPER.width,
       heightMm: PAPER.height,
@@ -554,27 +533,11 @@ describe("pdfme engine routes (PDF.md §5)", () => {
     expect(updatePayloads).toHaveLength(0)
   })
 
-  it("PATCH rejects engine 'pdfme' on a blocks draft without a template", async () => {
-    sessionState.value = admin
-    selectQueue.push([draftRow])
-
-    const res = await PATCH(
-      req("PATCH", "/api/admin/label-template/lt_draft", {
-        engine: "pdfme",
-      }),
-      { params: Promise.resolve({ id: "lt_draft" }) },
-    )
-    expect(res.status).toBe(400)
-    expect(updatePayloads).toHaveLength(0)
-  })
-
-  it("publish copies engine and template into the appended version", async () => {
+  it("publish copies the template into the appended version", async () => {
     sessionState.value = admin
     const pdfmeDraft = {
       ...draftRow,
-      engine: "pdfme",
       template: validPdfmeTemplate(),
-      blocks: [],
     }
     selectQueue.push([pdfmeDraft])
     selectQueue.push([{ max: 3 }])
@@ -591,7 +554,6 @@ describe("pdfme engine routes (PDF.md §5)", () => {
     )
     expect(res.status).toBe(201)
     expect(insertPayloads[0]).toMatchObject({
-      engine: "pdfme",
       template: validPdfmeTemplate(),
       version: 4,
       isDefault: true,
@@ -603,9 +565,7 @@ describe("pdfme engine routes (PDF.md §5)", () => {
     selectQueue.push([
       {
         ...draftRow,
-        engine: "pdfme",
         template: undersizedQrTemplate(),
-        blocks: [],
       },
     ])
 

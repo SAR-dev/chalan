@@ -57,33 +57,28 @@ export const POST = withErrorHandler(async (req: Request) => {
   const parsed = await parseBody(req, labelTemplateCreateSchema)
   if (parsed.error) return parsed.error
 
-  // Engine derivation (PDF.md §5): a draft is 'pdfme' exactly when it carries a
-  // pdfme template; the template itself is validated here (structure, bounds,
-  // element cap, QR floor) so no row can reach the table that the print path
-  // cannot generate. Paper size is taken from `basePdf`, never the client copy.
+  // The template is validated here (structure, bounds, element cap, QR floor)
+  // so no row can reach the table that the print path cannot generate. Paper
+  // size is taken from `basePdf`, never the client copy.
   const { template } = parsed.data
-  let engine: "blocks" | "pdfme" = "blocks"
-  let widthMm = parsed.data.widthMm
-  let heightMm = parsed.data.heightMm
-  if (parsed.data.engine === "pdfme" || template !== undefined) {
-    if (template === undefined || template === null) {
-      return NextResponse.json(
-        { error: "engine 'pdfme' requires a template" },
-        { status: 400 },
-      )
-    }
-    if (!validatePdfmeTemplate(template)) {
-      return NextResponse.json(
-        { error: "Invalid pdfme template" },
-        { status: 400 },
-      )
-    }
-    engine = "pdfme"
-    widthMm = Number((template as { basePdf: { width: number } }).basePdf.width)
-    heightMm = Number(
-      (template as { basePdf: { height: number } }).basePdf.height,
+  if (template === undefined || template === null) {
+    return NextResponse.json(
+      { error: "A pdfme template is required" },
+      { status: 400 },
     )
   }
+  if (!validatePdfmeTemplate(template)) {
+    return NextResponse.json(
+      { error: "Invalid pdfme template" },
+      { status: 400 },
+    )
+  }
+  const widthMm = Number(
+    (template as { basePdf: { width: number } }).basePdf.width,
+  )
+  const heightMm = Number(
+    (template as { basePdf: { height: number } }).basePdf.height,
+  )
 
   const [existing] = await dbRead
     .select({ id: labelTemplate.id })
@@ -104,9 +99,7 @@ export const POST = withErrorHandler(async (req: Request) => {
       widthMm,
       heightMm,
       logoRef: parsed.data.logoRef ?? null,
-      blocks: parsed.data.blocks ?? [],
-      engine,
-      template: engine === "pdfme" ? template : null,
+      template,
       version: 1,
       publishedAt: null,
       isDefault: false,

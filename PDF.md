@@ -15,7 +15,7 @@ Supersedes the flow-block baseline. Replaces the vertical block stack with a fre
 
 **Change**
 
-| Area | Baseline | New |
+| Area | Baseline (flow blocks) | Now |
 |---|---|---|
 | Layout model | Vertical flow, `full/half` width | Absolute x/y/w/h in mm (free canvas) |
 | Source of truth | `LabelBlock[]` | pdfme `Template` JSON |
@@ -24,31 +24,40 @@ Supersedes the flow-block baseline. Replaces the vertical block stack with a fre
 | Print | Portal + `@page` + `window.print()` | `generate()` → PDF blob → print or download |
 | New elements | — | Code128/other barcodes, lines, rectangles, images |
 
+**Status: shipped.** This section is the design record; the `blocks` engine,
+`<LabelRenderer>`, the print portal and the `engine` column it introduced have
+all been removed — pdfme is the only engine.
+
 **Trade-off to accept.** Preview and print are no longer literally the same code (Viewer vs `generate()`), though pdfme designs them to match. The guarantee becomes "verified on a real printer" (see §9 acceptance checks). The "never translate to points" rule no longer applies internally, but page size is still exact mm.
 
 ---
 
 ## 2) Domain model (DB)
 
-Table `label_template` keeps its shape. Additions:
+Table `label_template`, final shape:
 
 | Field | Type | Notes |
 |---|---|---|
-| `engine` | `text` | `'blocks'` (legacy) or `'pdfme'`. Default `'blocks'` for existing rows; new drafts use `'pdfme'`. |
-| `template` | `jsonb \| null` | pdfme `Template` (`{ basePdf, schemas }`). Required when `engine = 'pdfme'`. |
+| `template` | `jsonb` | pdfme `Template` (`{ basePdf, schemas }`) — the source of truth. Required by the API on create/update and re-validated on publish. |
 
-Existing columns stay: `widthMm`, `heightMm` (denormalized copy of `basePdf.width/height`, always written from the template on save), `logoRef`, `blocks` (legacy, read-only for old rows), `version`, `publishedAt`, `isDefault`, audit fields, and the partial unique index on `isDefault`.
+`widthMm`, `heightMm` (denormalized copy of `basePdf.width/height`, always
+written from the template on save), `logoRef`, `version`, `publishedAt`,
+`isDefault`, audit fields, and the partial unique index on `isDefault` all stay.
 
-**Legacy handling (no data migration).** Published `'blocks'` versions are immutable and reprint correctly with the old renderer, so keep `LabelRenderer` for `engine = 'blocks'` rows only. New publishes are `'pdfme'`. Remove the legacy path later, once old parcels no longer need reprinting.
-
-Migration (Drizzle):
+**The `engine` column, the `blocks` jsonb and the `engine` CHECK constraint are
+dropped** (`drizzle/postgres/0007_*`). With one engine left there is nothing to
+discriminate, and `template` is validated structurally by
+`validatePdfmeTemplate` on every write, so no row can reach the table that the
+print path cannot generate. Rows published under the old engine keep reprinting
+through `DEFAULT_LABEL_TEMPLATE_PDFME` until a pdfme version is published.
 
 ```sql
-ALTER TABLE label_template ADD COLUMN engine text NOT NULL DEFAULT 'blocks';
-ALTER TABLE label_template ADD COLUMN template jsonb;
-ALTER TABLE label_template ADD CONSTRAINT label_template_engine_chk CHECK (engine IN ('blocks','pdfme'));
-ALTER TABLE label_template ADD CONSTRAINT label_template_pdfme_has_template
-  CHECK (engine <> 'pdfme' OR template IS NOT NULL);
+-- applied as the 0007 migration
+ALTER TABLE label_template DROP COLUMN blocks;
+ALTER TABLE label_template DROP COLUMN engine;
+ALTER TABLE label_template DROP CONSTRAINT label_template_engine_chk;
+ALTER TABLE label_template ADD CONSTRAINT label_template_template_present
+  CHECK (template IS NOT NULL);
 ```
 
 ---

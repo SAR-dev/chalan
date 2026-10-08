@@ -7,10 +7,10 @@ import { loadLabelFont } from "@/lib/label/fonts"
 import { labelPlugins } from "@/lib/label/plugins"
 
 // =============================================================================
-// pdfme read-only preview (PDF.md §6) — the Preview tab's pdfme counterpart to
-// the DOM `LabelRenderer`. Renders `template` against sample inputs; external
-// template/input changes are mirrored in via `updateTemplate`/`setInputs`,
-// guarded by JSON equality so an echo can't loop.
+// pdfme read-only preview (PDF.md §6) — the Preview tab's pdfme renderer.
+// Renders `template` against sample inputs; external template/input changes
+// are mirrored in via `updateTemplate`/`setInputs`, guarded by JSON equality
+// so an echo can't loop.
 // =============================================================================
 
 interface PdfmeViewerProps {

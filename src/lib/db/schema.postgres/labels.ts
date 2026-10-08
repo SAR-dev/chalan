@@ -9,17 +9,16 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core"
-import type { LabelBlock } from "@/lib/validation"
 import { ts } from "./helpers"
 
 // =============================================================================
 // Parcel label template (R5)
 //
-// One platform-wide printable parcel label, edited in the admin designer. The
-// label is a vertical stack of typed blocks; `blocks` is the source of truth
-// and the renderer consumes it for both screen and print (and a future vector
-// PDF). It is deliberately a dedicated table rather than a `platform_config`
-// key/value row because the designer needs append-only versions.
+// One platform-wide printable parcel label, edited in the admin designer.
+// The label is a pdfme template; `template` is the source of truth and the
+// pdfme engine renders it for both screen and print. It is deliberately a
+// dedicated table rather than a `platform_config` key/value row because the
+// designer needs append-only versions.
 //
 // There is exactly one *default* row at a time (partial unique index below).
 // Publishing appends a new version rather than overwriting the old one, so a
@@ -41,12 +40,10 @@ export const labelTemplate = pgTable(
     heightMm: integer("heightMm").notNull().default(150),
     // Storage key for an optional logo, managed through `src/lib/storage`.
     logoRef: text("logoRef"),
-    engine: text("engine").notNull().default("blocks"),
+    // The pdfme template — the source of truth for the label. Structurally
+    // gated by `validatePdfmeTemplate` on every write, and re-validated on
+    // publish, so no row reaches the table that the print path cannot generate.
     template: jsonb("template"),
-    blocks: jsonb("blocks")
-      .$type<LabelBlock[]>()
-      .notNull()
-      .default(sql`'[]'::jsonb`),
 
     // Bumped on each publish; drafts keep the version they branched from.
     version: integer("version").notNull().default(1),

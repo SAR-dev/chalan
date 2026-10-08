@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import {
-  LABEL_BLOCK_WIDTHS,
-  LABEL_FIELD_KEYS,
-  LABEL_FONT_SCALES,
-  LABEL_ICON_DEFAULT_MM,
-  LABEL_ICON_MIN_MM,
-  LABEL_MAX_BLOCKS,
   LABEL_NAME_MAX,
-  LABEL_QR_MIN_MM,
-  LABEL_SPACER_MAX_MM,
   LABEL_TEMPLATE_MAX_MM,
   LABEL_TEMPLATE_MIN_MM,
-  LABEL_TEXT_MAX,
   MAX_BULK_ORDERS,
   MAX_TABLE_ROWS_PER_PAGE,
   ORDER_DELIVERY_TYPES,
@@ -932,76 +923,12 @@ export const packageAssignSchema = z.object({
 // ---------------------------------------------------------------------------
 // Parcel labels (R5)
 //
-// The block array is the source of truth for the parcel label and is rendered
-// by one `<LabelRenderer>`, on screen and under `@media print`. Every option is
-// an enum drawn from `src/lib/constants.ts`, so an admin can compose a label
-// but cannot produce one the renderer cannot lay out or a scanner cannot read.
+// The pdfme template is the source of truth for the parcel label and is
+// rendered by the pdfme engine, on screen and in the generated PDF. Every
+// option is validated by `validatePdfmeTemplate` so an admin can compose a
+// label but cannot produce one the engine cannot render or a scanner cannot
+// read.
 // ---------------------------------------------------------------------------
-
-const labelWidthSchema = z.enum(LABEL_BLOCK_WIDTHS)
-
-export const labelBlockSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("logo"),
-    width: labelWidthSchema.default("full"),
-  }),
-  z.object({
-    type: z.literal("qr"),
-    // Never below the scannable floor; the renderer additionally enforces the
-    // quiet zone. A block may ask for a larger code, never a smaller one.
-    minSizeMm: z
-      .number()
-      .min(LABEL_QR_MIN_MM, `QR code must be at least ${LABEL_QR_MIN_MM}mm`)
-      .max(LABEL_TEMPLATE_MAX_MM)
-      .default(LABEL_QR_MIN_MM),
-    caption: z.boolean().default(true),
-  }),
-  z.object({
-    type: z.literal("field"),
-    field: z.enum(LABEL_FIELD_KEYS),
-    scale: z.enum(LABEL_FONT_SCALES).default("m"),
-    bold: z.boolean().default(false),
-    width: labelWidthSchema.default("full"),
-  }),
-  // The one free-form block. Length-clamped so it still fits the sheet; the
-  // renderer wraps and scales it like a field.
-  z.object({
-    type: z.literal("text"),
-    text: z
-      .string()
-      .trim()
-      .min(1, "Custom text cannot be empty")
-      .max(
-        LABEL_TEXT_MAX,
-        `Custom text cannot exceed ${LABEL_TEXT_MAX} characters`,
-      ),
-    scale: z.enum(LABEL_FONT_SCALES).default("m"),
-    bold: z.boolean().default(false),
-    width: labelWidthSchema.default("full"),
-  }),
-  // The platform's own brand mark (`src/config/site.ts` -> `SiteIcon`), so a
-  // label can carry the sender identity without an uploaded logo.
-  z.object({
-    type: z.literal("icon"),
-    heightMm: z
-      .number()
-      .min(LABEL_ICON_MIN_MM)
-      .max(LABEL_SPACER_MAX_MM)
-      .default(LABEL_ICON_DEFAULT_MM),
-    width: labelWidthSchema.default("full"),
-  }),
-  z.object({ type: z.literal("separator") }),
-  z.object({
-    type: z.literal("spacer"),
-    heightMm: z.number().min(1).max(LABEL_SPACER_MAX_MM).default(4),
-  }),
-])
-
-export type LabelBlock = z.infer<typeof labelBlockSchema>
-
-const labelBlocksSchema = z
-  .array(labelBlockSchema)
-  .max(LABEL_MAX_BLOCKS, `A label can have at most ${LABEL_MAX_BLOCKS} blocks`)
 
 const labelDimension = (label: string) =>
   z
@@ -1016,29 +943,18 @@ const labelDimension = (label: string) =>
       `${label} cannot exceed ${LABEL_TEMPLATE_MAX_MM}mm`,
     )
 
-export const labelTemplateCreateSchema = z
-  .object({
-    name: requiredString("Template name").max(
-      LABEL_NAME_MAX,
-      `Template name cannot exceed ${LABEL_NAME_MAX} characters`,
-    ),
-    widthMm: labelDimension("Width"),
-    heightMm: labelDimension("Height"),
-    // Storage key from src/lib/storage/*, or blank/absent for no logo.
-    logoRef: z.string().trim().max(500).nullish(),
-    // The route validates `template` itself (PDF.md §5); the refine below keeps
-    // the structural rule here — a draft is blocks-with-a-stack or pdfme-with-a-
-    // template, never a bare row neither render path understands.
-    blocks: labelBlocksSchema.optional(),
-    engine: z.enum(["blocks", "pdfme"]).optional(),
-    template: z.any().optional(),
-  })
-  .refine(
-    (d) =>
-      d.template !== undefined ||
-      (d.blocks !== undefined && d.blocks.length > 0),
-    { error: "Add at least one block to the label", path: ["blocks"] },
-  )
+export const labelTemplateCreateSchema = z.object({
+  name: requiredString("Template name").max(
+    LABEL_NAME_MAX,
+    `Template name cannot exceed ${LABEL_NAME_MAX} characters`,
+  ),
+  widthMm: labelDimension("Width"),
+  heightMm: labelDimension("Height"),
+  // Storage key from src/lib/storage/*, or blank/absent for no logo.
+  logoRef: z.string().trim().max(500).nullish(),
+  // The pdfme template JSON. The route validates it via `validatePdfmeTemplate`.
+  template: z.any(),
+})
 
 export const labelTemplateUpdateSchema = z
   .object({
@@ -1051,8 +967,6 @@ export const labelTemplateUpdateSchema = z
     widthMm: labelDimension("Width").optional(),
     heightMm: labelDimension("Height").optional(),
     logoRef: z.string().trim().max(500).nullish(),
-    blocks: labelBlocksSchema.optional(),
-    engine: z.enum(["blocks", "pdfme"]).optional(),
     template: z.any().optional(),
   })
   .refine(
@@ -1061,8 +975,6 @@ export const labelTemplateUpdateSchema = z
       d.widthMm !== undefined ||
       d.heightMm !== undefined ||
       d.logoRef !== undefined ||
-      d.blocks !== undefined ||
-      d.engine !== undefined ||
       d.template !== undefined,
     { error: "Provide at least one field to update" },
   )

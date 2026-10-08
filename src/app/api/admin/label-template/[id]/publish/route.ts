@@ -37,21 +37,14 @@ export const POST = withErrorHandler(async (_req: Request, { params }: Ctx) => {
       { status: 409 },
     )
   }
-  // Publishing is the last gate (PDF.md §5): re-validate a pdfme template so a
-  // draft that slipped in before the rules (or via a direct DB write) can never
+  // Publishing is the last gate: re-validate the pdfme template so a draft
+  // that slipped in before the rules (or via a direct DB write) can never
   // become the live label the print path generates from.
-  if (draft.engine === "pdfme") {
-    if (!draft.template || !validatePdfmeTemplate(draft.template as never)) {
-      return NextResponse.json(
-        {
-          error: "The pdfme template is invalid. Fix it in the designer first.",
-        },
-        { status: 400 },
-      )
-    }
-  } else if (!draft.blocks || draft.blocks.length === 0) {
+  if (!draft.template || !validatePdfmeTemplate(draft.template as never)) {
     return NextResponse.json(
-      { error: "The draft has no blocks to publish." },
+      {
+        error: "The pdfme template is invalid. Fix it in the designer first.",
+      },
       { status: 400 },
     )
   }
@@ -78,8 +71,6 @@ export const POST = withErrorHandler(async (_req: Request, { params }: Ctx) => {
         widthMm: draft.widthMm,
         heightMm: draft.heightMm,
         logoRef: draft.logoRef,
-        blocks: draft.blocks,
-        engine: draft.engine,
         template: draft.template,
         version: nextVersion,
         publishedAt: new Date().toISOString(),

@@ -9,7 +9,7 @@
 > **SMS has been withdrawn from planning** - see Decisions.
 >
 > **Health:** `pnpm ci:check` green (953 files) · Unit **2526 pass** (2570
-> total, 239 spec files) · coverage **55.45 / 49.7 / 44.11 / 56.36** against
+> total, 238 spec files) · coverage **55.45 / 49.7 / 44.11 / 56.36** against
 > floors **50 / 45 / 40 / 52** · real-DB integration **43/43** · E2E **152
 > tests / 39 files / 80 scenarios**, run locally only
 > (`pnpm test:e2e`, ~8 min) by decision - CI runs quality · build · security ·
@@ -44,7 +44,7 @@
 | Item | Hard dependency | Soft constraint |
 |---|---|---|
 | **R1** i18n decision | none | **Decided - deferred** (see Decisions). New user-facing copy in R2 / R3 / R5 / R9 / P2 goes in `src/config/content.ts`, not new inline literals |
-| **R5** Printable parcel labels + QR code, admin label designer | none | **shipped** - see git history. Was the blocker for R9; its QR encodes `order.id`, and print runs per engine: `window.print()` for legacy blocks rows, a generated vector PDF for pdfme (PDF.md) |
+| **R5** Printable parcel labels + QR code, admin label designer | none | **shipped** - see git history. Was the blocker for R9; its QR encodes `order.id`, and print generates a vector PDF via pdfme (PDF.md) |
 | **R9** Parcel QR-code scanning at pickup + delivery | **R5** (satisfied) | **built** — a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
 | **R2** API keys, webhooks, OpenAPI | none | docs page and error copy follow R1's writing rule. `/api/v1/orders` should accept the order's `recipientMail` |
 | **R3** Notifications (in-app, preferences) | none — its R8 prerequisite is **shipped**: `recipientMail` is on the order | copy follows R1's writing rule. Shares R2's event source (`src/features/orders/transitions.ts`) - emit once, fan out to both sinks. Toast sounds use howler.js (see Decisions) |
@@ -118,8 +118,8 @@ the copy in what follows. R8 and R5 have shipped and left the plan.
 | **SMS is out of scope** | Withdrawn from this roadmap (it was R4.4 in the earlier numbering). The platform sends no SMS and none is planned. The two `SMS` strings at `src/app/track/page.tsx:49` and `:205` are deliberately untouched — line 205 attributes the message to *the merchant* ("the SMS or email your merchant sent"), who may text their own customer outside the platform. Do not "fix" this copy by wiring an SMS provider; that needs a new roadmap item. |
 | **R1 i18n — Bangla ships in a later phase** | Decided, so R1 is no longer open. This is *not* an English-only lock-in: the framework is simply deferred. Until that phase, all new user-facing copy goes through `src/config/content.ts` (page copy) and `src/config/table-column-labels.ts` (table headers) instead of new inline literals — that is where a future `messages/*` catalog starts, and it is the only part of this decision that constrains R2/R3/R5/P2. `lang="en"` at `src/app/layout.tsx:87`, `src/app/global-error.tsx:18` and `src/lib/email/templates.tsx:86` stays as-is; no `next-intl`/`i18next` dependency is added now. |
 | **The label template is platform-wide and singular** | One `label_template` row, platform-wide — never per-merchant, and never one row per paper size. The per-merchant migration stays additive if it is ever needed: a nullable `merchantId` plus a lookup that falls back to the default. Printing on non-thermal paper is a **scale** change on the same template, not a second layout (see next row). |
-| **One label template, scaled to the paper** | The parcel label is a **single** platform-wide template, authored once at the 100×150mm thermal default. Printing on different paper is a **scale** change on that same template (`widthMm`/`heightMm`), not a second layout — the block stack reflows inside whatever size is set. This supersedes the earlier *A4 label sheet (8-up)* decision: the sheet preset, the multi-up "select N orders → render a sheet" flow and the fixed packing slip / invoice are all **withdrawn**, on the owner's call that one template plus a scale knob is enough. The renderer still enforces the **QR code's minimum size and quiet zone** at any scale, so shrinking the label cannot produce an unscannable code; width/height stay clamped 20–400mm. Record **dimensions, never an Avery part number** — L7160/L7163/L7165 disagree across suppliers, so a part code in the schema would be a latent bug. |
-| **No rasterized PDFs — pdfme emits the vector PDF** | v1 printed with the browser's `window.print()` and the **blocks** engine still does, for the reason the old note recorded: rasterizing (`html2canvas` + `jsPDF`) blurs the QR and breaks R9, so a PDF would only be worth doing with its own vector-emitting renderer. What changed (PDF.md): the **pdfme** engine *is* that renderer — it generates the PDF vectorially from the same template the canvas edits, and `engine` on a published row decides which path runs. Legacy blocks rows keep printing through the old renderer with no migration; quick-print still needs no stored artifact. Rasterization stays banned either way. |
+| **One label template, scaled to the paper** | The parcel label is a **single** platform-wide template, authored once at the 100×150mm thermal default. Printing on different paper is a **scale** change on that same template (`widthMm`/`heightMm`), not a second layout — the elements reflow inside whatever size is set. This supersedes the earlier *A4 label sheet (8-up)* decision: the sheet preset, the multi-up "select N orders → render a sheet" flow and the fixed packing slip / invoice are all **withdrawn**, on the owner's call that one template plus a scale knob is enough. The renderer still enforces the **QR code's minimum size and quiet zone** at any scale, so shrinking the label cannot produce an unscannable code; width/height stay clamped 20–400mm. Record **dimensions, never an Avery part number** — L7160/L7163/L7165 disagree across suppliers, so a part code in the schema would be a latent bug. |
+| **No rasterized PDFs — pdfme emits the vector PDF** | The original v1 shipped the browser's `window.print()` over a DOM block stack, and the objection to a PDF path was that rasterizing (`html2canvas` + `jsPDF`) blurs the QR and breaks R9. pdfme *is* the vector-emitting renderer that objection asked for, so it became the only print path: the `blocks` engine, `<LabelRenderer>`, the print portal and the `engine` column are all **removed** (no migration — the template JSON is the single source of truth). Rasterization stays banned. |
 | **The COD amount prints as small type at the label's foot** | The label is on the *outside* of the box, so a prominent COD figure advertises cash inside and is a theft risk on a doorstep. It renders as an `xs`-scale, toggleable block at the foot — legible to the rider and the recipient for reconciliation, not from arm's length by a bystander. The amount stays authoritative in the app. |
 | **E2E runs locally, not in CI** | `pnpm test:e2e` (152 tests, ~8 min) is run by hand before merge. It is deliberately **not** wired into `.github/workflows/ci.yml` because of runner cost - do not "helpfully" re-add an `e2e` job. The commented block in `ci.yml:170-217` stays commented; `ci-workflow.spec.ts` still validates its step ordering by stripping comment markers, so re-enabling must keep that order. |
 | **Coverage floors are a floor, not a target** | Raise them as tests land; never lower them to make CI pass. Current measurement sits ~5-6 points above the floors; a drop toward them is a signal, not headroom. |
@@ -173,14 +173,12 @@ is in Decisions above.
 
 ### R5 Printable parcel labels and the label designer — **shipped**
 
-Delivered (source in git history): the `label_template` table and block-array
-model, the shared `<LabelRenderer>` (screen + `@media print`, QR min-size and
-quiet-zone enforced), quick-print from the warehouse/superadmin tables and the
-rider queues, single-label **print + reprint on the order detail page**, and the
-Super-Admin Design / Preview / Publish designer. A built-in default template
-means printing works before an admin publishes anything. The QR encodes
-`order.id`. Print runs per engine: `window.print()` for legacy **blocks** rows,
-a generated vector PDF for **pdfme** ones (PDF.md).
+Delivered (source in git history): the `label_template` table, quick-print from
+the warehouse/superadmin tables and the rider queues, single-label **print +
+reprint on the order detail page**, and the Super-Admin Design / Preview /
+Publish designer on the pdfme free canvas. A built-in default template means
+printing works before an admin publishes anything. The QR encodes `order.id`.
+Print generates a vector PDF through pdfme (PDF.md).
 
 The detail below is kept as the shipped record because R9's contract builds on
 it; what was planned is now implemented.
@@ -200,20 +198,17 @@ it; what was planned is now implemented.
   that same template (its `widthMm`/`heightMm`), not a second layout. See *One
   template, scaled to the paper* below. Reprint lives on the order detail page
   for merchant and warehouse, alongside the existing history view.
-- **How it prints - the browser print API for blocks, a vector PDF for pdfme.**
-  Two things to get right early, because retrofitting them later means
-  reprinting every parcel:
-  1. **Set the physical page size with CSS `@page`** to the template's
-     configured dimensions (`size: 100mm 150mm` for the default, or the browser
-     quietly rescales to A4). A scaled QR is a blurry QR, and a QR the camera
-     cannot read is precisely the failure R9 is built to avoid - the print step
-     is where the scan is won or lost.
-  2. **`window.print()` is the shipping path for the blocks engine; pdfme
-     generates the PDF the v1 note said such a path would need.** The v1
-     objection was that a PDF must be vector-emitting to keep the QR crisp (see
-     *Never rasterize a label*) — pdfme is exactly that renderer, so pdfme
-     templates generate a PDF while blocks rows print as before. Quick-print
-     plus reprint from the order detail page still need no stored artifact.
+- **How it prints - one vector PDF from pdfme.** Two things matter, because
+  retrofitting them later means reprinting every parcel:
+  1. **The page size is the template's own dimensions**, taken from `basePdf`
+     on save (never the client's copy). A scaled QR is a blurry QR, and a QR
+     the camera cannot read is precisely the failure R9 is built to avoid - the
+     print step is where the scan is won or lost.
+  2. **pdfme emits the PDF vectorially** from the same template the canvas
+     edits, so the QR stays crisp (see *Never rasterize a label*). The Print
+     button hands that PDF to the browser; a Download button beside it is the
+     fallback when the print dialog is blocked. Quick-print plus reprint from
+     the order detail page still need no stored artifact.
 - **Admin label designer.** Decisions closed: **platform-wide only** (no
   per-merchant templates and no fallback chain until a merchant actually asks —
   matching how the rest of `platform-config` works), **one template, scaled to
@@ -233,8 +228,8 @@ it; what was planned is now implemented.
 
 The label is a **single** admin-authored template. To print onto different paper
 you change its **scale** — the `widthMm`/`heightMm` on the same template —
-rather than maintain a second, separately laid out sheet; the block stack
-reflows inside whatever size is set.
+rather than maintain a second, separately laid out sheet; the elements reflow
+inside whatever size is set.
 
 This supersedes the earlier *A4 label sheet (8-up)* decision. The sheet preset,
 the multi-up "select N orders → render a sheet" flow and the fixed packing slip
@@ -251,42 +246,18 @@ supplier — remain the source of truth.
 
 #### How the designer works
 
-**Today the designer is the pdfme free canvas** (PDF.md): elements are placed
-in millimetres on a WYSIWYG canvas, **Preview** renders through the same pdfme
-generator the print action uses, and saving writes `engine: 'pdfme'` plus the
-`template` JSON. The block editor that shipped first is gone from the UI; the
-blocks model below stays as the shipped record for rows that were published
-under it — they still render through `<LabelRenderer>` and print with
-`window.print()` (no migration), and their history versions are read-only in
-the canvas (Load is disabled for engine `blocks`).
+**The designer is the pdfme free canvas** (PDF.md): elements are placed in
+millimetres on a WYSIWYG canvas, **Preview** renders through the same pdfme
+generator the print action uses, and saving writes the `template` JSON. Every
+version in History is loadable — there is no second engine and no read-only
+version class.
 
-**The block template was a JSON array of typed blocks — that array was the
-legacy source of truth, and everything else rendered it.**
-
-```jsonc
-[
-  { "type": "logo",     "width": "half" },
-  { "type": "qr",       "minSizeMm": 30, "caption": true },
-  { "type": "field",    "field": "recipientName", "scale": "l", "bold": true },
-  { "type": "field",    "field": "recipientPhone", "scale": "m" },
-  { "type": "field",    "field": "recipientAddress", "width": "full" },
-  { "type": "separator" },
-  { "type": "field",    "field": "codAmount", "scale": "xs" },
-  { "type": "spacer",   "heightMm": 4 }
-]
-```
-
-- **One renderer (blocks engine).** `blocks → <LabelRenderer>` renders on screen
-  (CSS-scaled to fit the panel) *and* under `@media print` at the true `@page`
-  size. Same component both times, so WYSIWYG is structural rather than
-  aspirational — and it is why the print bullet above matters: the renderer is
-  where the QR code's minimum size and quiet zone are actually enforced,
-  whatever the admin picked.
+- **One renderer.** pdfme renders the label on screen (`Viewer`) and generates
+  the PDF (`@pdfme/generator`) from the identical template, so the preview is
+  the print output rather than an approximation of it.
 - **Never rasterize a label.** `html2canvas` + `jsPDF` produces a bitmap, which
-  blurs the QR code and breaks R9 outright. The blocks label prints from the
-  live block array (HTML/CSS) so the QR stays vector-crisp; pdfme emits vector
-  PDFs for the same reason. The model is the contract, the renderer is
-  swappable.
+  blurs the QR code and breaks R9 outright. pdfme emits vectors for that
+  reason. The model is the contract, the renderer is swappable.
 - **Superseded — the designer is a canvas now.** The original call was *a block
   list, not a drag-drop canvas*: a delivery label is a vertical stack, and a
   hand-rolled absolute-positioning editor means collision handling,
@@ -309,9 +280,7 @@ legacy source of truth, and everything else rendered it.**
   widthMm, heightMm,                    // the "scale": clamped 20–400mm and
                                         // applied to the single template
   logoRef: text | null,                 // via src/lib/storage/*
-  blocks: jsonb().$type<LabelBlock[]>(),// legacy engine: the block stack
-  engine: enum('blocks','pdfme'),       // which renderer prints the row
-  template: jsonb().$type<Template>(),  // pdfme engine: the canvas template
+  template: jsonb().$type<Template>(),  // the canvas template — the source of truth
   version: integer,                     // bumps on publish
   publishedAt: ts | null,               // null = draft
   isDefault: boolean,                   // partial unique index → exactly one
@@ -322,9 +291,10 @@ legacy source of truth, and everything else rendered it.**
 One row, never per merchant — see *One template, scaled to the paper* above.
 
 `$type<T>()` is the pattern `announcement.targetRoles` and `bulkCancel.orderIds`
-already use; `LabelBlock` gets a Zod schema in `src/lib/validation.ts` like
-every other payload. Revisions are **append a row per publish**, not an
-overwrite — one insert, and the history survives.
+already use; the template is structurally gated by `validatePdfmeTemplate`
+(`src/lib/label/template-schema-guard.ts`) on every create, update and publish —
+the one gate a row must pass to become the live label. Revisions are **append a
+row per publish**, not an overwrite — one insert, and the history survives.
 
 **Stored config, not code — the rules that make that true:**
 
@@ -332,12 +302,11 @@ overwrite — one insert, and the history survives.
   `recipientAddress`, `codAmount`, `weight`, …) drawn from what exists on
   `order`, never free text.
 - **React escapes by default; never `dangerouslySetInnerHTML`.**
-- **Font size is an enum** (`xs`–`xl` + bold), not free px — enough to compose a
-  label, not enough to produce an unscannable one.
 - **Logo uploads** go through the existing storage abstraction; validate MIME and
   size on the way in.
-- **The QR block is not freely scalable** — `minSizeMm` and the quiet zone are
-  enforced by the renderer, not by the admin's discretion.
+- **The QR is not freely scalable** — the server-side guard rejects any
+  template whose QR falls under the floor or is not square, and `generateLabelPdf`
+  clamps again at print time, so no scale knob can produce an unscannable code.
 
 Band **R4 Product** — shipped; unblocks R9.
 

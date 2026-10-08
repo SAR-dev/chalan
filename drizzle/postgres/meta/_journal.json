@@ -50,6 +50,13 @@
       "when": 1791418505627,
       "tag": "0006_awesome_doctor_octopus",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791459458146,
+      "tag": "0007_exotic_blackheart",
+      "breakpoints": true
     }
   ]
 }

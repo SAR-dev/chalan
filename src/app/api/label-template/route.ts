@@ -8,10 +8,10 @@ import { withErrorHandler } from "@/lib/with-error-handler"
  * The published parcel-label template (R5), read by every print surface.
  *
  * Deliberately unauthenticated: the quick-print action runs for warehouse
- * admins and riders, and a label's block layout carries no personal data (the
+ * admins and riders, and a label's template carries no personal data (the
  * per-parcel values arrive from the order at print time). Returns `null` when
  * no template has been published yet, which the client renders as the built-in
- * `DEFAULT_LABEL_TEMPLATE`.
+ * `DEFAULT_LABEL_TEMPLATE_PDFME`.
  */
 export const GET = withErrorHandler(async () => {
   const [published] = await dbRead
@@ -20,8 +20,6 @@ export const GET = withErrorHandler(async () => {
       widthMm: labelTemplate.widthMm,
       heightMm: labelTemplate.heightMm,
       logoRef: labelTemplate.logoRef,
-      blocks: labelTemplate.blocks,
-      engine: labelTemplate.engine,
       template: labelTemplate.template,
       version: labelTemplate.version,
     })

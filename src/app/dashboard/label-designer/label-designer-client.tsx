@@ -25,11 +25,16 @@ import {
   type LabelTemplateSaveInput,
   useLabelTemplates,
 } from "@/features/platform-config/hooks/use-label-template"
-import { LABEL_TEMPLATE_MAX_MM, LABEL_TEMPLATE_MIN_MM } from "@/lib/constants"
+import {
+  LABEL_DEFAULT_HEIGHT_MM,
+  LABEL_DEFAULT_WIDTH_MM,
+  LABEL_TEMPLATE_MAX_MM,
+  LABEL_TEMPLATE_MIN_MM,
+} from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
 import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
 import { buildLabelInputs } from "@/lib/label/label-inputs"
-import { DEFAULT_LABEL_TEMPLATE, SAMPLE_LABEL_DATA } from "@/lib/label-layout"
+import { SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 import { toast } from "@/lib/notify"
 
 // The pdfme canvas/preview are heavy (pdfium, font machinery): load them as
@@ -67,9 +72,7 @@ const PREVIEW_DATA = {
 //
 // Saving writes a draft; publishing appends a new immutable version. The live
 // print path reads the newest published version, falling back to the built-in
-// default until one exists. Rows stored under the legacy 'blocks' engine still
-// *print* through the old renderer (no migration), but they edit read-only
-// here — Load is disabled for them; saving switches the draft to pdfme.
+// default until one exists.
 // =============================================================================
 
 type DesignerTab = "design" | "preview" | "history"
@@ -83,15 +86,13 @@ function formFrom(
         widthMm: number
         heightMm: number
         logoRef: string | null
-        blocks: LabelTemplateSaveInput["blocks"]
-        engine?: "blocks" | "pdfme"
         template?: LabelTemplateSaveInput["template"]
       }
     | null
     | undefined,
 ): LabelTemplateSaveInput {
   // A pdfme draft/version round-trips as-is; its paper size comes from basePdf.
-  if (source?.engine === "pdfme" && source.template) {
+  if (source?.template) {
     const bp = source.template.basePdf
     const widthMm =
       typeof bp === "object" && "width" in bp ? bp.width : source.widthMm
@@ -102,31 +103,22 @@ function formFrom(
       widthMm,
       heightMm,
       logoRef: source.logoRef,
-      blocks: source.blocks,
-      engine: "pdfme",
       template: source.template,
     }
   }
-  // The canvas *is* the editor. Seed from the built-in pdfme label — also
-  // over a legacy blocks draft/published row, which cannot be edited on the
-  // canvas — keeping the row's name, logo and its blocks array as the legacy
-  // copy that survives the engine switch on save.
+  // The canvas *is* the editor. Seed from the built-in pdfme label.
   const bp = DEFAULT_LABEL_TEMPLATE_PDFME.basePdf
   const widthMm =
-    typeof bp === "object" && "width" in bp
-      ? bp.width
-      : DEFAULT_LABEL_TEMPLATE.widthMm
+    typeof bp === "object" && "width" in bp ? bp.width : LABEL_DEFAULT_WIDTH_MM
   const heightMm =
     typeof bp === "object" && "height" in bp
       ? bp.height
-      : DEFAULT_LABEL_TEMPLATE.heightMm
+      : LABEL_DEFAULT_HEIGHT_MM
   return {
     name: source?.name ?? DEFAULT_NAME,
     widthMm,
     heightMm,
     logoRef: source?.logoRef ?? null,
-    blocks: source?.blocks ?? DEFAULT_LABEL_TEMPLATE.blocks,
-    engine: "pdfme",
     template: DEFAULT_LABEL_TEMPLATE_PDFME,
   }
 }
@@ -154,7 +146,6 @@ export function LabelDesignerPageClient() {
   // role is known, and seeding then would overwrite a saved draft with the
   // built-in default. After the first seed the editor is the source of truth
   // until reload, so a background revalidation never yanks typed edits away.
-  // formFrom always yields a pdfme form — the canvas is the only editor.
   const seedReady = currentUser?.role === "SUPER_ADMIN" && !isLoading
 
   useEffect(() => {
@@ -187,7 +178,6 @@ export function LabelDesignerPageClient() {
       const bp = next.basePdf
       return {
         ...current,
-        engine: "pdfme",
         template: next,
         widthMm:
           typeof bp === "object" && "width" in bp ? bp.width : current.widthMm,
@@ -465,12 +455,6 @@ export function LabelDesignerPageClient() {
                           variant="outline"
                           size="sm"
                           data-testid={`label-version-load-${version.version}`}
-                          disabled={version.engine !== "pdfme"}
-                          title={
-                            version.engine !== "pdfme"
-                              ? "Legacy block versions are read-only in the pdfme editor."
-                              : undefined
-                          }
                           onClick={() => {
                             setForm(formFrom(version))
                             setTab("design")

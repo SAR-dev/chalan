@@ -80,24 +80,37 @@ test.describe("3901. Label designer", () => {
     const saved = await saveRequest
     const payload = saved.postDataJSON() as {
       name: string
-      engine: string
       template: { schemas: Array<Array<{ name: string }>> }
     }
     expect(payload.name).toBe("Canvas parcel label")
-    expect(payload.engine).toBe("pdfme")
+    // pdfme is the only engine, so the save carries the canvas template and
+    // nothing else — there is no `engine` field to assert on.
+    expect(payload).not.toHaveProperty("engine")
+    expect(payload).not.toHaveProperty("blocks")
     expect(payload.template.schemas[0].map((s) => s.name)).toContain("siteName")
     await expect(toast(page, /Published/)).toBeVisible({ timeout: 15_000 })
 
-    // The published version is now the live one in history — and, being a
-    // pdfme row, it loads back into the canvas.
+    // The published version is now the live one in history, and every version
+    // loads back into the canvas — there is no read-only version class.
+    //
+    // The version number is read from the history list rather than hardcoded:
+    // publishing appends `max(version) + 1` and the *draft* already holds
+    // version 1, so the first live row is v2, not v1.
     await page.locator(labelDesigner.tabHistory).click()
-    const row = page.locator(labelDesigner.versionRow(1))
+    const row = page.locator("[data-testid^='label-version-']").first()
     await expect(row).toBeVisible()
     await expect(row).toContainText("Canvas parcel label")
     await expect(row).toContainText("Live")
-    const load = page.locator(labelDesigner.loadVersion(1))
+    const version = ((await row.getAttribute("data-testid")) ?? "").replace(
+      "label-version-",
+      "",
+    )
+    expect(version).toMatch(/^\d+$/)
+    expect(Number(version)).toBeGreaterThan(1)
+
+    const load = page.locator(labelDesigner.loadVersion(Number(version)))
     await expect(load).toBeEnabled()
     await load.click()
-    await expect(toast(page, /Loaded v1/)).toBeVisible()
+    await expect(toast(page, new RegExp(`Loaded v${version}`))).toBeVisible()
   })
 })

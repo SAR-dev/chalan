@@ -167,11 +167,12 @@ export const orders = {
 
 // ─── Quick-print parcel label (R5) ───────────────────────────────────────────
 // The one reusable label action, dropped into the warehouse/rider order tables
-// and the ongoing board cards. One button per order (tagged with the order id);
-// the printed label is portaled to `printRoot` only while the dialog is open.
+// and the ongoing board cards. One Print button per order (tagged with the
+// order id) plus a sibling Download button; the pdfme engine emits a vector
+// PDF, so nothing is portaled into the DOM to assert on.
 export const orderLabel = {
   button: (id: string) => `[data-testid='order-label-${id}']`,
-  printRoot: "#parcel-label-print",
+  download: (id: string) => `[data-testid='order-label-download-${id}']`,
 }
 
 // ─── Parcel label designer (R5) ──────────────────────────────────────────────

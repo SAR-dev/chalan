@@ -55,10 +55,7 @@ export const PATCH = withErrorHandler(async (req: Request, { params }: Ctx) => {
   const parsed = await parseBody(req, labelTemplateUpdateSchema)
   if (parsed.error) return parsed.error
 
-  // Same engine rules as create: a supplied template is validated and its
-  // `basePdf` becomes the paper size (PDF.md §5 rule 7); an explicit
-  // `engine: 'pdfme'` without a template is rejected before the DB check can.
-  let engineSet: "blocks" | "pdfme" | null = null
+  // A supplied template is validated and its `basePdf` becomes the paper size.
   let templateSet: unknown
   let widthMmSet: number | undefined
   let heightMmSet: number | undefined
@@ -79,31 +76,12 @@ export const PATCH = withErrorHandler(async (req: Request, { params }: Ctx) => {
         { status: 400 },
       )
     }
-    engineSet = "pdfme"
     templateSet = template
     widthMmSet = Number(
       (template as { basePdf: { width: number } }).basePdf.width,
     )
     heightMmSet = Number(
       (template as { basePdf: { height: number } }).basePdf.height,
-    )
-  } else if (parsed.data.engine === "pdfme" && existing.engine !== "pdfme") {
-    return NextResponse.json(
-      { error: "engine 'pdfme' requires a template" },
-      { status: 400 },
-    )
-  }
-  // A legacy (blocks) draft can never have its stack emptied — the renderer
-  // would have nothing to draw. Pdfme drafts keep `blocks` as a read-only copy.
-  if (
-    parsed.data.blocks !== undefined &&
-    parsed.data.blocks.length === 0 &&
-    templateSet === undefined &&
-    existing.engine !== "pdfme"
-  ) {
-    return NextResponse.json(
-      { error: "Add at least one block to the label" },
-      { status: 400 },
     )
   }
 
@@ -126,10 +104,6 @@ export const PATCH = withErrorHandler(async (req: Request, { params }: Ctx) => {
       ...(parsed.data.logoRef !== undefined
         ? { logoRef: parsed.data.logoRef ?? null }
         : {}),
-      ...(parsed.data.blocks !== undefined
-        ? { blocks: parsed.data.blocks }
-        : {}),
-      ...(engineSet !== null ? { engine: engineSet } : {}),
       ...(templateSet !== undefined ? { template: templateSet } : {}),
       updatedAt: new Date().toISOString(),
     })
