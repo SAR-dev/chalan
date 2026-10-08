@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
-import { LABEL_ICON_DEFAULT_MM } from "@/lib/constants"
 import { merchant } from "@/lib/db/schema"
 import {
   deliveryCityCreateSchema,
@@ -8,7 +7,6 @@ import {
   formatError,
   idsSchema,
   isValidBdPhone,
-  labelBlockSchema,
   labelTemplateCreateSchema,
   labelTemplateUpdateSchema,
   normalizePhone,
@@ -569,116 +567,12 @@ describe("rider vehicle fields", () => {
   })
 })
 
-describe("labelBlockSchema", () => {
-  it("applies the QR floor and caption defaults", () => {
-    const result = labelBlockSchema.safeParse({ type: "qr" })
-    expect(result.success).toBe(true)
-    if (!result.success) return
-    expect(result.data).toEqual({
-      type: "qr",
-      minSizeMm: 30,
-      caption: true,
-    })
-  })
-
-  it("rejects a QR block below the scannable floor", () => {
-    const result = labelBlockSchema.safeParse({ type: "qr", minSizeMm: 10 })
-    expect(result.success).toBe(false)
-  })
-
-  it("allows a QR block larger than the floor", () => {
-    const result = labelBlockSchema.safeParse({ type: "qr", minSizeMm: 60 })
-    expect(result.success).toBe(true)
-    if (result.success && result.data.type === "qr") {
-      expect(result.data.minSizeMm).toBe(60)
-    }
-  })
-
-  it("applies field block defaults", () => {
-    const result = labelBlockSchema.safeParse({
-      type: "field",
-      field: "recipientPhone",
-    })
-    expect(result.success).toBe(true)
-    if (!result.success) return
-    expect(result.data).toEqual({
-      type: "field",
-      field: "recipientPhone",
-      scale: "m",
-      bold: false,
-      width: "full",
-    })
-  })
-
-  it("rejects a field key that is not on the whitelist", () => {
-    const result = labelBlockSchema.safeParse({
-      type: "field",
-      field: "recipientPassword",
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it("rejects a spacer of zero height", () => {
-    expect(
-      labelBlockSchema.safeParse({ type: "spacer", heightMm: 0 }).success,
-    ).toBe(false)
-  })
-
-  it("rejects an unknown block type", () => {
-    expect(labelBlockSchema.safeParse({ type: "barcode" }).success).toBe(false)
-  })
-
-  it("applies custom-text defaults", () => {
-    const result = labelBlockSchema.safeParse({ type: "text", text: "Fragile" })
-    expect(result.success).toBe(true)
-    if (!result.success) return
-    expect(result.data).toEqual({
-      type: "text",
-      text: "Fragile",
-      scale: "m",
-      bold: false,
-      width: "full",
-    })
-  })
-
-  it("rejects empty or blank custom text", () => {
-    expect(labelBlockSchema.safeParse({ type: "text", text: "" }).success).toBe(
-      false,
-    )
-    expect(
-      labelBlockSchema.safeParse({ type: "text", text: "   " }).success,
-    ).toBe(false)
-  })
-
-  it("applies brand-icon defaults and a clamped height", () => {
-    const result = labelBlockSchema.safeParse({ type: "icon" })
-    expect(result.success).toBe(true)
-    if (!result.success) return
-    expect(result.data).toEqual({
-      type: "icon",
-      heightMm: LABEL_ICON_DEFAULT_MM,
-      width: "full",
-    })
-    expect(
-      labelBlockSchema.safeParse({ type: "icon", heightMm: 1 }).success,
-    ).toBe(false)
-  })
-
-  it("accepts the site identity field keys", () => {
-    for (const field of ["siteName", "siteUrl"] as const) {
-      expect(labelBlockSchema.safeParse({ type: "field", field }).success).toBe(
-        true,
-      )
-    }
-  })
-})
-
 describe("labelTemplateCreateSchema", () => {
   const valid = {
     name: "Thermal parcel label",
     widthMm: 100,
     heightMm: 150,
-    blocks: [{ type: "field", field: "orderId" }],
+    template: { basePdf: { width: 100, height: 150 }, schemas: [[]] },
   }
 
   it("accepts a minimal valid template", () => {
@@ -698,20 +592,36 @@ describe("labelTemplateCreateSchema", () => {
     ).toBe(false)
   })
 
-  it("rejects an empty block stack", () => {
+  it("requires a template", () => {
+    const { template: _t, ...noTemplate } = valid
+    expect(labelTemplateCreateSchema.safeParse(noTemplate).success).toBe(false)
+  })
+
+  it("rejects the legacy block-stack shape, which no longer exists", () => {
     expect(
-      labelTemplateCreateSchema.safeParse({ ...valid, blocks: [] }).success,
+      labelTemplateCreateSchema.safeParse({
+        name: "Legacy",
+        widthMm: 100,
+        heightMm: 150,
+        blocks: [{ type: "qr", minSizeMm: 30 }],
+      }).success,
     ).toBe(false)
   })
 
-  it("rejects more than the block ceiling", () => {
-    const blocks = Array.from({ length: 41 }, () => ({
-      type: "field" as const,
-      field: "orderId" as const,
-    }))
-    expect(
-      labelTemplateCreateSchema.safeParse({ ...valid, blocks }).success,
-    ).toBe(false)
+  it("strips a legacy `engine` field instead of honouring it", () => {
+    // Zod strips unknown keys, so a client still sending `engine: 'blocks'`
+    // parses — the guarantee is that it cannot reach the write, not that the
+    // request 400s. Asserted on the *parsed* output, which is what the route
+    // hands to the insert.
+    const result = labelTemplateCreateSchema.safeParse({
+      ...valid,
+      engine: "blocks",
+      blocks: [],
+    })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data).not.toHaveProperty("engine")
+    expect(result.data).not.toHaveProperty("blocks")
   })
 })
 

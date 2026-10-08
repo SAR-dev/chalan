@@ -211,6 +211,11 @@ export const pageContent = {
     },
   },
   merchant: {
+    apiAccess: {
+      title: "API access",
+      description:
+        "Create keys for programmatic order booking and register webhook endpoints for delivery events.",
+    },
     overview: {
       title: (firstName: string) => `Welcome back, ${firstName}`,
       description:

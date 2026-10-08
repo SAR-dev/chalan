@@ -5,6 +5,7 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { labelTemplate } from "@/lib/db/schema"
+import { validatePdfmeTemplate } from "@/lib/label/template-schema-guard"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -36,6 +37,17 @@ export const POST = withErrorHandler(async (_req: Request, { params }: Ctx) => {
       { status: 409 },
     )
   }
+  // Publishing is the last gate: re-validate the pdfme template so a draft
+  // that slipped in before the rules (or via a direct DB write) can never
+  // become the live label the print path generates from.
+  if (!draft.template || !validatePdfmeTemplate(draft.template as never)) {
+    return NextResponse.json(
+      {
+        error: "The pdfme template is invalid. Fix it in the designer first.",
+      },
+      { status: 400 },
+    )
+  }
 
   const [maxRow] = await dbRead
     .select({
@@ -59,7 +71,7 @@ export const POST = withErrorHandler(async (_req: Request, { params }: Ctx) => {
         widthMm: draft.widthMm,
         heightMm: draft.heightMm,
         logoRef: draft.logoRef,
-        blocks: draft.blocks,
+        template: draft.template,
         version: nextVersion,
         publishedAt: new Date().toISOString(),
         isDefault: true,

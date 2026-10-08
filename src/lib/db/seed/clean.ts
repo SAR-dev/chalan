@@ -40,6 +40,7 @@ export const SEED_CLEAN_TABLES = [
   "delivery_zone",
   "support_ticket",
   "platform_config",
+  "label_template",
 ] as const
 
 /**

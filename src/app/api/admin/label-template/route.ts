@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/api-auth"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
 import { labelTemplate } from "@/lib/db/schema"
+import { validatePdfmeTemplate } from "@/lib/label/template-schema-guard"
 import { labelTemplateCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -56,6 +57,29 @@ export const POST = withErrorHandler(async (req: Request) => {
   const parsed = await parseBody(req, labelTemplateCreateSchema)
   if (parsed.error) return parsed.error
 
+  // The template is validated here (structure, bounds, element cap, QR floor)
+  // so no row can reach the table that the print path cannot generate. Paper
+  // size is taken from `basePdf`, never the client copy.
+  const { template } = parsed.data
+  if (template === undefined || template === null) {
+    return NextResponse.json(
+      { error: "A pdfme template is required" },
+      { status: 400 },
+    )
+  }
+  if (!validatePdfmeTemplate(template)) {
+    return NextResponse.json(
+      { error: "Invalid pdfme template" },
+      { status: 400 },
+    )
+  }
+  const widthMm = Number(
+    (template as { basePdf: { width: number } }).basePdf.width,
+  )
+  const heightMm = Number(
+    (template as { basePdf: { height: number } }).basePdf.height,
+  )
+
   const [existing] = await dbRead
     .select({ id: labelTemplate.id })
     .from(labelTemplate)
@@ -72,10 +96,10 @@ export const POST = withErrorHandler(async (req: Request) => {
     .insert(labelTemplate)
     .values({
       name: parsed.data.name.trim(),
-      widthMm: parsed.data.widthMm,
-      heightMm: parsed.data.heightMm,
+      widthMm,
+      heightMm,
       logoRef: parsed.data.logoRef ?? null,
-      blocks: parsed.data.blocks,
+      template,
       version: 1,
       publishedAt: null,
       isDefault: false,

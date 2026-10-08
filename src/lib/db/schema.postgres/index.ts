@@ -9,6 +9,7 @@ export {
   riderIdSeq,
   warehouseIdSeq,
 } from "./helpers"
+export * from "./integrations"
 export * from "./labels"
 export * from "./logistics"
 export * from "./merchants"

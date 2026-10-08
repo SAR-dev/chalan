@@ -1,6 +1,27 @@
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL
 
 /**
+ * Extra origins the operator has explicitly trusted via
+ * `BETTER_AUTH_ALLOWED_URLS` (comma-separated). These are *configured*, never
+ * derived from the request, so widening the allowlist with them does not
+ * reintroduce the Host-header attack the `SITE_URL` comment below rules out.
+ * This is what makes a second reachable origin (a LAN IP, a preview host)
+ * usable: `NEXT_PUBLIC_SITE_URL` is singular and also drives cookie/redirect
+ * behaviour, so it cannot express "trusted for CSRF too".
+ */
+const EXTRA_ORIGINS = (process.env.BETTER_AUTH_ALLOWED_URLS ?? "")
+  .split(",")
+  .map((u) => u.trim())
+  .filter(Boolean)
+  .flatMap((u) => {
+    try {
+      return [new URL(u).origin]
+    } catch {
+      return []
+    }
+  })
+
+/**
  * CSRF origin check for API requests.
  *
  * Browsers attach an `Origin` header to every cross-origin request that may
@@ -24,8 +45,10 @@ export function isAllowedOrigin(req: Request): boolean {
     if (SITE_URL) {
       // A configured site origin is authoritative: do NOT also trust origins
       // derived from the request, or a caller able to influence the Host header
-      // could make an arbitrary Origin match.
+      // could make an arbitrary Origin match. Explicitly configured extras
+      // (EXTRA_ORIGINS) are still allowed — the operator asked for them by name.
       allowed.add(new URL(SITE_URL).origin)
+      for (const extra of EXTRA_ORIGINS) allowed.add(extra)
       return allowed.has(origin)
     }
 

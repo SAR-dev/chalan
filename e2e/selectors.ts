@@ -167,18 +167,22 @@ export const orders = {
 
 // ─── Quick-print parcel label (R5) ───────────────────────────────────────────
 // The one reusable label action, dropped into the warehouse/rider order tables
-// and the ongoing board cards. One button per order (tagged with the order id);
-// the printed label is portaled to `printRoot` only while the dialog is open.
+// and the ongoing board cards. One Print button per order (tagged with the
+// order id) plus a sibling Download button; the pdfme engine emits a vector
+// PDF, so nothing is portaled into the DOM to assert on.
 export const orderLabel = {
   button: (id: string) => `[data-testid='order-label-${id}']`,
-  printRoot: "#parcel-label-print",
+  download: (id: string) => `[data-testid='order-label-download-${id}']`,
 }
 
 // ─── Parcel label designer (R5) ──────────────────────────────────────────────
 // The superadmin design/preview/publish screen at /dashboard/label-designer.
-// `blockRowPrefix` is deliberately distinct from the block action buttons
-// (`label-block-up-*`, `-down-*`, `-remove-*`) so a block count does not also
-// count its own controls.
+// The Design tab is the pdfme free canvas: `canvas` is the designer host div
+// (mounted once the label font loads; `canvasLoading` before that), and the
+// palette inserts bound fields/primitives into the live template. History rows
+// are exact-match `versionRow(n)` — deliberately not a prefix, because the
+// Load button beside each row is `label-version-load-n` and would otherwise
+// match too.
 export const labelDesigner = {
   name: "[data-testid='label-name']",
   width: "[data-testid='label-width']",
@@ -188,12 +192,16 @@ export const labelDesigner = {
   tabDesign: "[data-testid='label-tab-design']",
   tabPreview: "[data-testid='label-tab-preview']",
   tabHistory: "[data-testid='label-tab-history']",
-  addBlock: (type: string) => `[data-testid='label-add-${type}']`,
-  textBlock: (index: number) => `[data-testid='label-text-${index}']`,
-  blockRowPrefix: "[data-testid^='label-block-row-']",
-  inlinePreview: "[data-testid='label-preview-inline']",
+  palette: "[data-testid='pdfme-field-palette']",
+  canvas: "[data-testid='pdfme-designer']",
+  canvasLoading: "[data-testid='pdfme-designer-loading']",
+  addField: (key: string) => `[data-testid='pdfme-add-field-${key}']`,
+  addStaticText: "[data-testid='pdfme-add-static-text']",
+  addQr: "[data-testid='pdfme-add-qrcode']",
   previewRenderer: "[data-testid='label-preview']",
-  versionPrefix: "[data-testid^='label-version-']",
+  versionRow: (version: number) => `[data-testid='label-version-${version}']`,
+  loadVersion: (version: number) =>
+    `[data-testid='label-version-load-${version}']`,
 }
 
 // ─── Order Form ──────────────────────────────────────────────────────────────
