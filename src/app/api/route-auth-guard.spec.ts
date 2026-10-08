@@ -24,6 +24,7 @@ const AUTH_ENTRY_POINTS: RegExp[] = [
   /requireSession\(/,
   /auth\.api\.getSession/,
   /isAuthorizedCron\(/,
+  /authenticateApiKey\(/,
   /applyOrderTransition\(/,
   /applyBulkOrderTransition\(/,
 ]
@@ -63,6 +64,9 @@ const PUBLIC_ALLOWLIST = new Set<string>([
   // the admin designer's draft/published management lives under the
   // authenticated `admin/label-template` routes instead.
   "label-template/route.ts",
+  // Machine-readable OpenAPI spec — no personal data, derived from the
+  // already-public Zod schemas.
+  "v1/openapi/route.ts",
 ])
 
 function collectRouteFiles(dir: string): string[] {

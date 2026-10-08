@@ -95,6 +95,17 @@ export const orderStatuses = [
 
 export const emailLogStatuses = ["SENT", "FAILED"] as const
 
+// Webhook delivery lifecycle (R2): PENDING (enqueued with the state change) →
+// SENDING (claimed by the drain) → DELIVERED, or FAILED once the retry budget is
+// spent. Stale SENDING rows are recovered the way email_outbox recovers them.
+// Drizzle-only enum hint.
+export const webhookDeliveryStatuses = [
+  "PENDING",
+  "SENDING",
+  "DELIVERED",
+  "FAILED",
+] as const
+
 // Transactional email outbox: a row is written in the same
 // transaction as the domain change, then drained by a worker/cron.
 export const emailOutboxStatuses = [

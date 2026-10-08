@@ -978,3 +978,47 @@ export const labelTemplateUpdateSchema = z
       d.template !== undefined,
     { error: "Provide at least one field to update" },
   )
+
+// ---------------------------------------------------------------------------
+// Merchant integrations (R2)
+// ---------------------------------------------------------------------------
+
+export const apiKeyCreateSchema = z.object({
+  label: requiredString("Key label").max(
+    80,
+    "Key label cannot exceed 80 characters",
+  ),
+  scopes: z
+    .array(
+      z.enum([
+        "orders:read",
+        "orders:write",
+        "webhooks:read",
+        "webhooks:write",
+      ]),
+    )
+    .min(1, "Choose at least one scope")
+    .max(4),
+  environment: z.enum(["live", "test"]).optional(),
+})
+
+export const webhookEndpointCreateSchema = z.object({
+  url: z
+    .url("Endpoint URL must be a valid https URL")
+    .refine((v) => v.startsWith("https://"), "Endpoint URL must use https"),
+  events: z
+    .array(
+      z.enum([
+        "order.created",
+        "order.approved",
+        "order.dispatched",
+        "order.picked-up",
+        "order.out-for-delivery",
+        "order.delivered",
+        "order.failed",
+        "order.returned",
+        "order.cancelled",
+      ]),
+    )
+    .default([]),
+})

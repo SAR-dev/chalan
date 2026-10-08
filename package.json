@@ -38,6 +38,10 @@
     "ci:fix": "pnpm lint && pnpm format",
     "ci:check": "pnpm typecheck && pnpm lint:check && pnpm format:check",
     "ci:test": "pnpm test:unit:run && pnpm build && pnpm test:e2e",
+    "serve:build": "pnpm build && nohup pnpm start > /tmp/chalan-server.log 2>&1 &",
+    "serve:start": "nohup pnpm start > /tmp/chalan-server.log 2>&1 &",
+    "serve:stop": "pkill -f \"[n]ext-server\" || pkill -f \"[n]ext start\" || true",
+    "serve:log": "tail -f /tmp/chalan-server.log",
     "bump-sw": "node scripts/bump-sw-version.js"
   },
   "dependencies": {

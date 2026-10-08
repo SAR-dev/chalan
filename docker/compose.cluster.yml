@@ -155,6 +155,7 @@ services:
       sh -c "
         crontab - 2>/dev/null <<'CRONTAB'
         * * * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/drain-email-outbox >> /var/log/cron.log 2>&1
+        * * * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/drain-webhooks >> /var/log/cron.log 2>&1
         0 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-sessions >> /var/log/cron.log 2>&1
         30 3 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-audit-logs >> /var/log/cron.log 2>&1
         0 4 * * * wget -qO- --header=\"Authorization: Bearer $$CRON_SECRET\" --post-data=\"\" http://dashboard:3000/api/cron/cleanup-email-logs >> /var/log/cron.log 2>&1
