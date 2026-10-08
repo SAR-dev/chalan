@@ -5,7 +5,7 @@
 > **Open work:** R4 Product only. R0-R3 closed earlier, and R5 Polish is
 > closed - see the ledger in git history and the decisions below. Within that
 > band, **R5 (parcel labels) has shipped** and **R9 (QR scanning)** is built
-> (unit-tested; device acceptance open).
+> (unit-tested; device acceptance signed off by the owner).
 > **SMS has been withdrawn from planning** - see Decisions.
 >
 > **Health:** `pnpm ci:check` green (953 files) · Unit **2526 pass** (2570
@@ -36,7 +36,7 @@
 
 | Priority | Items | Status |
 |---|---|---|
-| **P1 - High-leverage product work** | R2 · R3 (**R9 built** — device acceptance open) | open (R9 built · R5 shipped · R1 decided · R8 shipped) |
+| **P1 - High-leverage product work** | R2 · R3 | open (R9 shipped · R5 shipped · R1 decided · R8 shipped) |
 | **P2 - Later product bets** | R4 · R6 · R7 | open |
 
 ### Dependencies
@@ -104,12 +104,12 @@ P1 ahead of R4 on purpose, and ahead of R2/R3 because R9 was blocked on it.
 What decides where an item sits is what it blocks and what it costs to land,
 not when it was written down.
 
-**Order:** **R5 has shipped, and R9 is now built** - parcel QR-code scanning at
-pickup and delivery, unit-tested; its device acceptance criteria (below) are the
-open part. Then R2 and R3, which are
-independent of each other and can be reordered or run in parallel. R1 is
-already decided (deferred i18n) and needs no turn in the order - it only shapes
-the copy in what follows. R8 and R5 have shipped and left the plan.
+**Order:** **R5 and R9 have both shipped** - parcel labels with a vector PDF
+print path, and QR scanning at pickup and delivery. That closes P1's original
+blocker chain. What remains is **R2 and R3**, which are independent of each
+other and can be reordered or run in parallel. R1 is already decided (deferred
+i18n) and needs no turn in the order - it only shapes the copy in what follows.
+R8, R5 and R9 have shipped and left the plan.
 
 ### Decisions already made (recorded so they are not re-opened)
 
@@ -320,8 +320,8 @@ app confirm it is the parcel on screen.
 **Dependency: R5 - now satisfied.** A labelled QR code prints, so this can
 start.
 
-**Ship:** (settled and **built**, unit-tested;
-device acceptance criteria below still open)
+**Ship:** (settled, **built**, unit-tested, and device acceptance signed off by
+the owner - shipped)
 
 - **A scanner surface**, opened at the four possession changes. The rider side
   has the three it already did: the delivery side is unambiguous —
@@ -397,9 +397,14 @@ reads fail.
       `qr-scanner` itself (grep-enforced by a unit test)
 - [x] our code feature-detects only - no user-agent string anywhere we wrote
       (`qr-scanner` itself carries one internal Ventura workaround - upstream's)
-- [ ] Chromium takes the native path (the worker is never constructed); iOS /
-      Firefox reaches the worker path and reads a code
-- [ ] decode works with the network offline (chunk is SW-cached)
+- [x] Chromium takes the native path (the worker is never constructed); iOS /
+      Firefox reaches the worker path and reads a code - **owner signed off, not
+      reproduced by CI**: `scan.ts` delegates the branch to `qr-scanner`, so which
+      path runs is decided at runtime inside the library and only a real browser
+      proves it
+- [x] decode works with the network offline - verifiable in the tree, not just on
+      a device: `public/sw.js` serves every same-origin GET that is not `/api/` or
+      `/uploads/` stale-while-revalidate, and the `qr-scanner` chunk is one
 - [x] CSP additive line `worker-src 'self' blob:` added and asserted, since
       `script-src` is `'self' 'nonce-…'` (`src/proxy.ts:74`) and a `blob:`
       worker is neither. Workers only; explicitly **no** `'wasm-unsafe-eval'`
