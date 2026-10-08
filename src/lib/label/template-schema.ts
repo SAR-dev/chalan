@@ -1,0 +1,66 @@
+import type { Template } from "@pdfme/common"
+import { checkTemplate } from "@pdfme/common"
+import { z } from "zod"
+import {
+  LABEL_MAX_ELEMENTS,
+  LABEL_QR_MIN_MM,
+  LABEL_TEMPLATE_MAX_MM,
+  LABEL_TEMPLATE_MIN_MM,
+} from "@/lib/constants"
+
+export const pdfmeTemplateSchema = z.custom<Template>((val) => {
+  try {
+    checkTemplate(val as Template)
+    const t = val as Template
+    if (!t.basePdf || typeof t.basePdf !== "object") return false
+    const bp: any = t.basePdf
+    const w = Number(bp.width)
+    const h = Number(bp.height)
+    const p = Array.isArray(bp.padding) ? bp.padding : [0, 0, 0, 0]
+    if (
+      ![w, h].every(
+        (n) =>
+          Number.isInteger(n) &&
+          n >= LABEL_TEMPLATE_MIN_MM &&
+          n <= LABEL_TEMPLATE_MAX_MM,
+      )
+    )
+      return false
+    if (p.some((n: number) => Number.isFinite(n) && Math.abs(n) > 5))
+      return false
+    const schemas = t.schemas ?? []
+    if (schemas.length !== 1) return false
+    const elements = schemas[0] ?? []
+    if (elements.length > LABEL_MAX_ELEMENTS) return false
+    const allowed = new Set([
+      "text",
+      "image",
+      "line",
+      "rectangle",
+      "qrcode",
+      "code128",
+    ])
+    const names = new Set<string>()
+    for (const el of elements as any[]) {
+      const type = String(el?.type ?? "")
+      if (!allowed.has(type)) return false
+      const name = String(el?.name ?? "")
+      if (name === "") return false
+      if (names.has(name)) return false
+      names.add(name)
+      const x = Number(el?.position?.x)
+      const y = Number(el?.position?.y)
+      const ew = Number(el?.width)
+      const eh = Number(el?.height)
+      if ([x, y, ew, eh].some((n) => !Number.isFinite(n) || n < 0)) return false
+      if (x + ew > w + 0.001 || y + eh > h + 0.001) return false
+      if (type === "qrcode") {
+        if (ew < LABEL_QR_MIN_MM || eh < LABEL_QR_MIN_MM) return false
+        if (Math.abs(ew - eh) > 1) return false
+      }
+    }
+    return true
+  } catch {
+    return false
+  }
+}, "Invalid pdfme template")

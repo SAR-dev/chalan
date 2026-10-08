@@ -4,6 +4,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { makeOrder } from "@/app/__tests__/test-utils"
 import { siteConfig } from "@/config/site"
+import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
+import { DEFAULT_LABEL_TEMPLATE } from "@/lib/label-layout"
 import { OrderLabelButton, orderToLabelData } from "./order-label-button"
 
 describe("orderToLabelData", () => {
@@ -98,5 +100,107 @@ describe("OrderLabelButton", () => {
     await waitFor(() =>
       expect(document.getElementById("parcel-label-print")).toBeNull(),
     )
+  })
+})
+
+// =============================================================================
+// Engine branch (PDF.md §7): `engine: 'pdfme'` templates generate a real PDF
+// through the dynamically-imported pipeline and never mount the legacy print
+// portal; the default (blocks) template keeps the portal flow untouched and
+// offers no download action.
+// =============================================================================
+
+const pdfmeMocks = vi.hoisted(() => ({
+  generateLabelPdf: vi.fn(async () => new Uint8Array([0x25, 0x50, 0x44, 0x46])),
+  printOrDownload: vi.fn(),
+  downloadPdf: vi.fn(),
+  loadLabelFont: vi.fn(async () => ({
+    NotoSansJP: { data: new ArrayBuffer(0) },
+  })),
+  fetchLogoDataUri: vi.fn(async () => "data:image/png;base64,AAA"),
+}))
+
+vi.mock("@/lib/label/generate-pdf", () => ({
+  generateLabelPdf: pdfmeMocks.generateLabelPdf,
+}))
+vi.mock("@/lib/label/print", () => ({
+  printOrDownload: pdfmeMocks.printOrDownload,
+  downloadPdf: pdfmeMocks.downloadPdf,
+}))
+vi.mock("@/lib/label/fonts", () => ({
+  loadLabelFont: pdfmeMocks.loadLabelFont,
+}))
+vi.mock("@/lib/label/logo", () => ({
+  fetchLogoDataUri: pdfmeMocks.fetchLogoDataUri,
+}))
+
+describe("OrderLabelButton (pdfme engine)", () => {
+  const template = {
+    widthMm: 100,
+    heightMm: 150,
+    blocks: DEFAULT_LABEL_TEMPLATE.blocks,
+    logoRef: null,
+    engine: "pdfme" as const,
+    template: DEFAULT_LABEL_TEMPLATE_PDFME,
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("generates a PDF and hands it to the printer — no legacy print portal", async () => {
+    const order = makeOrder({ id: "ORD-100011" })
+    render(
+      <OrderLabelButton
+        order={order}
+        merchantName="Acme Store"
+        template={template}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId("order-label-ORD-100011"))
+
+    await waitFor(() =>
+      expect(pdfmeMocks.printOrDownload).toHaveBeenCalledTimes(1),
+    )
+    expect(pdfmeMocks.generateLabelPdf).toHaveBeenCalledTimes(1)
+    expect(pdfmeMocks.loadLabelFont).toHaveBeenCalledTimes(1)
+    // The legacy sheet never mounts and window.print is never called.
+    expect(document.getElementById("parcel-label-print")).toBeNull()
+    expect(pdfmeMocks.printOrDownload.mock.calls[0][1]).toBe(
+      "label-ORD-100011.pdf",
+    )
+  })
+
+  it("offers a download action that saves the same PDF", async () => {
+    const order = makeOrder({ id: "ORD-100012" })
+    render(<OrderLabelButton order={order} template={template} />)
+
+    fireEvent.click(screen.getByTestId("order-label-download-ORD-100012"))
+
+    await waitFor(() => expect(pdfmeMocks.downloadPdf).toHaveBeenCalledTimes(1))
+    expect(pdfmeMocks.printOrDownload).not.toHaveBeenCalled()
+    expect(pdfmeMocks.downloadPdf.mock.calls[0][1]).toBe("label-ORD-100012.pdf")
+  })
+
+  it("keeps the blocks flow portal-based with no download button", async () => {
+    vi.spyOn(window, "print").mockImplementation(() => {})
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0)
+      return 1
+    })
+    vi.stubGlobal("cancelAnimationFrame", () => {})
+
+    const order = makeOrder({ id: "ORD-100013" })
+    render(<OrderLabelButton order={order} />)
+
+    expect(screen.queryByTestId("order-label-download-ORD-100013")).toBeNull()
+    fireEvent.click(screen.getByTestId("order-label-ORD-100013"))
+    await waitFor(() =>
+      expect(document.getElementById("parcel-label-print")).not.toBeNull(),
+    )
+    expect(pdfmeMocks.generateLabelPdf).not.toHaveBeenCalled()
+    expect(window.print).toHaveBeenCalledTimes(1)
+    vi.unstubAllGlobals()
   })
 })

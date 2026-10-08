@@ -1,9 +1,9 @@
 "use client"
 
 import { History, Loader2, Save, Send } from "lucide-react"
+import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
 import { ConfirmDialog } from "@/components/confirm-dialog"
-import { LabelRenderer } from "@/components/label-renderer"
 import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,15 +21,33 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pageContent } from "@/config/content"
 import { siteConfig } from "@/config/site"
 import { useAuth } from "@/features/account/hooks/use-auth"
-import { LabelBlockEditor } from "@/features/platform-config/components/label-block-editor"
 import {
   type LabelTemplateSaveInput,
   useLabelTemplates,
 } from "@/features/platform-config/hooks/use-label-template"
 import { LABEL_TEMPLATE_MAX_MM, LABEL_TEMPLATE_MIN_MM } from "@/lib/constants"
 import { formatDateTime } from "@/lib/format"
+import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
+import { buildLabelInputs } from "@/lib/label/label-inputs"
 import { DEFAULT_LABEL_TEMPLATE, SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 import { toast } from "@/lib/notify"
+
+// The pdfme canvas/preview are heavy (pdfium, font machinery): load them as
+// separate chunks that only fetch when this screen needs them.
+const PdfmeDesigner = dynamic(
+  () =>
+    import("@/features/platform-config/components/pdfme-designer").then(
+      (m) => m.PdfmeDesigner,
+    ),
+  { ssr: false },
+)
+const PdfmeViewer = dynamic(
+  () =>
+    import("@/features/platform-config/components/pdfme-viewer").then(
+      (m) => m.PdfmeViewer,
+    ),
+  { ssr: false },
+)
 
 // The sample order values, plus the platform's real identity so the preview's
 // brand-name / website / icon blocks show what will actually print.
@@ -40,16 +58,18 @@ const PREVIEW_DATA = {
 }
 
 // =============================================================================
-// Label designer (R5)
+// Label designer (R5, pdfme — PDF.md)
 //
-// Design / Preview / Publish, one platform-wide parcel label. Everything the
-// admin composes is stored as the block array the renderer already consumes, so
-// the preview is not an approximation — it is the same component, at the same
-// physical millimetre sizes, that prints.
+// Design / Preview / Publish, one platform-wide parcel label. The designer is
+// the pdfme free canvas: elements are placed in millimetres and the Preview
+// tab renders them through the same engine the print action generates with —
+// the preview is not an approximation.
 //
 // Saving writes a draft; publishing appends a new immutable version. The live
 // print path reads the newest published version, falling back to the built-in
-// default until one exists.
+// default until one exists. Rows stored under the legacy 'blocks' engine still
+// *print* through the old renderer (no migration), but they edit read-only
+// here — Load is disabled for them; saving switches the draft to pdfme.
 // =============================================================================
 
 type DesignerTab = "design" | "preview" | "history"
@@ -64,25 +84,50 @@ function formFrom(
         heightMm: number
         logoRef: string | null
         blocks: LabelTemplateSaveInput["blocks"]
+        engine?: "blocks" | "pdfme"
+        template?: LabelTemplateSaveInput["template"]
       }
     | null
     | undefined,
 ): LabelTemplateSaveInput {
-  if (source) {
+  // A pdfme draft/version round-trips as-is; its paper size comes from basePdf.
+  if (source?.engine === "pdfme" && source.template) {
+    const bp = source.template.basePdf
+    const widthMm =
+      typeof bp === "object" && "width" in bp ? bp.width : source.widthMm
+    const heightMm =
+      typeof bp === "object" && "height" in bp ? bp.height : source.heightMm
     return {
       name: source.name,
-      widthMm: source.widthMm,
-      heightMm: source.heightMm,
+      widthMm,
+      heightMm,
       logoRef: source.logoRef,
       blocks: source.blocks,
+      engine: "pdfme",
+      template: source.template,
     }
   }
+  // The canvas *is* the editor. Seed from the built-in pdfme label — also
+  // over a legacy blocks draft/published row, which cannot be edited on the
+  // canvas — keeping the row's name, logo and its blocks array as the legacy
+  // copy that survives the engine switch on save.
+  const bp = DEFAULT_LABEL_TEMPLATE_PDFME.basePdf
+  const widthMm =
+    typeof bp === "object" && "width" in bp
+      ? bp.width
+      : DEFAULT_LABEL_TEMPLATE.widthMm
+  const heightMm =
+    typeof bp === "object" && "height" in bp
+      ? bp.height
+      : DEFAULT_LABEL_TEMPLATE.heightMm
   return {
-    name: DEFAULT_NAME,
-    widthMm: DEFAULT_LABEL_TEMPLATE.widthMm,
-    heightMm: DEFAULT_LABEL_TEMPLATE.heightMm,
-    logoRef: null,
-    blocks: DEFAULT_LABEL_TEMPLATE.blocks,
+    name: source?.name ?? DEFAULT_NAME,
+    widthMm,
+    heightMm,
+    logoRef: source?.logoRef ?? null,
+    blocks: source?.blocks ?? DEFAULT_LABEL_TEMPLATE.blocks,
+    engine: "pdfme",
+    template: DEFAULT_LABEL_TEMPLATE_PDFME,
   }
 }
 
@@ -109,12 +154,50 @@ export function LabelDesignerPageClient() {
   // role is known, and seeding then would overwrite a saved draft with the
   // built-in default. After the first seed the editor is the source of truth
   // until reload, so a background revalidation never yanks typed edits away.
+  // formFrom always yields a pdfme form — the canvas is the only editor.
   const seedReady = currentUser?.role === "SUPER_ADMIN" && !isLoading
 
   useEffect(() => {
     if (form !== null || !seedReady) return
     setForm(formFrom(draft ?? published))
   }, [form, seedReady, draft, published])
+
+  // The size inputs and the pdfme paper size are two views of one number
+  // (PDF.md §5 rule 7 writes widthMm/heightMm from basePdf on save, so the
+  // inputs must write into basePdf too).
+  useEffect(() => {
+    if (!form?.template) return
+    const bp = form.template.basePdf
+    if (typeof bp !== "object" || !("width" in bp)) return
+    if (bp.width === form.widthMm && bp.height === form.heightMm) return
+    setForm({
+      ...form,
+      template: {
+        ...form.template,
+        basePdf: { ...bp, width: form.widthMm, height: form.heightMm },
+      },
+    })
+  }, [form])
+
+  function handleDesignerChange(
+    next: NonNullable<LabelTemplateSaveInput["template"]>,
+  ): void {
+    setForm((current) => {
+      if (!current) return current
+      const bp = next.basePdf
+      return {
+        ...current,
+        engine: "pdfme",
+        template: next,
+        widthMm:
+          typeof bp === "object" && "width" in bp ? bp.width : current.widthMm,
+        heightMm:
+          typeof bp === "object" && "height" in bp
+            ? bp.height
+            : current.heightMm,
+      }
+    })
+  }
 
   async function handleSave(): Promise<string | null> {
     if (!form) return null
@@ -185,8 +268,8 @@ export function LabelDesignerPageClient() {
       </PageHeader>
 
       {form === null ? (
-        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,26rem)]">
-          <Skeleton className="h-96 w-full" />
+        <div className="flex flex-col gap-6">
+          <Skeleton className="h-44 w-full" />
           <Skeleton className="h-96 w-full" />
         </div>
       ) : (
@@ -208,121 +291,112 @@ export function LabelDesignerPageClient() {
           </TabsList>
 
           <TabsContent value="design">
-            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-              <div className="flex flex-col gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Label size</CardTitle>
-                    <CardDescription>
-                      The physical sheet the label prints on, in millimetres.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-1.5 sm:col-span-2">
-                      <Label htmlFor="label-name">Template name</Label>
-                      <Input
-                        id="label-name"
-                        value={form.name}
-                        data-testid="label-name"
-                        maxLength={80}
-                        onChange={(e) =>
-                          setForm({ ...form, name: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="label-width">Width (mm)</Label>
-                      <Input
-                        id="label-width"
-                        type="number"
-                        min={LABEL_TEMPLATE_MIN_MM}
-                        max={LABEL_TEMPLATE_MAX_MM}
-                        value={form.widthMm}
-                        data-testid="label-width"
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            widthMm: Number(e.target.value) || form.widthMm,
-                          })
-                        }
-                        onBlur={() =>
-                          setForm({
-                            ...form,
-                            widthMm: clampDimension(form.widthMm),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="label-height">Height (mm)</Label>
-                      <Input
-                        id="label-height"
-                        type="number"
-                        min={LABEL_TEMPLATE_MIN_MM}
-                        max={LABEL_TEMPLATE_MAX_MM}
-                        value={form.heightMm}
-                        data-testid="label-height"
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            heightMm: Number(e.target.value) || form.heightMm,
-                          })
-                        }
-                        onBlur={() =>
-                          setForm({
-                            ...form,
-                            heightMm: clampDimension(form.heightMm),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5 sm:col-span-2">
-                      <Label htmlFor="label-logo">Logo URL (optional)</Label>
-                      <Input
-                        id="label-logo"
-                        value={form.logoRef ?? ""}
-                        placeholder="/uploads/…"
-                        data-testid="label-logo"
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            logoRef: e.target.value.trim() || null,
-                          })
-                        }
-                      />
-                      <p className="text-muted-foreground text-xs">
-                        A logo block renders this image; it is ignored if unset.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Blocks</CardTitle>
-                    <CardDescription>
-                      The label is a top-to-bottom stack. Every block is
-                      constrained to what the renderer and a scanner can handle.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <LabelBlockEditor
-                      blocks={form.blocks}
-                      onChange={(blocks) => setForm({ ...form, blocks })}
+            <div className="flex flex-col gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Label size</CardTitle>
+                  <CardDescription>
+                    The physical sheet the label prints on, in millimetres.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <Label htmlFor="label-name">Template name</Label>
+                    <Input
+                      id="label-name"
+                      value={form.name}
+                      data-testid="label-name"
+                      maxLength={80}
+                      onChange={(e) =>
+                        setForm({ ...form, name: e.target.value })
+                      }
                     />
-                  </CardContent>
-                </Card>
-              </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="label-width">Width (mm)</Label>
+                    <Input
+                      id="label-width"
+                      type="number"
+                      min={LABEL_TEMPLATE_MIN_MM}
+                      max={LABEL_TEMPLATE_MAX_MM}
+                      value={form.widthMm}
+                      data-testid="label-width"
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          widthMm: Number(e.target.value) || form.widthMm,
+                        })
+                      }
+                      onBlur={() =>
+                        setForm({
+                          ...form,
+                          widthMm: clampDimension(form.widthMm),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="label-height">Height (mm)</Label>
+                    <Input
+                      id="label-height"
+                      type="number"
+                      min={LABEL_TEMPLATE_MIN_MM}
+                      max={LABEL_TEMPLATE_MAX_MM}
+                      value={form.heightMm}
+                      data-testid="label-height"
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          heightMm: Number(e.target.value) || form.heightMm,
+                        })
+                      }
+                      onBlur={() =>
+                        setForm({
+                          ...form,
+                          heightMm: clampDimension(form.heightMm),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <Label htmlFor="label-logo">Logo URL (optional)</Label>
+                    <Input
+                      id="label-logo"
+                      value={form.logoRef ?? ""}
+                      placeholder="/uploads/…"
+                      data-testid="label-logo"
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          logoRef: e.target.value.trim() || null,
+                        })
+                      }
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      A logo block renders this image; it is ignored if unset.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <div className="lg:sticky lg:top-4">
-                <LabelPreview
-                  widthMm={form.widthMm}
-                  heightMm={form.heightMm}
-                  blocks={form.blocks}
-                  logoRef={form.logoRef}
-                  scale={1.6}
-                />
-              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Canvas</CardTitle>
+                  <CardDescription>
+                    A free canvas in millimetres. Drag elements anywhere; add
+                    bound fields from the palette. The QR stays scannable
+                    (≥30mm) by construction.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {form.template ? (
+                    <PdfmeDesigner
+                      template={form.template}
+                      onChange={handleDesignerChange}
+                    />
+                  ) : null}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
@@ -331,23 +405,18 @@ export function LabelDesignerPageClient() {
               <CardHeader>
                 <CardTitle>Preview</CardTitle>
                 <CardDescription>
-                  Sample data on the real label. It scales to fit this panel;
-                  the print action always uses the true physical size.
+                  Sample data rendered through the PDF engine — the same
+                  generator the print action uses.
                 </CardDescription>
               </CardHeader>
               <CardContent className="py-6">
-                <LabelRenderer
-                  widthMm={form.widthMm}
-                  heightMm={form.heightMm}
-                  blocks={form.blocks}
-                  data={{
-                    ...PREVIEW_DATA,
-                    logoUrl: form.logoRef,
-                  }}
-                  scale={2}
-                  fit
-                  data-testid="label-preview"
-                />
+                {form.template ? (
+                  <PdfmeViewer
+                    template={form.template}
+                    inputs={buildLabelInputs(form.template, PREVIEW_DATA)}
+                    testId="label-preview"
+                  />
+                ) : null}
               </CardContent>
             </Card>
           </TabsContent>
@@ -396,6 +465,12 @@ export function LabelDesignerPageClient() {
                           variant="outline"
                           size="sm"
                           data-testid={`label-version-load-${version.version}`}
+                          disabled={version.engine !== "pdfme"}
+                          title={
+                            version.engine !== "pdfme"
+                              ? "Legacy block versions are read-only in the pdfme editor."
+                              : undefined
+                          }
                           onClick={() => {
                             setForm(formFrom(version))
                             setTab("design")
@@ -426,41 +501,5 @@ export function LabelDesignerPageClient() {
         onConfirm={handlePublish}
       />
     </div>
-  )
-}
-
-function LabelPreview({
-  widthMm,
-  heightMm,
-  blocks,
-  logoRef,
-  scale,
-}: {
-  widthMm: number
-  heightMm: number
-  blocks: LabelTemplateSaveInput["blocks"]
-  logoRef: string | null
-  scale: number
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Live preview</CardTitle>
-        <CardDescription>
-          {widthMm}×{heightMm}mm · sample data
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="overflow-hidden">
-        <LabelRenderer
-          widthMm={widthMm}
-          heightMm={heightMm}
-          blocks={blocks}
-          data={{ ...PREVIEW_DATA, logoUrl: logoRef }}
-          scale={scale}
-          fit
-          data-testid="label-preview-inline"
-        />
-      </CardContent>
-    </Card>
   )
 }

@@ -1,9 +1,12 @@
 "use client"
 
+import type { Template } from "@pdfme/common"
 import { useCallback } from "react"
 import useSWR from "swr"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
+import { labelPdfmeEnabled } from "@/lib/label/config"
+import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
 import {
   DEFAULT_LABEL_TEMPLATE,
   type LabelTemplateStructure,
@@ -33,6 +36,8 @@ export interface LabelTemplateRecord {
   heightMm: number
   logoRef: string | null
   blocks: LabelBlock[]
+  engine: "blocks" | "pdfme"
+  template: Template | null
   version: number
   publishedAt: string | null
   isDefault: boolean
@@ -46,6 +51,8 @@ type PublishedResponse = {
   heightMm: number
   logoRef: string | null
   blocks: LabelBlock[]
+  engine: "blocks" | "pdfme"
+  template: Template | null
   version: number
 } | null
 
@@ -60,10 +67,25 @@ export function usePublishedLabelTemplate(): {
     swrOptions,
   )
 
+  const fallback: LabelTemplateStructure = labelPdfmeEnabled()
+    ? {
+        ...DEFAULT_LABEL_TEMPLATE,
+        engine: "pdfme",
+        template: DEFAULT_LABEL_TEMPLATE_PDFME,
+      }
+    : DEFAULT_LABEL_TEMPLATE
+
   return {
     template: data
-      ? { widthMm: data.widthMm, heightMm: data.heightMm, blocks: data.blocks }
-      : DEFAULT_LABEL_TEMPLATE,
+      ? {
+          widthMm: data.widthMm,
+          heightMm: data.heightMm,
+          blocks: data.blocks,
+          logoRef: data.logoRef,
+          engine: data.engine,
+          template: data.template,
+        }
+      : fallback,
     isLoading,
   }
 }
@@ -74,6 +96,8 @@ export interface LabelTemplateSaveInput {
   heightMm: number
   logoRef: string | null
   blocks: LabelBlock[]
+  engine?: "blocks" | "pdfme"
+  template?: Template | null
 }
 
 type Result = { ok: boolean; error?: string }

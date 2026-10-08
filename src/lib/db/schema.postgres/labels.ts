@@ -41,13 +41,13 @@ export const labelTemplate = pgTable(
     heightMm: integer("heightMm").notNull().default(150),
     // Storage key for an optional logo, managed through `src/lib/storage`.
     logoRef: text("logoRef"),
-    // The block stack. Typed against the Zod-inferred `LabelBlock` union in
-    // `src/lib/validation.ts` so the column can never hold a shape the designer
-    // and renderer don't understand.
+    engine: text("engine").notNull().default("blocks"),
+    template: jsonb("template"),
     blocks: jsonb("blocks")
       .$type<LabelBlock[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+
     // Bumped on each publish; drafts keep the version they branched from.
     version: integer("version").notNull().default(1),
     // null = draft. Only a published row is used to print a real label.

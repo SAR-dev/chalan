@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
 import { POST as PUBLISH } from "./[id]/publish/route"
 import { DELETE, GET as GET_ONE, PATCH } from "./[id]/route"
 import { GET, POST } from "./route"
@@ -425,5 +426,194 @@ describe("POST /api/admin/label-template/:id/publish", () => {
       isDefault: true,
     })
     expect(json.id).toBe("lt_pub_2")
+  })
+})
+
+// =============================================================================
+// pdfme engine (PDF.md §5): engine derivation, server-side template
+// validation, paper size from basePdf, and publish copying the engine.
+// =============================================================================
+
+/** The default template's paper size (narrowed — BasePdf is a union type). */
+const PAPER = DEFAULT_LABEL_TEMPLATE_PDFME.basePdf as {
+  width: number
+  height: number
+}
+
+/** A template whose QR sits exactly on the scannable floor (30mm square). */
+function validPdfmeTemplate(): typeof DEFAULT_LABEL_TEMPLATE_PDFME {
+  return JSON.parse(JSON.stringify(DEFAULT_LABEL_TEMPLATE_PDFME))
+}
+
+/** Same, but with a QR under the floor — must be rejected everywhere. */
+function undersizedQrTemplate(): typeof DEFAULT_LABEL_TEMPLATE_PDFME {
+  const t = validPdfmeTemplate()
+  const qr = t.schemas[0].find((s) => s.type === "qrcode")
+  if (qr) {
+    qr.width = 10
+    qr.height = 10
+  }
+  return t
+}
+
+describe("pdfme engine routes (PDF.md §5)", () => {
+  it("creates an engine 'pdfme' draft without blocks, taking paper size from basePdf", async () => {
+    sessionState.value = admin
+    selectQueue.push([]) // no draft exists
+    insertResult.push({ id: "lt_pdfme" })
+
+    const res = await POST(
+      req("POST", "/api/admin/label-template", {
+        name: "Canvas label",
+        widthMm: 120, // in range, but the client copy must be ignored anyway
+        heightMm: 180,
+        template: validPdfmeTemplate(),
+      }),
+    )
+    expect(res.status).toBe(201)
+    const payload = insertPayloads[0]
+    expect(payload.engine).toBe("pdfme")
+    expect(payload.template).toEqual(validPdfmeTemplate())
+    expect(payload.blocks).toEqual([])
+    // Rule 7: widthMm/heightMm come from basePdf, never the client values.
+    expect(payload.widthMm).toBe(PAPER.width)
+    expect(payload.heightMm).toBe(PAPER.height)
+  })
+
+  it("rejects engine 'pdfme' when no template is supplied", async () => {
+    sessionState.value = admin
+    const res = await POST(
+      req("POST", "/api/admin/label-template", {
+        ...validBody,
+        engine: "pdfme",
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/template/i)
+  })
+
+  it("rejects a template whose QR is under the scannable floor", async () => {
+    sessionState.value = admin
+    const res = await POST(
+      req("POST", "/api/admin/label-template", {
+        name: "Too small",
+        widthMm: 100,
+        heightMm: 150,
+        template: undersizedQrTemplate(),
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/invalid pdfme template/i)
+  })
+
+  it("still rejects a blocks draft with no blocks", async () => {
+    sessionState.value = admin
+    const res = await POST(
+      req("POST", "/api/admin/label-template", {
+        name: "Empty",
+        widthMm: 100,
+        heightMm: 150,
+      }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it("PATCH validates a supplied template and rewrites widthMm/heightMm from basePdf", async () => {
+    sessionState.value = admin
+    selectQueue.push([draftRow]) // existing row read happens first
+    updateResultQueue.push([{ id: "lt_draft" }])
+
+    const res = await PATCH(
+      req("PATCH", "/api/admin/label-template/lt_draft", {
+        template: validPdfmeTemplate(),
+        widthMm: 120,
+        heightMm: 180,
+      }),
+      { params: Promise.resolve({ id: "lt_draft" }) },
+    )
+    expect(res.status).toBe(200)
+    expect(updatePayloads[0]).toMatchObject({
+      engine: "pdfme",
+      template: validPdfmeTemplate(),
+      widthMm: PAPER.width,
+      heightMm: PAPER.height,
+    })
+  })
+
+  it("PATCH rejects an invalid template before touching the row", async () => {
+    sessionState.value = admin
+    selectQueue.push([draftRow])
+
+    const res = await PATCH(
+      req("PATCH", "/api/admin/label-template/lt_draft", {
+        template: undersizedQrTemplate(),
+      }),
+      { params: Promise.resolve({ id: "lt_draft" }) },
+    )
+    expect(res.status).toBe(400)
+    expect(updatePayloads).toHaveLength(0)
+  })
+
+  it("PATCH rejects engine 'pdfme' on a blocks draft without a template", async () => {
+    sessionState.value = admin
+    selectQueue.push([draftRow])
+
+    const res = await PATCH(
+      req("PATCH", "/api/admin/label-template/lt_draft", {
+        engine: "pdfme",
+      }),
+      { params: Promise.resolve({ id: "lt_draft" }) },
+    )
+    expect(res.status).toBe(400)
+    expect(updatePayloads).toHaveLength(0)
+  })
+
+  it("publish copies engine and template into the appended version", async () => {
+    sessionState.value = admin
+    const pdfmeDraft = {
+      ...draftRow,
+      engine: "pdfme",
+      template: validPdfmeTemplate(),
+      blocks: [],
+    }
+    selectQueue.push([pdfmeDraft])
+    selectQueue.push([{ max: 3 }])
+    insertResult.push({
+      ...pdfmeDraft,
+      id: "lt_pub_4",
+      version: 4,
+      isDefault: true,
+    })
+
+    const res = await PUBLISH(
+      req("POST", "/api/admin/label-template/lt_draft/publish"),
+      { params: Promise.resolve({ id: "lt_draft" }) },
+    )
+    expect(res.status).toBe(201)
+    expect(insertPayloads[0]).toMatchObject({
+      engine: "pdfme",
+      template: validPdfmeTemplate(),
+      version: 4,
+      isDefault: true,
+    })
+  })
+
+  it("publish refuses an invalid pdfme template", async () => {
+    sessionState.value = admin
+    selectQueue.push([
+      {
+        ...draftRow,
+        engine: "pdfme",
+        template: undersizedQrTemplate(),
+        blocks: [],
+      },
+    ])
+
+    const res = await PUBLISH(
+      req("POST", "/api/admin/label-template/lt_draft/publish"),
+      { params: Promise.resolve({ id: "lt_draft" }) },
+    )
+    expect(res.status).toBe(400)
+    expect(insertPayloads).toHaveLength(0)
   })
 })

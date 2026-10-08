@@ -5,6 +5,7 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { db, dbRead } from "@/lib/db"
 import { labelTemplate } from "@/lib/db/schema"
+import { validatePdfmeTemplate } from "@/lib/label/template-schema-guard"
 import { labelTemplateUpdateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -54,24 +55,82 @@ export const PATCH = withErrorHandler(async (req: Request, { params }: Ctx) => {
   const parsed = await parseBody(req, labelTemplateUpdateSchema)
   if (parsed.error) return parsed.error
 
+  // Same engine rules as create: a supplied template is validated and its
+  // `basePdf` becomes the paper size (PDF.md §5 rule 7); an explicit
+  // `engine: 'pdfme'` without a template is rejected before the DB check can.
+  let engineSet: "blocks" | "pdfme" | null = null
+  let templateSet: unknown
+  let widthMmSet: number | undefined
+  let heightMmSet: number | undefined
+  if (parsed.data.template !== undefined) {
+    const template = parsed.data.template
+    if (template === null) {
+      return NextResponse.json(
+        {
+          error:
+            "A pdfme template cannot be cleared; discard the draft instead.",
+        },
+        { status: 400 },
+      )
+    }
+    if (!validatePdfmeTemplate(template)) {
+      return NextResponse.json(
+        { error: "Invalid pdfme template" },
+        { status: 400 },
+      )
+    }
+    engineSet = "pdfme"
+    templateSet = template
+    widthMmSet = Number(
+      (template as { basePdf: { width: number } }).basePdf.width,
+    )
+    heightMmSet = Number(
+      (template as { basePdf: { height: number } }).basePdf.height,
+    )
+  } else if (parsed.data.engine === "pdfme" && existing.engine !== "pdfme") {
+    return NextResponse.json(
+      { error: "engine 'pdfme' requires a template" },
+      { status: 400 },
+    )
+  }
+  // A legacy (blocks) draft can never have its stack emptied — the renderer
+  // would have nothing to draw. Pdfme drafts keep `blocks` as a read-only copy.
+  if (
+    parsed.data.blocks !== undefined &&
+    parsed.data.blocks.length === 0 &&
+    templateSet === undefined &&
+    existing.engine !== "pdfme"
+  ) {
+    return NextResponse.json(
+      { error: "Add at least one block to the label" },
+      { status: 400 },
+    )
+  }
+
   const [updated] = await db
     .update(labelTemplate)
     .set({
       ...(parsed.data.name !== undefined
         ? { name: parsed.data.name.trim() }
         : {}),
-      ...(parsed.data.widthMm !== undefined
-        ? { widthMm: parsed.data.widthMm }
-        : {}),
-      ...(parsed.data.heightMm !== undefined
-        ? { heightMm: parsed.data.heightMm }
-        : {}),
+      ...(widthMmSet !== undefined
+        ? { widthMm: widthMmSet }
+        : parsed.data.widthMm !== undefined
+          ? { widthMm: parsed.data.widthMm }
+          : {}),
+      ...(heightMmSet !== undefined
+        ? { heightMm: heightMmSet }
+        : parsed.data.heightMm !== undefined
+          ? { heightMm: parsed.data.heightMm }
+          : {}),
       ...(parsed.data.logoRef !== undefined
         ? { logoRef: parsed.data.logoRef ?? null }
         : {}),
       ...(parsed.data.blocks !== undefined
         ? { blocks: parsed.data.blocks }
         : {}),
+      ...(engineSet !== null ? { engine: engineSet } : {}),
+      ...(templateSet !== undefined ? { template: templateSet } : {}),
       updatedAt: new Date().toISOString(),
     })
     .where(eq(labelTemplate.id, id))

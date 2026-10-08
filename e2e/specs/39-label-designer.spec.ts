@@ -7,9 +7,11 @@ import { dialog, labelDesigner } from "../selectors"
  * platform-wide parcel label and publishes versions of it. The quick-print
  * action (see `38-print-label.spec.ts`) reads whatever this screen publishes.
  *
- * One scenario walks the whole lifecycle — edit, preview against sample data,
- * save the draft, publish, and see the new version in history — because the
- * value is in the pipeline, not in any single control.
+ * The Design tab is the pdfme free canvas. One scenario walks the whole
+ * lifecycle — edit on the canvas, preview against sample data, save the draft,
+ * publish, load the version back — because the value is in the pipeline, not
+ * in any single control. The canvas itself (pdfme's `Designer`) is covered by
+ * unit smoke tests; here we assert its seams: mount, palette, save payload.
  */
 
 test.describe("3901. Label designer", () => {
@@ -20,60 +22,82 @@ test.describe("3901. Label designer", () => {
     await page.goto("/dashboard/label-designer")
     await waitForAppReady(page)
 
-    // The editor seeds from the API (or the built-in default) and the design
-    // tab previews it against the sample order immediately.
+    // The editor seeds from the API (or the built-in default) as a pdfme
+    // template; the canvas host mounts once the label font has loaded, and
+    // pdfme's Designer renders its own DOM subtree into it.
     await expect(page.locator(labelDesigner.name)).toBeVisible({
       timeout: 15_000,
     })
-    await expect(page.locator(labelDesigner.inlinePreview)).toContainText(
-      "ORD-100001",
-    )
-
-    // The inline preview shrinks to its panel instead of overflowing it — a
-    // fixed-size render is wider than the design column.
+    const canvas = page.locator(labelDesigner.canvas)
+    await expect(canvas).toBeVisible({ timeout: 20_000 })
     await expect
-      .poll(() =>
-        page.locator(labelDesigner.inlinePreview).evaluate((el) => {
-          const panel = el.closest('[data-slot="card-content"]')
-          return panel
-            ? el.getBoundingClientRect().width <=
-                panel.getBoundingClientRect().width + 1
-            : false
-        }),
-      )
-      .toBe(true)
+      .poll(() => canvas.evaluate((el) => el.childElementCount), {
+        timeout: 20_000,
+      })
+      .toBeGreaterThan(0)
 
-    // Add a block: the stack is the label, so an edit must add a row.
-    const rows = page.locator(labelDesigner.blockRowPrefix)
-    const before = await rows.count()
-    await page.locator(labelDesigner.addBlock("spacer")).click()
-    await expect(rows).toHaveCount(before + 1)
+    // The palette reads the live template: the default label already carries
+    // a QR, so a second one is refused with a toast…
+    await page.locator(labelDesigner.addQr).click()
+    await expect(toast(page, /already on the label/)).toBeVisible()
 
-    // A custom-text block carries free text onto the label; its body shows in
-    // the live preview immediately.
-    await page.locator(labelDesigner.addBlock("text")).click()
-    await expect(rows).toHaveCount(before + 2)
-    await page.locator(labelDesigner.textBlock(before + 1)).fill("This side up")
-    await expect(page.locator(labelDesigner.inlinePreview)).toContainText(
-      "This side up",
-    )
+    // …while a field that isn't on the label yet is added — and is then
+    // refused too, which proves the first click landed in the form's
+    // template rather than only in the canvas internals.
+    const siteName = page.locator(labelDesigner.addField("siteName"))
+    await siteName.click()
+    await siteName.click()
+    await expect(
+      toast(page, /"Brand name" is already on the label/),
+    ).toBeVisible()
 
-    // The full preview tab renders the same blocks, fitted to the panel too.
+    // The template name is what history will remember this edit by.
+    await page.locator(labelDesigner.name).fill("Canvas parcel label")
+
+    // The preview tab renders through the PDF engine — the same generator the
+    // print action uses — not through the DOM renderer.
     await page.locator(labelDesigner.tabPreview).click()
     const preview = page.locator(labelDesigner.previewRenderer)
     await expect(preview).toBeVisible()
-    await expect(preview).toContainText("ORD-100001")
+    await expect
+      .poll(() => preview.evaluate((el) => el.childElementCount), {
+        timeout: 20_000,
+      })
+      .toBeGreaterThan(0)
 
-    // Publish persists the draft first, then appends a new live version.
+    // Publish persists the draft first — its payload *is* the canvas state —
+    // then appends a new live version.
+    const saveRequest = page.waitForRequest(
+      (req) =>
+        req.method() === "POST" &&
+        req.url().endsWith("/api/admin/label-template") &&
+        req.postDataJSON()?.template != null,
+      { timeout: 30_000 },
+    )
     await page.locator(labelDesigner.publish).click()
     await expect(page.locator(dialog.confirm)).toBeVisible()
     await page.locator(dialog.confirmButton).click()
+    const saved = await saveRequest
+    const payload = saved.postDataJSON() as {
+      name: string
+      engine: string
+      template: { schemas: Array<Array<{ name: string }>> }
+    }
+    expect(payload.name).toBe("Canvas parcel label")
+    expect(payload.engine).toBe("pdfme")
+    expect(payload.template.schemas[0].map((s) => s.name)).toContain("siteName")
     await expect(toast(page, /Published/)).toBeVisible({ timeout: 15_000 })
 
-    // The published version is now the live one in history.
+    // The published version is now the live one in history — and, being a
+    // pdfme row, it loads back into the canvas.
     await page.locator(labelDesigner.tabHistory).click()
-    await expect(
-      page.locator(labelDesigner.versionPrefix).filter({ hasText: "Live" }),
-    ).toBeVisible()
+    const row = page.locator(labelDesigner.versionRow(1))
+    await expect(row).toBeVisible()
+    await expect(row).toContainText("Canvas parcel label")
+    await expect(row).toContainText("Live")
+    const load = page.locator(labelDesigner.loadVersion(1))
+    await expect(load).toBeEnabled()
+    await load.click()
+    await expect(toast(page, /Loaded v1/)).toBeVisible()
   })
 })

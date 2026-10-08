@@ -21,6 +21,8 @@ export const GET = withErrorHandler(async () => {
       heightMm: labelTemplate.heightMm,
       logoRef: labelTemplate.logoRef,
       blocks: labelTemplate.blocks,
+      engine: labelTemplate.engine,
+      template: labelTemplate.template,
       version: labelTemplate.version,
     })
     .from(labelTemplate)

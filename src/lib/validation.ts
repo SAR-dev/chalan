@@ -1016,17 +1016,29 @@ const labelDimension = (label: string) =>
       `${label} cannot exceed ${LABEL_TEMPLATE_MAX_MM}mm`,
     )
 
-export const labelTemplateCreateSchema = z.object({
-  name: requiredString("Template name").max(
-    LABEL_NAME_MAX,
-    `Template name cannot exceed ${LABEL_NAME_MAX} characters`,
-  ),
-  widthMm: labelDimension("Width"),
-  heightMm: labelDimension("Height"),
-  // Storage key from src/lib/storage/*, or blank/absent for no logo.
-  logoRef: z.string().trim().max(500).nullish(),
-  blocks: labelBlocksSchema.min(1, "Add at least one block to the label"),
-})
+export const labelTemplateCreateSchema = z
+  .object({
+    name: requiredString("Template name").max(
+      LABEL_NAME_MAX,
+      `Template name cannot exceed ${LABEL_NAME_MAX} characters`,
+    ),
+    widthMm: labelDimension("Width"),
+    heightMm: labelDimension("Height"),
+    // Storage key from src/lib/storage/*, or blank/absent for no logo.
+    logoRef: z.string().trim().max(500).nullish(),
+    // The route validates `template` itself (PDF.md §5); the refine below keeps
+    // the structural rule here — a draft is blocks-with-a-stack or pdfme-with-a-
+    // template, never a bare row neither render path understands.
+    blocks: labelBlocksSchema.optional(),
+    engine: z.enum(["blocks", "pdfme"]).optional(),
+    template: z.any().optional(),
+  })
+  .refine(
+    (d) =>
+      d.template !== undefined ||
+      (d.blocks !== undefined && d.blocks.length > 0),
+    { error: "Add at least one block to the label", path: ["blocks"] },
+  )
 
 export const labelTemplateUpdateSchema = z
   .object({
@@ -1039,9 +1051,9 @@ export const labelTemplateUpdateSchema = z
     widthMm: labelDimension("Width").optional(),
     heightMm: labelDimension("Height").optional(),
     logoRef: z.string().trim().max(500).nullish(),
-    blocks: labelBlocksSchema
-      .min(1, "Add at least one block to the label")
-      .optional(),
+    blocks: labelBlocksSchema.optional(),
+    engine: z.enum(["blocks", "pdfme"]).optional(),
+    template: z.any().optional(),
   })
   .refine(
     (d) =>
@@ -1049,6 +1061,8 @@ export const labelTemplateUpdateSchema = z
       d.widthMm !== undefined ||
       d.heightMm !== undefined ||
       d.logoRef !== undefined ||
-      d.blocks !== undefined,
+      d.blocks !== undefined ||
+      d.engine !== undefined ||
+      d.template !== undefined,
     { error: "Provide at least one field to update" },
   )

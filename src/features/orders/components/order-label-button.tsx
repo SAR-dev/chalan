@@ -1,6 +1,6 @@
 "use client"
 
-import { Printer } from "lucide-react"
+import { Download, Printer } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { LabelRenderer } from "@/components/label-renderer"
@@ -12,6 +12,7 @@ import {
   type LabelData,
   type LabelTemplateStructure,
 } from "@/lib/label-layout"
+import { toast } from "@/lib/notify"
 import type { Order } from "@/lib/types"
 
 // =============================================================================
@@ -101,6 +102,14 @@ export function OrderLabelButton({
   className,
 }: OrderLabelButtonProps) {
   const [printing, setPrinting] = useState(false)
+  const [generating, setGenerating] = useState(false)
+
+  // Engine branch (PDF.md §7): pdfme templates generate a real PDF and hand it
+  // to the browser; legacy block templates keep the portal + `window.print()`
+  // flow untouched. A published engine always wins — the rollout flag only
+  // decides the *fallback* template, never how a published one prints.
+  const pdfmeTemplate =
+    template.engine === "pdfme" && template.template ? template.template : null
 
   useEffect(() => {
     if (!printing) return
@@ -123,6 +132,43 @@ export function OrderLabelButton({
   const data = orderToLabelData(order, merchantName)
   const ariaLabel = `${formLabels.printLabel} ${order.id}`
 
+  async function handlePdfme(mode: "print" | "download"): Promise<void> {
+    if (!pdfmeTemplate || generating) return
+    setGenerating(true)
+    try {
+      // Dynamic imports: the PDF engine (and its font machinery) loads only on
+      // the click that needs it, never into every list that shows the button.
+      const [
+        { generateLabelPdf },
+        { buildLabelInputs },
+        { loadLabelFont },
+        { printOrDownload, downloadPdf },
+        { fetchLogoDataUri },
+      ] = await Promise.all([
+        import("@/lib/label/generate-pdf"),
+        import("@/lib/label/label-inputs"),
+        import("@/lib/label/fonts"),
+        import("@/lib/label/print"),
+        import("@/lib/label/logo"),
+      ])
+      const [font, logoDataUri] = await Promise.all([
+        loadLabelFont(),
+        template.logoRef ? fetchLogoDataUri(template.logoRef) : undefined,
+      ])
+      const inputs = buildLabelInputs(pdfmeTemplate, data, logoDataUri)
+      const pdf = await generateLabelPdf(pdfmeTemplate, inputs, font)
+      if (mode === "download") {
+        downloadPdf(pdf, `label-${order.id}.pdf`)
+      } else {
+        printOrDownload(pdf, `label-${order.id}.pdf`)
+      }
+    } catch {
+      toast.error("Could not generate the label PDF. Try Download instead.")
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   return (
     <>
       <Button
@@ -132,7 +178,11 @@ export function OrderLabelButton({
         aria-label={ariaLabel}
         title={formLabels.printLabel}
         data-testid={`order-label-${order.id}`}
-        onClick={() => setPrinting(true)}
+        disabled={generating}
+        onClick={() => {
+          if (pdfmeTemplate) void handlePdfme("print")
+          else setPrinting(true)
+        }}
       >
         <Printer className="size-4" />
         {showLabel ? (
@@ -141,6 +191,20 @@ export function OrderLabelButton({
           <span className="sr-only">{formLabels.printLabel}</span>
         )}
       </Button>
+      {pdfmeTemplate && (
+        <Button
+          variant={variant}
+          size="icon"
+          className={`size-8 ${className ?? ""}`.trim()}
+          aria-label={`Download label for ${order.id}`}
+          title="Download label PDF"
+          data-testid={`order-label-download-${order.id}`}
+          disabled={generating}
+          onClick={() => void handlePdfme("download")}
+        >
+          <Download className="size-4" />
+        </Button>
+      )}
       {printing &&
         typeof document !== "undefined" &&
         createPortal(

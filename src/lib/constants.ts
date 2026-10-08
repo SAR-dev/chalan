@@ -332,8 +332,8 @@ export const LABEL_DEFAULT_HEIGHT_MM = 150
  */
 export const LABEL_QR_MIN_MM = 30
 
-/** Guardrails for a hand-wavy block stack. */
 export const LABEL_MAX_BLOCKS = 40
+export const LABEL_MAX_ELEMENTS = 40
 export const LABEL_SPACER_MAX_MM = 40
 export const LABEL_NAME_MAX = 80
 

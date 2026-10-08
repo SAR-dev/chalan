@@ -1,3 +1,4 @@
+import type { Template } from "@pdfme/common"
 import {
   LABEL_DEFAULT_HEIGHT_MM,
   LABEL_DEFAULT_WIDTH_MM,
@@ -54,11 +55,18 @@ export const LABEL_SCALE_MM: Record<LabelFontScale, number> = {
  * The shape of the single platform label template — physical size plus the
  * ordered block stack. `label_template.blocks` stores exactly this array; the
  * fallback below is what the print action uses until an admin publishes one.
+ *
+ * The optional `engine`/`template` fields carry the pdfme free-canvas engine
+ * (see `PDF.md`): when `engine === "pdfme"`, `template` holds the pdfme
+ * `Template` JSON and `blocks` is only a legacy copy for old rows.
  */
 export interface LabelTemplateStructure {
   widthMm: number
   heightMm: number
   blocks: LabelBlock[]
+  logoRef?: string | null
+  engine?: "blocks" | "pdfme"
+  template?: Template | null
 }
 
 /**
