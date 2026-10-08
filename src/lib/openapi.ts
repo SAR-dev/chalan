@@ -46,12 +46,9 @@ registry.registerPath({
         .string()
         .optional()
         .openapi({ description: "Search by order id, recipient, phone" }),
-      status: z
-        .string()
-        .optional()
-        .openapi({
-          description: "Comma-separated statuses, e.g. PENDING,DELIVERED",
-        }),
+      status: z.string().optional().openapi({
+        description: "Comma-separated statuses, e.g. PENDING,DELIVERED",
+      }),
       limit: z.coerce.number().optional().openapi({ description: "Page size" }),
       offset: z.coerce.number().optional().openapi({ description: "Offset" }),
     }),
@@ -83,12 +80,9 @@ registry.registerPath({
   security: [{ bearerAuth: [] }],
   request: {
     headers: z.object({
-      "Idempotency-Key": z
-        .string()
-        .optional()
-        .openapi({
-          description: "Retry safety — same key returns the original order",
-        }),
+      "Idempotency-Key": z.string().optional().openapi({
+        description: "Retry safety — same key returns the original order",
+      }),
     }),
     body: {
       content: {

@@ -36,7 +36,7 @@
 
 | Priority | Items | Status |
 |---|---|---|
-| **P1 - High-leverage product work** | R2 · R3 | open (R9 shipped · R5 shipped · R1 decided · R8 shipped) |
+| **P1 - High-leverage product work** | R3 | open (R2 shipped · R9 shipped · R5 shipped · R1 decided · R8 shipped) |
 | **P2 - Later product bets** | R4 · R6 · R7 | open |
 
 ### Dependencies
@@ -46,7 +46,7 @@
 | **R1** i18n decision | none | **Decided - deferred** (see Decisions). New user-facing copy in R2 / R3 / R5 / R9 / P2 goes in `src/config/content.ts`, not new inline literals |
 | **R5** Printable parcel labels + QR code, admin label designer | none | **shipped** - see git history. Was the blocker for R9; its QR encodes `order.id`, and print generates a vector PDF via pdfme (PDF.md) |
 | **R9** Parcel QR-code scanning at pickup + delivery | **R5** (satisfied) | **built** — a scan proves possession of the parcel, never rider identity - it must not weaken the auth guard. Scanning and manual code entry are two routes to the same action, so a dead camera never blocks a delivery |
-| **R2** API keys, webhooks, OpenAPI | none | docs page and error copy follow R1's writing rule. `/api/v1/orders` should accept the order's `recipientMail` |
+| **R2** API keys, webhooks, OpenAPI | none | **shipped** — `/api/v1/orders` behind API keys (hash-only, `orders:write`/`read`), signed webhooks on the state machine, and `/help/api` + `/api/v1/openapi` generated from `orderCreateSchema` via `@asteasolutions/zod-to-openapi` |
 | **R3** Notifications (in-app, preferences) | none — its R8 prerequisite is **shipped**: `recipientMail` is on the order | copy follows R1's writing rule. Shares R2's event source (`src/features/orders/transitions.ts`) - emit once, fan out to both sinks. Toast sounds use howler.js (see Decisions) |
 | **P2** items (R4 · R6 · R7) | none | copy follows R1's writing rule |
 
@@ -104,12 +104,11 @@ P1 ahead of R4 on purpose, and ahead of R2/R3 because R9 was blocked on it.
 What decides where an item sits is what it blocks and what it costs to land,
 not when it was written down.
 
-**Order:** **R5 and R9 have both shipped** - parcel labels with a vector PDF
-print path, and QR scanning at pickup and delivery. That closes P1's original
-blocker chain. What remains is **R2 and R3**, which are independent of each
-other and can be reordered or run in parallel. R1 is already decided (deferred
-i18n) and needs no turn in the order - it only shapes the copy in what follows.
-R8, R5 and R9 have shipped and left the plan.
+**Order:** **R5, R9 and R2 have shipped** - parcel labels with a vector PDF
+print path, QR scanning at pickup and delivery, and merchant API keys + webhooks
++ OpenAPI. P1's blocker chain is closed; what remains is **R3** and the P2 bets.
+R1 is already decided (deferred i18n) and needs no turn in the order - it only
+shapes the copy in what follows. R8, R5, R9 and R2 have shipped and left the plan.
 
 ### Decisions already made (recorded so they are not re-opened)
 
@@ -443,24 +442,23 @@ stays with R5.
 
 Band **R4 Product** - spec first, then build. **Depends on R5.**
 
-### R2 Merchant integration surface: API keys, webhooks, OpenAPI
+### R2 Merchant integration surface: API keys, webhooks, OpenAPI — **shipped**
 
-No merchant-facing integration surface exists: `apiKey`, `api-key`,
-`openapi` and `swagger` return **0** matches, and the only `webhook` hits are
-the ops-only `ERROR_WEBHOOK_URL` sink (`src/lib/error-report.ts:16`,
-`src/lib/env.ts:174` - POSTs unhandled 500s to an operator, nothing a merchant
-can call). Merchants cannot push orders programmatically at all. This is the
-single biggest barrier to onboarding anyone above small volume, and it is the
-reason every merchant conversation ends in "can we integrate?".
+Was the single biggest barrier to onboarding anyone above small volume — every
+merchant conversation ended in "can we integrate?" No `apiKey`, `openapi` or
+merchant-facing `webhook` existed; the only webhook was the ops-only
+`ERROR_WEBHOOK_URL` sink.
 
-**Ship:** `/api/v1/orders` behind API keys, signed webhooks on order state
-changes (the state machine at `src/features/orders/transitions.ts` is the
-event source), and a docs page generated from Zod schemas (already
-centralised in `src/lib/validation.ts`).
+**Shipped:** `/api/v1/orders` behind API keys (hash-only, `chl_live_…`,
+`orders:write`/`read`, `Idempotency-Key` and `recipientMail` supported),
+signed webhooks on the state machine (`order.created` + 7 status events,
+HMAC over `<timestamp>.<body>`, `FOR UPDATE SKIP LOCKED` drain every minute,
+no retries by decision), and `/help/api` + `/api/v1/openapi` generated from
+`orderCreateSchema` via `@asteasolutions/zod-to-openapi` (so a new field in
+Zod appears in the spec and the build fails otherwise).
 
-Independent of R3. Webhooks and in-app notifications consume the same order
-events, so emit each event once and fan out to both sinks rather than building
-two emitters.
+R3 notifications consume the same event source — emit once, fan out to both
+sinks, rather than building two emitters. Independent of R3.
 
 ### R3 Notification system
 
