@@ -26,6 +26,7 @@ import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { CANCELLABLE_ORDER_STATUSES } from "@/lib/constants"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
+import { toast } from "@/lib/notify"
 import type { Order, Rider, Warehouse } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -191,7 +192,12 @@ export function OrderDetailView({
                           noteValue.trim(),
                         )
                         setNoteSaving(false)
-                        if (!res.ok) return
+                        if (!res.ok) {
+                          toast.error(
+                            res.error ?? "Could not save the merchant note.",
+                          )
+                          return
+                        }
                         setEditingNote(false)
                       }}
                     >

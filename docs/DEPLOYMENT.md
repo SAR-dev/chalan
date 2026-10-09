@@ -61,21 +61,33 @@ LIMIT 20;
 1. Import the repo into Vercel and set the required env vars (`DATABASE_URL`,
    `BETTER_AUTH_SECRET`, plus any storage/mail vars from `docs/ENV.md`).
 2. Add `CRON_SECRET` to the project's env vars — Vercel Cron injects the
-   `Authorization` header automatically for the job defined in
-   [`vercel.json`](./vercel.json) (`/api/cron/cleanup-sessions`, daily at 03:00 UTC).
-3. `vercel.json` only schedules session cleanup. The audit-log and email-log
-   cleanup jobs (`/api/cron/cleanup-audit-logs`, `/api/cron/cleanup-email-logs`)
-   aren't in the free Vercel Cron plan by default — add them as additional
-   `crons` entries if your plan supports more than one job, or trigger them
-   from an external scheduler (e.g. GitHub Actions, cron-job.org) with the
-   same `Authorization: Bearer $CRON_SECRET` header.
-4. Set `BETTER_AUTH_ALLOWED_URLS` in your env to list all preview/staging
+   `Authorization` header automatically for the jobs defined in
+   [`vercel.json`](./vercel.json) (`drain-email-outbox` and `drain-webhooks`
+   every minute, then the four cleanup jobs daily).
+3. **Migrations run automatically on production deploys.** `vercel.json` has no
+   pre-deploy step, so the build uses a `vercel-build` script
+   (`scripts/vercel-build.mjs`) that runs `pnpm db:migrate` before
+   `next build` when `VERCEL_ENV === "production"`. A failed migration fails the
+   deploy, so a schema change can never ship ahead of the code that needs it.
+   `migrate.ts` takes a database-wide advisory lock, so concurrent or
+   re-entrant deploys cannot double-apply. Preview and development deployments
+   skip it — only the production branch owns the schema. Two operational notes:
+   - The build container must be able to **reach** the database. If yours is
+     VPC-locked or IP-restricted, set `VERCEL_SKIP_MIGRATE=1` and run
+     `pnpm db:migrate` from a runner that can reach it.
+   - The `drizzle.__drizzle_migrations` ledger must already exist. If the target
+     database was created by `db:push` or predates the ledger, the first deploy
+     fails and tells you to run `pnpm db:migrate --baseline` once. Do that
+     against a database whose schema you have confirmed is current.
+4. `vercel.json` no longer needs extra `crons` entries for the cleanup jobs;
+   all six are scheduled there.
+5. Set `BETTER_AUTH_ALLOWED_URLS` in your env to list all preview/staging
    URLs that Better Auth should trust (comma-separated). Omit for production
    single-instance deployments.
-5. Local disk storage (`STORAGE_PROVIDER=local`) does **not** work on Vercel's
+6. Local disk storage (`STORAGE_PROVIDER=local`) does **not** work on Vercel's
    ephemeral filesystem. Use `STORAGE_PROVIDER=r2`
    instead.
-6. The app uses `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`,
+7. The app uses `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`,
    `pg_stat_statements`, and `pg_cron` PostgreSQL extensions — if you're
    using a managed Postgres provider (Neon, Supabase, RDS), enable them
    manually after provisioning (see [SETUP.md](./SETUP.md#postgresql-extensions)).

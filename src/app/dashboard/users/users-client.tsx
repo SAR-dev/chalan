@@ -147,7 +147,11 @@ export function UsersPageClient({
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="ghost" size="icon" data-testid="users-actions">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid={`users-actions-${u.id}`}
+                >
                   <MoreHorizontal className="size-4" />
                   <span className="sr-only">Actions</span>
                 </Button>

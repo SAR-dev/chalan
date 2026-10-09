@@ -101,7 +101,14 @@ export function MerchantsPageClient({
 
   async function confirmBulkSuspend() {
     setBulkBusy(true)
-    await suspendMerchants(bulkSuspendIds)
+    const result = await suspendMerchants(bulkSuspendIds)
+    if (!result.ok) {
+      toast.error(result.error ?? "Failed to suspend merchants.")
+      setBulkBusy(false)
+      setBulkSuspendOpen(false)
+      setBulkSuspendIds([])
+      return
+    }
     toast.success(
       `${bulkSuspendIds.length} merchant${bulkSuspendIds.length === 1 ? "" : "s"} suspended.`,
     )
@@ -117,7 +124,14 @@ export function MerchantsPageClient({
 
   async function confirmBulkReactivate() {
     setBulkBusy(true)
-    await reactivateMerchants(bulkReactivateIds)
+    const result = await reactivateMerchants(bulkReactivateIds)
+    if (!result.ok) {
+      toast.error(result.error ?? "Failed to reactivate merchants.")
+      setBulkBusy(false)
+      setBulkReactivateOpen(false)
+      setBulkReactivateIds([])
+      return
+    }
     toast.success(
       `${bulkReactivateIds.length} merchant${bulkReactivateIds.length === 1 ? "" : "s"} reactivated.`,
     )
@@ -143,8 +157,18 @@ export function MerchantsPageClient({
     setPage(1)
   }, [tab, setStatuses, setPage])
 
-  const counts = useMemo(
-    () => ({
+  // The all-list is query-aware, so a zero is a real answer once a search runs
+  // — falling back to the unfiltered aggregate would show a total for rows the
+  // table is not displaying.
+  const counts = useMemo(() => {
+    if (query) {
+      return {
+        total: allMerchants.length,
+        active: allMerchants.filter((m) => m.status === "ACTIVE").length,
+        suspended: allMerchants.filter((m) => m.status === "SUSPENDED").length,
+      }
+    }
+    return {
       total: allMerchants.length || initialCounts.total,
       active:
         allMerchants.filter((m) => m.status === "ACTIVE").length ||
@@ -152,9 +176,8 @@ export function MerchantsPageClient({
       suspended:
         allMerchants.filter((m) => m.status === "SUSPENDED").length ||
         initialCounts.suspended,
-    }),
-    [allMerchants, initialCounts],
-  )
+    }
+  }, [allMerchants, initialCounts, query])
 
   function openConfirm(merchant: Merchant, action: "suspend" | "reactivate") {
     setConfirmMerchant(merchant)
@@ -167,10 +190,18 @@ export function MerchantsPageClient({
     setConfirmLoading(true)
     try {
       if (confirmAction === "suspend") {
-        await suspendMerchant(confirmMerchant.id)
+        const result = await suspendMerchant(confirmMerchant.id)
+        if (!result.ok) {
+          toast.error(result.error ?? "Failed to suspend merchant.")
+          return
+        }
         toast.success(`${confirmMerchant.businessName} suspended.`)
       } else if (confirmAction === "reactivate") {
-        await reactivateMerchant(confirmMerchant.id)
+        const result = await reactivateMerchant(confirmMerchant.id)
+        if (!result.ok) {
+          toast.error(result.error ?? "Failed to reactivate merchant.")
+          return
+        }
         toast.success(`${confirmMerchant.businessName} reactivated.`)
       }
       setConfirmOpen(false)

@@ -73,8 +73,20 @@ export function RiderApplicationsPageClient({
     setPage(1)
   }, [tab, setStatuses, setPage])
 
-  const counts = useMemo(
-    () => ({
+  // The all-list is query-aware, so a zero is a real answer once a search runs
+  // — falling back to the unfiltered aggregate would show a total for rows the
+  // table is not displaying.
+  const counts = useMemo(() => {
+    if (query) {
+      return {
+        total: allApplications.length,
+        pending: allApplications.filter((a) => a.status === "PENDING").length,
+        approved: allApplications.filter((a) => a.status === "APPROVED").length,
+        active: allApplications.filter((a) => a.status === "ACTIVE").length,
+        rejected: allApplications.filter((a) => a.status === "REJECTED").length,
+      }
+    }
+    return {
       total: allApplications.length || initialTotal,
       pending:
         allApplications.filter((a) => a.status === "PENDING").length ||
@@ -86,9 +98,8 @@ export function RiderApplicationsPageClient({
       rejected:
         allApplications.filter((a) => a.status === "REJECTED").length ||
         initialCounts.rejected,
-    }),
-    [allApplications, initialTotal, initialCounts],
-  )
+    }
+  }, [allApplications, initialTotal, initialCounts, query])
 
   function openDetail(app: RiderApplication) {
     setDetailApp(app)

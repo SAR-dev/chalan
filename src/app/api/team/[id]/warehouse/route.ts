@@ -42,24 +42,30 @@ export const PATCH = withErrorHandler(
     }
 
     // Keep warehouse.managedBy in sync: release any warehouse this admin used to
-    // manage, then claim the newly selected one (if any).
-    await db
-      .update(warehouse)
-      .set({ managedBy: null })
-      .where(eq(warehouse.managedBy, id))
-
-    if (warehouseId) {
-      await db
+    // manage, then claim the newly selected one (if any). All three writes share
+    // one transaction so a partial failure cannot leave `warehouse.managedBy`
+    // pointing at an admin whose profile says otherwise.
+    const updated = await db.transaction(async (tx) => {
+      await tx
         .update(warehouse)
-        .set({ managedBy: id })
-        .where(eq(warehouse.id, warehouseId))
-    }
+        .set({ managedBy: null })
+        .where(eq(warehouse.managedBy, id))
 
-    const [updated] = await db
-      .update(profile)
-      .set({ warehouseId })
-      .where(eq(profile.userId, id))
-      .returning()
+      if (warehouseId) {
+        await tx
+          .update(warehouse)
+          .set({ managedBy: id })
+          .where(eq(warehouse.id, warehouseId))
+      }
+
+      const [row] = await tx
+        .update(profile)
+        .set({ warehouseId })
+        .where(eq(profile.userId, id))
+        .returning()
+
+      return row
+    })
 
     const [targetUser] = await db
       .select({ name: user.name })

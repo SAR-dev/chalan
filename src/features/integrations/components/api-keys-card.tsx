@@ -65,7 +65,13 @@ export function ApiKeysCard() {
       toast.error(res.error ?? "Could not create key")
       return
     }
-    setRevealedKey({ plaintext: res.plaintext!, label: label.trim() })
+    if (!res.plaintext) {
+      // The API returns the secret exactly once on a 201; a missing value means
+      // the contract changed rather than a user error, so do not assert on it.
+      toast.error("The key was created but its secret was not returned.")
+      return
+    }
+    setRevealedKey({ plaintext: res.plaintext, label: label.trim() })
     setLabel("")
     toast.success("API key created — copy it now, it will not be shown again")
   }
@@ -120,9 +126,16 @@ export function ApiKeysCard() {
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={() => {
-                    navigator.clipboard.writeText(revealedKey.plaintext)
-                    toast.success("Copied")
+                  aria-label={`Copy API key for ${revealedKey.label}`}
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(revealedKey.plaintext)
+                      toast.success("Copied")
+                    } catch {
+                      toast.error(
+                        "Could not copy — select the key and copy it manually",
+                      )
+                    }
                   }}
                 >
                   <Copy className="size-4" />
@@ -214,6 +227,7 @@ export function ApiKeysCard() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={`Revoke API key ${k.label}`}
                     data-testid={`revoke-${k.id}`}
                     onClick={() => setRevokeId(k.id)}
                   >
@@ -341,6 +355,7 @@ export function ApiKeysCard() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label={`Remove webhook endpoint ${ep.url}`}
                   data-testid={`delete-webhook-${ep.id}`}
                   onClick={async () => {
                     const res = await deleteEndpoint(ep.id)

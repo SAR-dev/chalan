@@ -2,6 +2,7 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto"
 import { and, asc, eq, inArray, lte } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { webhookDelivery, webhookEndpoint } from "@/lib/db/schema"
+import { isPrivateHost } from "@/lib/host-guard"
 import { logger } from "@/lib/logger"
 
 /**
@@ -127,7 +128,6 @@ export async function emitWebhookEvent({
   /** ISO timestamp to use for the webhook payload's `createdAt`. Defaults to `new Date().toISOString()` but transitions pass their single `now` so the bulk test's clock spy stays at 1. */
   now?: string
 }): Promise<void> {
-  if ((tx as unknown as { __isMock?: boolean }).__isMock) return
   let endpoints: { id: string; events: string[] | null }[]
   try {
     endpoints = await tx
@@ -275,6 +275,39 @@ export async function drainWebhooks({
     const timestamp = Math.floor(Date.now() / 1000)
     const signature = signWebhookPayload(endpoint.secret, timestamp, body)
 
+    // SSRF guard: resolve the endpoint URL's hostname and reject private /
+    // internal targets before making the request. This is a second layer
+    // beyond the schema check (which runs at create/update time) — the
+    // endpoint could have been created before the guard was added, or the
+    // DNS record could have changed since.
+    let url: URL
+    try {
+      url = new URL(endpoint.url)
+    } catch {
+      await db
+        .update(webhookDelivery)
+        .set({
+          status: "FAILED",
+          lastError: "Invalid endpoint URL",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(webhookDelivery.id, row.id))
+      failed++
+      continue
+    }
+    if (isPrivateHost(url.hostname)) {
+      await db
+        .update(webhookDelivery)
+        .set({
+          status: "FAILED",
+          lastError: "Endpoint URL resolves to a private or internal host",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(webhookDelivery.id, row.id))
+      failed++
+      continue
+    }
+
     try {
       const res = await fetch(endpoint.url, {
         method: "POST",
@@ -289,6 +322,7 @@ export async function drainWebhooks({
         },
         body,
         signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+        redirect: "manual",
       })
 
       if (!res.ok) {
@@ -328,27 +362,56 @@ export async function drainWebhooks({
         })
         .where(eq(webhookDelivery.id, row.id))
 
-      const failures = endpoint.failureCount + 1
-      const shouldDisable = failures >= WEBHOOK_FAILURE_THRESHOLD
+      // No retry: park it. The merchant sees the failure and the error in their
+      // delivery log, and can reconcile against `/api/v1/orders`.
       await db
-        .update(webhookEndpoint)
+        .update(webhookDelivery)
         .set({
-          failureCount: failures,
-          ...(shouldDisable
-            ? {
-                isActive: false,
-                disabledAt: new Date().toISOString(),
-              }
-            : {}),
+          status: "FAILED",
+          attempts: row.attempts + 1,
+          lastError: message.slice(0, 500),
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(webhookEndpoint.id, endpoint.id))
+        .where(eq(webhookDelivery.id, row.id))
+
+      // Increment the endpoint's failure counter under a row lock and recompute
+      // from the locked value. Reading it into JS first (the old
+      // `endpoint.failureCount + 1`) let concurrent drains overwrite each other
+      // with a stale snapshot, which could push auto-disable past the threshold.
+      const { failures, shouldDisable } = await db.transaction(async (tx) => {
+        const [locked] = await tx
+          .select({ failureCount: webhookEndpoint.failureCount })
+          .from(webhookEndpoint)
+          .where(eq(webhookEndpoint.id, endpoint.id))
+          .for("update")
+          .limit(1)
+
+        const failures = (locked?.failureCount ?? 0) + 1
+        const shouldDisable = failures >= WEBHOOK_FAILURE_THRESHOLD
+
+        await tx
+          .update(webhookEndpoint)
+          .set({
+            failureCount: failures,
+            ...(shouldDisable
+              ? {
+                  isActive: false,
+                  disabledAt: new Date().toISOString(),
+                }
+              : {}),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(webhookEndpoint.id, endpoint.id))
+
+        return { failures, shouldDisable }
+      })
 
       logger.warn("webhook delivery failed", {
         deliveryId: row.id,
         endpointId: endpoint.id,
         event: row.event,
         attempts: row.attempts + 1,
+        failureCount: failures,
         disabled: shouldDisable,
         err: message,
       })

@@ -18,7 +18,6 @@ import { columnLabels } from "@/config/table-column-labels"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
-import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { Order, OrderStatus } from "@/lib/types"
@@ -55,6 +54,7 @@ const TAB_STATUSES: Record<FilterTab, string[] | undefined> = {
 export default function MerchantOrdersPage() {
   const {
     orders,
+    allOrders,
     total,
     setPage,
     setLimit,
@@ -68,24 +68,51 @@ export default function MerchantOrdersPage() {
     sortDir,
     onSortChange,
     mutate: refresh,
-  } = useOrders()
+  } = useOrders({
+    // The tab badges count across every status, which the paginated list
+    // (filtered to the active tab, one page at a time) cannot give.
+    includeAllOrders: true,
+  })
 
-  const { pickupLocations } = usePickupLocations()
   const [tab, setTab] = useState<FilterTab>("ACTIVE")
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [viewOrderCode, setViewOrderCode] = useState<string | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
 
-  const _pickup = (id: string) => pickupLocations.find((p) => p.id === id)
-
   useEffect(() => {
     setStatuses(TAB_STATUSES[tab])
     setPage(1)
   }, [tab, setStatuses, setPage])
 
+  // `allOrders` is the unfiltered (all-status) set, so a tab badge counts real
+  // rows rather than the single page the table happens to be showing. While a
+  // search is running the badges reflect it, so a zero is a real answer.
   const counts = useMemo(() => {
-    const all = orders
+    if (query) {
+      const searched = allOrders
+      return {
+        active: searched.filter((o) =>
+          ACTIVE_STATUSES.includes(o.status as OrderStatus),
+        ).length,
+        pending: searched.filter((o) => o.status === "PENDING").length,
+        inProgress: searched.filter((o) =>
+          [
+            "APPROVED",
+            "OUT_FOR_PICKUP",
+            "PICKED_UP",
+            "IN_WAREHOUSE",
+            "IN_TRANSIT",
+            "OUT_FOR_DELIVERY",
+          ].includes(o.status as OrderStatus),
+        ).length,
+        issues: searched.filter((o) =>
+          ["FAILED_ATTEMPT", "RETURNED"].includes(o.status as OrderStatus),
+        ).length,
+      }
+    }
+
+    const all = allOrders
     return {
       active: all.filter((o) =>
         ACTIVE_STATUSES.includes(o.status as OrderStatus),
@@ -105,7 +132,7 @@ export default function MerchantOrdersPage() {
         ["FAILED_ATTEMPT", "RETURNED"].includes(o.status as OrderStatus),
       ).length,
     }
-  }, [orders])
+  }, [allOrders, query])
 
   const columns: DataTableColumn<Order>[] = [
     {

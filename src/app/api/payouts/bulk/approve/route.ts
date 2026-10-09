@@ -1,10 +1,12 @@
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import { badRequest, forbidden, unauthorized } from "@/lib/api-response"
 import { logAuditMany } from "@/lib/audit"
 import { db } from "@/lib/db"
-import { payoutRequest } from "@/lib/db/schema"
+import { sumMoney } from "@/lib/db/money-sql"
+import { order, payoutRequest } from "@/lib/db/schema"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { idsSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -12,6 +14,9 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   const me = await requireSession()
   if (!me) return unauthorized()
   if (me.role !== "SUPER_ADMIN") return forbidden()
+
+  const limited = await rateLimitByIp(req, "payout-bulk-approve", 20, 60)
+  if (limited) return limited
 
   const parsed = await parseBody(req, idsSchema)
   if (parsed.error) return parsed.error
@@ -28,24 +33,52 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     return badRequest("No PENDING payout requests found for the given IDs.")
   }
 
-  const pendingIds = pendings.map((p) => p.id)
-  const updated = await db
-    .update(payoutRequest)
-    .set({
-      status: "APPROVED",
-      reviewedBy: me.name,
-      reviewedAt: new Date().toISOString(),
-    })
-    .where(
-      and(
-        inArray(payoutRequest.id, pendingIds),
-        eq(payoutRequest.status, "PENDING"),
-      ),
-    )
-    .returning()
+  const reviewedAt = new Date().toISOString()
+  const approved: { id: string }[] = []
+
+  await db.transaction(async (tx) => {
+    for (const { id } of pendings) {
+      const [current] = await tx
+        .select({
+          status: payoutRequest.status,
+        })
+        .from(payoutRequest)
+        .where(eq(payoutRequest.id, id))
+        .for("update")
+        .limit(1)
+
+      if (!current || current.status !== "PENDING") continue
+
+      const [totals] = await tx
+        .select({
+          orderCount: sql<number>`count(*)::int`,
+          total: sumMoney(order.merchantEarnings),
+        })
+        .from(order)
+        .where(eq(order.payoutRequestId, id))
+
+      if (Number(totals?.orderCount ?? 0) === 0) continue
+
+      await tx
+        .update(payoutRequest)
+        .set({
+          status: "APPROVED",
+          amount: Number(totals?.total ?? 0),
+          reviewedBy: me.name,
+          reviewedAt,
+        })
+        .where(eq(payoutRequest.id, id))
+
+      approved.push({ id })
+    }
+  })
+
+  if (approved.length === 0) {
+    return badRequest("No payout requests could be approved.")
+  }
 
   await logAuditMany(
-    updated.map((p) => ({
+    approved.map((p) => ({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: "PAYOUT_APPROVED",
       entityType: "payout_request",
@@ -54,5 +87,5 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     })),
   )
 
-  return NextResponse.json({ ok: true, count: updated.length })
+  return NextResponse.json({ ok: true, count: approved.length })
 })

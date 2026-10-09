@@ -144,18 +144,25 @@ export function PayoutsPageClient({
     setPage(1)
   }, [tab, setStatuses, setPage])
 
-  const pendingCount =
-    allPayoutRequests.filter((p) => p.status === "PENDING").length ||
-    initialCounts.pending
-  const approvedCount =
-    allPayoutRequests.filter((p) => p.status === "APPROVED").length ||
-    initialCounts.approved
-  const paidCount =
-    allPayoutRequests.filter((p) => p.status === "PAID").length ||
-    initialCounts.paid
-  const rejectedCount =
-    allPayoutRequests.filter((p) => p.status === "REJECTED").length ||
-    initialCounts.rejected
+  // The all-list is query-aware, so a zero is a real answer once a search runs
+  // — falling back to the unfiltered aggregate would show a total for rows the
+  // table is not displaying.
+  const pendingCount = query
+    ? allPayoutRequests.filter((p) => p.status === "PENDING").length
+    : allPayoutRequests.filter((p) => p.status === "PENDING").length ||
+      initialCounts.pending
+  const approvedCount = query
+    ? allPayoutRequests.filter((p) => p.status === "APPROVED").length
+    : allPayoutRequests.filter((p) => p.status === "APPROVED").length ||
+      initialCounts.approved
+  const paidCount = query
+    ? allPayoutRequests.filter((p) => p.status === "PAID").length
+    : allPayoutRequests.filter((p) => p.status === "PAID").length ||
+      initialCounts.paid
+  const rejectedCount = query
+    ? allPayoutRequests.filter((p) => p.status === "REJECTED").length
+    : allPayoutRequests.filter((p) => p.status === "REJECTED").length ||
+      initialCounts.rejected
 
   function openConfirm(req: PayoutRequest, action: "approve" | "markPaid") {
     setConfirmPayout(req)

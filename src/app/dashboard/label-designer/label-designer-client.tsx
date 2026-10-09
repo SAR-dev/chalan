@@ -137,6 +137,14 @@ export function LabelDesignerPageClient() {
 
   const [tab, setTab] = useState<DesignerTab>("design")
   const [form, setForm] = useState<LabelTemplateSaveInput | null>(null)
+  // Raw text for the two dimension inputs. `Number("") || value` used to snap a
+  // cleared field straight back to its old number, so retyping one meant
+  // selecting the whole field first. Holding the raw string lets the input go
+  // empty and be retyped; `null` means "show the stored value".
+  const [dimensionDraft, setDimensionDraft] = useState<{
+    field: "widthMm" | "heightMm"
+    text: string
+  } | null>(null)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
@@ -309,20 +317,31 @@ export function LabelDesignerPageClient() {
                       type="number"
                       min={LABEL_TEMPLATE_MIN_MM}
                       max={LABEL_TEMPLATE_MAX_MM}
-                      value={form.widthMm}
+                      value={
+                        dimensionDraft?.field === "widthMm"
+                          ? dimensionDraft.text
+                          : form.widthMm
+                      }
                       data-testid="label-width"
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const text = e.target.value
+                        setDimensionDraft({ field: "widthMm", text })
+                        const next = Number(text)
                         setForm({
                           ...form,
-                          widthMm: Number(e.target.value) || form.widthMm,
+                          widthMm:
+                            text !== "" && Number.isFinite(next)
+                              ? next
+                              : form.widthMm,
                         })
-                      }
-                      onBlur={() =>
+                      }}
+                      onBlur={() => {
+                        setDimensionDraft(null)
                         setForm({
                           ...form,
                           widthMm: clampDimension(form.widthMm),
                         })
-                      }
+                      }}
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -332,20 +351,31 @@ export function LabelDesignerPageClient() {
                       type="number"
                       min={LABEL_TEMPLATE_MIN_MM}
                       max={LABEL_TEMPLATE_MAX_MM}
-                      value={form.heightMm}
+                      value={
+                        dimensionDraft?.field === "heightMm"
+                          ? dimensionDraft.text
+                          : form.heightMm
+                      }
                       data-testid="label-height"
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const text = e.target.value
+                        setDimensionDraft({ field: "heightMm", text })
+                        const next = Number(text)
                         setForm({
                           ...form,
-                          heightMm: Number(e.target.value) || form.heightMm,
+                          heightMm:
+                            text !== "" && Number.isFinite(next)
+                              ? next
+                              : form.heightMm,
                         })
-                      }
-                      onBlur={() =>
+                      }}
+                      onBlur={() => {
+                        setDimensionDraft(null)
                         setForm({
                           ...form,
                           heightMm: clampDimension(form.heightMm),
                         })
-                      }
+                      }}
                     />
                   </div>
                   <div className="flex flex-col gap-1.5 sm:col-span-2">

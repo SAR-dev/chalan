@@ -61,21 +61,6 @@ export default function NidReviewsPage() {
   const [nidFilter, setNidFilter] = useState<NidFilter>("pending")
   const [approveMerchant, setApproveMerchant] = useState<Merchant | null>(null)
   const [approveOpen, setApproveOpen] = useState(false)
-  const [_viewMerchant, setViewMerchant] = useState<Merchant | null>(null)
-  const [_viewOpen, setViewOpen] = useState(false)
-  const [_viewLoading, setViewLoading] = useState(false)
-
-  function _openView(merchant: Merchant) {
-    setViewMerchant(merchant)
-    setViewOpen(true)
-    setViewLoading(true)
-    fetch(`/api/merchants/${merchant.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.id) setViewMerchant(data)
-      })
-      .finally(() => setViewLoading(false))
-  }
 
   const isNidPending = (m: Merchant) =>
     Boolean(m.nidSubmittedAt) && !m.nidVerifiedAt && !m.nidRejectedAt

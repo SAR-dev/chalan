@@ -2,11 +2,27 @@
   "crons": [
     {
       "path": "/api/cron/drain-email-outbox",
-      "schedule": "0 0 * * *"
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/drain-webhooks",
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/cleanup-sessions",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-audit-logs",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-email-logs",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-uploads",
+      "schedule": "30 4 * * *"
     }
   ],
   "git": {

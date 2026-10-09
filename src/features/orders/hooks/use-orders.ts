@@ -188,10 +188,7 @@ export function useOrders({
               }
             : {}),
         })
-        const resData = await res
-          .json()
-          .catch(() => null)
-          .catch(() => null)
+        const resData = await res.json().catch(() => null)
         if (!res.ok) {
           throw new ApiError(resData?.error ?? "Action failed.")
         }
@@ -393,10 +390,7 @@ export function useOrders({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ merchantNote }),
             })
-            const resData = await res
-              .json()
-              .catch(() => null)
-              .catch(() => null)
+            const resData = await res.json().catch(() => null)
             if (!res.ok) {
               throw new ApiError(resData?.error ?? "Failed to save note.")
             }
@@ -442,10 +436,7 @@ export function useOrders({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ receiverNote }),
             })
-            const resData = await res
-              .json()
-              .catch(() => null)
-              .catch(() => null)
+            const resData = await res.json().catch(() => null)
             if (!res.ok) {
               throw new ApiError(resData?.error ?? "Failed to save note.")
             }

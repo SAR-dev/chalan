@@ -26,7 +26,13 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 40, y: 5 },
         width: 55,
         height: 8,
-        fontSize: 7,
+        // Font sizes are in POINTS (pdfme converts width/height/position from mm
+        // but passes fontSize straight through to pdf-lib). A 100×150 mm label
+        // printed at 2.5pt is sub-millimetre text — unreadable at the counter and
+        // the reason a label can look like "just a QR code" on screen. Every
+        // field below stays inside its own box: line height is
+        // size × lineHeight, and each height leaves room for it.
+        fontSize: 10,
         fontWeight: "bold",
         lineHeight: 1.25,
       },
@@ -36,7 +42,7 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 5, y: 38 },
         width: 90,
         height: 8,
-        fontSize: 4,
+        fontSize: 11,
         fontWeight: "bold",
         lineHeight: 1.25,
       },
@@ -46,7 +52,7 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 5, y: 46 },
         width: 90,
         height: 6,
-        fontSize: 4,
+        fontSize: 10,
         lineHeight: 1.25,
       },
       {
@@ -55,7 +61,8 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 5, y: 52 },
         width: 90,
         height: 24,
-        fontSize: 3,
+        // 24mm / (10pt × 1.25) is five wrapped lines before clipping.
+        fontSize: 10,
         lineHeight: 1.25,
       },
       {
@@ -71,7 +78,7 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 5, y: 82 },
         width: 90,
         height: 5,
-        fontSize: 2.5,
+        fontSize: 9,
         lineHeight: 1.25,
       },
       {
@@ -80,7 +87,7 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 5, y: 88 },
         width: 45,
         height: 5,
-        fontSize: 3,
+        fontSize: 9,
         lineHeight: 1.25,
       },
       {
@@ -89,7 +96,7 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 50, y: 88 },
         width: 45,
         height: 5,
-        fontSize: 3,
+        fontSize: 9,
         lineHeight: 1.25,
       },
       {
@@ -98,7 +105,7 @@ export const DEFAULT_LABEL_TEMPLATE_PDFME: Template = {
         position: { x: 5, y: 94 },
         width: 90,
         height: 5,
-        fontSize: 2.5,
+        fontSize: 10,
         fontWeight: "bold",
         lineHeight: 1.25,
       },

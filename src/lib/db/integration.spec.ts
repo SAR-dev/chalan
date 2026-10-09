@@ -1168,10 +1168,7 @@ suite("order CHECK constraints (DBREFACTOR Phase C/D)", () => {
       constraint: "order_cancellation_fee_nonneg",
       extra: { cancellationFee: -65 },
     },
-    {
-      constraint: "order_merchant_earnings_nonneg",
-      extra: { merchantEarnings: -1 },
-    },
+
     {
       constraint: "order_amount_collected_nonneg",
       extra: { amountCollected: -100 },

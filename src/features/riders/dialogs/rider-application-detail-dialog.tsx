@@ -29,6 +29,7 @@ import {
 } from "@/features/riders/dialogs/task-type"
 import type { RiderApplication } from "@/features/riders/hooks/use-rider-applications"
 import { RIDER_TASK_TYPE_LABELS } from "@/lib/constants"
+import { toast } from "@/lib/notify"
 import type { RiderVehicleType } from "@/lib/types"
 
 interface WarehouseOption {
@@ -119,6 +120,9 @@ export function RiderApplicationDetailDialog({
         onApproved()
         onOpenChange(false)
         setMode("view")
+      } else {
+        const data = await res.json().catch(() => null)
+        toast.error(data?.error ?? "Failed to approve the rider application.")
       }
     } finally {
       setLoadingApprove(false)
@@ -142,6 +146,9 @@ export function RiderApplicationDetailDialog({
         onOpenChange(false)
         setMode("view")
         setRejectReason("")
+      } else {
+        const data = await res.json().catch(() => null)
+        toast.error(data?.error ?? "Failed to reject the rider application.")
       }
     } finally {
       setLoadingReject(false)

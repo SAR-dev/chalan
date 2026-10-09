@@ -95,6 +95,9 @@ describe("PdfmeDesigner", () => {
     const next = onChange.mock.calls[0][0] as Template
     const added = next.schemas[0].find((s) => s.name === "siteName")
     expect(added).toMatchObject({ type: "text" })
+    // Points, not mm — a field added from the palette must start legible rather
+    // than at the sub-millimetre size this default used to carry.
+    expect(added?.fontSize).toBeGreaterThanOrEqual(9)
     // The canvas instance was handed the same template synchronously.
     expect(instances[0].props.template).toEqual(next)
   })

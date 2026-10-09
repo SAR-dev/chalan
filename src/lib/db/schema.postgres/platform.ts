@@ -8,6 +8,7 @@ import {
   jsonb,
   pgTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 import { emailLogStatuses, emailOutboxStatuses, profileRoles } from "./enums"
 import { ts } from "./helpers"
@@ -251,22 +252,35 @@ export const platformConfig = pgTable("platform_config", {
 // Super Admins can add, edit, and switch between configs at runtime.
 // =============================================================================
 
-export const mailConfig = pgTable("mail_config", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  label: text("label").notNull(), // human-friendly name, e.g. "Primary SMTP"
-  host: text("host").notNull(),
-  port: text("port").notNull().default("587"),
-  secure: boolean("secure").notNull().default(false),
-  user: text("user").notNull(),
-  pass: text("pass").notNull(),
-  fromEmail: text("fromEmail").notNull(),
-  fromName: text("fromName").notNull().default("Delivery Management"),
-  isActive: boolean("isActive").notNull().default(false),
-  createdAt: ts("createdAt").notNull().defaultNow(),
-  updatedAt: ts("updatedAt").notNull().defaultNow(),
-})
+export const mailConfig = pgTable(
+  "mail_config",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    label: text("label").notNull(), // human-friendly name, e.g. "Primary SMTP"
+    host: text("host").notNull(),
+    port: text("port").notNull().default("587"),
+    secure: boolean("secure").notNull().default(false),
+    user: text("user").notNull(),
+    pass: text("pass").notNull(),
+    fromEmail: text("fromEmail").notNull(),
+    fromName: text("fromName").notNull().default("Delivery Management"),
+    isActive: boolean("isActive").notNull().default(false),
+    createdAt: ts("createdAt").notNull().defaultNow(),
+    updatedAt: ts("updatedAt").notNull().defaultNow(),
+  },
+  // "Only one active" is an invariant the app maintains by deactivating every
+  // row before activating one, which a partial unique index turns from a
+  // convention into a fact: a second active row cannot be inserted even if a
+  // future code path forgets the deactivation step. Same shape as the
+  // one-default rule on `label_template`.
+  (t) => [
+    uniqueIndex("mail_config_one_active_uniq")
+      .on(t.isActive)
+      .where(sql`${t.isActive} = true`),
+  ],
+)
 
 // =============================================================================
 // Cron heartbeat

@@ -271,7 +271,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   // the unique (merchantId, key) index makes the concurrent case safe too.
   const idempotencyKey = req.headers.get("idempotency-key")?.trim() || null
   const findByKey = () =>
-    dbRead
+    db
       .select()
       .from(order)
       .where(

@@ -123,7 +123,7 @@ export function usePayouts({
           error: formatError(resData, "Could not request payout."),
         }
       await mutate()
-      _globalMutate((key: string) => key === KEY)
+      _globalMutate((key: string) => key.startsWith(KEY))
       _globalMutate((key: string) => key.startsWith("/api/orders"))
       return { ok: true, request: resData }
     },
@@ -142,7 +142,7 @@ export function usePayouts({
           error: formatError(resData, "Could not approve payout."),
         }
       await mutate()
-      _globalMutate((key: string) => key === KEY)
+      _globalMutate((key: string) => key.startsWith(KEY))
       _globalMutate((key: string) => key.startsWith("/api/orders"))
       return { ok: true }
     },
@@ -163,7 +163,7 @@ export function usePayouts({
           error: formatError(data, "Could not approve payouts."),
         }
       await mutate()
-      _globalMutate((key: string) => key === KEY)
+      _globalMutate((key: string) => key.startsWith(KEY))
       _globalMutate((key: string) => key.startsWith("/api/orders"))
       return { ok: true }
     },
@@ -174,6 +174,7 @@ export function usePayouts({
     async (requestId: string, reason: string): Promise<Result> => {
       const res = await fetch(`${KEY}/${requestId}/reject`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
       })
       const resData = await res.json().catch(() => null)
@@ -183,7 +184,7 @@ export function usePayouts({
           error: formatError(resData, "Could not reject payout."),
         }
       await mutate()
-      _globalMutate((key: string) => key === KEY)
+      _globalMutate((key: string) => key.startsWith(KEY))
       _globalMutate((key: string) => key.startsWith("/api/orders"))
       return { ok: true }
     },
@@ -204,7 +205,7 @@ export function usePayouts({
           error: formatError(data, "Could not reject payouts."),
         }
       await mutate()
-      _globalMutate((key: string) => key === KEY)
+      _globalMutate((key: string) => key.startsWith(KEY))
       _globalMutate((key: string) => key.startsWith("/api/orders"))
       return { ok: true }
     },
@@ -221,7 +222,7 @@ export function usePayouts({
           error: formatError(resData, "Could not mark payout as paid."),
         }
       await mutate()
-      _globalMutate((key: string) => key === KEY)
+      _globalMutate((key: string) => key.startsWith(KEY))
       return { ok: true }
     },
     [mutate, _globalMutate],
@@ -241,7 +242,7 @@ export function usePayouts({
           error: formatError(data, "Could not mark payouts as paid."),
         }
       await mutate()
-      _globalMutate((key: string) => key === KEY)
+      _globalMutate((key: string) => key.startsWith(KEY))
       return { ok: true }
     },
     [mutate, _globalMutate],

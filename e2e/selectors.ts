@@ -264,7 +264,9 @@ export const signOut = {
 export const users = {
   table: "[data-testid='users-table']",
   search: "[data-testid='table-search-users']",
-  actions: "[data-testid='users-actions']",
+  // Per-row scoping: one actions trigger per row, matched by prefix so a
+  // narrowed search still leaves exactly one match.
+  actions: "[data-testid^='users-actions-']",
   resetOpen: "[data-testid='users-reset-open']",
   resetPassword: "[data-testid='users-reset-password']",
   resetConfirm: "[data-testid='users-reset-confirm']",

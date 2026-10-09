@@ -112,8 +112,7 @@ vi.mock("@/lib/db", () => {
     }
     return chain
   }
-  const db: MockDb & { __isMock: boolean } = {
-    __isMock: true,
+  const db: MockDb = {
     select: () => makeSelectChain(),
     update: () => makeUpdateChain(),
     // Ledger + balance writes (balance_transaction / merchant_balance).
@@ -142,12 +141,18 @@ vi.mock("@/lib/audit", () => ({
   logAuditMany: vi.fn(() => Promise.resolve()),
 }))
 
+// Enqueueing the webhook event is one more read against `webhook_endpoint`, which
+// would make the batch-cost assertions below count it as part of the transition's
+// own work. The enqueue behaviour has its own spec in `webhooks.spec.ts`.
+vi.mock("@/lib/webhooks", () => ({
+  emitWebhookEvent: vi.fn(() => Promise.resolve()),
+}))
+
 // Every transition ends by expiring the dashboard stat tiles.
 // Mocked rather than left real for two reasons: the real `revalidateTag` throws
 // "static generation store missing" outside a request, and the resulting
 // `logger.warn` reads the clock — which would show up in the batch-stamping
-// test below as extra `toISOString` reads and make it measure the logger rather
-// than the transition.
+// test below as extra `toISOString` reads and make it measure the logger rather// than the transition.
 const revalidatedTags: string[] = []
 vi.mock("next/cache", () => ({
   revalidateTag: (tag: string) => {

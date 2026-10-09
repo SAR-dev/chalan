@@ -83,6 +83,10 @@ export function MerchantDetailClient({
   const [maxModerators, setMaxModerators] = useState(
     initialMerchant.maxModerators ?? 3,
   )
+  // Raw text for the quota input: `Number("")` is 0, so clearing the field used
+  // to jump to 0 and then read back as "012" while typing. `null` shows the
+  // stored value.
+  const [quotaDraft, setQuotaDraft] = useState<string | null>(null)
   const [savingQuota, setSavingQuota] = useState(false)
 
   async function handleSaveQuota() {
@@ -367,8 +371,16 @@ export function MerchantDetailClient({
                   type="number"
                   min={0}
                   max={20}
-                  value={maxModerators}
-                  onChange={(e) => setMaxModerators(Number(e.target.value))}
+                  value={quotaDraft ?? String(maxModerators)}
+                  onChange={(e) => {
+                    const text = e.target.value
+                    setQuotaDraft(text)
+                    const next = Number(text)
+                    if (text !== "" && Number.isFinite(next)) {
+                      setMaxModerators(next)
+                    }
+                  }}
+                  onBlur={() => setQuotaDraft(null)}
                   className="w-24"
                   data-testid="moderator-quota-input"
                   aria-label="Moderator quota"

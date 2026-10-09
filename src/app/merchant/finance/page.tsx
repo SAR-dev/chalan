@@ -95,21 +95,6 @@ export default function MerchantFinancePage() {
   const isActive = currentMerchant?.status === "ACTIVE"
   const canRequest = isActive && merchantPayableTotal > 0
 
-  function _getPayableSearchValue(o: Order, columnId: string): string | null {
-    switch (columnId) {
-      case "tracking":
-        return o.id
-      case "recipient":
-        return `${o.recipientName} ${o.deliveryCity}`
-      case "delivered":
-        return o.deliveredAt ?? null
-      case "productCost":
-        return String(o.productCost)
-      default:
-        return null
-    }
-  }
-
   function _getPayoutSearchValue(
     p: {
       id: string

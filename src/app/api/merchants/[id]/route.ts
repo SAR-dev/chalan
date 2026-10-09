@@ -86,18 +86,18 @@ export const PATCH = withErrorHandler(
       return forbidden("Business settings are owner-only.")
     }
 
-    // Try the profile schema (businessName, email, phone, address) first, then
-    // the admin-managed moderator quota.
+    // Quota or profile: both are all-optional, so either can claim a partial
+    // body. Parsing them independently below then tells us which fields were
+    // actually present — requiring the full profile schema here would reject a
+    // partial edit (`{ businessName }` alone) with a 400 that names fields the
+    // caller never sent.
     const { data: body, error: bodyError } = await parseBody(
       req,
-      // Quota before profile: it is all-optional, so it must be the one to
-      // claim a quota-only body rather than letting the required-field profile
-      // schema reject it outright.
-      merchantModeratorQuotaSchema.or(merchantProfileSchema),
+      merchantModeratorQuotaSchema.or(merchantProfileSchema.partial()),
     )
     if (bodyError) return bodyError
 
-    const profileParsed = merchantProfileSchema.safeParse(body)
+    const profileParsed = merchantProfileSchema.partial().safeParse(body)
     const quotaParsed = merchantModeratorQuotaSchema.safeParse(body)
     if (quotaParsed.success && !isAdmin) {
       return forbidden("Only administrators can change the moderator quota.")
@@ -105,12 +105,15 @@ export const PATCH = withErrorHandler(
 
     const updates: Record<string, unknown> = {}
 
+    // Only the fields the caller actually sent — this route used to require the
+    // whole profile body, so a single-field edit was a 400 naming fields that
+    // were never submitted.
     if (profileParsed.success) {
       const { businessName, email, phone, address } = profileParsed.data
-      updates.businessName = businessName.trim()
-      updates.email = email.trim()
-      updates.phone = phone.trim()
-      updates.address = address.trim()
+      if (businessName !== undefined) updates.businessName = businessName.trim()
+      if (email !== undefined) updates.email = email.trim()
+      if (phone !== undefined) updates.phone = phone.trim()
+      if (address !== undefined) updates.address = address.trim()
     }
 
     if (quotaParsed.success) {
@@ -128,9 +131,10 @@ export const PATCH = withErrorHandler(
     // Account can no longer sign in with the new address. The
     // two writes and the audits share one transaction; a duplicate email
     // (`merchant_email_unique` / `user_email_unique`) is a 409, not a 500.
-    const newEmail = profileParsed.success
-      ? profileParsed.data.email.trim()
-      : null
+    const newEmail =
+      profileParsed.success && profileParsed.data.email !== undefined
+        ? profileParsed.data.email.trim()
+        : null
 
     let updated: typeof merchant.$inferSelect | null
     try {

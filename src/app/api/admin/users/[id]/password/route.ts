@@ -1,11 +1,16 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { forbidden, notFound, unauthorized } from "@/lib/api-response"
+import {
+  badRequest,
+  forbidden,
+  notFound,
+  unauthorized,
+} from "@/lib/api-response"
 import { logAudit } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { dbRead } from "@/lib/db"
-import { user } from "@/lib/db/schema"
+import { profile, user } from "@/lib/db/schema"
 import { logger } from "@/lib/logger"
 import { parseBody, userPasswordSchema } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -22,11 +27,20 @@ export const PATCH = withErrorHandler(
 
     const { id } = await params
     const [target] = await dbRead
-      .select({ id: user.id, email: user.email })
+      .select({ id: user.id, email: user.email, role: profile.role })
       .from(user)
+      .innerJoin(profile, eq(profile.userId, user.id))
       .where(eq(user.id, id))
       .limit(1)
     if (!target) return notFound("User not found")
+    if (target.id === me.userId) {
+      return badRequest("Cannot reset your own password")
+    }
+    // Same denial-of-administration vector the ban route guards against: a
+    // SUPER_ADMIN who can set a peer admin's password owns that account.
+    if (target.role === "SUPER_ADMIN") {
+      return forbidden("Super admin accounts cannot have their password reset")
+    }
 
     try {
       await auth.api.setUserPassword({
