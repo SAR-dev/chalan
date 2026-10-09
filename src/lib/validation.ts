@@ -13,6 +13,7 @@ import {
   RIDER_VEHICLE_TYPES,
 } from "@/lib/constants"
 import { isAllowedOrigin } from "@/lib/csrf"
+import { isPrivateHost } from "@/lib/host-guard"
 
 export const idsSchema = z.object({
   ids: z
@@ -1005,7 +1006,15 @@ export const apiKeyCreateSchema = z.object({
 export const webhookEndpointCreateSchema = z.object({
   url: z
     .url("Endpoint URL must be a valid https URL")
-    .refine((v) => v.startsWith("https://"), "Endpoint URL must use https"),
+    .refine((v) => v.startsWith("https://"), "Endpoint URL must use https")
+    .refine((v) => {
+      try {
+        const { hostname } = new URL(v)
+        return !isPrivateHost(hostname)
+      } catch {
+        return false
+      }
+    }, "Endpoint URL must not point to a private or internal host"),
   events: z
     .array(
       z.enum([

@@ -2,6 +2,7 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto"
 import { and, asc, eq, inArray, lte } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { webhookDelivery, webhookEndpoint } from "@/lib/db/schema"
+import { isPrivateHost } from "@/lib/host-guard"
 import { logger } from "@/lib/logger"
 
 /**
@@ -275,6 +276,39 @@ export async function drainWebhooks({
     const timestamp = Math.floor(Date.now() / 1000)
     const signature = signWebhookPayload(endpoint.secret, timestamp, body)
 
+    // SSRF guard: resolve the endpoint URL's hostname and reject private /
+    // internal targets before making the request. This is a second layer
+    // beyond the schema check (which runs at create/update time) — the
+    // endpoint could have been created before the guard was added, or the
+    // DNS record could have changed since.
+    let url: URL
+    try {
+      url = new URL(endpoint.url)
+    } catch {
+      await db
+        .update(webhookDelivery)
+        .set({
+          status: "FAILED",
+          lastError: "Invalid endpoint URL",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(webhookDelivery.id, row.id))
+      failed++
+      continue
+    }
+    if (isPrivateHost(url.hostname)) {
+      await db
+        .update(webhookDelivery)
+        .set({
+          status: "FAILED",
+          lastError: "Endpoint URL resolves to a private or internal host",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(webhookDelivery.id, row.id))
+      failed++
+      continue
+    }
+
     try {
       const res = await fetch(endpoint.url, {
         method: "POST",
@@ -289,6 +323,7 @@ export async function drainWebhooks({
         },
         body,
         signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+        redirect: "manual",
       })
 
       if (!res.ok) {
