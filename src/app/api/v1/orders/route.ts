@@ -14,7 +14,7 @@ import { NextResponse } from "next/server"
 import { createOrderForMerchant } from "@/features/orders/create-order"
 import { authenticateApiKey, hasApiKeyScope } from "@/lib/api-keys"
 import { forbidden } from "@/lib/api-response"
-import { dbRead } from "@/lib/db"
+import { db, dbRead } from "@/lib/db"
 import { ORDER_CORE_COLUMNS } from "@/lib/db/order-columns"
 import {
   deliveryCity as deliveryCityTable,
@@ -174,7 +174,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!idempotencyKey) {
     return NextResponse.json({ error: "Duplicate request" }, { status: 409 })
   }
-  const [existing] = await dbRead
+  const [existing] = await db
     .select()
     .from(order)
     .where(

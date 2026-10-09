@@ -101,7 +101,7 @@ export async function createOrderForMerchant(
   // instead of charging twice. Checked before any pricing work; the unique
   // (merchantId, key) index makes the concurrent case safe too.
   const findByKey = () =>
-    dbRead
+    db
       .select()
       .from(order)
       .where(
