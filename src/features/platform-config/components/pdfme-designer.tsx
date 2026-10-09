@@ -127,7 +127,10 @@ export function PdfmeDesigner({ template, onChange }: PdfmeDesignerProps) {
       position: nextPosition(base, height),
       width: 55,
       height,
-      fontSize: 4,
+      // Points, not mm (pdfme converts only width/height/position). The default
+      // template's body text is 9-11pt; 4pt was sub-millimetre and unreadable on
+      // a printed label. A 7mm box holds 10pt at the 1.25 line height.
+      fontSize: 10,
       content: LABEL_FIELD_LABELS[key], // placeholder in the designer only
     })
   }
@@ -141,7 +144,7 @@ export function PdfmeDesigner({ template, onChange }: PdfmeDesignerProps) {
       position: nextPosition(base, 7),
       width: 45,
       height: 7,
-      fontSize: 4,
+      fontSize: 10,
       content: "Static text",
     })
   }
