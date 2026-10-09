@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { forbidden, notFound } from "@/lib/api-response"
+import { conflict, forbidden, notFound } from "@/lib/api-response"
 import { refreshStats, statTag } from "@/lib/cached-stats"
 import { db } from "@/lib/db"
 import { mailConfig } from "@/lib/db/schema"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const PATCH = withErrorHandler(
@@ -22,18 +23,30 @@ export const PATCH = withErrorHandler(
       .limit(1)
     if (!existing) return notFound()
 
-    // Deactivate all configs, then activate the selected one
-    await db.transaction(async (tx) => {
-      await tx
-        .update(mailConfig)
-        .set({ isActive: false, updatedAt: new Date().toISOString() })
-        .where(eq(mailConfig.isActive, true))
+    // Deactivate all configs, then activate the selected one. The partial
+    // unique index on `isActive = true` makes the invariant structural: if a
+    // concurrent activate already claimed the single active slot, this is a
+    // 409 rather than a silently overwritten config.
+    try {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(mailConfig)
+          .set({ isActive: false, updatedAt: new Date().toISOString() })
+          .where(eq(mailConfig.isActive, true))
 
-      await tx
-        .update(mailConfig)
-        .set({ isActive: true, updatedAt: new Date().toISOString() })
-        .where(eq(mailConfig.id, id))
-    })
+        await tx
+          .update(mailConfig)
+          .set({ isActive: true, updatedAt: new Date().toISOString() })
+          .where(eq(mailConfig.id, id))
+      })
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return conflict(
+          "Another mail config is already active. Reload and retry.",
+        )
+      }
+      throw err
+    }
 
     const [updated] = await db
       .select({

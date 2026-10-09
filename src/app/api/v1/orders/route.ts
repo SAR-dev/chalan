@@ -32,7 +32,7 @@ import {
   parseSort,
   parseStatusFilter,
 } from "@/lib/pagination"
-import { rateLimit } from "@/lib/rate-limit"
+import { rateLimitByIp } from "@/lib/rate-limit"
 import { orderCreateSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -62,9 +62,15 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (!hasApiKeyScope(key, "orders:read"))
     return forbidden("This key cannot read orders")
 
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "no-ip"
-  const limited = await rateLimit(`v1-orders-read:${key.keyId}:${ip}`, 60, 60)
+  // Keyed on the API key (already authenticated and unique per merchant) plus
+  // the trusted client IP. Raw `x-forwarded-for` is client-controlled — without
+  // a declared proxy a caller could mint a fresh bucket per request.
+  const limited = await rateLimitByIp(
+    req,
+    `v1-orders-read:${key.keyId}`,
+    60,
+    60,
+  )
   if (limited) return limited
 
   let where = eq(order.merchantId, key.merchantId)
@@ -149,9 +155,15 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (!hasApiKeyScope(key, "orders:write"))
     return forbidden("This key cannot create orders")
 
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "no-ip"
-  const limited = await rateLimit(`v1-orders-write:${key.keyId}:${ip}`, 30, 60)
+  // Keyed on the API key (already authenticated and unique per merchant) plus
+  // the trusted client IP. Raw `x-forwarded-for` is client-controlled — without
+  // a declared proxy a caller could mint a fresh bucket per request.
+  const limited = await rateLimitByIp(
+    req,
+    `v1-orders-write:${key.keyId}`,
+    30,
+    60,
+  )
   if (limited) return limited
 
   const parsed = await parseBody(req, orderCreateSchema)

@@ -5,12 +5,26 @@
 
 type CsvCell = string | number | null | undefined
 
+/**
+ * Characters a spreadsheet treats as the start of a formula. A cell whose text
+ * begins with one of these is executed by Excel/Sheets/LibreOffice when the
+ * export is opened, so untrusted content (recipient names, addresses, notes)
+ * must be neutralised rather than passed through.
+ */
+const FORMULA_PREFIX = /^[=+\-@\t\r]/
+
+/** Prefixes a formula-looking cell so spreadsheet apps render it as text. */
+function neutralizeFormula(value: string): string {
+  return FORMULA_PREFIX.test(value) ? `'${value}` : value
+}
+
 function escapeCell(cell: CsvCell): string {
   const value = cell == null ? "" : String(cell)
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`
+  const safe = neutralizeFormula(value)
+  if (/[",\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`
   }
-  return value
+  return safe
 }
 
 /** Builds RFC 4180 CSV text from rows of cells, with an optional header row. */

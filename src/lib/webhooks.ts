@@ -363,27 +363,56 @@ export async function drainWebhooks({
         })
         .where(eq(webhookDelivery.id, row.id))
 
-      const failures = endpoint.failureCount + 1
-      const shouldDisable = failures >= WEBHOOK_FAILURE_THRESHOLD
+      // No retry: park it. The merchant sees the failure and the error in their
+      // delivery log, and can reconcile against `/api/v1/orders`.
       await db
-        .update(webhookEndpoint)
+        .update(webhookDelivery)
         .set({
-          failureCount: failures,
-          ...(shouldDisable
-            ? {
-                isActive: false,
-                disabledAt: new Date().toISOString(),
-              }
-            : {}),
+          status: "FAILED",
+          attempts: row.attempts + 1,
+          lastError: message.slice(0, 500),
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(webhookEndpoint.id, endpoint.id))
+        .where(eq(webhookDelivery.id, row.id))
+
+      // Increment the endpoint's failure counter under a row lock and recompute
+      // from the locked value. Reading it into JS first (the old
+      // `endpoint.failureCount + 1`) let concurrent drains overwrite each other
+      // with a stale snapshot, which could push auto-disable past the threshold.
+      const { failures, shouldDisable } = await db.transaction(async (tx) => {
+        const [locked] = await tx
+          .select({ failureCount: webhookEndpoint.failureCount })
+          .from(webhookEndpoint)
+          .where(eq(webhookEndpoint.id, endpoint.id))
+          .for("update")
+          .limit(1)
+
+        const failures = (locked?.failureCount ?? 0) + 1
+        const shouldDisable = failures >= WEBHOOK_FAILURE_THRESHOLD
+
+        await tx
+          .update(webhookEndpoint)
+          .set({
+            failureCount: failures,
+            ...(shouldDisable
+              ? {
+                  isActive: false,
+                  disabledAt: new Date().toISOString(),
+                }
+              : {}),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(webhookEndpoint.id, endpoint.id))
+
+        return { failures, shouldDisable }
+      })
 
       logger.warn("webhook delivery failed", {
         deliveryId: row.id,
         endpointId: endpoint.id,
         event: row.event,
         attempts: row.attempts + 1,
+        failureCount: failures,
         disabled: shouldDisable,
         err: message,
       })
