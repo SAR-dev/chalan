@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
 import {
@@ -35,6 +35,7 @@ import {
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { generateTrackingToken } from "@/lib/tracking-token"
 import { orderBulkCreateSchema, parseBody } from "@/lib/validation"
+import { emitWebhookEvent } from "@/lib/webhooks"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const POST = withErrorHandler(async (req: Request) => {
@@ -54,6 +55,26 @@ export const POST = withErrorHandler(async (req: Request) => {
   const parsed = await parseBody(req, orderBulkCreateSchema)
   if (parsed.error) return parsed.error
   const { orders: inputs } = parsed.data
+
+  // Idempotency: a retried bulk create with the same key returns the
+  // original orders instead of charging twice. Checked before any pricing work;
+  // the unique (merchantId, key) index makes the concurrent case safe too.
+  const idempotencyKey = req.headers.get("idempotency-key")?.trim() || null
+  if (idempotencyKey) {
+    const existing = await db
+      .select()
+      .from(order)
+      .where(
+        and(
+          eq(order.merchantId, me.merchantId),
+          eq(order.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1)
+    if (existing.length > 0) {
+      return NextResponse.json(existing)
+    }
+  }
 
   const [merchantRow] = await db
     .select({
@@ -362,31 +383,66 @@ export const POST = withErrorHandler(async (req: Request) => {
           createdAtIso,
           deliveryDaysFor(input),
         ),
+        idempotencyKey,
       }
     })
 
-    const insertedOrders = await tx.insert(order).values(values).returning({
-      id: order.id,
-      merchantId: order.merchantId,
-      pickupLocationId: order.pickupLocationId,
-      warehouseId: order.warehouseId,
-      recipientName: order.recipientName,
-      recipientPhone: order.recipientPhone,
-      recipientMail: order.recipientMail,
-      deliveryAddress: order.deliveryAddress,
-      deliveryMapLink: order.deliveryMapLink,
-      parcelWeightKg: order.parcelWeightKg,
-      itemType: order.itemType,
-      deliveryType: order.deliveryType,
-      productCost: order.productCost,
-      deliveryFee: order.deliveryFee,
-      codFee: order.codFee,
-      cancellationFee: order.cancellationFee,
-      merchantEarnings: order.merchantEarnings,
-      status: order.status,
-      merchantNote: order.merchantNote,
-      createdAt: order.createdAt,
-    })
+    const insertedOrders = await tx
+      .insert(order)
+      .values(values)
+      .onConflictDoNothing()
+      .returning({
+        id: order.id,
+        merchantId: order.merchantId,
+        pickupLocationId: order.pickupLocationId,
+        warehouseId: order.warehouseId,
+        recipientName: order.recipientName,
+        recipientPhone: order.recipientPhone,
+        recipientMail: order.recipientMail,
+        deliveryAddress: order.deliveryAddress,
+        deliveryMapLink: order.deliveryMapLink,
+        parcelWeightKg: order.parcelWeightKg,
+        itemType: order.itemType,
+        deliveryType: order.deliveryType,
+        productCost: order.productCost,
+        deliveryFee: order.deliveryFee,
+        codFee: order.codFee,
+        cancellationFee: order.cancellationFee,
+        merchantEarnings: order.merchantEarnings,
+        status: order.status,
+        merchantNote: order.merchantNote,
+        createdAt: order.createdAt,
+        trackingToken: order.trackingToken,
+      })
+
+    // Lost the race to a concurrent retry — nothing to write; the caller
+    // re-reads the winner.
+    if (insertedOrders.length === 0) return []
+
+    // Enqueue the creation event in the same transaction so it can never
+    // describe an order that rolled back. No I/O here — just a row.
+    for (const o of insertedOrders) {
+      await emitWebhookEvent({
+        tx,
+        merchantId,
+        event: "order.created",
+        orderId: o.id,
+        data: {
+          id: o.id,
+          status: o.status,
+          recipientName: o.recipientName,
+          recipientPhone: o.recipientPhone,
+          recipientMail: o.recipientMail,
+          deliveryAddress: o.deliveryAddress,
+          parcelWeightKg: o.parcelWeightKg,
+          productCost: o.productCost,
+          deliveryFee: o.deliveryFee,
+          trackingToken: o.trackingToken,
+          createdAt: o.createdAt as unknown as string,
+        },
+        now: createdAtIso,
+      })
+    }
 
     // Compute total platform fee across the batch and write one ledger entry
     // per order, then upsert the running balance once for the whole batch.
@@ -431,6 +487,22 @@ export const POST = withErrorHandler(async (req: Request) => {
 
     return insertedOrders
   })
+
+  // Lost the race to a concurrent retry — re-read the winner.
+  if (created.length === 0 && idempotencyKey) {
+    const existing = await db
+      .select()
+      .from(order)
+      .where(
+        and(
+          eq(order.merchantId, me.merchantId),
+          eq(order.idempotencyKey, idempotencyKey),
+        ),
+      )
+    if (existing.length > 0) {
+      return NextResponse.json(existing)
+    }
+  }
 
   return NextResponse.json(created, { status: 201 })
 })
