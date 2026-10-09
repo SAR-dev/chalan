@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest"
 import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
 import { generateLabelPdf } from "@/lib/label/generate-pdf"
 import { buildLabelInputs } from "@/lib/label/label-inputs"
+import { extractPdfText } from "@/lib/label/pdf-text"
 import { SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 
 // =============================================================================
@@ -83,6 +84,29 @@ describe("generateLabelPdf", () => {
     const pdf = await generateLabelPdf(t, [...one, ...two], testFont())
     const doc = await PDFDocument.load(pdf)
     expect(doc.getPageCount()).toBe(2)
+  })
+
+  it("draws every bound field's text on the page", async () => {
+    const t = DEFAULT_LABEL_TEMPLATE_PDFME
+    const pdf = await generateLabelPdf(
+      t,
+      buildLabelInputs(t, SAMPLE_LABEL_DATA),
+      testFont(),
+    )
+
+    // A label that comes out with only its QR code passes the page-size and
+    // page-count assertions above, so the wording is asserted here, from the
+    // text actually drawn rather than from the inputs handed in.
+    const drawn = extractPdfText(pdf)
+
+    const inputs = buildLabelInputs(t, SAMPLE_LABEL_DATA)[0]
+    for (const [key, value] of Object.entries(inputs)) {
+      if (typeof value !== "string" || value.trim() === "") continue
+      expect(
+        drawn.some((line) => line.includes(value)),
+        `field "${key}" (${value}) is missing from the printed label`,
+      ).toBe(true)
+    }
   })
 
   it("clamps an undersized QR to the scannable floor instead of failing", async () => {
