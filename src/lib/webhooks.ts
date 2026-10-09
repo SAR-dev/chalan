@@ -128,7 +128,6 @@ export async function emitWebhookEvent({
   /** ISO timestamp to use for the webhook payload's `createdAt`. Defaults to `new Date().toISOString()` but transitions pass their single `now` so the bulk test's clock spy stays at 1. */
   now?: string
 }): Promise<void> {
-  if ((tx as unknown as { __isMock?: boolean }).__isMock) return
   let endpoints: { id: string; events: string[] | null }[]
   try {
     endpoints = await tx

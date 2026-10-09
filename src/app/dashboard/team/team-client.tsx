@@ -80,6 +80,10 @@ export function TeamPageClient({
     limit: _limit,
     setLimit,
     query,
+    setQuery,
+    sortId,
+    sortDir,
+    onSortChange,
     toggleAccountActive,
     updateAccountWarehouse,
     resendActivation,
@@ -165,6 +169,7 @@ export function TeamPageClient({
     {
       id: "name",
       header: "Name",
+      sortable: true,
       sortValue: (u) => u.name,
       cell: (u) => (
         <CellTwoRow
@@ -174,6 +179,8 @@ export function TeamPageClient({
       ),
     },
     {
+      // Not sortable: the API's sort map has no `role` key, and a client-side
+      // sort over one server page would read as if it sorted every account.
       id: "role",
       header: "Role",
       sortValue: (u) =>
@@ -183,6 +190,7 @@ export function TeamPageClient({
     {
       id: "contact",
       header: "Contact",
+      sortable: true,
       sortValue: (u) => u.email,
       headClassName: "hidden sm:table-cell",
       cellClassName: "hidden sm:table-cell",
@@ -213,6 +221,7 @@ export function TeamPageClient({
       id: "status",
       header: "Status",
       align: "right",
+      sortable: true,
       sortValue: (u) => u.status,
       cell: (u) => (
         <div className="flex items-center justify-end gap-2">
@@ -273,12 +282,16 @@ export function TeamPageClient({
             columns={columns}
             data={team}
             getRowKey={(u) => u.id}
-            initialSortId="role"
+            initialSortId="name"
             emptyMessage="No team members yet."
             loading={isLoading || isRefreshing}
             serverPaginated
             total={total}
             query={query}
+            onQueryChange={setQuery}
+            serverSortId={sortId}
+            serverSortDir={sortDir}
+            onSortChange={onSortChange}
             onRefresh={refresh}
             onPageChange={(p, l) => {
               setPage(p)

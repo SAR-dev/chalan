@@ -18,7 +18,6 @@ import { columnLabels } from "@/config/table-column-labels"
 import { CancelOrderDialog } from "@/features/orders/dialogs/cancel-order-dialog"
 import { OrderDetailsDrawer } from "@/features/orders/dialogs/order-details-drawer"
 import { useOrders } from "@/features/orders/hooks/use-orders"
-import { usePickupLocations } from "@/features/pickup-locations/hooks/use-pickup-locations"
 import { formatDateTime } from "@/lib/format"
 import { formatTk } from "@/lib/pricing"
 import type { Order, OrderStatus } from "@/lib/types"
@@ -75,14 +74,11 @@ export default function MerchantOrdersPage() {
     includeAllOrders: true,
   })
 
-  const { pickupLocations } = usePickupLocations()
   const [tab, setTab] = useState<FilterTab>("ACTIVE")
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [viewOrderCode, setViewOrderCode] = useState<string | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
-
-  const _pickup = (id: string) => pickupLocations.find((p) => p.id === id)
 
   useEffect(() => {
     setStatuses(TAB_STATUSES[tab])

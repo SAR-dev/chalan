@@ -82,14 +82,11 @@ SELECT cron.schedule(
 -- R2), which only the app can do — there is no SQL equivalent, and
 -- pg_cron has no HTTP client (this deployment installs no pg_net/http
 -- extension). Schedule the endpoint over HTTP instead:
---   - Docker cron container: docker/compose.cluster.yml (04:30 line, configured;
---     ships with ?dryRun=1 — remove that query param after reviewing a week of
---     dry-run logs, per ROADMAP 5.6 acceptance)
+--   - Docker cron container: docker/compose.cluster.yml (04:30 line, configured)
 --   - System crontab / manual run:
 --       30 4 * * * curl -s -X POST "http://localhost:3000/api/cron/cleanup-uploads" \
 --         -H "Authorization: Bearer $CRON_SECRET" >> /var/log/app-cron.log 2>&1
---   - Vercel: not in vercel.json (free plan limit) — trigger manually or from
---     an external scheduler.
+--   - Vercel: in vercel.json at 04:30 daily.
 -- Grace period: UPLOAD_SWEEP_MIN_AGE_HOURS (default 48) — files younger than
 -- that are never deleted, because ImageUpload stores on file select, before
 -- the owning form is submitted.

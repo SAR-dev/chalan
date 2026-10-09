@@ -167,7 +167,7 @@ later given a bulk sibling, the bulk route tends to drop the guardrails
 
 ---
 
-## P3 — Polish, docs, dead code
+## P3 — Polish, docs, dead code — **DONE**
 
 | ID | Finding | File:line |
 |---|---|---|
@@ -187,6 +187,26 @@ later given a bulk sibling, the bulk route tends to drop the guardrails
 | P3-14 | Duplicate unreachable `.catch(() => null).catch(() => null)` | `src/features/orders/hooks/use-orders.ts:191-194,396-399,446-449` |
 | P3-15 | Non-null assertion on `res.plaintext!`; clipboard write fire-and-forget then success toast | `src/features/integrations/components/api-keys-card.tsx:68, 120-129` |
 | P3-16 | Merchant-note save failure is silent (`if (!res.ok) return`) | `src/features/orders/components/order-detail-view.tsx:187-196` |
+
+> All 16 items below are complete. Notes on the ones worth knowing:
+>
+> - **P3-12 was already fixed** as a side-effect of P0-5 (the `"deliveryCity"`
+>   `searchColumns` entry was removed there).
+> - **P3-2** removed a test-only `__isMock` backdoor from production
+>   `emitWebhookEvent`; `transitions.spec.ts` now mocks the whole module, since
+>   it has its own spec.
+> - **P3-5**: `vercel.json` is *not* the deploy target — `deploy.yml` runs Docker
+>   Compose, whose `compose-cron.spec.ts` already pins the correct schedule. The
+>   Vercel crons were brought in line so a hypothetical Vercel deploy is not
+>   silently mis-scheduled, but Docker remains authoritative.
+> - **P3-4**: the four `*_URL` vars were documented as required and read by
+>   nothing. Removed from the table with a note rather than deleted outright, so
+>   the history stays greppable.
+> - **P3-11**: wired *server* sorting for `name` / `contact` / `status` (the
+>   API's sort map has no `role`, so that column stays unsortable) and changed
+>   `initialSortId="role"` to `"name"`.
+> - **P3-9** introduced a draft-string state so a cleared dimension input stays
+>   empty instead of snapping back to the old value.
 
 ---
 
@@ -211,15 +231,15 @@ later given a bulk sibling, the bulk route tends to drop the guardrails
 
 These are opportunities, ordered by leverage.
 
-1. **Bulk/single parity as a first-class rule.** P0-3, P1-1, P1-4 and P1-8 all share one root cause: a bulk sibling re-implementing a single route without its guardrails. Extract shared helpers (`approvePayout`, `createOrders`, `approveMerchants`) and add a source-scan test that flags a `bulk/*/route.ts` with no matching single-route import.
-2. **Make "authorization reads on the primary" enforceable.** A small helper (`dbSecurityRead`) plus a source-scan spec would prevent P0-2 regressions.
-3. **A PDF-content assertion helper** used by both the unit spec and e2e, so label output is verified end-to-end (P2-9).
-4. **Webhook delivery test harness** (P2-8) — the highest-risk untested module.
-5. **Explicit CSV-injection policy** in `lib/csv.ts` + tests (P2-5).
-6. **Document the deployment reality of read replicas:** if `DATABASE_URL_READ_ONLY` is set, which reads are allowed to lag, and which are not (P0-2).
-7. **Consolidate "counts" endpoints/patterns.** Several pages recompute page-scoped counts client-side (P1-6); a shared server `counts` projection would remove the whole class.
-8. **Docs sweep:** `LOG_LEVEL`, the four unused `*_URL` vars, Vercel cron (P3-3…P3-5), and the stale unit counts in `ROADMAP.md`. Cheap and removes operator confusion.
-9. **Speed up the unit suite.** Vitest reports the run spends 237 s spawning 240 isolated workers, and suggests `isolate: false` for a ~65 s saving. Worth testing in `vitest.config.ts` now that specs share few globals.
+1. **Bulk/single parity as a first-class rule.** *Not done.* P0-3, P1-1, P1-4 and P1-8 shared one root cause — a bulk sibling re-implementing a single route without its guardrails — and each was fixed at its own call site. The structural follow-up is to extract the shared helpers (`approvePayout`, `createOrders`, `approveMerchants`) and add a source-scan test that flags a `bulk/*/route.ts` with no matching single-route import.
+2. **Make "authorization reads on the primary" enforceable.** *Not done.* P0-2 moved the specific security reads onto `db`, but nothing stops the next one drifting back to `dbRead`. A small helper (`dbSecurityRead`) plus a source-scan spec would make the rule mechanical.
+3. **A PDF-content assertion helper** — **done**: `src/lib/label/pdf-text.ts`, used by `generate-pdf.spec.ts` and available to Playwright (P2-9). The e2e half is still open.
+4. **Webhook delivery test harness** — **done** (P2-8): 9 tests over the drain path, including the private-host refusal and the no-redirect policy.
+5. **Explicit CSV-injection policy** — **done** (P2-5) in `lib/csv.ts`.
+6. **Document the deployment reality of read replicas.** *Not done.* Write down, for a deploy with `DATABASE_URL_READ_ONLY` set, which reads are allowed to lag (display-only fields) and which are not (every authorization gate) — see P0-2.
+7. **Consolidate "counts" endpoints/patterns.** *Partially done.* P1-6 fixed the call sites that were reading a single page, but there is still no shared server `counts` projection, so each page keeps its own `includeAllOrders` fetch.
+8. **Docs sweep** — **done**: `LOG_LEVEL`, the four unused `*_URL` vars, the Vercel cron schedule (P3-3…P3-5), the stale SQL comment (P3-6) and `ROADMAP.md` all refreshed.
+9. **Speed up the unit suite.** *Not done.* Vitest reports ~65 s could be saved with `isolate: false` (the suite spends most of its time spawning 241 workers). Worth testing in `vitest.config.ts` now that specs share few globals.
 10. **R3 (notifications)** and the remaining P2 roadmap items remain the product backlog — see `ROADMAP.md`. R3 is unblocked and shares R2's event source.
 
 ---

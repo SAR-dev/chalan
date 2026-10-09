@@ -108,13 +108,6 @@ export function useMerchants({
     globalMutate((key: string) => key.startsWith(KEY))
   }, [mutate])
 
-  const _replaceOne = useCallback(
-    (_id: string, _updated: Merchant) => {
-      revalidateAll()
-    },
-    [revalidateAll],
-  )
-
   const suspendMerchant = useCallback(
     async (id: string) => {
       const res = await fetch(`/api/merchants/${id}/suspend`, {

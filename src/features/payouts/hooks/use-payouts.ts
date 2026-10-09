@@ -174,6 +174,7 @@ export function usePayouts({
     async (requestId: string, reason: string): Promise<Result> => {
       const res = await fetch(`${KEY}/${requestId}/reject`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
       })
       const resData = await res.json().catch(() => null)

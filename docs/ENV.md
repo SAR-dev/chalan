@@ -57,6 +57,7 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 | ------------------ | ------------ | ------- | ----------------------------------------------------------------------------- |
 | `SMTP_SECRET_KEY`  | **Yes** (prod) | —     | 64-hex-char AES-256-GCM key for SMTP passwords at rest. `openssl rand -hex 32` |
 | `MAIL_DISABLED`    | No           | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)            |
+| `LOG_LEVEL`        | No           | `info`  | Minimum level for the structured logger (`src/lib/logger.ts`): `debug` \| `info` \| `warn` \| `error`. Every line is JSON (`level`, `time`, `msg`, fields). `debug` adds request/route detail that is normally too noisy to leave on. |
 | `LOG_EMAIL_BODY`   | No           | —       | Set to `1` to add the (redacted + truncated) message body to the `Sending email` log line. **Off by default** — the body carries customer content, so stdout stays envelope-only (ROADMAP P4.4). The full body is always available in the admin-only Email Logs page. |
 
 Each email is sent **once** — there is no retry and no outbox requeue/backoff.
@@ -236,10 +237,12 @@ Notes:
 
 Per-role portal URLs for multi-container deployments. `ALLOWED_ROLE` is set automatically per-container.
 
-| Variable        | Required | Default                 | Description                                                                                    |
-| --------------- | -------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
-| `DASHBOARD_URL` | **Yes**  | `http://localhost:3001` | Dashboard portal URL                                                                           |
-| `MERCHANT_URL`  | **Yes**  | `http://localhost:3002` | Merchant portal URL                                                                            |
-| `RIDER_URL`     | **Yes**  | `http://localhost:3003` | Rider portal URL                                                                               |
-| `WAREHOUSE_URL` | **Yes**  | `http://localhost:3004` | Warehouse portal URL                                                                           |
-| `ALLOWED_ROLE`  | No       | —                       | Restrict to one role: `dashboard`, `merchant`, `rider`, `warehouse`. Leave empty for all roles |
+| Variable       | Required | Default                 | Description                                                                                    |
+| -------------- | -------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `ALLOWED_ROLE` | No       | —                       | Restrict to one role: `dashboard`, `merchant`, `rider`, `warehouse`. Leave empty for all roles |
+
+> **Removed: `DASHBOARD_URL` / `MERCHANT_URL` / `RIDER_URL` / `WAREHOUSE_URL`.**
+> These were documented as required but nothing read them — the app resolves
+> links from the request's own host and `src/proxy.ts` prefixes. Do not add them
+> to a `.env`. If a future feature needs an absolute portal URL, reintroduce it
+> with the reader that consumes it.
