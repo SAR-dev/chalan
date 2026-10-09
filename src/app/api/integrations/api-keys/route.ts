@@ -1,7 +1,7 @@
 import { desc, eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { requireSession } from "@/lib/api-auth"
-import { API_KEY_SCOPES, generateApiKey, isApiKeyScope } from "@/lib/api-keys"
+import { generateApiKey } from "@/lib/api-keys"
 import { forbidden, unauthorized } from "@/lib/api-response"
 import { db, dbRead } from "@/lib/db"
 import { apiKey, merchant } from "@/lib/db/schema"
@@ -52,17 +52,6 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (parsed.error) return parsed.error
 
   const { label, scopes, environment } = parsed.data
-  // Defensive: Zod already checks, but a hand-crafted JSON array of strings
-  // could still carry a value outside the declared scopes — reject it rather
-  // than persisting a capability the server never honours.
-  for (const s of scopes) {
-    if (!isApiKeyScope(s)) {
-      return NextResponse.json(
-        { error: `Unknown scope: ${s}. Allowed: ${API_KEY_SCOPES.join(", ")}` },
-        { status: 400 },
-      )
-    }
-  }
 
   const merchantId = me.merchantId
   const env = environment ?? "live"

@@ -6,7 +6,7 @@ import { db, dbRead } from "@/lib/db"
 import { merchant, webhookEndpoint } from "@/lib/db/schema"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { parseBody, webhookEndpointCreateSchema } from "@/lib/validation"
-import { generateWebhookSecret, isWebhookEvent } from "@/lib/webhooks"
+import { generateWebhookSecret } from "@/lib/webhooks"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 const MAX_WEBHOOKS_PER_MERCHANT = 10
@@ -46,14 +46,6 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (parsed.error) return parsed.error
 
   const { url, events } = parsed.data
-  for (const e of events) {
-    if (!isWebhookEvent(e)) {
-      return NextResponse.json(
-        { error: `Unknown event: ${e}` },
-        { status: 400 },
-      )
-    }
-  }
 
   const merchantId = me.merchantId
   const secret = generateWebhookSecret()
