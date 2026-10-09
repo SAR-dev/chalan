@@ -370,7 +370,10 @@ export const order = pgTable(
     check("order_delivery_fee_nonneg", sql`${t.deliveryFee} >= 0`),
     check("order_cod_fee_nonneg", sql`${t.codFee} >= 0`),
     check("order_cancellation_fee_nonneg", sql`${t.cancellationFee} >= 0`),
-    check("order_merchant_earnings_nonneg", sql`${t.merchantEarnings} >= 0`),
+    // `merchantEarnings` is signed on purpose: when fees exceed COD collected,
+    // the merchant is net-negative; clamping to 0 would hide that debt from
+    // payouts and reports. The ledger stores the true signed balance, so the
+    // non-negative CHECK must not block legitimate negative-earnings orders.
     // `amountCollected` is nullable (null until a rider hands cash over), and a
     // CHECK that evaluates to NULL passes — but the `IS NULL` is written out
     // anyway so the next reader does not have to know that rule of three-valued

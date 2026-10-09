@@ -109,7 +109,12 @@ export function TeamPageClient({
 
   async function handleToggleActive(user: TeamMember) {
     setTogglingId(user.id)
-    await toggleAccountActive(user.id)
+    const result = await toggleAccountActive(user.id)
+    if (!result.ok) {
+      toast.error(result.error ?? "Failed to toggle account status.")
+      setTogglingId(null)
+      return
+    }
     toast.success(`${user.name} ${user.isActive ? "disabled" : "enabled"}.`)
     setTogglingId(null)
   }
@@ -140,7 +145,13 @@ export function TeamPageClient({
       return
     }
     setWarehouseSaving(true)
-    await updateAccountWarehouse(warehouseUser.id, warehouseId)
+    const result = await updateAccountWarehouse(warehouseUser.id, warehouseId)
+    if (!result.ok) {
+      toast.error(result.error ?? "Failed to update warehouse assignment.")
+      setWarehouseSaving(false)
+      setWarehouseDialogOpen(false)
+      return
+    }
     toast.success(
       warehouseId
         ? `${warehouseUser.name} now manages ${warehouseName(warehouseId)}.`

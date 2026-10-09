@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth" // ← was missing
 // Primary before the route's own query ran. `dbRead` falls
 // back to the primary when no replica is configured, so behaviour is unchanged
 // on a default deploy.
-import { dbRead } from "@/lib/db"
+import { db, dbRead } from "@/lib/db"
 import { merchant, profile, user } from "@/lib/db/schema"
 import { isRoleAllowedIn, parsePortalMode } from "@/lib/portal-mode"
 import {
@@ -26,7 +26,7 @@ const loadSession = cache(async (lenient: boolean) => {
   const session = await auth.api.getSession({ headers: hdrs }) // ← replaces manual token extraction + DB query
   if (!session?.user) return null
 
-  const [row] = await dbRead
+  const [row] = await db
     .select({
       userId: profile.userId,
       role: profile.role,

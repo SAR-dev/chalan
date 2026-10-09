@@ -447,7 +447,13 @@ describe("PATCH /api/payouts/bulk/approve", () => {
 
   it("approves pending requests", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([{ id: "pr_1" }, { id: "pr_2" }])
+    selectQueue.push(
+      [{ id: "pr_1" }, { id: "pr_2" }],
+      [{ status: "PENDING" }],
+      [{ orderCount: 1, total: 89 }],
+      [{ status: "PENDING" }],
+      [{ orderCount: 1, total: 89 }],
+    )
     updateResult.push({ id: "pr_1" }, { id: "pr_2" })
     const res = await bulkApprovePayout(
       req("PATCH", undefined, { ids: ["pr_1", "pr_2"] }),
@@ -538,7 +544,7 @@ describe("PATCH /api/payouts/bulk/reject", () => {
 
   it("rejects pending requests and clears their orders", async () => {
     sessionState.value = superAdmin
-    selectQueue.push([{ id: "pr_1" }])
+    selectQueue.push([{ id: "pr_1" }], [{ status: "PENDING" }], [], [])
     updateResult.push({ id: "pr_1" })
     const res = await bulkRejectPayout(
       req("PATCH", undefined, { ids: ["pr_1"], reason: "Invalid details" }),

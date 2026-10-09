@@ -35,34 +35,47 @@ export const PATCH = withErrorHandler(async (req: Request) => {
 
   const pendingIds = pendings.map((p) => p.id)
 
-  const updated = await db
-    .update(payoutRequest)
-    .set({
-      status: "REJECTED",
-      reviewedBy: me.name,
-      reviewedAt: new Date().toISOString(),
-      rejectReason: reason.trim(),
-    })
-    .where(
-      and(
-        inArray(payoutRequest.id, pendingIds),
-        eq(payoutRequest.status, "PENDING"),
-      ),
-    )
-    .returning()
+  const reviewedAt = new Date().toISOString()
+  const rejected: { id: string }[] = []
 
-  if (updated.length === 0) {
+  await db.transaction(async (tx) => {
+    for (const id of pendingIds) {
+      const [current] = await tx
+        .select({
+          status: payoutRequest.status,
+        })
+        .from(payoutRequest)
+        .where(eq(payoutRequest.id, id))
+        .for("update")
+        .limit(1)
+
+      if (!current || current.status !== "PENDING") continue
+
+      await tx
+        .update(order)
+        .set({ payoutRequestId: null })
+        .where(eq(order.payoutRequestId, id))
+
+      await tx
+        .update(payoutRequest)
+        .set({
+          status: "REJECTED",
+          reviewedBy: me.name,
+          reviewedAt,
+          rejectReason: reason.trim(),
+        })
+        .where(eq(payoutRequest.id, id))
+
+      rejected.push({ id })
+    }
+  })
+
+  if (rejected.length === 0) {
     return badRequest("No PENDING payout requests found for the given IDs.")
   }
 
-  const rejectedIds = updated.map((p) => p.id)
-  await db
-    .update(order)
-    .set({ payoutRequestId: null })
-    .where(inArray(order.payoutRequestId, rejectedIds))
-
   await logAuditMany(
-    updated.map((p) => ({
+    rejected.map((p) => ({
       actor: { userId: me.userId, name: me.name, role: me.role },
       action: "PAYOUT_REJECTED",
       entityType: "payout_request",
@@ -71,5 +84,5 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     })),
   )
 
-  return NextResponse.json({ ok: true, count: updated.length })
+  return NextResponse.json({ ok: true, count: rejected.length })
 })

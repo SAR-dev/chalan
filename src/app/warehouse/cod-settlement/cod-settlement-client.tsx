@@ -137,33 +137,7 @@ export function WarehouseSettlementPageClient({
     0,
   )
 
-  const visibleUnsettled = useMemo(
-    () =>
-      currentWarehouse
-        ? orders.filter(
-            (o) =>
-              o.status === "DELIVERED" &&
-              o.warehouseId === currentWarehouse.id &&
-              !o.codSettledAt,
-          )
-        : [],
-    [orders, currentWarehouse],
-  )
-
-  const visibleSettled = useMemo(
-    () =>
-      currentWarehouse
-        ? orders.filter(
-            (o) =>
-              o.warehouseId === currentWarehouse.id &&
-              o.status === "DELIVERED" &&
-              Boolean(o.codSettledAt),
-          )
-        : [],
-    [orders, currentWarehouse],
-  )
-
-  const visible = tab === "UNSETTLED" ? visibleUnsettled : visibleSettled
+  const visible = tab === "UNSETTLED" ? unsettledOrdersList : settled
 
   function openConfirm(order: Order) {
     setConfirmOrder(order)
@@ -286,12 +260,7 @@ export function WarehouseSettlementPageClient({
             pinnedColumns={["order"]}
             id="warehouse-settlement"
             searchable
-            searchColumns={[
-              "order",
-              "merchant",
-              "deliveryRider",
-              "deliveryCity",
-            ]}
+            searchColumns={["order", "merchant", "deliveryRider"]}
             toolbarLeft={
               <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
                 <TabsList>

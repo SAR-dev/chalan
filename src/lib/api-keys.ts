@@ -102,7 +102,7 @@ export async function authenticateApiKey(
   const presented = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : ""
   if (!presented) return null
 
-  const [row] = await dbRead
+  const [row] = await db
     .select({
       id: apiKey.id,
       merchantId: apiKey.merchantId,
@@ -121,7 +121,7 @@ export async function authenticateApiKey(
 
   // A suspended or unverified merchant must not be able to keep placing orders
   // through a key minted while the account was healthy.
-  const [m] = await dbRead
+  const [m] = await db
     .select({ status: merchant.status })
     .from(merchant)
     .where(eq(merchant.id, row.merchantId))
