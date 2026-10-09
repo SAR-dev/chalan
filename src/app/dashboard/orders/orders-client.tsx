@@ -84,7 +84,14 @@ export function OrdersPageClient({
     sortDir,
     onSortChange,
     mutate: refresh,
-  } = useOrders({ initialData, initialTotal })
+  } = useOrders({
+    initialData,
+    initialTotal,
+    // The status tiles below need the counts across every status, which the
+    // paginated (status-filtered) list cannot give. This is the only page that
+    // opts in — warehouse screens use the server `/counts` aggregates instead.
+    includeAllOrders: true,
+  })
   const baseColumns = useOrderColumns()
   const [tab, setTab] = useState<FilterTab>("PENDING")
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
@@ -99,25 +106,29 @@ export function OrdersPageClient({
     setPage(1)
   }, [tab, setStatuses, setPage])
 
-  const counts = useMemo(
-    () => ({
-      pending:
-        allOrders.filter((o) => o.status === "PENDING").length ||
-        initialCounts.pending,
-      approved:
-        allOrders.filter((o) => o.status === "APPROVED").length ||
-        initialCounts.approved,
-      inProgress:
-        allOrders.filter(
-          (o) =>
-            !["PENDING", "DELIVERED", "RETURNED", "CANCELLED"].includes(
-              o.status,
-            ),
-        ).length || initialCounts.inProgress,
+  const counts = useMemo(() => {
+    const pending = allOrders.filter((o) => o.status === "PENDING").length
+    const approved = allOrders.filter((o) => o.status === "APPROVED").length
+    const inProgress = allOrders.filter(
+      (o) =>
+        !["PENDING", "DELIVERED", "RETURNED", "CANCELLED"].includes(o.status),
+    ).length
+
+    // `allOrders` is query-aware, so a zero is a real answer once a search is
+    // running — falling back to the unfiltered aggregate here would show a
+    // total for rows the table is not displaying.
+    if (query) {
+      return { pending, approved, inProgress, total: allOrders.length }
+    }
+
+    // No search yet: the server aggregates stand in until the list resolves.
+    return {
+      pending: pending || initialCounts.pending,
+      approved: approved || initialCounts.approved,
+      inProgress: inProgress || initialCounts.inProgress,
       total: allOrders.length || initialCounts.total,
-    }),
-    [allOrders, initialCounts],
-  )
+    }
+  }, [allOrders, initialCounts, query])
 
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)

@@ -123,7 +123,7 @@ export function WarehouseRidersPageClient({
         items={[
           {
             label: statCardLabels.warehouse.riders.totalRiders.label,
-            value: riders.length,
+            value: total,
             icon: Users,
           },
           {

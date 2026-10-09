@@ -157,8 +157,18 @@ export function MerchantsPageClient({
     setPage(1)
   }, [tab, setStatuses, setPage])
 
-  const counts = useMemo(
-    () => ({
+  // The all-list is query-aware, so a zero is a real answer once a search runs
+  // — falling back to the unfiltered aggregate would show a total for rows the
+  // table is not displaying.
+  const counts = useMemo(() => {
+    if (query) {
+      return {
+        total: allMerchants.length,
+        active: allMerchants.filter((m) => m.status === "ACTIVE").length,
+        suspended: allMerchants.filter((m) => m.status === "SUSPENDED").length,
+      }
+    }
+    return {
       total: allMerchants.length || initialCounts.total,
       active:
         allMerchants.filter((m) => m.status === "ACTIVE").length ||
@@ -166,9 +176,8 @@ export function MerchantsPageClient({
       suspended:
         allMerchants.filter((m) => m.status === "SUSPENDED").length ||
         initialCounts.suspended,
-    }),
-    [allMerchants, initialCounts],
-  )
+    }
+  }, [allMerchants, initialCounts, query])
 
   function openConfirm(merchant: Merchant, action: "suspend" | "reactivate") {
     setConfirmMerchant(merchant)
