@@ -9,7 +9,7 @@ import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
 import { validatePdfmeTemplate } from "@/lib/label/template-schema-guard"
 
 // =============================================================================
-// Server-side template validation (PDF.md §5) — the gate every create,
+// Server-side template validation — the gate every create,
 // update and publish passes through. A row that fails here can never reach
 // the table, so the print path always has something generatable.
 // =============================================================================

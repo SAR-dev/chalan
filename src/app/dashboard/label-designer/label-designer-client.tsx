@@ -64,7 +64,7 @@ const PREVIEW_DATA = {
 }
 
 // =============================================================================
-// Label designer (R5, pdfme — PDF.md)
+// Label designer — pdfme canvas, see CONTRIBUTING §3.76.
 //
 // Design / Preview / Publish, one platform-wide parcel label. The designer is
 // the pdfme free canvas: elements are placed in millimetres and the Preview
@@ -163,7 +163,7 @@ export function LabelDesignerPageClient() {
   }, [form, seedReady, draft, published])
 
   // The size inputs and the pdfme paper size are two views of one number
-  // (PDF.md §5 rule 7 writes widthMm/heightMm from basePdf on save, so the
+  // (template-schema-guard.ts writes widthMm/heightMm from basePdf on save, so the
   // inputs must write into basePdf too).
   useEffect(() => {
     if (!form?.template) return

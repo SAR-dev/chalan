@@ -7,6 +7,14 @@ import {
   LABEL_TEMPLATE_MIN_MM,
 } from "@/lib/constants"
 
+/**
+ * The single gate every label template passes to become live.
+ *
+ * Called on create, update and publish, so no row can reach the table that the
+ * print path cannot generate. The QR floor here is re-applied in
+ * `generate-pdf.ts` as a second guard — shrinking the label must never produce
+ * a code a camera cannot read.
+ */
 export function validatePdfmeTemplate(t: Template): boolean {
   try {
     checkTemplate(t)

@@ -5,7 +5,7 @@ import { buildLabelInputs } from "@/lib/label/label-inputs"
 import { SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 
 // =============================================================================
-// buildLabelInputs (PDF.md §5 binding rules): every element resolves to its
+// buildLabelInputs binding rules: every element resolves to its
 // input value by *name* — label field keys through resolveLabelField, any QR
 // to the order reference, the `logo` element to the data URI, static
 // readOnly elements skipped, everything else to its static content.
