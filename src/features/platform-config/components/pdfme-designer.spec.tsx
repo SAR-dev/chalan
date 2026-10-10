@@ -9,7 +9,7 @@ import { PdfmeDesigner } from "@/features/platform-config/components/pdfme-desig
 import { DEFAULT_LABEL_TEMPLATE_PDFME } from "@/lib/label/default-template"
 
 // =============================================================================
-// PdfmeDesigner smoke test (PDF.md §9). The imperative @pdfme/ui Designer is
+// PdfmeDesigner smoke test. The imperative @pdfme/ui Designer is
 // mocked — it owns a canvas jsdom can't paint — so what's under test is the
 // wiring: mount once the font loads, palette clicks produce bound elements in
 // the onChange template, and duplicate-bound-fields are refused.

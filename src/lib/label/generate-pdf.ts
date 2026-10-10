@@ -4,6 +4,16 @@ import { LABEL_QR_MIN_MM } from "@/lib/constants"
 import { clampQrSizeMm } from "@/lib/label-layout"
 import { labelPlugins } from "./plugins"
 
+/**
+ * Render a label to a **vector** PDF — the only label render path.
+ *
+ * pdfme emits vectors, which is what keeps the QR crisp: a rasterized label
+ * (`html2canvas` + `jsPDF`) blurs the code and breaks scanning at the doorstep.
+ * Never add a bitmap fallback.
+ *
+ * The template is cloned before the QR clamp because the caller's object is
+ * React state — mutating it here would edit the canvas from under the designer.
+ */
 export async function generateLabelPdf(
   template: Template,
   inputs: Record<string, string>[],

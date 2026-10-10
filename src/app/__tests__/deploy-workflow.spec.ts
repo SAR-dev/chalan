@@ -38,4 +38,15 @@ describe("deploy workflow", () => {
   it("deploys the exact commit CI validated", () => {
     expect(raw).toContain("github.event.workflow_run.head_sha")
   })
+
+  it("sets up Buildx before a build that exports a cache", () => {
+    // The default `docker` driver cannot export a cache, so `cache-to: type=gha`
+    // aborts the build before the image is pushed. That took production down for
+    // days; this pins the step that makes the cache legal, and its ordering.
+    const setupAt = raw.indexOf("docker/setup-buildx-action")
+    const buildAt = raw.indexOf("docker/build-push-action")
+    expect(setupAt).toBeGreaterThan(-1)
+    expect(buildAt).toBeGreaterThan(-1)
+    expect(setupAt).toBeLessThan(buildAt)
+  })
 })

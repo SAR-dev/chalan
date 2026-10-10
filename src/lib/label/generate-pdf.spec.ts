@@ -10,7 +10,7 @@ import { extractPdfText } from "@/lib/label/pdf-text"
 import { SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 
 // =============================================================================
-// generateLabelPdf (PDF.md §5/§9): the real pdfme pipeline — bundled font,
+// generateLabelPdf: the real pdfme pipeline — bundled font,
 // plugins, QR clamp — asserted by parsing the produced PDF itself:
 //   - page 0's MediaBox equals the template paper size in points
 //   - one page per input row

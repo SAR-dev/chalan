@@ -1025,8 +1025,9 @@ Rules:
 - The detail page (`/announcements/[id]`) writes **nothing** on open: viewing
   one announcement must not advance the watermark (it would mark everything
   else as seen too). Only visiting the feed stamps.
-- Do not rebuild the tray: if R4.1 lands in-app notifications, the tray
-  hosts *those* and the announcement link keeps its current shape.
+- The tray belongs to notifications, not announcements. The bell stays a plain
+  link; in-app notifications have their own bell and tray beside it
+  (`src/features/notifications/`) — see §3.76.
 - Detail rendering is `<Markdown>` (react-markdown + remark-gfm, same as
   `/terms`): announcements are authored as markdown on the create/edit pages
   (`markdown-editor.tsx` — Write pane is CodeMirror 6 with a formatting
@@ -1034,6 +1035,59 @@ Rules:
   preview == what readers get) and listed with `stripMarkdown()` excerpts
   (`src/lib/markdown.ts`). Never show raw markdown source in a one-line
   preview, and never render announcement HTML directly.
+
+## 3.76. Parcel labels (`src/lib/label/`)
+
+The label system is **pdfme and nothing else**. The original DOM-block renderer
+(`blocks` engine, `<LabelRenderer>`, the `@page` print portal, the `engine`
+column) is gone — there is no second engine and no fallback layout.
+
+**One generator, vector output.** `generateLabelPdf` (`generate-pdf.ts`) is the
+only thing that renders a label, and the designer's Preview tab shows the PDF it
+produces rather than a second on-screen renderer. Preview cannot drift from
+print because it *is* print.
+
+**Never rasterize a label.** `html2canvas` + `jsPDF` produces a bitmap, which
+blurs the QR and breaks scanning at the doorstep — the whole reason the label
+exists. The QR has a hard floor (`LABEL_QR_MIN_MM`, `src/lib/constants.ts`)
+enforced on save *and* re-applied in `generate-pdf.ts` before generation, so no
+scale knob can produce an unscannable code.
+
+**The template JSON is the persisted contract.** A published row stores a pdfme
+`Template`; printing reads it back. That makes a pdfme upgrade a migration
+concern, not just a dependency bump — **pin the pdfme versions** and check
+stored templates against a new major before adopting it.
+
+**One gate on every write.** `validatePdfmeTemplate`
+(`template-schema-guard.ts`, mirrored as a Zod schema in `template-schema.ts`)
+is the single validation path for create, update and publish: structural
+`checkTemplate`, exactly one page, the element cap, the allowed type list,
+unique names, elements inside the page, the QR floor and squareness, and
+`widthMm`/`heightMm` written from `basePdf` — **never** from the client.
+Publishing appends an immutable version, so a parcel can always be reprinted
+with the label it shipped with.
+
+**Field binding is by element name** (`label-inputs.ts`): a `LabelFieldKey`
+name resolves through `resolveLabelField`; a `qrcode` gets the order id; `logo`
+gets a data URI; anything else is static and carries `readOnly`. The palette
+only offers whitelisted keys — never free text — so the binding cannot be
+typo'd into silently printing nothing.
+
+Two things that bite in practice:
+
+- **Register the plugins.** In pdfme v6 `builtInPlugins` contains only `Text`;
+  `plugins.ts` registers image/line/rectangle/QR/Code128 explicitly. Omit one
+  and validation fails with `"<type>" is not found in plugins` at generate
+  time, not at build time.
+- **Printer scaling is the user's job.** The PDF page is exactly
+  `widthMm × heightMm`, so the printer must be set to the matching paper size
+  and **"Actual size" / 100%** — any "fit to page" scaling silently shrinks the
+  QR. The print dialog help text says so.
+
+**Not built:** batch printing and a server-side `label.pdf` route. Both were
+considered and left out; the client generates and prints per order, with a
+Download button as the fallback when the print dialog is blocked. Adding the
+server route is the documented upgrade path if iOS printing proves unreliable.
 
 ## 3.9. DataTable loading skeleton
 

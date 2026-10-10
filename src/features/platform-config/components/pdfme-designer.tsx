@@ -13,7 +13,7 @@ import { labelPlugins } from "@/lib/label/plugins"
 import { toast } from "@/lib/notify"
 
 // =============================================================================
-// pdfme free-canvas designer (PDF.md §6)
+// pdfme free-canvas designer — see CONTRIBUTING §3.76.
 //
 // The `Designer` is imperative (it owns a DOM subtree + its own React root),
 // so this wrapper owns one instance for the mount lifetime and mirrors
@@ -160,7 +160,7 @@ export function PdfmeDesigner({ template, onChange }: PdfmeDesignerProps) {
       name: "qr",
       type: "qrcode",
       position: { x: Math.max(1, page.width - 34), y: 5 },
-      width: 30, // the scannable floor from PDF.md §5
+      width: 30, // the scannable floor — LABEL_QR_MIN_MM in @/lib/constants
       height: 30,
     })
   }
