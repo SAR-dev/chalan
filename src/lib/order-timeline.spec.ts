@@ -17,7 +17,7 @@ import type { OrderStatus } from "@/lib/types"
 // two screens. There is now one definition; the second half of this file is
 // what stops a second one being written.
 
-describe("order timeline (ROADMAP R5.2)", () => {
+describe("order timeline", () => {
   it("describes the lifecycle in seven ordered steps", () => {
     expect(STEPS.map((s) => s.key)).toEqual([
       "PLACED",
@@ -142,7 +142,7 @@ describe("order timeline (ROADMAP R5.2)", () => {
   })
 })
 
-describe("the timeline has exactly one definition (ROADMAP R5.2)", () => {
+describe("the timeline has exactly one definition", () => {
   const consumers = [
     "src/app/track/[id]/lib.ts",
     "src/features/orders/components/tracking-timeline.tsx",

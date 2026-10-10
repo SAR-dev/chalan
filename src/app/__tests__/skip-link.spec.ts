@@ -26,7 +26,7 @@ const mains = tsxFiles(ROOT).flatMap((file) => {
     : []
 })
 
-describe("skip-to-content target (ROADMAP P4.4)", () => {
+describe("skip-to-content target", () => {
   it("finds the page/shell <main> landmarks", () => {
     // Guards the guard: if this ever returns 0 the assertions below are vacuous.
     expect(mains.length).toBeGreaterThan(0)

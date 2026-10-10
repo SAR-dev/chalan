@@ -106,7 +106,7 @@ async function renderPage() {
   return element.props
 }
 
-describe("Warehouse riders page - scope is part of the cache key (ROADMAP R3.7)", () => {
+describe("Warehouse riders page - scope is part of the cache key", () => {
   it("passes the warehouse id as an argument, not as a captured value", async () => {
     // A Drizzle `where` clause built from the request scope is not serialisable,
     // so it cannot be part of a cache key. The id has to arrive as a plain

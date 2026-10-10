@@ -15,7 +15,7 @@ afterEach(() => {
   process.env.TZ = ORIGINAL_TZ
 })
 
-describe("formatDateTime (ROADMAP R3.3)", () => {
+describe("formatDateTime", () => {
   it("renders in the business timezone, not the host's", () => {
     // Force the host to UTC: without an explicit `timeZone` this value lands
     // on Jan 1, but Dhaka is UTC+6 so the business date is Jan 2. Any revert

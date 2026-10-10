@@ -25,6 +25,7 @@ import {
 import { canPlaceOrders } from "@/lib/merchant-verification"
 import { hasNavPermission } from "@/lib/nav-config"
 import { computeExpectedDeliveryAt } from "@/lib/order-delivery-time"
+import { emitOrderEvent } from "@/lib/order-events"
 import { lockAndResolveMerchantPackageRule } from "@/lib/order-pricing"
 import { applyPackageRule, pickTierForCount } from "@/lib/packages"
 import {
@@ -35,7 +36,6 @@ import {
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { generateTrackingToken } from "@/lib/tracking-token"
 import { orderBulkCreateSchema, parseBody } from "@/lib/validation"
-import { emitWebhookEvent } from "@/lib/webhooks"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const POST = withErrorHandler(async (req: Request) => {
@@ -422,11 +422,12 @@ export const POST = withErrorHandler(async (req: Request) => {
     // Enqueue the creation event in the same transaction so it can never
     // describe an order that rolled back. No I/O here — just a row.
     for (const o of insertedOrders) {
-      await emitWebhookEvent({
+      await emitOrderEvent({
         tx,
-        merchantId,
         event: "order.created",
         orderId: o.id,
+        merchantId,
+        now: createdAtIso,
         data: {
           id: o.id,
           status: o.status,
@@ -440,7 +441,6 @@ export const POST = withErrorHandler(async (req: Request) => {
           trackingToken: o.trackingToken,
           createdAt: o.createdAt as unknown as string,
         },
-        now: createdAtIso,
       })
     }
 

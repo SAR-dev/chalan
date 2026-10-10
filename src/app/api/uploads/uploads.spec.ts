@@ -253,7 +253,7 @@ describe("POST /api/uploads/token", () => {
 // the app shares, so four instances each applied 20/min against a 20/min
 // Intent — 80 uploads/min/IP. It lives here now, where the
 // shared limiter is reachable.
-describe("upload rate limiting (ROADMAP R3.2)", () => {
+describe("upload rate limiting", () => {
   const uploadReq = () =>
     new Request("http://test.local/api/uploads", { method: "POST" })
 

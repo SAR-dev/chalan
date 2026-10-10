@@ -66,7 +66,7 @@ beforeEach(() => {
   vi.mocked(logger.debug).mockClear()
 })
 
-describe("noteCronInvocation (ROADMAP R0.8)", () => {
+describe("noteCronInvocation", () => {
   it("derives the job from the cron path and upserts it", () => {
     noteCronInvocation(cronReq("/api/cron/cleanup-audit-logs"))
     expect(dbState.inserted).toHaveLength(1)

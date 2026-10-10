@@ -86,6 +86,20 @@ export const announcements = {
   back: "[data-testid='announcement-back']",
 }
 
+// ─── In-app notifications (merchant) ────────────────────────────────────────
+export const notifications = {
+  bell: "[data-testid='notification-bell']",
+  badge: "[data-testid='notification-badge']",
+  tray: "[data-testid='notification-tray']",
+  trayRow: "[data-testid='notification-tray-row']",
+  trayEmpty: "[data-testid='notification-empty']",
+  trayAll: "[data-testid='notification-tray-all']",
+  // Inbox rows carry the notification id, which the test only learns at runtime.
+  inboxRowAny: "[data-testid^='notification-row-']",
+  newPill: (id: string) => `[data-testid='notification-new-${id}']`,
+  navLink: "[data-testid='nav-/merchant/notifications']",
+}
+
 // ─── Announcement create/edit pages (replaced the dialogs) ──────────────────
 export const announcementForm = {
   newLink: "[data-testid='announcements-new']",

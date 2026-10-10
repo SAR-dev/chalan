@@ -148,7 +148,7 @@ async function bodyOf(response: FakeResponse | undefined): Promise<unknown> {
 const PORTAL_HTML = "<html>Merchant 1 Business · COD 42,000 TK</html>"
 const PUBLIC_HTML = "<html>Sign in to access your workspace.</html>"
 
-describe("public/sw.js (ROADMAP R0.4)", () => {
+describe("public/sw.js", () => {
   it("precaches the public landing page, never the redirecting /", async () => {
     const sw = loadServiceWorker()
     await sw.dispatch("install")

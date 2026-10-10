@@ -121,7 +121,7 @@ const MERCHANT_GROUPS = [
   { status: "SUSPENDED", count: 2 },
 ]
 
-describe("Merchant queue - total derived from the status groups (ROADMAP R3.7)", () => {
+describe("Merchant queue - total derived from the status groups", () => {
   const PAGE = "@/app/dashboard/merchants/page"
 
   it("sums the groups instead of counting the table again", async () => {
@@ -160,7 +160,7 @@ describe("Merchant queue - total derived from the status groups (ROADMAP R3.7)",
   })
 })
 
-describe("Payout queue - total derived from the status groups (ROADMAP R3.7)", () => {
+describe("Payout queue - total derived from the status groups", () => {
   it("sums the groups and runs no bare count", async () => {
     const { props, groupByCalls, bareCountCalls } = await renderPage(
       "@/app/dashboard/payouts/page",
@@ -176,7 +176,7 @@ describe("Payout queue - total derived from the status groups (ROADMAP R3.7)", (
   })
 })
 
-describe("Rider application queue - total derived (ROADMAP R3.7)", () => {
+describe("Rider application queue - total derived", () => {
   it("sums the groups and runs no bare count", async () => {
     const { props, groupByCalls, bareCountCalls } = await renderPage(
       "@/app/dashboard/rider-applications/page",

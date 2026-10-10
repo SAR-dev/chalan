@@ -337,7 +337,7 @@ describe("isNavItemActive", () => {
   })
 })
 
-describe("merchant moderator nav grants (ROADMAP 5.2)", () => {
+describe("merchant moderator nav grants", () => {
   const owner = { role: "MERCHANT", isModerator: false }
   const moderatorOrdersOnly = {
     role: "MERCHANT",

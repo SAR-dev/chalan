@@ -58,7 +58,7 @@ password is encrypted at rest using an env-provided AES-256-GCM key:
 | `SMTP_SECRET_KEY`  | **Yes** (prod) | —     | 64-hex-char AES-256-GCM key for SMTP passwords at rest. `openssl rand -hex 32` |
 | `MAIL_DISABLED`    | No           | —       | Set to `1` to skip all SMTP sends (avoids auth errors in dev/test)            |
 | `LOG_LEVEL`        | No           | `info`  | Minimum level for the structured logger (`src/lib/logger.ts`): `debug` \| `info` \| `warn` \| `error`. Every line is JSON (`level`, `time`, `msg`, fields). `debug` adds request/route detail that is normally too noisy to leave on. |
-| `LOG_EMAIL_BODY`   | No           | —       | Set to `1` to add the (redacted + truncated) message body to the `Sending email` log line. **Off by default** — the body carries customer content, so stdout stays envelope-only (ROADMAP P4.4). The full body is always available in the admin-only Email Logs page. |
+| `LOG_EMAIL_BODY`   | No           | —       | Set to `1` to add the (redacted + truncated) message body to the `Sending email` log line. **Off by default** — the body carries customer content, so stdout stays envelope-only. The full body is always available in the admin-only Email Logs page. |
 
 Each email is sent **once** — there is no retry and no outbox requeue/backoff.
 Every send attempt is recorded in `email_log` (SENT or FAILED); failed mails
@@ -80,7 +80,7 @@ HTML is not persisted.
 
 | Variable             | Required | Default   | Description                                                                                                                                                                                                                                                                                        |
 | -------------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TRUSTED_PROXY_HOPS` | No       | `0`       | How many reverse-proxy hops sit in front of the app. Forwarding headers (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`) are **only trusted when this is set** (ROADMAP P0.6): the client IP is taken from the entry the last trusted hop appended, so a client cannot forge a fresh rate-limit bucket or forge its way past `ADMIN_IP_ALLOWLIST`. Single nginx = `1`; Cloudflare + nginx = `2`. Unset/`0` = no proxy, the headers are ignored. |
+| `TRUSTED_PROXY_HOPS` | No       | `0`       | How many reverse-proxy hops sit in front of the app. Forwarding headers (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`) are **only trusted when this is set**: the client IP is taken from the entry the last trusted hop appended, so a client cannot forge a fresh rate-limit bucket or forge its way past `ADMIN_IP_ALLOWLIST`. Single nginx = `1`; Cloudflare + nginx = `2`. Unset/`0` = no proxy, the headers are ignored. |
 | `ADMIN_IP_ALLOWLIST` | No       | disabled  | Comma-separated IPs/CIDRs allowed to reach the admin portal: paths starting with `/dashboard` and `/api/admin` (e.g. `203.0.113.5,10.0.0.0/8,2001:db8::/32`). Exact IPv4/IPv6 and CIDR ranges are supported; `*` allows any IP. Unset or empty disables the check entirely (default — e2e and dev are unaffected). Invalid entries are ignored (boot fails if none are valid). Requests from other IPs get `403` and are logged. Other admin-gated APIs are not covered — they rely on role authz.  **Requires `TRUSTED_PROXY_HOPS`**: the allowlist reads the client IP from proxy headers, so the app must sit behind a proxy that overwrites them - otherwise every request resolves to "unknown" and is denied. |
 | `ADMIN_2FA_REQUIRED` | No       | `0`       | Set to `1` to make two-factor authentication mandatory for admin roles (`SUPER_ADMIN`, `WAREHOUSE_ADMIN`): **enforced server-side**: while it is on, an unenrolled admin session is refused by every API route and every server-rendered page (`requireSession()` returns no session) and unenrolled admins are redirected to their account page's Two-factor tab until enrolled. Read at request time by `/api/users/me` — changing it requires a restart/redeploy (env, not DB). Merchants and riders can always opt into 2FA themselves and are never affected by this flag. |
 
@@ -120,7 +120,7 @@ HTML is not persisted.
 | `UPLOAD_SWEEP_MIN_AGE_HOURS` | No       | `48`    | Hours an unreferenced upload must age before `/api/cron/cleanup-uploads` may delete it          |
 | `ERROR_WEBHOOK_URL`          | No       | -       | Where unhandled 500s are POSTed as JSON. Unset = stdout logs only                               |
 
-`/api/cron/cleanup-uploads` (ROADMAP 5.6 — storage hygiene) is scheduled via
+`/api/cron/cleanup-uploads` is scheduled via
 crontab / the Docker cron container (pg_cron cannot make HTTP calls, so it is
 not in `scripts/setup-pg-cron.sql`), and is **not** in `vercel.json` (same
 free-plan limit as the audit/email jobs — call it manually or from an external

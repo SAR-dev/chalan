@@ -13,9 +13,8 @@ const teamDescription = `Active platform announcements from the ${siteConfig.nam
  *
  * `pageContent` below owns titles and descriptions; this owns the handful of
  * *control* labels that a decision has said must not be inlined in a
- * component. It exists so that when i18n lands (deferred, not cancelled — see
- * the R1 decision in ROADMAP.md) the catalog has somewhere to start instead of
- * ~500 scattered literals.
+ * component. It exists so that when i18n lands (deferred, not cancelled) the
+ * catalog has somewhere to start instead of ~500 scattered literals.
  *
  * Not a migration of everything: the sibling labels in `parcel-card.tsx`
  * ("Recipient name", "Recipient phone", …) are still inline, as is most form
@@ -256,6 +255,10 @@ export const pageContent = {
     announcements: {
       title: "Announcements",
       description: "Active platform announcements.",
+    },
+    notifications: {
+      title: "Notifications",
+      description: "Updates about your orders, deliveries and payouts.",
     },
     support: {
       title: "Support",

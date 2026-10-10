@@ -18,6 +18,7 @@ import {
   computeExpectedDeliveryAt,
   resolveRouteDeliveryTime,
 } from "@/lib/order-delivery-time"
+import { emitOrderEvent } from "@/lib/order-events"
 import {
   lockAndResolveMerchantPackageRule,
   resolveRoutePricing,
@@ -31,7 +32,6 @@ import {
 } from "@/lib/pricing"
 import { generateTrackingToken } from "@/lib/tracking-token"
 import type { orderCreateSchema } from "@/lib/validation"
-import { emitWebhookEvent } from "@/lib/webhooks"
 
 /**
  * Order creation, shared by the merchant UI and the public API (R2).
@@ -314,11 +314,12 @@ export async function createOrderForMerchant(
     // Enqueue the creation event in the same transaction so it can never
     // describe an order that rolled back. No I/O here — just a row. Pass the
     // single `createdAtIso` as `now` so the bulk test's clock spy stays at 1.
-    await emitWebhookEvent({
+    await emitOrderEvent({
       tx,
-      merchantId,
       event: "order.created",
       orderId: inserted.id,
+      merchantId,
+      now: createdAtIso,
       data: {
         id: inserted.id,
         status: inserted.status,
@@ -332,7 +333,6 @@ export async function createOrderForMerchant(
         trackingToken: inserted.trackingToken,
         createdAt: (inserted.createdAt as unknown as string) ?? createdAtIso,
       },
-      now: createdAtIso,
     })
 
     return { replay: false as const, order: inserted }

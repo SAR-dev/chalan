@@ -99,7 +99,7 @@ const AGG = {
   inProgress: 20,
 }
 
-describe("Dashboard orders page - aggregate pass and cache (ROADMAP R3.7)", () => {
+describe("Dashboard orders page - aggregate pass and cache", () => {
   it("walks `order` once for counts, not twice", async () => {
     fromCalls.length = 0
     counts = [{ ...AGG }]

@@ -117,7 +117,7 @@ Five scheduled endpoints are available, all authenticated via `CRON_SECRET`:
 Transactional email (activation, verification, password reset, merchant
 approval) is written to the `email_outbox` table in the same transaction as the
 domain change; `drain-email-outbox` delivers anything a request could not send
-synchronously (ROADMAP P1.5).
+synchronously.
 
 Retention is configurable via `AUDIT_LOG_RETENTION_DAYS`,
 `EMAIL_LOG_RETENTION_DAYS`, and `UPLOAD_SWEEP_MIN_AGE_HOURS` env vars. FAILED

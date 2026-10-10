@@ -10,7 +10,7 @@ function read(...parts: string[]): string {
   return readFileSync(join(process.cwd(), ...parts), "utf-8")
 }
 
-describe("pageSizeOptions stays deleted (ROADMAP R5.3)", () => {
+describe("pageSizeOptions stays deleted", () => {
   // Rows per page is already a first-class, *persisted* preference: it lives on
   // the user row, is validated against MAX_TABLE_ROWS_PER_PAGE in
   // src/lib/validation.ts, is edited in Account Settings, and DataTable uses it
@@ -38,7 +38,7 @@ describe("pageSizeOptions stays deleted (ROADMAP R5.3)", () => {
   })
 })
 
-describe("log tables take their headers from the shared module (ROADMAP R5.4)", () => {
+describe("log tables take their headers from the shared module", () => {
   const audit = read("src/app/dashboard/audit-logs/audit-logs-client.tsx")
   const email = read("src/app/dashboard/email-logs/page.tsx")
 
@@ -72,7 +72,7 @@ describe("log tables take their headers from the shared module (ROADMAP R5.4)", 
   })
 })
 
-describe("every role portal has a 404 of its own (ROADMAP R5.5)", () => {
+describe("every role portal has a 404 of its own", () => {
   const segments: Array<[file: string, home: string]> = [
     ["src/app/dashboard/not-found.tsx", "/dashboard"],
     ["src/app/merchant/not-found.tsx", "/merchant"],
@@ -99,7 +99,7 @@ describe("every role portal has a 404 of its own (ROADMAP R5.5)", () => {
   })
 })
 
-describe("heavy dependencies are loaded on demand (ROADMAP R5.10)", () => {
+describe("heavy dependencies are loaded on demand", () => {
   it("keeps react-markdown out of the client bundle", () => {
     // `markdown.tsx` had "use client", which pulled react-markdown + remark-gfm
     // (~139 KB raw in the measured build) into the client bundles of /terms,

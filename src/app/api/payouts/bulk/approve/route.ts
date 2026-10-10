@@ -6,6 +6,7 @@ import { logAuditMany } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { sumMoney } from "@/lib/db/money-sql"
 import { order, payoutRequest } from "@/lib/db/schema"
+import { emitOrderEvent } from "@/lib/order-events"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { idsSchema, parseBody } from "@/lib/validation"
 import { withErrorHandler } from "@/lib/with-error-handler"
@@ -23,7 +24,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   const { ids } = parsed.data
 
   const pendings = await db
-    .select({ id: payoutRequest.id })
+    .select({ id: payoutRequest.id, merchantId: payoutRequest.merchantId })
     .from(payoutRequest)
     .where(
       and(inArray(payoutRequest.id, ids), eq(payoutRequest.status, "PENDING")),
@@ -37,7 +38,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
   const approved: { id: string }[] = []
 
   await db.transaction(async (tx) => {
-    for (const { id } of pendings) {
+    for (const { id, merchantId } of pendings) {
       const [current] = await tx
         .select({
           status: payoutRequest.status,
@@ -68,6 +69,17 @@ export const PATCH = withErrorHandler(async (req: Request) => {
           reviewedAt,
         })
         .where(eq(payoutRequest.id, id))
+
+      // One notification per approved request, inside the transaction — see the
+      // single-approve route for why this cannot live after the commit.
+      await emitOrderEvent({
+        tx,
+        event: "payout.approved",
+        orderId: null,
+        merchantId,
+        actorName: me.name,
+        data: { id, amount: Number(totals?.total ?? 0) },
+      })
 
       approved.push({ id })
     }

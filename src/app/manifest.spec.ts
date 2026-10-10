@@ -4,7 +4,7 @@ import manifest from "./manifest"
 // The manifest claimed installability while leaving out the
 // fields that decide *which* app an installed shortcut belongs to.
 
-describe("PWA manifest (ROADMAP R5.6)", () => {
+describe("PWA manifest", () => {
   const webAppManifest = manifest()
 
   it("pins an id, so a redeploy is not treated as a different app", () => {

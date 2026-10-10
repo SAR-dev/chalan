@@ -43,6 +43,7 @@ import {
   computeExpectedDeliveryAt,
   resolveRouteDeliveryTime,
 } from "@/lib/order-delivery-time"
+import { emitOrderEvent } from "@/lib/order-events"
 import {
   lockAndResolveMerchantPackageRule,
   resolveRoutePricing,
@@ -499,6 +500,33 @@ export const POST = withErrorHandler(async (req: Request) => {
         })
         .where(eq(merchantPackage.id, bundle.merchantPackageId))
     }
+
+    // A portal-created order raises the same `order.created` event an API-key
+    // order does. This route has its own creation path rather than sharing
+    // `createOrderForMerchant`, so without this the merchant's own portal would
+    // be the one way to place an order that raises no event — and therefore no
+    // webhook and no in-app notification.
+    await emitOrderEvent({
+      tx,
+      event: "order.created",
+      orderId: inserted.id,
+      merchantId,
+      actorName: me.name,
+      now: createdAtIso,
+      data: {
+        id: inserted.id,
+        status: inserted.status,
+        recipientName: inserted.recipientName,
+        recipientPhone: inserted.recipientPhone,
+        deliveryCityId: destCityId ?? null,
+        parcelWeightKg: inserted.parcelWeightKg,
+        productCost: inserted.productCost,
+        deliveryFee: inserted.deliveryFee,
+        codFee: inserted.codFee,
+        merchantEarnings: inserted.merchantEarnings,
+        updatedAt: inserted.createdAt,
+      },
+    })
 
     return { replay: false as const, order: inserted }
   })

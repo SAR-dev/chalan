@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest"
 const config = readFileSync(join(process.cwd(), "next.config.mjs"), "utf-8")
 const proxy = readFileSync(join(process.cwd(), "src", "proxy.ts"), "utf-8")
 
-describe("static security headers (ROADMAP R5.9)", () => {
+describe("static security headers", () => {
   it("stops announcing the framework", () => {
     // `X-Powered-By: Next.js` tells an attacker the framework and version
     // before they have probed for anything.

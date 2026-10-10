@@ -12,6 +12,7 @@ import { diffEntity } from "@/lib/audit-diff"
 import { db } from "@/lib/db"
 import { sumMoney } from "@/lib/db/money-sql"
 import { order, payoutRequest } from "@/lib/db/schema"
+import { emitOrderEvent } from "@/lib/order-events"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
@@ -85,6 +86,21 @@ export const PATCH = withErrorHandler(
 
       committed.row = updated
       committed.before = current
+
+      // Raised inside the transaction, so a merchant is never told their payout
+      // was approved against a write that rolled back. This route used to write
+      // only an audit row, which is a record for operators and reaches nobody.
+      if (updated) {
+        await emitOrderEvent({
+          tx,
+          event: "payout.approved",
+          orderId: null,
+          merchantId: updated.merchantId,
+          actorName: me.name,
+          data: { id: updated.id, amount: updated.amount },
+        })
+      }
+
       return NextResponse.json(updated)
     })
 

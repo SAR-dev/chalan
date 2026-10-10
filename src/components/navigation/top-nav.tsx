@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sheet"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBell } from "@/features/announcements/components/announcement-bell"
+import { NotificationBell } from "@/features/notifications/components/notification-bell"
 import { BRAND_NAME } from "@/lib/constants"
 import {
   isNavItemActive,
@@ -193,6 +194,10 @@ export function TopNav({
         </Button>
 
         <AnnouncementBell />
+
+        {/* In-app notifications. Renders null for roles that have no inbox
+            (see useHasNotifications), so the bar is unchanged for them. */}
+        {currentUser?.role === "MERCHANT" ? <NotificationBell /> : null}
 
         {/* Icon-only on md+; the RightNav panel carries it on mobile so the
             bar stays uncrowded. */}

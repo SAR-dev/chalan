@@ -458,7 +458,7 @@ describe("POST /api/orders", () => {
     expect(updatePayloads.some((p) => "ordersUsed" in p)).toBe(false)
   })
 
-  it("returns the original order for a repeated Idempotency-Key (ROADMAP B13)", async () => {
+  it("returns the original order for a repeated Idempotency-Key", async () => {
     sessionState.value = merchant
     selectQueue.push([{ id: "o_orig", status: "PENDING" }])
     const request = new Request("http://test.local/api", {
@@ -581,7 +581,7 @@ describe("GET /api/orders/payable", () => {
 // answer ORs that cross relations, so the planner's realistic choice was "join
 // all four tables, then filter" — the search got slower the more it matched
 // Nothing.
-describe("GET /api/orders?q= search shape (ROADMAP R3.10)", () => {
+describe("GET /api/orders?q= search shape", () => {
   async function searchClauseFor(q: string) {
     sessionState.value = admin
     whereCalls.length = 0
@@ -630,7 +630,7 @@ describe("GET /api/orders?q= search shape (ROADMAP R3.10)", () => {
 // A rider has two queues. Without `?queue=` the endpoint returned their union
 // and each queue page filtered client-side, so the footer's `total` counted
 // rows the table never rendered and page 2 showed a different subset
-describe("GET /api/orders?queue= (ROADMAP R0.2)", () => {
+describe("GET /api/orders?queue=", () => {
   const renderWhere = () =>
     new PgDialect().sqlToQuery(
       whereCalls[0] as Parameters<PgDialect["sqlToQuery"]>[0],
@@ -679,7 +679,7 @@ describe("GET /api/orders?queue= (ROADMAP R0.2)", () => {
   })
 })
 
-describe("GET /api/orders/summary (ROADMAP R0.1)", () => {
+describe("GET /api/orders/summary", () => {
   const aggregates = {
     inProgressCount: 7,
     // node-postgres can hand numeric aggregates back as text; the route must

@@ -26,6 +26,13 @@ vi.mock("@/lib/rate-limit", () => ({
   getClientIp: () => "127.0.0.1",
 }))
 
+// The event fan-out is exercised in lib/order-events.spec.ts. Mocked here
+// because it reads the recipient profiles, which would consume this spec's
+// positional `selectQueue` and desynchronise every payout read after it.
+vi.mock("@/lib/order-events", () => ({
+  emitOrderEvent: vi.fn(() => Promise.resolve()),
+}))
+
 const selectQueue: unknown[][] = []
 const updateResult: unknown[] = []
 const updatePayloads: Record<string, unknown>[] = []
@@ -213,7 +220,7 @@ describe("POST /api/payouts", () => {
     expect(updatePayloads[0]).toMatchObject({ payoutRequestId: "pr_new" })
   })
 
-  it("caps the request at the available credit (ROADMAP B1)", async () => {
+  it("caps the request at the available credit", async () => {
     sessionState.value = merchantSession
     selectQueue.push(
       [

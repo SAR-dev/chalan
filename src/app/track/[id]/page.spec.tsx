@@ -164,7 +164,7 @@ describe("Track detail page", () => {
   })
 
   it("never exposes the recipient's email on the public page", async () => {
-    // Personal data (ROADMAP R8): whoever holds the tracking link may see where
+    // Personal data: whoever holds the tracking link may see where
     // the parcel is, never how to reach the person it belongs to. The loader
     // strips the column before it reaches this component — this is the proof
     // that it stays gone even when the row carries one.

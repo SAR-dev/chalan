@@ -11,7 +11,7 @@ const raw = readFileSync(
   "utf-8",
 )
 
-describe("deploy workflow (ROADMAP P2.1)", () => {
+describe("deploy workflow", () => {
   it("only runs after the CI workflow succeeds on main", () => {
     expect(raw).toMatch(/workflow_run:/)
     expect(raw).toMatch(/workflows:\s*\["CI"\]/)

@@ -20,7 +20,7 @@ Supersedes the flow-block baseline. Replaces the vertical block stack with a fre
 | Layout model | Vertical flow, `full/half` width | Absolute x/y/w/h in mm (free canvas) |
 | Source of truth | `LabelBlock[]` | pdfme `Template` JSON |
 | Designer | Block list editor | pdfme `Designer` (drag, resize, snap, property panel) |
-| Preview | Own `LabelRenderer` | pdfme `Viewer` with sample/real data |
+| Preview | Own `LabelRenderer` | the generated PDF in a frame (`LabelPreview`) |
 | Print | Portal + `@page` + `window.print()` | `generate()` → PDF blob → print or download |
 | New elements | — | Code128/other barcodes, lines, rectangles, images |
 
@@ -28,7 +28,7 @@ Supersedes the flow-block baseline. Replaces the vertical block stack with a fre
 `<LabelRenderer>`, the print portal and the `engine` column it introduced have
 all been removed — pdfme is the only engine.
 
-**Trade-off to accept.** Preview and print are no longer literally the same code (Viewer vs `generate()`), though pdfme designs them to match. The guarantee becomes "verified on a real printer" (see §9 acceptance checks). The "never translate to points" rule no longer applies internally, but page size is still exact mm.
+**Trade-off to accept.** Preview and print are the *same artefact*, not merely two renderers that should match: the Preview tab runs `generateLabelPdf` and shows the resulting PDF, so a preview cannot drift from print. This is strictly stronger than the original Viewer-vs-`generate()` trade-off, and it removes the "Viewer vs PDF drift" check in §9. The "never translate to points" rule no longer applies internally, but page size is still exact mm.
 
 ---
 
@@ -195,7 +195,9 @@ export function PdfmeDesigner({ template, font, onChange }:
 - Debounce `onChange` (about 500 ms) before `saveDraft` (PATCH).
 - **Label size** inputs (width/height) stay in the form header; on change, write them into `template.basePdf` and call `updateTemplate`.
 - Ship a **field palette**: a small list of `LabelFieldKey`s the admin can add as pre-named elements, so field binding (§3) is not left to hand-typed names. Static text uses the designer's normal text element with `readOnly` on.
-- **Preview tab**: `Viewer` with `inputs = buildLabelInputs(template, SAMPLE_LABEL_DATA)`. Optionally let the admin pick a real order to preview.
+- **Preview tab**: `LabelPreview` — generates the PDF with
+  `inputs = buildLabelInputs(template, SAMPLE_LABEL_DATA)` and shows it in a
+  frame sized from `basePdf`. Optionally let the admin pick a real order to preview.
 - **History tab**: unchanged API; loading a `'pdfme'` version copies its `template` into the editor. Legacy `'blocks'` versions are shown read-only (use the old renderer for preview; "copy into editor" is disabled, or offered as a manual rebuild).
 
 ---
@@ -287,7 +289,7 @@ Client fallback when the endpoint returns `null`: `DEFAULT_LABEL_TEMPLATE` (now 
 ## 10) Risks and open items
 
 - **Printer driver scaling.** The PDF is exact, but users must pick the matching paper size and "Actual size / 100%". Document this on the print dialog help text.
-- **Viewer vs PDF drift.** Compare Viewer and generated PDF for the default template (fonts, alignment, rotation) before launch.
+- ~~**Viewer vs PDF drift.**~~ Resolved by construction: the Preview tab generates the PDF it displays, so there is no second renderer to drift from the print path.
 - **Bundle size.** `@pdfme/ui` is large; load only on the designer route and the print click (dynamic import for `generate`).
 - **Bundler quirks.** `@pdfme/ui` pulls in a PDF-import module (pdfium WASM). If your Next build complains about Node built-ins or `import.meta.url`, add the matching webpack/Turbopack fallbacks; the designer does not need PDF import.
 - **Logo images.** pdfme needs a data URI; fetch with CORS-safe URLs (or server side) and cache the conversion.

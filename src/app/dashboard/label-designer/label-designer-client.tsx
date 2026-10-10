@@ -37,8 +37,9 @@ import { buildLabelInputs } from "@/lib/label/label-inputs"
 import { SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 import { toast } from "@/lib/notify"
 
-// The pdfme canvas/preview are heavy (pdfium, font machinery): load them as
-// separate chunks that only fetch when this screen needs them.
+// The pdfme canvas is heavy (pdfium, font machinery): load it as a separate
+// chunk that only fetches when this screen needs it. The preview is a plain
+// frame around a generated PDF, so it needs no pdfme UI at all.
 const PdfmeDesigner = dynamic(
   () =>
     import("@/features/platform-config/components/pdfme-designer").then(
@@ -46,10 +47,10 @@ const PdfmeDesigner = dynamic(
     ),
   { ssr: false },
 )
-const PdfmeViewer = dynamic(
+const LabelPreview = dynamic(
   () =>
-    import("@/features/platform-config/components/pdfme-viewer").then(
-      (m) => m.PdfmeViewer,
+    import("@/features/platform-config/components/label-preview").then(
+      (m) => m.LabelPreview,
     ),
   { ssr: false },
 )
@@ -431,7 +432,7 @@ export function LabelDesignerPageClient() {
               </CardHeader>
               <CardContent className="py-6">
                 {form.template ? (
-                  <PdfmeViewer
+                  <LabelPreview
                     template={form.template}
                     inputs={buildLabelInputs(form.template, PREVIEW_DATA)}
                     testId="label-preview"
