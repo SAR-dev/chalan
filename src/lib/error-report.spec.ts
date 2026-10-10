@@ -32,7 +32,7 @@ function sentBody(): Record<string, unknown> {
   return JSON.parse(String(init.body))
 }
 
-describe("error reporting (ROADMAP R3.1)", () => {
+describe("error reporting", () => {
   it("is off by default and sends nothing without a sink", () => {
     expect(isErrorReportingEnabled()).toBe(false)
     reportError(new Error("boom"), { requestId: "abc" })

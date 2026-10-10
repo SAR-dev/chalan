@@ -51,7 +51,7 @@ describe("FormErrors", () => {
   })
 })
 
-describe("Input error wiring (ROADMAP R2.4)", () => {
+describe("Input error wiring", () => {
   it("marks the control invalid and links the message to it", () => {
     render(
       <>

@@ -418,6 +418,74 @@ suite("announcement watermark (profile)", () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].seenAt).toBeNull()
   })
+
+  it("a profile can be created without setting notificationsSeenAt", async () => {
+    // Same contract as the announcement watermark: the in-app notification
+    // badge counts rows newer than this, and Better Auth / signup know nothing
+    // about the column. NOT NULL without a default would break every signup.
+    const userId = `itest-nwm-${RUN}`
+    await client.query(
+      `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
+      [userId, `itest notify ${RUN}`, `itest.nwm.${RUN}@example.com`],
+    )
+    track("user", "id", userId)
+    await client.query(
+      `INSERT INTO profile ("userId", role) VALUES ($1, 'MERCHANT')`,
+      [userId],
+    )
+    track("profile", "userId", userId)
+
+    const { rows } = await client.query<{ seenAt: string | null }>(
+      `SELECT "notificationsSeenAt"::text AS "seenAt" FROM profile WHERE "userId" = $1`,
+      [userId],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].seenAt).toBeNull()
+  })
+})
+
+suite("notification", () => {
+  it("cascades with its recipient, so a deleted user leaves no rows", async () => {
+    const userId = `itest-ntf-${RUN}`
+    await client.query(
+      `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
+      [userId, `itest notify ${RUN}`, `itest.ntf.${RUN}@example.com`],
+    )
+    track("user", "id", userId)
+    await client.query(
+      `INSERT INTO notification (id, "userId", event, title, href)
+       VALUES ($1, $2, 'order.created', 'New order received', '/merchant/orders')`,
+      [`itest-ntf-row-${RUN}`, userId],
+    )
+    track("notification", "id", `itest-ntf-row-${RUN}`)
+
+    await client.query(`DELETE FROM "user" WHERE id = $1`, [userId])
+    const { rows } = await client.query(
+      `SELECT 1 FROM notification WHERE "userId" = $1`,
+      [userId],
+    )
+    expect(rows).toHaveLength(0)
+  })
+
+  it("allows a money event with no order behind it", async () => {
+    // `orderId` is nullable on purpose: payout.approved and cash.submitted have
+    // no order to point at, and forcing one would make them unrecordable.
+    const userId = `itest-ntf2-${RUN}`
+    await client.query(
+      `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
+      [userId, `itest notify2 ${RUN}`, `itest.ntf2.${RUN}@example.com`],
+    )
+    track("user", "id", userId)
+    const id = `itest-ntf2-row-${RUN}`
+    await expect(
+      client.query(
+        `INSERT INTO notification (id, "userId", event, title, href)
+         VALUES ($1, $2, 'payout.approved', 'Payout approved', '/merchant/payouts')`,
+        [id, userId],
+      ),
+    ).resolves.toBeDefined()
+    track("notification", "id", id)
+  })
 })
 
 suite("advisory lock (P1.2)", () => {
@@ -880,7 +948,7 @@ suite("ledger reconciliation with a bundle (Phase 9 DoD)", () => {
 // semantics actually exist in Postgres.
 // -----------------------------------------------------------------------------
 
-suite("cron heartbeat + new indexes (ROADMAP R0.8, R3.8, R3.9)", () => {
+suite("cron heartbeat + new indexes ", () => {
   it("upserts one row per job instead of one per run", async () => {
     const job = `itest-cron-${RUN}`
     track("cron_run", "job", job)
@@ -1325,7 +1393,7 @@ suite("order CHECK constraints (DBREFACTOR Phase C/D)", () => {
 })
 
 // =============================================================================
-// ROADMAP R8 — recipient email (`order.recipientMail`)
+// Recipient email (`order.recipientMail`)
 //
 // Nullability is the load-bearing property here, not a detail. Every order
 // created before this column existed, every bulk row that omits the column and

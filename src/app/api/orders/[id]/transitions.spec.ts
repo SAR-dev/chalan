@@ -382,7 +382,7 @@ describe("PATCH /orders/:id/approve", () => {
     expect(status).toBe(200)
   })
 
-  it("400 when the merchant is suspended (ROADMAP B8)", async () => {
+  it("400 when the merchant is suspended", async () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [makeOrder({ parcelWeightKg: 2 })],
@@ -1097,7 +1097,7 @@ describe("PATCH /orders/:id/delivered", () => {
     ).toMatchObject({ amount: -750, status: "SETTLED" })
   })
 
-  it("credits only the amount actually collected (partial COD, ROADMAP B2)", async () => {
+  it("credits only the amount actually collected (partial COD)", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
       [
@@ -1129,7 +1129,7 @@ describe("PATCH /orders/:id/delivered", () => {
     ).toMatchObject({ amount: -500 })
   })
 
-  it("400 when a shortfall has no reason (ROADMAP B2)", async () => {
+  it("400 when a shortfall has no reason", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
       [
@@ -1147,7 +1147,7 @@ describe("PATCH /orders/:id/delivered", () => {
     })
   })
 
-  it("400 when collecting more than the COD (ROADMAP B2)", async () => {
+  it("400 when collecting more than the COD", async () => {
     sessionState.value = riderSession("rider_1")
     dbState.selectQueue = [
       [
@@ -1635,7 +1635,7 @@ describe("PATCH /orders/:id/cancel", () => {
     expect(payload).toMatchObject({ status: "CANCELLED" })
   })
 
-  it("refunds the full creation charge when cancelled before pickup (ROADMAP B4)", async () => {
+  it("refunds the full creation charge when cancelled before pickup", async () => {
     sessionState.value = merchantSession("merch_1")
     dbState.selectQueue = [
       [
@@ -1692,7 +1692,7 @@ describe("PATCH /orders/:id/cancel", () => {
     expect(dbState.updatePayloads.some((p) => "ordersUsed" in p)).toBe(false)
   })
 
-  it("charges the cancellation fee when cancelled after pickup (ROADMAP B4)", async () => {
+  it("charges the cancellation fee when cancelled after pickup", async () => {
     sessionState.value = admin
     dbState.selectQueue = [
       [
@@ -1722,7 +1722,7 @@ describe("PATCH /orders/:id/cancel", () => {
     ).toMatchObject({ amount: 20 })
   })
 
-  it("keeps the charge when refundOnCancel is off (ROADMAP B15)", async () => {
+  it("keeps the charge when refundOnCancel is off", async () => {
     sessionState.value = merchantSession("merch_1")
     dbState.selectQueue = [
       [
@@ -1915,7 +1915,7 @@ describe("PATCH /orders/:id/cancel", () => {
 // the same lane must not add statements. Only genuinely new keys (a second
 // merchant, a second lane) may cost more, and only once each.
 // ---------------------------------------------------------------------------
-describe("bulk transition batch cost (ROADMAP R3.5)", () => {
+describe("bulk transition batch cost", () => {
   /**
    * Run a bulk `approve` over `n` orders that share one merchant and one lane,
    * and report the statements it cost.
@@ -2125,15 +2125,18 @@ describe("bulk transition batch cost (ROADMAP R3.5)", () => {
   }
 
   it("reads each merchant in the batch exactly once", async () => {
-    // 1 batch lock + 2 merchant reads + 4 reads for the one shared lane.
+    // 1 batch lock + 2 merchant reads + 4 reads for the one shared lane
+    // + 1 notification-recipient read per *distinct* merchant.
     // Without the memo this was one merchant read *per order* — 4, and it grew
-    // with the batch rather than with the number of distinct merchants.
+    // with the batch rather than with the number of distinct merchants. The
+    // recipient lookup is memoised the same way, so it is 2 here (not 4) and 1
+    // in the single-merchant case: it tracks distinct merchants, not rows.
     expect(
       await approveBatch(fourOrdersOn(["city_1"], ["merch_1", "merch_2"])),
-    ).toMatchObject({ selects: 7, updates: 1 })
+    ).toMatchObject({ selects: 9, updates: 1 })
     expect(
       await approveBatch(fourOrdersOn(["city_1"], ["merch_1"])),
-    ).toMatchObject({ selects: 6, updates: 1 })
+    ).toMatchObject({ selects: 7, updates: 1 })
   })
 
   it("resolves each lane in the batch exactly once", async () => {
@@ -2141,11 +2144,11 @@ describe("bulk transition batch cost (ROADMAP R3.5)", () => {
     // *warehouse* is the clean way to get a second key: both origins price out
     // through the same fixture rows.
     //
-    // 1 lock + 1 merchant + 2 lanes x 4 reads = 10, and the queue drains
-    // exactly. Without the memo each of the 4 orders resolved its own lane:
-    // 22 statements. This also pins the memo's contract — it must store a
-    // settled value, not the re-runnable query builder, or every cache hit
-    // would issue the query again and desynchronise the reads.
+    // 1 lock + 1 merchant + 2 lanes x 4 reads + 1 recipient read = 11, and the
+    // queue drains exactly. Without the memo each of the 4 orders resolved its
+    // own lane: 22 statements. This also pins the memo's contract — it must
+    // store a settled value, not the re-runnable query builder, or every cache
+    // hit would issue the query again and desynchronise the reads.
     type BatchOrder = ReturnType<typeof makeOrder> & {
       merchantId: string
       deliveryCityId: string
@@ -2154,7 +2157,7 @@ describe("bulk transition batch cost (ROADMAP R3.5)", () => {
       (o, i): BatchOrder => ({ ...o, warehouseId: i % 2 ? "wh_2" : "wh_1" }),
     )
     expect(await approveBatch(orders)).toMatchObject({
-      selects: 10,
+      selects: 11,
       updates: 1,
     })
   })

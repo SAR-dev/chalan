@@ -66,7 +66,7 @@ describe("withErrorHandler", () => {
 // There was no access log at all before this: only unhandled
 // 500s produced a line, so there was no 4xx record, no route latency and no
 // slow-request signal. These assert the shape of that log.
-describe("access log (ROADMAP R3.1)", () => {
+describe("access log", () => {
   let logSpy: ReturnType<typeof vi.spyOn>
   const originalLevel = process.env.LOG_LEVEL
 

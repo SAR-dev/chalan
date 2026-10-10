@@ -71,6 +71,13 @@
       "when": 1791538132716,
       "tag": "0009_clear_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791639754968,
+      "tag": "0010_pretty_silk_fever",
+      "breakpoints": true
     }
   ]
 }

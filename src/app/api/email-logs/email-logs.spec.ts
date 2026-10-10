@@ -109,7 +109,7 @@ describe("GET /api/email-logs", () => {
     expect(json.total).toBe(1)
   })
 
-  it("omits the html/plain bodies from list rows (ROADMAP P3)", async () => {
+  it("omits the html/plain bodies from list rows", async () => {
     sessionState.value = admin
     selectQueue.push([{ count: 1 }], [{ id: "log_1" }])
     const res = await listEmailLogs(

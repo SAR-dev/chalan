@@ -2253,7 +2253,7 @@ remove the `cloudflared` service block from the compose file.
 
 Copy `config.example.yml` to `config.yml` and edit it to match your actual
 Cloudflare Tunnel configuration. `config.yml` is gitignored — it carries your
-tunnel UUID and hostname, which is why it is never committed (ROADMAP R3.4).
+tunnel UUID and hostname, which is why it is never committed.
 The token-based flow (`CLOUDFLARE_TUNNEL_TOKEN`, see `docs/DEPLOYMENT.md`) is
 what the compose deployment uses.
 

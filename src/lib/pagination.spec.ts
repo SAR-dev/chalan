@@ -21,7 +21,7 @@ describe("parsePagination", () => {
     expect(parsePagination(req)).toEqual({ limit: MAX_LIMIT, offset: 0 })
   })
 
-  it("clamps offset at MAX_OFFSET (ROADMAP P3)", () => {
+  it("clamps offset at MAX_OFFSET", () => {
     const req = new Request(
       `http://localhost?limit=10&offset=${MAX_OFFSET + 5_000_000}`,
     )

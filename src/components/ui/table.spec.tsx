@@ -14,7 +14,7 @@ import {
 // `<th>` carried no `scope`, so a screen reader could not pair a
 // cell with its column once focus moved off the header row.
 
-describe("TableHead (ROADMAP R5.5)", () => {
+describe("TableHead", () => {
   it("marks every header cell as a column header", () => {
     const { container } = render(
       <Table>

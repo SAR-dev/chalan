@@ -10,6 +10,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core"
+import { user } from "./auth"
 import { emailLogStatuses, emailOutboxStatuses, profileRoles } from "./enums"
 import { ts } from "./helpers"
 
@@ -145,12 +146,63 @@ export const announcement = pgTable(
 )
 
 // =============================================================================
+// In-app notification
+//
+// One row per recipient per raised event. Unlike `announcement` — a broadcast
+// everybody reads — a notification is addressed: it is written for the users who
+// can act on it, so there is no `targetRoles` fan-out at read time and no
+// per-item read receipt either. "What's new" is one watermark on the profile
+// (`profile.notificationsSeenAt`), the same shape `announcementsSeenAt` uses.
+//
+// The `notification_read` table that a per-item receipt model would need is
+// still absent on purpose; `announcement_read` was built and removed for the
+// same reason.
+// =============================================================================
+
+export const notification = pgTable(
+  "notification",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    // The recipient. Read as the "mine" filter on every inbox query.
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // One of ORDER_EVENTS (src/lib/order-events.ts). Kept as text rather than a
+    // PG enum so a new event is a one-line schema change, matching `webhook_delivery.event`.
+    event: text("event").notNull(),
+    // Null for platform money events with no order behind them.
+    orderId: text("orderId"),
+    // Which merchant this fact belongs to. Not a read filter — the inbox reads
+    // by `userId` — but the only way to answer "why did this account get this?"
+    // without joining back through the order, which money events have none of.
+    merchantId: text("merchantId"),
+    // Who acted, when the emitter knows it. Null for system-generated facts.
+    actorName: text("actorName"),
+    // The headline, stored so the row is readable on its own. Derived from
+    // `event` at write time; `notificationTitleForEvent` owns the copy.
+    title: text("title").notNull(),
+    // Deep link, resolved by `notificationHrefForEvent` at read time.
+    href: text("href").notNull(),
+    createdAt: ts("createdAt").notNull().defaultNow(),
+  },
+  (t) => [
+    // The inbox query: "my notifications, newest first". Without this it is a
+    // seq scan per poll, and the tray polls.
+    index("notification_user_created_idx").on(t.userId, t.createdAt),
+    // Backs the retention sweep — the only other query that scans by age.
+    index("notification_created_at_idx").on(t.createdAt),
+  ],
+)
+
+// =============================================================================
 // Announcement read state — REMOVED
 //
 // `announcement_read` (one row per announcement × user) was built for this
 // feature and then deleted: announcements are broadcasts, not per-recipient
 // messages, so per-item read receipts rebuilt the notification model that
-// R4.1 will own. The state is now one timestamp on the profile row
+// in-app notifications now own. The state is one timestamp on the profile row
 // (`profile.announcementsSeenAt` = when you last looked at the feed) and the
 // badge counts live announcements published after it.
 // =============================================================================

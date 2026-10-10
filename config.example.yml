@@ -9,7 +9,7 @@
 # production hostname in it, while `docker/compose.cluster.yml` ran the
 # token-based flow (`CLOUDFLARE_TUNNEL_TOKEN`) and `deploy.yml` defaulted to a
 # third hostname — three mechanisms, two names, one secret committed to the
-# repo (ROADMAP R3.4). The token flow is the documented deployment path (see
+# repo. The token flow is the documented deployment path (see
 # docs/DEPLOYMENT.md); this file exists for local development only, which is
 # why nothing in `docker/` or `.github/` may reference a hostname literal.
 tunnel: REPLACE_WITH_YOUR_TUNNEL_UUID

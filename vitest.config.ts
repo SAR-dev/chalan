@@ -11,7 +11,7 @@ export default defineConfig({
     // jsdom, and under full-suite load a single render can take tens of
     // seconds.
     //
-    // Two separate concerns used to be conflated here (ROADMAP R1.6):
+    // Two separate concerns used to be conflated here:
     //
     //  1. An *isolation* bug — a timed-out render leaked into the next test's
     //     DOM and failed it with bogus "found multiple elements" errors. That
@@ -46,7 +46,7 @@ export default defineConfig({
     // ~45s while leaving headroom for the OS and coverage I/O.
     pool: "threads",
     maxWorkers: 4,
-    // Coverage tooling (ROADMAP P3). `pnpm test:coverage` writes a summary +
+    // Coverage tooling. `pnpm test:coverage` writes a summary +
     // LCOV report; thresholds are enforced there and in CI so coverage cannot
     // silently regress.
     coverage: {
@@ -75,8 +75,8 @@ export default defineConfig({
         "src/instrumentation*.ts",
       ],
       // Global floors, set under the measured baseline so a drop fails the gate
-      // (measured 55.98 / 50.30 / 44.44 / 56.87 at the last raise — see the
-      // ROADMAP health block). They are a regression guard, not a target —
+      // (measured 55.98 / 50.30 / 44.44 / 56.87 at the last raise). They are a
+      // regression guard, not a target —
       // raise them as tests land; never lower them to make CI pass.
       //
       // The glob floors exist because a *global* number can be met while a
@@ -100,7 +100,7 @@ export default defineConfig({
           functions: 91,
           lines: 87,
         },
-        // The one directory that had no floor at all (ROADMAP R1.5), so the
+        // The one directory that had no floor at all, so the
         // whole feature layer could lose ground while the global figure stayed
         // green. Set ~2 points under the measured baseline — statements 29.56,
         // branches 27.31, functions 23.64, lines 30.34 across 111 files.

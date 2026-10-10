@@ -38,40 +38,7 @@ function e2eTestCount(): number {
   return count
 }
 
-/**
- * The unit suite's own spec-file count. Vitest's include pattern matches every
- * `.spec.` and `.test.` file under `.ts`/`.tsx`, minus `node_modules`, `.next`
- * and `e2e` — so the roots are `src`, `scripts` and `env`, plus anything
- * sitting at the repo root. `env/` is not tracked and need not exist; a missing
- * root contributes nothing rather than throwing.
- *
- * Do not paste the literal include glob into this comment: it contains a pair
- * that terminates the comment and fails to parse.
- */
-function unitSpecFileCount(): number {
-  const roots = ["src", "scripts", "env"]
-  const pattern = /\.(test|spec)\.(ts|tsx)$/
-  const walk = (dir: string): string[] =>
-    !existsSync(dir)
-      ? []
-      : readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-          const full = join(dir, entry.name)
-          return entry.isDirectory()
-            ? walk(full)
-            : pattern.test(entry.name)
-              ? [full]
-              : []
-        })
-  const top = readdirSync(process.cwd(), { withFileTypes: true }).flatMap(
-    (entry) =>
-      pattern.test(entry.name) && entry.isFile()
-        ? [join(process.cwd(), entry.name)]
-        : [],
-  )
-  return [...roots.flatMap((r) => walk(join(process.cwd(), r))), ...top].length
-}
-
-describe("docs / env drift (ROADMAP P2.6)", () => {
+describe("docs / env drift", () => {
   it("ships a BETTER_AUTH_SECRET placeholder that passes the 32-char boot check", () => {
     const raw = read(".env.example")
     const line = raw
@@ -106,7 +73,7 @@ describe("docs / env drift (ROADMAP P2.6)", () => {
  * silently delete on a different schedule than the routes do — which is how the
  * Comments drifted to 90 / 30 while the code applied 30 / 10.
  */
-describe("retention defaults (ROADMAP R0.7)", () => {
+describe("retention defaults", () => {
   /** The `coalesce(..., N)` fallback guarding `app.<setting>` in pg_cron SQL. */
   function pgCronFallback(setting: string): number | null {
     const raw = read("scripts", "setup-pg-cron.sql")
@@ -171,7 +138,7 @@ describe("retention defaults (ROADMAP R0.7)", () => {
  * removing a scenario renumbers exactly one file, and the log runs in serial
  * order because the files do.
  */
-describe("E2E suite invariants (ROADMAP R1.4)", () => {
+describe("E2E suite invariants", () => {
   function serials() {
     const dir = join(process.cwd(), "e2e", "specs")
     return readdirSync(dir)
@@ -231,34 +198,13 @@ describe("E2E suite invariants (ROADMAP R1.4)", () => {
     ).toContain(normalize(expected))
   })
 
-  // ROADMAP.md carries the same snapshot in a different order, and had drifted
-  // to "883 files / 138 tests / S1-S76" while the tree was well past it — it
-  // was the one quoting the numbers and not being checked.
-  it("quotes suite numbers in ROADMAP.md that match the tree", () => {
-    const list = serials()
-    expect(list.length).toBeGreaterThan(0)
-    const expected = `${e2eTestCount()} tests / ${e2eSpecFiles().length} files / ${list.length} scenarios`
-    expect(
-      normalize(read("ROADMAP.md")),
-      "ROADMAP.md E2E summary is stale — update it to: " + expected,
-    ).toContain(normalize(expected))
-  })
-
+  // The coverage floors live in vitest.config.ts; the doc that quotes them is
+  // checked here so it cannot drift silently.
   it("documents coverage floors that match vitest.config.ts", () => {
     const config = read("vitest.config.ts")
     const floor = (key: string) =>
       Number(config.match(new RegExp(`\\b${key}:\\s*(\\d+)`))?.[1])
     const documented = `${floor("statements")} / ${floor("branches")} / ${floor("functions")} / ${floor("lines")}`
     expect(read("AGENTS.md")).toContain(`(${documented})`)
-    expect(normalize(read("ROADMAP.md"))).toContain(`floors **${documented}**`)
-  })
-
-  it("quotes a unit spec-file count in ROADMAP.md that matches the tree", () => {
-    const count = unitSpecFileCount()
-    expect(count).toBeGreaterThan(0)
-    expect(
-      normalize(read("ROADMAP.md")),
-      "ROADMAP.md spec-file count is stale — update it to: " + count,
-    ).toContain(`${count} spec files`)
   })
 })

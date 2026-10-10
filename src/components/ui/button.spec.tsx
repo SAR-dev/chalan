@@ -21,7 +21,7 @@ const GLOBALS_CSS = readFileSync(
   "utf-8",
 )
 
-describe("button hit area (ROADMAP R2.10)", () => {
+describe("button hit area", () => {
   it("carries the hit-area hook on every size variant", () => {
     const sizes = [
       "xs",
@@ -315,7 +315,7 @@ function findCollisions(): Collision[] {
   return collisions
 }
 
-describe("hit areas do not overlap (ROADMAP R2.10)", () => {
+describe("hit areas do not overlap", () => {
   it("finds no two adjacent buttons whose targets collide", () => {
     // Found by hand once already: the table footer's prev/next pair sat at
     // `gap-1`, which put their expanders 8px over each other. There is no way to

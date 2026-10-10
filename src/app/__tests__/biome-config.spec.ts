@@ -14,7 +14,7 @@ function includes(): string[] {
   return (JSON.parse(raw) as { files: { includes: string[] } }).files.includes
 }
 
-describe("biome config (ROADMAP R5.7)", () => {
+describe("biome config", () => {
   it("is strict JSON, because Biome rejects comments in biome.json", () => {
     // A `//` note makes Biome report `at biome.json:N:M parse — Expected an
     // array, an object, or a literal` *and then run with defaults*, checking

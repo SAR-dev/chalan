@@ -133,7 +133,7 @@ describe("calcMerchantEarnings", () => {
     expect(calcMerchantEarnings(100, 10, 1)).toBe(89)
   })
 
-  it("goes negative when the fees exceed the COD (signed net, ROADMAP B7)", () => {
+  it("goes negative when the fees exceed the COD (signed net)", () => {
     expect(calcMerchantEarnings(50, 60, 7.5)).toBe(-17.5)
   })
 

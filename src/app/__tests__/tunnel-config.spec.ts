@@ -19,7 +19,7 @@ function read(...parts: string[]): string {
   return readFileSync(join(process.cwd(), ...parts), "utf-8")
 }
 
-describe("tunnel identity (ROADMAP R3.4)", () => {
+describe("tunnel identity", () => {
   it("ships a template rather than a live tunnel", () => {
     expect(existsSync(join(process.cwd(), "config.example.yml"))).toBe(true)
     const example = read("config.example.yml")

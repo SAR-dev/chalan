@@ -8,7 +8,7 @@ const nextConfig = {
   // Produce a self-contained build (.next/standalone) for small Docker images.
   output: "standalone",
   // Drops `X-Powered-By: Next.js` — a fingerprint that tells an attacker the
-  // framework and version before they probe for anything (ROADMAP R5.9).
+  // framework and version before they probe for anything.
   poweredByHeader: false,
   // ioredis is a server-side Redis client — keep it external so it is not
   // bundled into the build (matches nodemailer etc.).
@@ -29,7 +29,7 @@ const nextConfig = {
     //
     // Payload size is handled at upload time instead: the uploader
     // downscales client-side to `UPLOAD_MAX_DIMENSIONS` and the API caps
-    // uploads at 5MB. Moving to `next/image` is tracked in ROADMAP (P3).
+    // uploads at 5MB.
     unoptimized: true,
   },
   async redirects() {
@@ -57,7 +57,7 @@ const nextConfig = {
           // the cloudflared edge config is outside this repo. Browsers only
           // honour it over HTTPS, so plain-HTTP local dev is unaffected. The
           // host it is sent on is `chalan.sarn.top`, so `includeSubDomains`
-          // reaches only `*.chalan.sarn.top` (ROADMAP R5.9).
+          // reaches only `*.chalan.sarn.top`.
           {
             key: "Strict-Transport-Security",
             value: "max-age=31536000; includeSubDomains",

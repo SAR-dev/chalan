@@ -23,7 +23,7 @@ const stages = [...dockerfile.matchAll(/^FROM\s+\S+\s+AS\s+(\S+)/gim)].map(
   (m) => m[1],
 )
 
-describe("docker/Dockerfile stages (ROADMAP P4.4)", () => {
+describe("docker/Dockerfile stages", () => {
   it("declares the expected stages", () => {
     expect(stages).toEqual(["base", "deps", "builder", "runner"])
   })

@@ -35,7 +35,7 @@ function crontabLine(raw: string, route: string): string | undefined {
     .find((l) => l.includes("wget") && l.includes(`/api/cron/${route}`))
 }
 
-describe("cron configuration (ROADMAP P2.5)", () => {
+describe("cron configuration", () => {
   it("cluster cron runs the upload sweep without ?dryRun=1", () => {
     const raw = read("docker", "compose.cluster.yml")
     expect(raw).toContain("/api/cron/cleanup-uploads")
@@ -75,7 +75,7 @@ describe("cron configuration (ROADMAP P2.5)", () => {
 // cron route that nobody schedules there is a job that simply never executes.
 // This guard is what stops one being shipped silently: every route on disk must
 // have a crontab line in both compose files, and both must stay in step.
-describe("every cron route runs in production (ROADMAP R0.5)", () => {
+describe("every cron route runs in production", () => {
   const routes = cronRoutes()
 
   it("finds the routes it is meant to guard", () => {

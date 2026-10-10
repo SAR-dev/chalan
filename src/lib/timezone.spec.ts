@@ -118,7 +118,7 @@ describe("date arithmetic", () => {
   })
 })
 
-describe("businessPresetRange (ROADMAP R0.3)", () => {
+describe("businessPresetRange", () => {
   // 20:00 UTC is 02:00 the next day in Dhaka — the instant where a device-local
   // derivation and a Dhaka derivation disagree by a whole calendar day.
   const instant = new Date("2026-07-01T20:00:00Z")

@@ -32,7 +32,9 @@ import {
   rider,
 } from "@/lib/db/schema"
 import { hasNavPermission } from "@/lib/nav-config"
+import { createRecipientResolver } from "@/lib/notifications"
 import { computeActualDeliveryDays } from "@/lib/order-delivery-time"
+import { emitOrderEvent, type OrderEvent } from "@/lib/order-events"
 import { resolveRoutePricing } from "@/lib/order-pricing"
 import { applyPackageRule } from "@/lib/packages"
 import { calcDeliveryCharge, calcMerchantEarnings } from "@/lib/pricing"
@@ -52,7 +54,6 @@ import {
   orderSetExpectedDeliverySchema,
   parseBody,
 } from "@/lib/validation"
-import { emitWebhookEvent, type WebhookEvent } from "@/lib/webhooks"
 
 type Session = NonNullable<Awaited<ReturnType<typeof requireSession>>>
 type OrderRow = typeof order.$inferSelect
@@ -815,34 +816,45 @@ const TRANSITION_LABELS: Record<TransitionName, string> = {
 }
 
 /**
- * Which webhook event a transition produces (R2).
+ * Which event a transition raises.
+ *
+ * Every transition that changes an order's fate notifies someone, so this map
+ * is exhaustive rather than a `Partial` — a transition missing from it would
+ * silently raise nothing. Transitions that are pure bookkeeping
+ * (`assign-pickup-rider`, `set-expected-delivery`) are absent on purpose:
+ * nothing a merchant could act on happened.
  */
-const TRANSITION_WEBHOOK_EVENT: Partial<Record<TransitionName, WebhookEvent>> =
-  {
-    approve: "order.approved",
-    dispatch: "order.dispatched",
-    "picked-up": "order.picked-up",
-    "out-for-delivery": "order.out-for-delivery",
-    delivered: "order.delivered",
-    failed: "order.failed",
-    return: "order.returned",
-    cancel: "order.cancelled",
-  }
+const TRANSITION_EVENT: Partial<Record<TransitionName, OrderEvent>> = {
+  approve: "order.approved",
+  dispatch: "order.dispatched",
+  "picked-up": "order.picked-up",
+  "out-for-delivery": "order.out-for-delivery",
+  delivered: "order.delivered",
+  failed: "order.failed",
+  return: "order.returned",
+  cancel: "order.cancelled",
+  "settle-cod": "cash.submitted",
+}
 
-async function emitOrderWebhook(
+async function emitOrderEventForTransition(
   tx: OrderTx,
   name: TransitionName,
   before: OrderRow,
   after: OrderRow,
+  actorName: string,
   now?: string,
+  resolveRecipients?: (merchantId: string) => Promise<string[]>,
 ): Promise<void> {
-  const event = TRANSITION_WEBHOOK_EVENT[name]
+  const event = TRANSITION_EVENT[name]
   if (!event) return
-  await emitWebhookEvent({
+  await emitOrderEvent({
     tx,
-    merchantId: after.merchantId,
     event,
     orderId: after.id,
+    merchantId: after.merchantId,
+    actorName,
+    now,
+    resolveRecipients,
     data: {
       id: after.id,
       status: after.status,
@@ -1184,7 +1196,14 @@ export async function applyOrderTransition(
       note: transitionNote(name, body),
     })
 
-    await emitOrderWebhook(tx, name, orderRow, updated, ctx.now)
+    await emitOrderEventForTransition(
+      tx,
+      name,
+      orderRow,
+      updated,
+      me.name,
+      ctx.now,
+    )
 
     return NextResponse.json(updated)
   })
@@ -1364,13 +1383,19 @@ export async function applyBulkOrderTransition(
       await tx.insert(orderStatusHistory).values(historyRows)
     }
 
+    // One recipient resolver for the whole batch: 25 orders for 3 merchants cost
+    // 3 lookups, not 25. Without this the batch cost grows with batch size,
+    // which is exactly what the batch-cost guards pin.
+    const resolveRecipients = createRecipientResolver(tx)
     for (const row of updated) {
-      await emitOrderWebhook(
+      await emitOrderEventForTransition(
         tx,
         name,
         beforeById.get(row.id) ?? row,
         row,
+        me.name,
         batchNow,
+        resolveRecipients,
       )
     }
 

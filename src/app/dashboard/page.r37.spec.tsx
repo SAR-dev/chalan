@@ -92,7 +92,7 @@ function queueTiles() {
   ]
 }
 
-describe("Overview page - one cache entry for the tile row (ROADMAP R3.7)", () => {
+describe("Overview page - one cache entry for the tile row", () => {
   it("serves all six tiles from a single cache entry", async () => {
     // Six separate `unstable_cache` calls would let the row render half-updated:
     // "3 pending merchants" next to "0 pending orders" because two of six
