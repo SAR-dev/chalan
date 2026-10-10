@@ -251,9 +251,13 @@ generator the print action uses, and saving writes the `template` JSON. Every
 version in History is loadable — there is no second engine and no read-only
 version class.
 
-- **One renderer.** pdfme renders the label on screen (`Viewer`) and generates
-  the PDF (`@pdfme/generator`) from the identical template, so the preview is
-  the print output rather than an approximation of it.
+- **One generator.** `generateLabelPdf` produces the print PDF from the template,
+  and the designer's **Preview** shows that same PDF directly in a frame - not a
+  second on-screen renderer that could drift from it. The preview is the print
+  output, not an approximation. (This used to be pdfme's on-screen `Viewer`;
+  it was dropped because a zoom/navigation toolbar and an injected global
+  stylesheet are pure noise on a one-page label, and nothing it drew was
+  gained over showing the PDF.)
 - **Never rasterize a label.** `html2canvas` + `jsPDF` produces a bitmap, which
   blurs the QR code and breaks R9 outright. pdfme emits vectors for that
   reason. The model is the contract, the renderer is swappable.
@@ -266,10 +270,9 @@ version class.
   and name-based bindings (`src/lib/label/*`), with the block editor removed.
 - **Preview mirrors the tabs you already ship** in `markdown-editor.tsx`:
   **Design** (the pdfme canvas: palette of bound fields and primitives,
-  millimetre placement) and **Preview** (the same template rendered by the
-  pdfme viewer — the print generator, not an approximation). **Publish**
-  promotes draft → published and bumps `version`; printing reads only the
-  published row.
+  millimetre placement) and **Preview** (the generated PDF itself - the print
+  generator, not an approximation). **Publish** promotes draft → published and
+  bumps `version`; printing reads only the published row.
 
 **Schema** — a dedicated `label_template` table, not a `platform_config` entry
 (that store is key/value and has no revisions):
