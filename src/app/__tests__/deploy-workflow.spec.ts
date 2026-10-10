@@ -49,4 +49,19 @@ describe("deploy workflow", () => {
     expect(buildAt).toBeGreaterThan(-1)
     expect(setupAt).toBeLessThan(buildAt)
   })
+
+  it("pushes a lowercase image name", () => {
+    // Docker rejects an uppercase repository and `github.repository` is
+    // `SAR-dev/chalan`, so a tag built from it fails at push time with
+    // "repository name must be lowercase". The name is computed once, lowercased,
+    // and both the tags and the VPS's APP_IMAGE read that one output.
+    const normaliseAt = raw.indexOf("Compute the lowercase image name")
+    const buildAt = raw.indexOf("docker/build-push-action")
+    expect(normaliseAt).toBeGreaterThan(-1)
+    expect(normaliseAt).toBeLessThan(buildAt)
+    expect(raw).toContain("${GITHUB_REPOSITORY,,}")
+    // The raw, uppercase-carrying source must not reach a tag again.
+    expect(raw).not.toMatch(/tags:.*github\.repository/)
+    expect(raw).not.toContain("env.IMAGE_NAME")
+  })
 })
