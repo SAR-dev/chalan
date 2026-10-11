@@ -52,7 +52,14 @@ interface ServiceWorkerHarness {
   stored: Map<string, FakeResponse>
   /** Paths passed to `cache.addAll` during install. */
   precached: string[]
-  dispatch(type: "install" | "activate"): Promise<unknown>
+  /** Cache keys the worker was asked to delete. */
+  deleted: string[]
+  /** Cache keys `caches.keys()` reports. Replaceable per test. */
+  cacheKeys: string[]
+  dispatch(
+    type: "install" | "activate" | "message",
+    data?: unknown,
+  ): Promise<unknown>
   navigate(
     path: string,
     response: FakeResponse | Error,
@@ -64,6 +71,8 @@ function loadServiceWorker(): ServiceWorkerHarness {
   const listeners = new Map<string, (event: unknown) => void>()
   const stored = new Map<string, FakeResponse>()
   const precached: string[] = []
+  const deleted: string[] = []
+  const cacheKeys: string[] = []
   // Held outside the sandbox so `navigate` can swap it after the script has
   // been evaluated; the worker resolves `fetch` off the global each call.
   let fetchImpl: (request?: unknown) => Promise<FakeResponse> = () =>
@@ -92,8 +101,11 @@ function loadServiceWorker(): ServiceWorkerHarness {
     caches: {
       open: () => Promise.resolve(shellCache),
       match: (key: unknown) => Promise.resolve(stored.get(String(key))),
-      keys: () => Promise.resolve([]),
-      delete: () => Promise.resolve(true),
+      keys: () => Promise.resolve(cacheKeys),
+      delete: (key: string) => {
+        deleted.push(key)
+        return Promise.resolve(true)
+      },
     },
     fetch: (request: unknown) => fetchImpl(request),
     URL,
@@ -105,9 +117,12 @@ function loadServiceWorker(): ServiceWorkerHarness {
   return {
     stored,
     precached,
-    dispatch(type) {
+    deleted,
+    cacheKeys,
+    dispatch(type, data) {
       let result: Promise<unknown> | undefined
       listeners.get(type)?.({
+        data,
         waitUntil: (promise: Promise<unknown>) => {
           result = promise
         },
@@ -210,5 +225,37 @@ describe("public/sw.js", () => {
     sw.stored.set("/login", makeResponse(PUBLIC_HTML))
     const served = await sw.navigate("/login", new Error("offline"))
     expect(await bodyOf(served)).toBe(PUBLIC_HTML)
+  })
+})
+
+describe("manual purge", () => {
+  // Driven by the Update button on the Account page. It has to clear *every*
+  // generation, not just the active one — a user stuck on a stale page is
+  // usually holding caches the worker has already stopped using.
+  it("deletes all caches on PURGE_CACHES", async () => {
+    const sw = loadServiceWorker()
+    sw.cacheKeys.push(
+      "chalan-shell-0.1.0",
+      "chalan-static-0.1.0",
+      "chalan-shell-0.0.9",
+    )
+
+    await sw.dispatch("message", { type: "PURGE_CACHES" })
+
+    expect(sw.deleted).toEqual([
+      "chalan-shell-0.1.0",
+      "chalan-static-0.1.0",
+      "chalan-shell-0.0.9",
+    ])
+  })
+
+  it("ignores messages it does not own", async () => {
+    const sw = loadServiceWorker()
+    sw.cacheKeys.push("chalan-shell-0.1.0")
+
+    await sw.dispatch("message", { type: "SOMETHING_ELSE" })
+    await sw.dispatch("message", undefined)
+
+    expect(sw.deleted).toEqual([])
   })
 })

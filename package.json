@@ -43,7 +43,10 @@
     "serve:start": "nohup pnpm start > /tmp/chalan-server.log 2>&1 &",
     "serve:stop": "pkill -f \"[n]ext-server\" || pkill -f \"[n]ext start\" || true",
     "serve:log": "tail -f /tmp/chalan-server.log",
-    "bump-sw": "node scripts/bump-sw-version.js"
+    "bump-sw": "node scripts/bump-sw-version.js",
+    "bump-sw:minor": "node scripts/bump-sw-version.js minor",
+    "bump-sw:major": "node scripts/bump-sw-version.js major",
+    "bump-sw:prerelease": "node scripts/bump-sw-version.js prerelease"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",

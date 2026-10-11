@@ -26,12 +26,17 @@
  * through `isStorableShell()`. Both matter: fixing only the fetch handler
  * leaves the install-time leak in place.
  *
- * Bump VERSION to invalidate old caches on deploy. Deploying a new SW with a
- * changed CACHE_VERSION prunes the previous generation automatically — which
- * is how any HTML already written by v24 gets dropped.
+ * VERSION mirrors `package.json` — it is the app version, not a private counter,
+ * so the number shown on the Account Settings page is the number this file
+ * caches under. `scripts/bump-sw-version.js` writes both in one step; editing
+ * this by hand is how the two drift apart.
+ *
+ * Changing it invalidates old caches on deploy: a new SW with a different cache
+ * name prunes the previous generation automatically, which is how any HTML
+ * already written by an earlier build gets dropped.
  */
 
-const VERSION = "v29"
+const VERSION = "0.1.0"
 const SHELL_CACHE = `chalan-shell-${VERSION}`
 const STATIC_CACHE = `chalan-static-${VERSION}`
 
@@ -113,6 +118,29 @@ self.addEventListener("activate", (event) => {
         ),
       )
       .then(() => self.clients.claim()),
+  )
+})
+
+/**
+ * Manual escape hatch, driven by the Update button on the Account page.
+ *
+ * `skipWaiting()` on install already means a new worker activates as soon as it
+ * is fetched, so this is not about waiting for one. It is about the page that is
+ * *already open*: it was served by — and may still be rendering from — caches
+ * belonging to a build that has since been replaced. Purging on demand and
+ * reloading is the only way out of that without asking the user to clear site
+ * data by hand.
+ *
+ * Deletes every cache on the origin rather than only the current generation,
+ * for the same reason `activate` prunes prefix-agnostically.
+ */
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "PURGE_CACHES") return
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => self.skipWaiting()),
   )
 })
 
