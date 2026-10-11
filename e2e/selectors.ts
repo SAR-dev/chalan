@@ -333,7 +333,7 @@ export const ongoing = {
   dispatchPrefix: "[data-testid^='kanban-dispatch-']",
   // A selector that must never match anything. Cancel lives on the approval
   // queue and in the admin portal; putting it on a board card would undo the
-  // PENDING-only approval split (TODO.md decision #9).
+  // PENDING-only approval split.
   cancelPrefix: "[data-testid^='kanban-cancel-']",
   // Distinct from `empty`: there ARE parcels, the filter just hides all of them.
   noMatches: "[data-testid='kanban-no-matches']",

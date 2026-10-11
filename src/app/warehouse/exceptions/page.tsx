@@ -41,7 +41,7 @@ export default async function WarehouseExceptionsPage() {
   // This warehouse.
   const warehouseScope = eq(order.warehouseId, me.warehouseId)
   // FAILED_ATTEMPT only: the one status with a next action. RETURNED moved to
-  // the Completed page — see TODO.md decision #1.
+  // the Completed page.
   const statusFilter = eq(order.status, "FAILED_ATTEMPT")
 
   const [[{ total }], rows] = await Promise.all([

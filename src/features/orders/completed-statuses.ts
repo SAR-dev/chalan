@@ -11,7 +11,7 @@ import type { OrderStatus } from "@/lib/types"
  * sets it and nothing leaves it. It used to sit on the Exceptions page under a
  * "Resolved" tab, which was ownership by history rather than by state — the
  * page's own purpose is "parcels you can still resolve", and a resolved parcel
- * has nothing to resolve. See TODO.md decision #1.
+ * has nothing to resolve.
  *
  * FAILED_ATTEMPT is deliberately absent: it is not closed, it is stuck.
  */
