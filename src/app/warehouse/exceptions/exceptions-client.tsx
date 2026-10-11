@@ -37,7 +37,7 @@ import type { Order } from "@/lib/types"
 
 /**
  * FAILED_ATTEMPT is the only status a warehouse admin can still act on, and it
- * is the only one this page lists (TODO.md decision #1).
+ * is the only one this page lists.
  *
  * RETURNED used to sit here under a "Resolved" tab. It is terminal — the
  * `return` transition sets it and nothing leaves it — so filing it on a page

@@ -93,7 +93,9 @@ function DetailRow({
       </dt>
       <dd
         className={cn(
-          "text-right text-xs font-medium",
+          // `min-w-0 break-all` so a long tracking id or address wraps inside
+          // the cell instead of pushing the row wider than the card.
+          "min-w-0 text-right text-sm font-medium break-all",
           mono && "font-mono tabular-nums",
         )}
       >

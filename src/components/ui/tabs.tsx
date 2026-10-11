@@ -47,7 +47,14 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      // `max-w-full overflow-x-auto` so a list with more tabs than fit scrolls
+      // instead of overflowing its parent. Triggers are `whitespace-nowrap`, so
+      // before this a five-tab list (Account Settings) was clipped on a phone.
+      className={cn(
+        tabsListVariants({ variant }),
+        "max-w-full overflow-x-auto",
+        className,
+      )}
       {...props}
     />
   )

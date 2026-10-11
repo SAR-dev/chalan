@@ -9,9 +9,10 @@ import {
 } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { countMutate, listMutate } = vi.hoisted(() => ({
+const { countMutate, listMutate, globalMutate } = vi.hoisted(() => ({
   countMutate: vi.fn(),
   listMutate: vi.fn(),
+  globalMutate: vi.fn(async () => undefined),
 }))
 
 const swrState = vi.hoisted(() => ({
@@ -34,6 +35,9 @@ vi.mock("swr", () => ({
       mutate: isCount ? countMutate : listMutate,
     }
   },
+  // The hook drains the badge's own cache as well as the list, so it reaches
+  // for the global mutator.
+  useSWRConfig: () => ({ mutate: globalMutate }),
 }))
 
 let currentRole = "MERCHANT"
@@ -137,5 +141,25 @@ describe("NotificationBell", () => {
 
     // The cache was never populated, so nothing was overwritten.
     expect(listMutate).not.toHaveBeenCalled()
+  })
+
+  it("drains the badge's own cache, not just the list", async () => {
+    // The badge reads a separate SWR key (`?count=1`) from the list. Draining
+    // only the list leaves the bell showing its last polled number, so the tray
+    // reads "seen" while the badge still counts the same rows.
+    const { useNotifications } = await import(
+      "@/features/notifications/hooks/use-notifications"
+    )
+    const { result } = renderHook(() => useNotifications())
+
+    await act(async () => {
+      await result.current.markSeen()
+    })
+
+    expect(globalMutate).toHaveBeenCalledWith(
+      "/api/notifications?count=1",
+      { newCount: 0 },
+      { revalidate: false },
+    )
   })
 })

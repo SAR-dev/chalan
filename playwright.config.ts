@@ -39,6 +39,18 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      // The mobile spec runs in its own project below. Running it here too
+      // would only re-test the same page at a width it is not written for.
+      testIgnore: /41-mobile-layout/,
+    },
+    {
+      // A real phone viewport for the responsive spec. Kept to one file on
+      // purpose: running the whole suite twice would double a ~7 minute run for
+      // little extra signal, and the layout invariants worth pinning are all in
+      // 41-mobile-layout.
+      name: "mobile",
+      use: { ...devices["Pixel 5"] },
+      testMatch: /41-mobile-layout/,
     },
   ],
   webServer: {

@@ -32,7 +32,7 @@ function PhoneLink({ phone }: { phone?: string }) {
     <a
       href={`tel:${phone}`}
       onClick={(e) => e.stopPropagation()}
-      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs tabular-nums"
+      className="text-muted-foreground hover:text-foreground active:text-foreground inline-flex items-center gap-1 text-sm tabular-nums"
     >
       {phone}
     </a>
@@ -106,7 +106,7 @@ export default function RiderDeliveryQueuePage() {
             setViewOrderCode(o.id)
             setViewOpen(true)
           }}
-          className="font-mono text-xs font-medium text-left text-primary underline-offset-2 hover:underline focus:outline-none"
+          className="font-mono text-sm font-medium text-left text-primary underline-offset-2 hover:underline focus:outline-none hit-target-44"
         >
           {o.id}
         </button>
@@ -137,7 +137,7 @@ export default function RiderDeliveryQueuePage() {
           <span className="underline decoration-dotted underline-offset-4">
             {o.deliveryCity}
           </span>
-          <span className="text-muted-foreground text-xs">
+          <span className="text-muted-foreground text-sm">
             {o.deliveryAddress}
           </span>
         </div>
@@ -147,6 +147,9 @@ export default function RiderDeliveryQueuePage() {
       id: "deliveryMapLink",
       header: columnLabels.rider.mapLink,
       align: "center",
+      // Secondary on a phone — the address column carries the same place.
+      headClassName: "hidden sm:table-cell",
+      cellClassName: "hidden sm:table-cell",
       cell: (o) => {
         const mapLink = o.deliveryMapLink ?? null
         return mapLink ? (
@@ -155,7 +158,7 @@ export default function RiderDeliveryQueuePage() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Open delivery location in maps for order ${o.id}`}
-            className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent"
+            className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent hit-target-44"
           >
             <MapPin className="size-4" />
           </a>
@@ -196,7 +199,11 @@ export default function RiderDeliveryQueuePage() {
         )
       },
     },
-    orderLabelColumn(merchantName, labelTemplate),
+    {
+      ...orderLabelColumn(merchantName, labelTemplate),
+      headClassName: "hidden sm:table-cell",
+      cellClassName: "hidden sm:table-cell",
+    },
     {
       id: "actions",
       sticky: true,

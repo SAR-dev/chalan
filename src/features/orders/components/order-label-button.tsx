@@ -59,6 +59,13 @@ export interface OrderLabelButtonProps {
   template?: LabelTemplateStructure
   /** Render the label text beside the icon (board cards) instead of icon-only (tables). */
   showLabel?: boolean
+  /**
+   * Render the Download fallback beside Print. Off on the rider queue: two
+   * icon buttons per row is most of the width of a phone, and a rider printing
+   * a label at a doorstep has no use for a file. Download stays on the order
+   * detail page, where a blocked print dialog is worth recovering from.
+   */
+  showDownload?: boolean
   variant?: "ghost" | "outline"
   className?: string
 }
@@ -73,6 +80,7 @@ export function OrderLabelButton({
     template: DEFAULT_LABEL_TEMPLATE_PDFME,
   },
   showLabel = false,
+  showDownload = true,
   variant = "ghost",
   className,
 }: OrderLabelButtonProps) {
@@ -137,18 +145,20 @@ export function OrderLabelButton({
           <span className="sr-only">{formLabels.printLabel}</span>
         )}
       </Button>
-      <Button
-        variant={variant}
-        size="icon"
-        className={`size-8 ${className ?? ""}`.trim()}
-        aria-label={`Download label for ${order.id}`}
-        title="Download label PDF"
-        data-testid={`order-label-download-${order.id}`}
-        disabled={generating}
-        onClick={() => void handlePdfme("download")}
-      >
-        <Download className="size-4" />
-      </Button>
+      {showDownload ? (
+        <Button
+          variant={variant}
+          size="icon"
+          className={`size-8 ${className ?? ""}`.trim()}
+          aria-label={`Download label for ${order.id}`}
+          title="Download label PDF"
+          data-testid={`order-label-download-${order.id}`}
+          disabled={generating}
+          onClick={() => void handlePdfme("download")}
+        >
+          <Download className="size-4" />
+        </Button>
+      ) : null}
     </>
   )
 }

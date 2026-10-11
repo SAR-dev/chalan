@@ -242,16 +242,19 @@ export default async function LandingPage() {
     <div className="bg-background text-foreground min-h-screen font-sans antialiased">
       {/* ── Nav ── */}
       <header className="border-border/60 bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <Link href="/" className="flex items-center gap-2">
-            <SiteIcon className="size-5" />
-            <span className="text-sm font-semibold tracking-tight">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
+          <Link href="/" className="flex min-w-0 items-center gap-2">
+            <SiteIcon className="size-5 shrink-0" />
+            <span className="truncate text-sm font-semibold tracking-tight">
               {siteConfig.name}
             </span>
           </Link>
 
-          <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <ThemeToggle />
+            {/* Help and Pricing are secondary and stay behind sm. Sign in and
+                Register do not: a phone user who scrolls past the hero would
+                otherwise have no header route into the product at all. */}
             <div className="hidden items-center gap-1 sm:flex sm:gap-3">
               <Button
                 variant="ghost"
@@ -270,22 +273,25 @@ export default async function LandingPage() {
               >
                 Pricing
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                render={<Link href="/login" />}
-                nativeButton={false}
-              >
-                Sign in
-              </Button>
-              <Button
-                size="sm"
-                render={<Link href="/register" />}
-                nativeButton={false}
-              >
-                Create merchant account
-              </Button>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="nav-signin"
+              render={<Link href="/login" />}
+              nativeButton={false}
+            >
+              Sign in
+            </Button>
+            <Button
+              size="sm"
+              data-testid="nav-register"
+              render={<Link href="/register" />}
+              nativeButton={false}
+            >
+              <span className="hidden sm:inline">Create merchant account</span>
+              <span className="sm:hidden">Register</span>
+            </Button>
           </div>
         </div>
       </header>

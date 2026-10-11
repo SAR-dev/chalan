@@ -109,56 +109,92 @@ function RateMatrix({
             {emptyText}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table
-              data-testid={testId}
-              className="w-full min-w-[720px] border-collapse text-sm"
+          <>
+            {/* Below sm the matrix cannot fit — 720px of grid on a 320px phone
+                is two columns and a scrollbar. Same data, one block per pickup
+                city, destination over price. */}
+            <div
+              className="flex flex-col sm:hidden"
+              data-testid={`${testId}-stacked`}
             >
-              <thead>
-                <tr className="border-border/60 border-b bg-muted/30">
-                  <th
-                    scope="col"
-                    className="text-muted-foreground sticky left-0 z-30 border-r border-border/60 bg-muted/30 px-4 py-3 text-left text-xs font-semibold tracking-wide uppercase"
-                  >
-                    Pickup ↓ / Destination →
-                  </th>
-                  {cities.map((to) => (
+              {cities.map((from) => (
+                <div
+                  key={from.id}
+                  className="border-border/40 border-b last:border-b-0"
+                >
+                  <p className="bg-muted/30 px-4 py-2.5 text-sm font-semibold">
+                    From {from.name}
+                  </p>
+                  <dl className="flex flex-col">
+                    {cities.map((to) => (
+                      <div
+                        key={to.id}
+                        className="border-border/20 flex items-center justify-between gap-3 border-b px-4 py-2.5 last:border-b-0"
+                      >
+                        <dt className="text-muted-foreground min-w-0 truncate text-sm">
+                          {to.name}
+                        </dt>
+                        <dd className="shrink-0 text-sm tabular-nums">
+                          {cell(from, to)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto sm:block">
+              <table
+                data-testid={testId}
+                className="w-full min-w-[720px] border-collapse text-sm"
+              >
+                <thead>
+                  <tr className="border-border/60 border-b bg-muted/30">
                     <th
-                      key={to.id}
                       scope="col"
-                      className="text-muted-foreground px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap uppercase"
+                      className="text-muted-foreground sticky left-0 z-30 border-r border-border/60 bg-muted/30 px-4 py-3 text-left text-xs font-semibold tracking-wide uppercase"
                     >
-                      {to.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {cities.map((from) => (
-                  <tr
-                    key={from.id}
-                    className="border-border/40 border-b last:border-b-0"
-                  >
-                    <th
-                      scope="row"
-                      className="bg-card sticky left-0 z-10 border-r border-border/60 px-4 py-2.5 text-left font-medium whitespace-nowrap"
-                    >
-                      {from.name}
+                      Pickup ↓ / Destination →
                     </th>
                     {cities.map((to) => (
-                      <td
+                      <th
                         key={to.id}
-                        className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums"
-                        title={cellTitle?.(from, to)}
+                        scope="col"
+                        className="text-muted-foreground px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap uppercase"
                       >
-                        {cell(from, to)}
-                      </td>
+                        {to.name}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {cities.map((from) => (
+                    <tr
+                      key={from.id}
+                      className="border-border/40 border-b last:border-b-0"
+                    >
+                      <th
+                        scope="row"
+                        className="bg-card sticky left-0 z-10 border-r border-border/60 px-4 py-2.5 text-left font-medium whitespace-nowrap"
+                      >
+                        {from.name}
+                      </th>
+                      {cities.map((to) => (
+                        <td
+                          key={to.id}
+                          className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums"
+                          title={cellTitle?.(from, to)}
+                        >
+                          {cell(from, to)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

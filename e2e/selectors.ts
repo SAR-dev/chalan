@@ -86,6 +86,14 @@ export const announcements = {
   back: "[data-testid='announcement-back']",
 }
 
+// ─── Public landing page ────────────────────────────────────────────────────
+export const landing = {
+  // Kept visible below `sm`: a phone user past the hero needs a header route in.
+  signIn: "[data-testid='nav-signin']",
+  register: "[data-testid='nav-register']",
+  pricing: "[data-testid='nav-pricing']",
+}
+
 // ─── In-app notifications (merchant) ────────────────────────────────────────
 export const notifications = {
   bell: "[data-testid='notification-bell']",
@@ -333,7 +341,7 @@ export const ongoing = {
   dispatchPrefix: "[data-testid^='kanban-dispatch-']",
   // A selector that must never match anything. Cancel lives on the approval
   // queue and in the admin portal; putting it on a board card would undo the
-  // PENDING-only approval split (TODO.md decision #9).
+  // PENDING-only approval split.
   cancelPrefix: "[data-testid^='kanban-cancel-']",
   // Distinct from `empty`: there ARE parcels, the filter just hides all of them.
   noMatches: "[data-testid='kanban-no-matches']",

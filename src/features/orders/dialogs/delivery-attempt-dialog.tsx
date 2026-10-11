@@ -145,11 +145,11 @@ export function DeliveryAttemptDialog({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => setOutcome("DELIVERED")}
-            className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
+            className={`flex min-h-11 items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
               outcome === "DELIVERED"
                 ? "border-chart-2 bg-chart-2/10 text-chart-2"
                 : "border-border text-muted-foreground hover:bg-muted"
@@ -161,7 +161,7 @@ export function DeliveryAttemptDialog({
           <button
             type="button"
             onClick={() => setOutcome("FAILED")}
-            className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
+            className={`flex min-h-11 items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
               outcome === "FAILED"
                 ? "border-destructive bg-destructive/10 text-destructive"
                 : "border-border text-muted-foreground hover:bg-muted"

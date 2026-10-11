@@ -85,7 +85,7 @@ export function DateRangePicker({
 
   return (
     <div className={cn("flex flex-wrap items-end gap-2", className)}>
-      <div className="flex items-center gap-1.5">
+      <div className="flex w-full items-center gap-1.5 sm:w-auto">
         <CalendarDays className="text-muted-foreground size-4" />
         <Input
           type="date"
@@ -94,7 +94,7 @@ export function DateRangePicker({
             setPreset("")
             onFromChange(e.target.value || undefined)
           }}
-          className="h-8 w-36 text-xs"
+          className="h-9 w-full text-sm sm:h-8 sm:w-36 sm:text-xs"
           aria-label="From date"
         />
         <span className="text-muted-foreground text-xs">—</span>
@@ -105,7 +105,7 @@ export function DateRangePicker({
             setPreset("")
             onToChange(e.target.value || undefined)
           }}
-          className="h-8 w-36 text-xs"
+          className="h-9 w-full text-sm sm:h-8 sm:w-36 sm:text-xs"
           aria-label="To date"
         />
       </div>
@@ -116,7 +116,7 @@ export function DateRangePicker({
           if (v) applyPreset(v)
         }}
       >
-        <SelectTrigger className="h-8 w-auto min-w-[130px] text-xs">
+        <SelectTrigger className="h-9 w-full text-sm sm:h-8 sm:w-auto sm:min-w-[130px] sm:text-xs">
           <SelectValue placeholder="Quick range" />
         </SelectTrigger>
         <SelectContent>

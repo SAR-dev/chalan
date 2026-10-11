@@ -125,7 +125,7 @@ export default function RiderCashPage() {
                 >
                   {formatTk(cash?.cashOnHand ?? 0)}
                 </div>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-sm">
                   Available to submit
                 </p>
               </CardContent>
@@ -145,7 +145,7 @@ export default function RiderCashPage() {
                 >
                   {formatTk(cash?.totalCollected ?? 0)}
                 </div>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-sm">
                   From all deliveries
                 </p>
               </CardContent>
@@ -165,7 +165,7 @@ export default function RiderCashPage() {
                 >
                   {formatTk(cash?.totalSubmitted ?? 0)}
                 </div>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-sm">
                   Handed to warehouse
                 </p>
               </CardContent>
@@ -196,7 +196,7 @@ export default function RiderCashPage() {
                             <p className="text-sm font-medium">
                               <TransactionLabel type={tx.type} />
                             </p>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-muted-foreground text-sm">
                               {formatDate(tx.createdAt)}
                             </p>
                           </div>
