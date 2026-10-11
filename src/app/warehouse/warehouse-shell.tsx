@@ -11,6 +11,7 @@ import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
 import { loginPathWithNext } from "@/lib/auth-redirect"
 import { WAREHOUSE_SIDEBAR } from "@/lib/nav-config"
 import { twoFactorEnforcementPath } from "@/lib/two-factor"
+import type { AppVersion } from "@/lib/version"
 
 // Warehouse Admin monitors: warehouses, orders, merchants, riders, pickup-locations.
 const WAREHOUSE_KEYS = [
@@ -21,7 +22,14 @@ const WAREHOUSE_KEYS = [
   "/api/pickup-locations",
 ] as const
 
-export function WarehouseShell({ children }: { children: React.ReactNode }) {
+export function WarehouseShell({
+  children,
+  version,
+}: {
+  children: React.ReactNode
+  /** Build version, read in the server layout and shown by TopNav. */
+  version?: AppVersion
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
@@ -74,7 +82,11 @@ export function WarehouseShell({ children }: { children: React.ReactNode }) {
     <div className="bg-background flex min-h-dvh">
       <WarehouseSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav config={WAREHOUSE_SIDEBAR} subtitle={currentWarehouse?.name} />
+        <TopNav
+          version={version}
+          config={WAREHOUSE_SIDEBAR}
+          subtitle={currentWarehouse?.name}
+        />
         <main
           id="main-content"
           className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"

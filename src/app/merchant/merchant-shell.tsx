@@ -25,6 +25,8 @@ import {
   merchantVisibleNavItems,
 } from "@/lib/nav-config"
 import { cn } from "@/lib/utils"
+// Type-only: `src/lib/version.ts` reads `node:fs`.
+import type { AppVersion } from "@/lib/version"
 
 // Merchant monitors: merchants, orders, pickup-locations.
 const MERCHANT_KEYS = [
@@ -174,7 +176,14 @@ function MerchantPickupLocationAlert() {
   )
 }
 
-export function MerchantShell({ children }: { children: React.ReactNode }) {
+export function MerchantShell({
+  children,
+  version,
+}: {
+  children: React.ReactNode
+  /** Build version, read in the server layout and shown by TopNav. */
+  version?: AppVersion
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
@@ -242,6 +251,7 @@ export function MerchantShell({ children }: { children: React.ReactNode }) {
       <MerchantSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav
+          version={version}
           config={navConfig}
           subtitle={currentMerchant?.businessName ?? null}
           businessName={currentMerchant?.businessName ?? undefined}

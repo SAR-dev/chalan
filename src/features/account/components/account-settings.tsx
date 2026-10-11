@@ -8,7 +8,6 @@ import {
   LogOut,
   Mail,
   Monitor,
-  Package,
   Smartphone,
   Table2,
   UserRound,
@@ -29,7 +28,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AppUpdateButton } from "@/features/account/components/app-update-button"
 import { TwoFactorSettings } from "@/features/account/components/two-factor-settings"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { authClient } from "@/lib/auth-client"
@@ -108,16 +106,7 @@ function formatTimeAgo(date: string) {
   return `${days}d ago`
 }
 
-export function AccountSettings({
-  version,
-}: {
-  /**
-   * The running build's version, read server-side from `package.json`. Passed
-   * in rather than imported because `src/lib/version.ts` reads `node:fs`, and
-   * importing it here would pull that into the browser bundle.
-   */
-  version?: AppVersion
-}) {
+export function AccountSettings() {
   const {
     currentUser,
     updateProfileName,
@@ -692,44 +681,6 @@ export function AccountSettings({
               </CardFooter>
             </form>
           </Card>
-
-          {/* Read-only — there is nothing to edit here. It exists so support
-              can tell which build a user is actually on, which a stale cached
-              shell makes non-obvious. */}
-          {version ? (
-            <Card className="mt-6 max-w-lg" data-testid="account-build">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="size-4" />
-                  Build
-                </CardTitle>
-                <CardDescription>
-                  The version of Chalan you are currently running.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p
-                  className="font-mono text-sm"
-                  data-testid="account-build-version"
-                >
-                  v{version.version}
-                  {version.commit ? (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      • {version.commit}
-                    </span>
-                  ) : null}
-                </p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  If the app looks stale or something will not load, update to
-                  clear the cached files from your last visit.
-                </p>
-              </CardContent>
-              <CardFooter className="justify-start">
-                <AppUpdateButton />
-              </CardFooter>
-            </Card>
-          ) : null}
         </TabsContent>
 
         {/* ── Security ─────────────────────────────────────────────────── */}

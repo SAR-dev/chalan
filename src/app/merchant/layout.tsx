@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { AuthProvider } from "@/features/account/hooks/use-auth"
+import { getAppVersion } from "@/lib/version"
 import { MerchantShell } from "./merchant-shell"
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export default function MerchantLayout({
 }) {
   return (
     <AuthProvider>
-      <MerchantShell>{children}</MerchantShell>
+      <MerchantShell version={getAppVersion()}>{children}</MerchantShell>
     </AuthProvider>
   )
 }

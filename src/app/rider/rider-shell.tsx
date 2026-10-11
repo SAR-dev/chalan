@@ -10,6 +10,7 @@ import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { loginPathWithNext } from "@/lib/auth-redirect"
 import { RIDER_SIDEBAR } from "@/lib/nav-config"
+import type { AppVersion } from "@/lib/version"
 
 // Rider monitors: riders, orders, merchants, warehouses, pickup-locations.
 const RIDER_KEYS = [
@@ -20,7 +21,14 @@ const RIDER_KEYS = [
   "/api/pickup-locations",
 ] as const
 
-export function RiderShell({ children }: { children: React.ReactNode }) {
+export function RiderShell({
+  children,
+  version,
+}: {
+  children: React.ReactNode
+  /** Build version, read in the server layout and shown by TopNav. */
+  version?: AppVersion
+}) {
   const router = useRouter()
   const { currentUser, isReady } = useAuth()
   // The rider's zone moved here from the sidebar footer — TopNav shows it as
@@ -56,7 +64,11 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
     <div className="bg-background flex min-h-dvh">
       <RiderSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav config={RIDER_SIDEBAR} subtitle={currentRider?.zone} />
+        <TopNav
+          version={version}
+          config={RIDER_SIDEBAR}
+          subtitle={currentRider?.zone}
+        />
         <main
           id="main-content"
           className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"

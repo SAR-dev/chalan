@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { AuthProvider } from "@/features/account/hooks/use-auth"
+import { getAppVersion } from "@/lib/version"
 import { DashboardShell } from "./dashboard-shell"
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export default function DashboardLayout({
 }) {
   return (
     <AuthProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell version={getAppVersion()}>{children}</DashboardShell>
     </AuthProvider>
   )
 }

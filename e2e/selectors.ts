@@ -13,13 +13,6 @@ export const auth = {
   // Lives in the RightNav panel now: open topnav.userMenu first.
   logout: "[data-testid='logout']",
   accountTwoFactorTab: "[data-testid='account-tab-two-factor']",
-  // Build version on the Preferences tab. Rendered by a server component from
-  // package.json, so it is the only check that the version reaches the browser
-  // rather than just existing in the module.
-  accountPreferencesTab: "[data-testid='account-tab-preferences']",
-  accountBuild: "[data-testid='account-build']",
-  accountBuildVersion: "[data-testid='account-build-version']",
-  accountBuildUpdate: "[data-testid='account-build-update']",
 }
 
 // ─── Rider application (public) ──────────────────────────────────────────────
@@ -80,6 +73,13 @@ export const topnav = {
   rightnav: "[data-testid='rightnav']",
   rightnavName: "[data-testid='rightnav-name']",
   rightnavAccount: "[data-testid='rightnav-account']",
+  // Build version. The bar shows the number only; the commit and the manual
+  // update button are one click behind it.
+  versionBadge: "[data-testid='topnav-version']",
+  versionDialog: "[data-testid='version-dialog']",
+  versionDialogValue: "[data-testid='version-dialog-version']",
+  versionDialogCommit: "[data-testid='version-dialog-commit']",
+  versionUpdate: "[data-testid='account-build-update']",
 }
 
 // ─── Announcements (bell link + feed + detail page) ──────────────────────────
