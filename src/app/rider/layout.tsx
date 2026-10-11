@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { AuthProvider } from "@/features/account/hooks/use-auth"
+import { getAppVersion } from "@/lib/version"
 import { RiderShell } from "./rider-shell"
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export default function RiderLayout({
 }) {
   return (
     <AuthProvider>
-      <RiderShell>{children}</RiderShell>
+      <RiderShell version={getAppVersion()}>{children}</RiderShell>
     </AuthProvider>
   )
 }

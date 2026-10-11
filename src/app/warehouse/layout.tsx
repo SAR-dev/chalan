@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { AuthProvider } from "@/features/account/hooks/use-auth"
+import { getAppVersion } from "@/lib/version"
 import { WarehouseShell } from "./warehouse-shell"
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export default function WarehouseLayout({
 }) {
   return (
     <AuthProvider>
-      <WarehouseShell>{children}</WarehouseShell>
+      <WarehouseShell version={getAppVersion()}>{children}</WarehouseShell>
     </AuthProvider>
   )
 }

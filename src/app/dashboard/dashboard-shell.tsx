@@ -10,6 +10,7 @@ import { homeForRole, useAuth } from "@/features/account/hooks/use-auth"
 import { loginPathWithNext } from "@/lib/auth-redirect"
 import { dashboardSidebarForRole } from "@/lib/nav-config"
 import { twoFactorEnforcementPath } from "@/lib/two-factor"
+import type { AppVersion } from "@/lib/version"
 
 // Dashboard (Super Admin / Admin) monitors all resources.
 const DASHBOARD_KEYS = [
@@ -24,7 +25,14 @@ const DASHBOARD_KEYS = [
   "/api/email-logs",
 ] as const
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  children,
+  version,
+}: {
+  children: React.ReactNode
+  /** Build version, read in the server layout and shown by TopNav. */
+  version?: AppVersion
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const { currentUser, isReady } = useAuth()
@@ -74,7 +82,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="bg-background flex min-h-dvh">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav config={dashboardSidebarForRole(currentUser.role)} />
+        <TopNav
+          version={version}
+          config={dashboardSidebarForRole(currentUser.role)}
+        />
         <main
           id="main-content"
           className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8"

@@ -14,6 +14,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { VersionBadge } from "@/features/account/components/version-badge"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { AnnouncementBell } from "@/features/announcements/components/announcement-bell"
 import { NotificationBell } from "@/features/notifications/components/notification-bell"
@@ -24,6 +25,9 @@ import {
   sidebarVisibleItems,
 } from "@/lib/nav-config"
 import { cn, initials } from "@/lib/utils"
+// Type-only: `src/lib/version.ts` reads `node:fs`, and TopNav is a client
+// component.
+import type { AppVersion } from "@/lib/version"
 import { CommandPalette } from "./command-palette"
 import { RightNav } from "./right-nav"
 
@@ -48,10 +52,13 @@ export function TopNav({
   config,
   subtitle,
   businessName,
+  version,
 }: {
   config: SidebarConfig
   subtitle?: string | null
   businessName?: string
+  /** Build version, read in the server layout. Omitted = no badge rendered. */
+  version?: AppVersion
 }) {
   const pathname = usePathname()
   const { currentUser } = useAuth()
@@ -194,6 +201,8 @@ export function TopNav({
         </Button>
 
         <AnnouncementBell />
+
+        <VersionBadge version={version} />
 
         {/* In-app notifications. Renders null for roles that have no inbox
             (see useHasNotifications), so the bar is unchanged for them. */}
