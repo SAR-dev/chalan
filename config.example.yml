@@ -1,4 +1,4 @@
-# Cloudflare cloudflared tunnel config — TEMPLATE.
+# Cloudflare cloudflared tunnel config.
 #
 # Copy to `config.yml` (which is gitignored) and fill in your own tunnel:
 #
