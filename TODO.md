@@ -232,13 +232,18 @@ The utility is baked into the `Button` cva, so these are under 44px:
 
 | File:line | Element |
 |---|---|
-| `src/app/rider/page.tsx:237,324` | order-id button |
 | `src/app/rider/pickup/page.tsx:108-117`, `delivery/page.tsx:103-112` | order-id button in the table |
 | `src/features/riders/components/run-sheet-card.tsx:84-90` | "Try again" |
 | `src/components/data-table/index.tsx:752-774` | sort header |
 | `src/features/orders/dialogs/delivery-attempt-dialog.tsx:148-173` | Delivered/Failed toggles |
 
-**Fix:** convert to `<Button>`, or add `hit-target-44` plus padding.
+**Fix:** done — each now carries `hit-target-44` (the two table order-id
+buttons, the run-sheet "Try again", the sort header) or `min-h-11` (the two
+outcome toggles).
+
+**Correction:** the audit also listed `src/app/rider/page.tsx:237,324` as an
+order-id *button*. It is a `<span>` — the queue shows the id as text, not a
+control — so there was nothing to enlarge. Its 12px→14px bump is R3.
 
 ### R13 [P2] — small-input and small-text leftovers
 
