@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-// Structural guards for the mobile-layout fixes in TODO.md. These cannot be
+// Structural guards for the mobile-layout fixes. These cannot be
 // seen in a rendered screenshot at a desktop width, and jsdom has no layout
 // engine, so they are pinned against the source — the same approach as
 // `button.spec.tsx`'s hit-area scan and `p2-polish.spec.ts`.
