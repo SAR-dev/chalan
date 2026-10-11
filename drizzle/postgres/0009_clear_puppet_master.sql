@@ -1,2 +1,0 @@
-ALTER TABLE "order" DROP CONSTRAINT "order_merchant_earnings_nonneg";--> statement-breakpoint
-CREATE UNIQUE INDEX "mail_config_one_active_uniq" ON "mail_config" USING btree ("isActive") WHERE "mail_config"."isActive" = true;

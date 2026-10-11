@@ -27,6 +27,7 @@ CREATE TABLE "profile" (
 	"isActive" boolean DEFAULT true NOT NULL,
 	"tableRowsPerPage" integer DEFAULT 20 NOT NULL,
 	"announcementsSeenAt" timestamp with time zone,
+	"notificationsSeenAt" timestamp with time zone,
 	"warehouseId" text,
 	"merchantId" text,
 	"riderId" text,
@@ -113,6 +114,66 @@ CREATE TABLE "merchant_balance" (
 	"pendingBalance" numeric(14, 2) DEFAULT 0 NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "merchant_balance_merchantId_unique" UNIQUE("merchantId")
+);
+--> statement-breakpoint
+CREATE TABLE "api_key" (
+	"id" text PRIMARY KEY NOT NULL,
+	"merchantId" text NOT NULL,
+	"label" text NOT NULL,
+	"prefix" text NOT NULL,
+	"keyHash" text NOT NULL,
+	"scopes" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"revokedAt" timestamp with time zone,
+	"lastUsedAt" timestamp with time zone,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "webhook_delivery" (
+	"id" text PRIMARY KEY NOT NULL,
+	"endpointId" text NOT NULL,
+	"merchantId" text NOT NULL,
+	"event" text NOT NULL,
+	"orderId" text,
+	"payload" jsonb NOT NULL,
+	"eventId" text NOT NULL,
+	"status" text DEFAULT 'PENDING' NOT NULL,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"lastError" text,
+	"nextAttemptAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"deliveredAt" timestamp with time zone,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "webhook_endpoint" (
+	"id" text PRIMARY KEY NOT NULL,
+	"merchantId" text NOT NULL,
+	"url" text NOT NULL,
+	"secret" text NOT NULL,
+	"events" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"isActive" boolean DEFAULT true NOT NULL,
+	"failureCount" integer DEFAULT 0 NOT NULL,
+	"disabledAt" timestamp with time zone,
+	"lastDeliveredAt" timestamp with time zone,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "label_template" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"widthMm" integer DEFAULT 100 NOT NULL,
+	"heightMm" integer DEFAULT 150 NOT NULL,
+	"logoRef" text,
+	"template" jsonb,
+	"version" integer DEFAULT 1 NOT NULL,
+	"publishedAt" timestamp with time zone,
+	"isDefault" boolean DEFAULT false NOT NULL,
+	"createdBy" text,
+	"updatedBy" text,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "delivery_city" (
@@ -275,7 +336,6 @@ CREATE TABLE "order" (
 	CONSTRAINT "order_delivery_fee_nonneg" CHECK ("order"."deliveryFee" >= 0),
 	CONSTRAINT "order_cod_fee_nonneg" CHECK ("order"."codFee" >= 0),
 	CONSTRAINT "order_cancellation_fee_nonneg" CHECK ("order"."cancellationFee" >= 0),
-	CONSTRAINT "order_merchant_earnings_nonneg" CHECK ("order"."merchantEarnings" >= 0),
 	CONSTRAINT "order_amount_collected_nonneg" CHECK ("order"."amountCollected" IS NULL OR "order"."amountCollected" >= 0)
 );
 --> statement-breakpoint
@@ -435,11 +495,27 @@ CREATE TABLE "mail_config" (
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "notification" (
+	"id" text PRIMARY KEY NOT NULL,
+	"userId" text NOT NULL,
+	"event" text NOT NULL,
+	"orderId" text,
+	"merchantId" text,
+	"actorName" text,
+	"title" text NOT NULL,
+	"href" text NOT NULL,
+	"createdAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "platform_config" (
 	"id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
 	"minCodFeePercentage" double precision DEFAULT 0.5 NOT NULL,
 	"maxCodFeePercentage" double precision DEFAULT 5 NOT NULL,
 	"refundOnCancel" boolean DEFAULT true NOT NULL,
+	"pickupScanRequired" boolean DEFAULT true NOT NULL,
+	"deliveryScanRequired" boolean DEFAULT true NOT NULL,
+	"warehouseScanRequired" boolean DEFAULT true NOT NULL,
+	"warehouseReceiveScanRequired" boolean DEFAULT true NOT NULL,
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -509,6 +585,10 @@ ALTER TABLE "twoFactor" ADD CONSTRAINT "twoFactor_userId_user_id_fk" FOREIGN KEY
 ALTER TABLE "balance_transaction" ADD CONSTRAINT "balance_transaction_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "balance_transaction" ADD CONSTRAINT "balance_transaction_orderId_order_id_fk" FOREIGN KEY ("orderId") REFERENCES "public"."order"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "merchant_balance" ADD CONSTRAINT "merchant_balance_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "api_key" ADD CONSTRAINT "api_key_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "webhook_delivery" ADD CONSTRAINT "webhook_delivery_endpointId_webhook_endpoint_id_fk" FOREIGN KEY ("endpointId") REFERENCES "public"."webhook_endpoint"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "webhook_delivery" ADD CONSTRAINT "webhook_delivery_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "webhook_endpoint" ADD CONSTRAINT "webhook_endpoint_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "delivery_city" ADD CONSTRAINT "delivery_city_zoneId_delivery_zone_id_fk" FOREIGN KEY ("zoneId") REFERENCES "public"."delivery_zone"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "delivery_city" ADD CONSTRAINT "delivery_city_warehouseId_warehouse_id_fk" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouse"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "zone_delivery_time" ADD CONSTRAINT "zone_delivery_time_fromZoneId_delivery_zone_id_fk" FOREIGN KEY ("fromZoneId") REFERENCES "public"."delivery_zone"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -534,6 +614,7 @@ ALTER TABLE "merchant_package" ADD CONSTRAINT "merchant_package_packageId_pricin
 ALTER TABLE "package_purchase_request" ADD CONSTRAINT "package_purchase_request_merchantId_merchant_id_fk" FOREIGN KEY ("merchantId") REFERENCES "public"."merchant"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "package_purchase_request" ADD CONSTRAINT "package_purchase_request_packageId_pricing_package_id_fk" FOREIGN KEY ("packageId") REFERENCES "public"."pricing_package"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pricing_package_tier" ADD CONSTRAINT "pricing_package_tier_packageId_pricing_package_id_fk" FOREIGN KEY ("packageId") REFERENCES "public"."pricing_package"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification" ADD CONSTRAINT "notification_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_ticket" ADD CONSTRAINT "support_ticket_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rider" ADD CONSTRAINT "rider_warehouseId_warehouse_id_fk" FOREIGN KEY ("warehouseId") REFERENCES "public"."warehouse"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_user_id_idx" ON "account" USING btree ("userId");--> statement-breakpoint
@@ -557,6 +638,14 @@ CREATE INDEX "balance_tx_order_id_idx" ON "balance_transaction" USING btree ("or
 CREATE INDEX "balance_tx_created_at_idx" ON "balance_transaction" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "balance_tx_merchant_id_created_at_idx" ON "balance_transaction" USING btree ("merchantId","createdAt");--> statement-breakpoint
 CREATE UNIQUE INDEX "balance_tx_one_pending_payment_uniq" ON "balance_transaction" USING btree ("merchantId") WHERE "balance_transaction"."type" = 'PAYMENT_PENDING' and "balance_transaction"."status" = 'PENDING';--> statement-breakpoint
+CREATE UNIQUE INDEX "api_key_hash_uniq" ON "api_key" USING btree ("keyHash");--> statement-breakpoint
+CREATE INDEX "api_key_merchant_created_idx" ON "api_key" USING btree ("merchantId","createdAt");--> statement-breakpoint
+CREATE INDEX "webhook_delivery_status_next_attempt_idx" ON "webhook_delivery" USING btree ("status","nextAttemptAt");--> statement-breakpoint
+CREATE INDEX "webhook_delivery_endpoint_idx" ON "webhook_delivery" USING btree ("endpointId");--> statement-breakpoint
+CREATE INDEX "webhook_delivery_merchant_created_idx" ON "webhook_delivery" USING btree ("merchantId","createdAt");--> statement-breakpoint
+CREATE INDEX "webhook_endpoint_merchant_idx" ON "webhook_endpoint" USING btree ("merchantId");--> statement-breakpoint
+CREATE INDEX "label_template_published_at_idx" ON "label_template" USING btree ("publishedAt");--> statement-breakpoint
+CREATE UNIQUE INDEX "label_template_one_default_uniq" ON "label_template" USING btree ("isDefault") WHERE "label_template"."isDefault" = true;--> statement-breakpoint
 CREATE INDEX "delivery_city_zone_id_idx" ON "delivery_city" USING btree ("zoneId");--> statement-breakpoint
 CREATE INDEX "delivery_city_warehouse_id_idx" ON "delivery_city" USING btree ("warehouseId");--> statement-breakpoint
 CREATE INDEX "zone_delivery_time_from_idx" ON "zone_delivery_time" USING btree ("fromZoneId");--> statement-breakpoint
@@ -634,6 +723,9 @@ CREATE INDEX "email_log_to_trgm_idx" ON "email_log" USING gin ("to" gin_trgm_ops
 CREATE INDEX "email_log_subject_trgm_idx" ON "email_log" USING gin ("subject" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "email_outbox_status_next_attempt_idx" ON "email_outbox" USING btree ("status","nextAttemptAt");--> statement-breakpoint
 CREATE INDEX "email_outbox_created_at_idx" ON "email_outbox" USING btree ("createdAt");--> statement-breakpoint
+CREATE UNIQUE INDEX "mail_config_one_active_uniq" ON "mail_config" USING btree ("isActive") WHERE "mail_config"."isActive" = true;--> statement-breakpoint
+CREATE INDEX "notification_user_created_idx" ON "notification" USING btree ("userId","createdAt");--> statement-breakpoint
+CREATE INDEX "notification_created_at_idx" ON "notification" USING btree ("createdAt");--> statement-breakpoint
 CREATE INDEX "support_ticket_status_created_at_idx" ON "support_ticket" USING btree ("status","createdAt");--> statement-breakpoint
 CREATE INDEX "support_ticket_user_id_idx" ON "support_ticket" USING btree ("userId");--> statement-breakpoint
 CREATE INDEX "support_ticket_subject_trgm_idx" ON "support_ticket" USING gin ("subject" gin_trgm_ops);--> statement-breakpoint

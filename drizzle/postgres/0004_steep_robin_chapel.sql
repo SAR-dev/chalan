@@ -1,1 +1,0 @@
-ALTER TABLE "platform_config" ADD COLUMN "warehouseScanRequired" boolean DEFAULT true NOT NULL;
