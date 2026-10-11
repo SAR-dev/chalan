@@ -24,7 +24,7 @@ export function RunSheetCard({ riderId }: { riderId?: string | null }) {
             <MapPinned className="text-muted-foreground mt-0.5 size-4 shrink-0" />
             <div>
               <h2 className="text-sm font-medium">Suggested run order</h2>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-sm">
                 {isError
                   ? "Could not load your run order."
                   : isLoading
@@ -46,17 +46,17 @@ export function RunSheetCard({ riderId }: { riderId?: string | null }) {
                 data-testid={`run-sheet-stop-${stop.sequence}`}
                 className="flex items-baseline gap-3"
               >
-                <span className="text-muted-foreground w-5 shrink-0 text-right text-xs tabular-nums">
+                <span className="text-muted-foreground w-6 shrink-0 text-right text-sm tabular-nums">
                   {stop.sequence}.
                 </span>
                 <span className="flex flex-col">
                   <span
                     data-testid={`run-sheet-parcel-${stop.sequence}`}
-                    className="font-mono text-xs font-medium"
+                    className="font-mono text-sm font-medium"
                   >
                     {stop.orderId}
                   </span>
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-muted-foreground text-sm">
                     <span
                       data-testid={`run-sheet-destination-${stop.sequence}`}
                     >
@@ -84,7 +84,7 @@ export function RunSheetCard({ riderId }: { riderId?: string | null }) {
           <button
             type="button"
             onClick={() => refresh()}
-            className="text-primary text-xs underline underline-offset-2"
+            className="text-primary hit-target-44 text-sm underline underline-offset-2"
           >
             Try again
           </button>

@@ -86,6 +86,14 @@ export const announcements = {
   back: "[data-testid='announcement-back']",
 }
 
+// ─── Public landing page ────────────────────────────────────────────────────
+export const landing = {
+  // Kept visible below `sm`: a phone user past the hero needs a header route in.
+  signIn: "[data-testid='nav-signin']",
+  register: "[data-testid='nav-register']",
+  pricing: "[data-testid='nav-pricing']",
+}
+
 // ─── In-app notifications (merchant) ────────────────────────────────────────
 export const notifications = {
   bell: "[data-testid='notification-bell']",

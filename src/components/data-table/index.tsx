@@ -754,7 +754,9 @@ export function DataTable<T>({
                         type="button"
                         onClick={() => toggleSort(col)}
                         className={cn(
-                          "hover:text-foreground inline-flex cursor-pointer items-center gap-1 rounded-sm font-medium transition-colors select-none",
+                          // Raw <button>, so it needs hit-target-44 itself —
+                          // the utility lives on the Button cva, not globally.
+                          "hover:text-foreground hit-target-44 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1 py-1.5 font-medium transition-colors select-none",
                           isSorted
                             ? "text-foreground"
                             : "text-muted-foreground",

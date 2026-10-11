@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
 
@@ -65,6 +65,7 @@ export function useNotifications({
 } = {}) {
   const hasInbox = useHasNotifications()
   const enabled = override ?? hasInbox
+  const { mutate: globalMutate } = useSWRConfig()
 
   const { data, isLoading, error, mutate } = useSWR<NotificationFeed>(
     enabled ? LIST_KEY : null,
@@ -91,6 +92,11 @@ export function useNotifications({
     try {
       const res = await fetch("/api/notifications/seen", { method: "POST" })
       if (!res.ok) return { ok: false, error: "Failed to open your inbox." }
+      // Zero the badge's own cache too. The badge reads a *separate* SWR key
+      // (`?count=1`) from this list, so draining only the list leaves the
+      // badge showing its last polled number until the next tick — the tray
+      // would read "seen" while the bell still counted the same rows.
+      await globalMutate(COUNT_KEY, { newCount: 0 }, { revalidate: false })
       // Only rewrite the cache if a list is actually loaded. On the tray's
       // first open the fetch may not have resolved yet, and writing
       // `{notifications: []}` there would cache an empty inbox over the rows

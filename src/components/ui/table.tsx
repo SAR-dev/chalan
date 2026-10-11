@@ -87,6 +87,11 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
     <td
       data-slot="table-cell"
+      // `whitespace-nowrap` keeps short, scannable values on one line. It is
+      // deliberately last-wins-overridable: a column with long content passes
+      // `cellClassName="whitespace-normal"` (or a `max-w-*` + truncate) through
+      // `DataTableColumn`, and `cn`'s tailwind-merge lets that win. Without an
+      // override, one long address widens the column and scrolls the table.
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className,

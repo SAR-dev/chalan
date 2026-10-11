@@ -77,7 +77,9 @@ export function PieChart({
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
+            // Nudged up when a legend is shown, so the two do not collide in
+            // the fixed height. The legend is bottom-aligned and capped below.
+            cy={showLegend ? "42%" : "50%"}
             innerRadius={innerRadius}
             outerRadius={outerRadius}
             paddingAngle={2}
@@ -104,7 +106,15 @@ export function PieChart({
           />
           {showLegend ? (
             <Legend
-              wrapperStyle={{ fontSize: 11 }}
+              verticalAlign="bottom"
+              // Capped and scrollable: an unbounded legend wraps past the
+              // fixed chart height on a narrow card and gets clipped.
+              wrapperStyle={{
+                fontSize: 11,
+                lineHeight: "16px",
+                maxHeight: 56,
+                overflowY: "auto",
+              }}
               formatter={(value: string) => (
                 <span className="text-muted-foreground">{value}</span>
               )}

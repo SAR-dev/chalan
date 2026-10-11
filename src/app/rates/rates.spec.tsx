@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { screen } from "@testing-library/react"
+import { screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { renderPage } from "@/app/__tests__/test-utils"
 
@@ -57,15 +57,17 @@ describe("Public pricing page", () => {
     expect(
       screen.getByRole("heading", { name: /city-to-city rates/i }),
     ).toBeInTheDocument()
-    expect(screen.getByTestId("pricing-table")).toBeInTheDocument()
-    expect(screen.getByTestId("cancellation-fee-table")).toBeInTheDocument()
+    // Scoped to the matrix table: the page also renders a stacked list below
+    // `sm` for phones, so a page-wide count would see each value twice.
+    const matrix = within(screen.getByTestId("pricing-table"))
+    const cancellation = within(screen.getByTestId("cancellation-fee-table"))
     // Destination header + origin row labels.
-    expect(screen.getAllByText("Dhaka")).toHaveLength(4)
-    expect(screen.getAllByText("Chattogram")).toHaveLength(4)
+    expect(matrix.getAllByText("Dhaka")).toHaveLength(2)
+    expect(matrix.getAllByText("Chattogram")).toHaveLength(2)
     // Both pairs share the same zone → every cell of the 2×2 grid shows 60 TK
     // in the delivery matrix and 5 TK in the cancellation matrix.
-    expect(screen.getAllByText("60 TK")).toHaveLength(4)
-    expect(screen.getAllByText("5 TK")).toHaveLength(4)
+    expect(matrix.getAllByText("60 TK")).toHaveLength(4)
+    expect(cancellation.getAllByText("5 TK")).toHaveLength(4)
   })
 
   it("shows an empty state when no routes are published", async () => {

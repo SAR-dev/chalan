@@ -1,5 +1,11 @@
 # TODO — Mobile responsiveness
 
+> **Status: implemented.** Everything below shipped, except **R7**, which was
+> deliberately not done — it contradicts the R9 two-step decision (see its
+> entry). The list is kept as the record of what was found and fixed, so the
+> `file:line` citations are the ones from the audit rather than current line
+> numbers.
+
 Findings from an audit of the four role shells (dashboard, warehouse, rider,
 merchant) plus the public pages. Every entry cites a `file:line` that was
 verified by hand — re-check before acting, and update the citation if the line
@@ -153,7 +159,15 @@ row competing with the "Scan the parcel label" heading.
 This is the rider's critical path. **Fix:** `size="default"`, or full-width
 below the heading on mobile.
 
-### R7 [P1] — the scan gate hides all order context until verified
+### R7 [P1] — NOT DONE: the scan gate hides all order context until verified
+
+**Deliberately left as-is.** This contradicts the R9 two-step decision, which is
+documented in the code at `out-for-delivery-dialog.tsx:76-77`: *"while a scan is
+required the body is just the gate — the parcel details wait for the label to be
+verified"*, and in the R9 spec as *"the validation, not a wall, comes first"*.
+Reversing it is a product decision, not a layout fix. The order id is already
+visible in the dialog title, so a rider is not fully blind. Revisit only with an
+explicit decision.
 
 `src/features/orders/dialogs/out-for-delivery-dialog.tsx:69-98` — when
 `warehouseScanRequired` is on, the body renders *only* the `ScanGate`. The

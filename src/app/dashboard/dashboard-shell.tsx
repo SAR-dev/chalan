@@ -62,7 +62,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       // A blank region with no indication anything is happening.
       <div
         role="status"
-        className="bg-background flex min-h-screen items-center justify-center"
+        className="bg-background flex min-h-dvh items-center justify-center"
       >
         <Loader2 className="text-muted-foreground size-6 animate-spin" />
         <span className="sr-only">Loading…</span>
@@ -71,7 +71,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="bg-background flex min-h-screen">
+    <div className="bg-background flex min-h-dvh">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav config={dashboardSidebarForRole(currentUser.role)} />

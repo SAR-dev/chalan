@@ -111,7 +111,7 @@ export default function RiderPickupQueuePage() {
             setViewOrderCode(o.id)
             setViewOpen(true)
           }}
-          className="font-mono text-xs font-medium text-left text-primary underline-offset-2 hover:underline focus:outline-none"
+          className="font-mono text-sm font-medium text-left text-primary underline-offset-2 hover:underline focus:outline-none hit-target-44"
         >
           {o.id}
         </button>
@@ -128,6 +128,10 @@ export default function RiderPickupQueuePage() {
     {
       id: "merchantPhone",
       header: columnLabels.rider.contact,
+      // Secondary on a phone: the rider calls from the queue card, and the
+      // number is a tap target rather than something to scan in a table.
+      headClassName: "hidden sm:table-cell",
+      cellClassName: "hidden sm:table-cell",
       sortValue: (o) => o.merchantPhone ?? "—",
       cell: (o) => {
         const phone = o.merchantPhone ?? null
@@ -150,7 +154,7 @@ export default function RiderPickupQueuePage() {
       cell: (o) => {
         const p = pickup(o.pickupLocationId)
         return (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-muted-foreground text-sm">
             {p?.address ?? "—"}
           </span>
         )
@@ -160,6 +164,10 @@ export default function RiderPickupQueuePage() {
       id: "mapLink",
       header: columnLabels.rider.mapLink,
       align: "center",
+      // The address beside it is the same information; the link is a
+      // convenience a phone already provides by tapping the address.
+      headClassName: "hidden sm:table-cell",
+      cellClassName: "hidden sm:table-cell",
       cell: (o) => {
         const mapLink = o.pickupLocationMapLink ?? null
         return mapLink ? (
@@ -168,7 +176,7 @@ export default function RiderPickupQueuePage() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Open pickup location in maps for order ${o.id}`}
-            className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent"
+            className="inline-flex items-center justify-center size-8 rounded-md hover:bg-accent hit-target-44"
           >
             <MapPin className="size-4" />
           </a>
@@ -190,7 +198,12 @@ export default function RiderPickupQueuePage() {
         )
       },
     },
-    orderLabelColumn(merchantNameFn, labelTemplate),
+    // Print-only on a phone; the download fallback lives on the order detail.
+    {
+      ...orderLabelColumn(merchantNameFn, labelTemplate),
+      headClassName: "hidden sm:table-cell",
+      cellClassName: "hidden sm:table-cell",
+    },
     {
       id: "actions",
       sticky: true,

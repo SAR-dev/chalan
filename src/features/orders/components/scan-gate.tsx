@@ -120,17 +120,20 @@ export function ScanGate({
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-0.5">
               <p className="text-sm font-medium">Scan the parcel label</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-sm">
                 Photo the QR code on the label, or type the code below.
               </p>
             </div>
+            {/* Full-width on a phone: this opens the camera, and it is the
+                rider's critical path at a doorstep. */}
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              size="default"
+              className="w-full shrink-0 sm:w-auto"
               data-testid="scan-gate-scan"
               disabled={decoding}
               onClick={() => fileRef.current?.click()}
@@ -157,7 +160,7 @@ export function ScanGate({
 
           {phase === "mismatch" && readCode !== null ? (
             <p
-              className="text-destructive text-xs"
+              className="text-destructive text-sm"
               data-testid="scan-gate-mismatch"
             >
               Read {truncate(readCode)} — this parcel is {orderId}
@@ -166,7 +169,7 @@ export function ScanGate({
 
           {phase === "unreadable" ? (
             <p
-              className="text-muted-foreground text-xs"
+              className="text-muted-foreground text-sm"
               data-testid="scan-gate-unreadable"
             >
               Couldn&apos;t read a QR code in that photo. Try again, or type the
@@ -175,7 +178,7 @@ export function ScanGate({
           ) : null}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={inputId} className="text-xs">
+            <Label htmlFor={inputId} className="text-sm">
               Code from the label
             </Label>
             <Input
@@ -189,7 +192,7 @@ export function ScanGate({
             />
             {manualLongEnough && !manualMatches ? (
               <p
-                className="text-muted-foreground text-xs"
+                className="text-muted-foreground text-sm"
                 data-testid="scan-gate-manual-mismatch"
               >
                 Doesn&apos;t match this order&apos;s code.

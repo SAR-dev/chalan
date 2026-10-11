@@ -230,11 +230,11 @@ export default function RiderTodoPage() {
                 return (
                   <div
                     key={o.id}
-                    className="flex items-center justify-between gap-3 border-border border-b px-4 py-3 last:border-b-0 sm:px-5"
+                    className="flex flex-col gap-3 border-border border-b px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:px-5"
                   >
                     <div className="flex flex-1 flex-col gap-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-medium">
+                        <span className="font-mono text-sm font-medium">
                           {o.id}
                         </span>
                         <span className="text-muted-foreground text-xs">•</span>
@@ -242,26 +242,29 @@ export default function RiderTodoPage() {
                           {merchantName(o.merchantId)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         {phone && (
                           <a
                             href={`tel:${phone}`}
-                            className="hover:text-foreground inline-flex items-center gap-1"
+                            className="hover:text-foreground active:text-foreground inline-flex shrink-0 items-center gap-1"
                           >
                             <Phone className="size-3" />
                             {phone}
                           </a>
                         )}
                         {p?.address && (
-                          <span className="truncate">{p.address}</span>
+                          <span className="min-w-0 truncate">{p.address}</span>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    {/* Full-width on a phone: the primary action is the whole
+                        point of the row, and a rider taps it one-handed. */}
+                    <div className="flex w-full items-center gap-3 sm:w-auto sm:shrink-0">
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={!mapLink}
+                        aria-label="Open pickup location in maps"
                         onClick={() => {
                           if (mapLink) window.open(mapLink, "_blank")
                         }}
@@ -270,7 +273,8 @@ export default function RiderTodoPage() {
                       </Button>
                       {o.status === "APPROVED" ? (
                         <Button
-                          size="sm"
+                          size="default"
+                          className="flex-1 sm:flex-none"
                           onClick={() => openStartPickup(o)}
                           data-testid={`rider-start-pickup-${o.id}`}
                         >
@@ -282,7 +286,8 @@ export default function RiderTodoPage() {
                         // transition refuses anything else, so offering the
                         // button any earlier would just produce a 400 toast.
                         <Button
-                          size="sm"
+                          size="default"
+                          className="flex-1 sm:flex-none"
                           onClick={() => openPickup(o)}
                           data-testid={`rider-picked-up-${o.id}`}
                         >
@@ -295,6 +300,7 @@ export default function RiderTodoPage() {
                         merchantName={merchantName(o.merchantId)}
                         template={labelTemplate}
                         variant="outline"
+                        showDownload={false}
                       />
                     </div>
                   </div>
@@ -317,44 +323,49 @@ export default function RiderTodoPage() {
                 return (
                   <div
                     key={o.id}
-                    className="flex items-center justify-between gap-3 border-border border-b px-4 py-3 last:border-b-0 sm:px-5"
+                    className="flex flex-col gap-3 border-border border-b px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:px-5"
                   >
                     <div className="flex flex-1 flex-col gap-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-medium">
+                        <span className="font-mono text-sm font-medium">
                           {o.id}
                         </span>
                         <span className="text-muted-foreground text-xs">•</span>
                         <span className="truncate text-sm font-medium">
                           {o.recipientName}
                         </span>
+                        {/* COD is data, not an action — it belongs with the
+                            parcel, not in the tap row. */}
+                        <span className="ml-auto shrink-0 text-sm font-medium tabular-nums sm:ml-0">
+                          {formatTk(o.productCost)}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         {o.recipientPhone && (
                           <a
                             href={`tel:${o.recipientPhone}`}
-                            className="hover:text-foreground inline-flex items-center gap-1"
+                            className="hover:text-foreground active:text-foreground inline-flex shrink-0 items-center gap-1"
                           >
                             <Phone className="size-3" />
                             {o.recipientPhone}
                           </a>
                         )}
-                        {o.deliveryCity && <span>{o.deliveryCity}</span>}
+                        {o.deliveryCity && (
+                          <span className="shrink-0">{o.deliveryCity}</span>
+                        )}
                         {o.deliveryAddress && (
-                          <span className="truncate">
+                          <span className="min-w-0 truncate">
                             — {o.deliveryAddress}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-medium tabular-nums">
-                        {formatTk(o.productCost)}
-                      </span>
+                    <div className="flex w-full items-center gap-3 sm:w-auto sm:shrink-0">
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={!mapLink}
+                        aria-label="Open delivery location in maps"
                         onClick={() => {
                           if (mapLink) window.open(mapLink, "_blank")
                         }}
@@ -362,13 +373,21 @@ export default function RiderTodoPage() {
                         <MapPin className="size-4" />
                       </Button>
                       {canStart && (
-                        <Button size="sm" onClick={() => openStartDelivery(o)}>
+                        <Button
+                          size="default"
+                          className="flex-1 sm:flex-none"
+                          onClick={() => openStartDelivery(o)}
+                        >
                           <Navigation className="size-4" />
                           Start
                         </Button>
                       )}
                       {canRecord && (
-                        <Button size="sm" onClick={() => openDelivery(o)}>
+                        <Button
+                          size="default"
+                          className="flex-1 sm:flex-none"
+                          onClick={() => openDelivery(o)}
+                        >
                           <CheckCircle2 className="size-4" />
                           Record
                         </Button>
@@ -378,6 +397,7 @@ export default function RiderTodoPage() {
                         merchantName={merchantName(o.merchantId)}
                         template={labelTemplate}
                         variant="outline"
+                        showDownload={false}
                       />
                     </div>
                   </div>
