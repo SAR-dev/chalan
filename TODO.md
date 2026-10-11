@@ -5,6 +5,11 @@ merchant) plus the public pages. Every entry cites a `file:line` that was
 verified by hand — re-check before acting, and update the citation if the line
 has moved.
 
+**The rider surface is the priority.** Riders are the only role that is
+phone-first: they work one-handed, outdoors, sometimes in gloves. Everything in
+the **Rider pages** section below outranks the general findings — a cramped
+merchant table is an annoyance, a cramped delivery action is a failed delivery.
+
 **How to verify a change:** `pnpm dev`, then Chrome DevTools at **375×812**
 (iPhone) and **320×568** (small phone). The smallest supported width is 320px —
 that is the floor `e2e/specs/28-toast-responsive.spec.ts` already guards.
@@ -51,10 +56,192 @@ These were checked and are correct. Changing them risks regressing real work.
   `src/app/register/page.tsx:313`, `src/app/track/page.tsx:135`.
 - **Charts** — `src/components/charts/*` use `ResponsiveContainer width="100%"`
   with no fixed widths.
+- **Rider shell** — `src/app/rider/rider-shell.tsx:56-62` hides the sidebar
+  below `md` and gives the content column its own `overflow-y-auto`.
+- **Rider tables keep actions reachable** — `src/app/rider/pickup/page.tsx:196`
+  and `src/app/rider/delivery/page.tsx` mark the actions column `sticky: true`,
+  so the primary action never scrolls out of reach.
+- **Scan flow is defensive** — `src/lib/scan.ts` dynamic-imports, never throws,
+  and returns `{ kind: "no-code" }`; `scan-gate.tsx:147-156` uses a hidden
+  `capture="environment"` input, and manual entry is always offered.
+- **Upload affordances on touch** — `src/components/image-upload.tsx:96-121`
+  uses `pointer-coarse:opacity-100` so the replace/remove buttons are visible
+  without hover.
 
 ---
 
-## P0 — breaks on a phone
+## Rider pages (phone-first — do these first)
+
+### R1 [P0] — the queue action cluster overflows a 320px screen
+
+`src/app/rider/page.tsx:260` — `<div className="flex items-center gap-1 shrink-0">`
+(pickup rows `:260-299`, delivery rows `:350-382`).
+
+Each row packs **up to four controls** into that cluster: a map-pin `Button`
+(`:262`), the primary action (`:273`/`:285`), and `OrderLabelButton`, which
+renders **two** `size="icon"` buttons of its own
+(`src/features/orders/components/order-label-button.tsx:123-151`). That is
+roughly 32 + 80 + 32 + 32 ≈ **176px** of fixed-width controls before gaps, so on
+a 320px screen the `min-w-0` info column is squeezed to ~140px and the primary
+action label truncates.
+
+**Fix:** stack on mobile — `flex-col gap-2 sm:flex-row sm:items-center` on the
+row, with the primary action full-width. Drop the **download** icon from the
+rider queue (print is enough) and move the map pin beside the address rather
+than into the action cluster.
+
+### R2 [P1] — the primary action is 28px tall
+
+`src/app/rider/page.tsx:262,273,285,355,365,371` — all `size="sm"`, which is
+`h-7` (28px) per `src/components/ui/button.tsx:30`.
+
+`hit-target-44` widens the *hit* area, but the painted button is 28px with
+12.8px text — hard to read in sunlight and easy to miss. This is the single most
+important tap on the page ("Picked up", "Start", "Record").
+
+**Fix:** `size="default"` (32px) or a dedicated taller mobile size, with
+`text-sm` labels.
+
+### R3 [P1] — critical text is 12px
+
+| File:line | Content |
+|---|---|
+| `src/app/rider/page.tsx:237,324` | order id, `font-mono text-xs` |
+| `src/app/rider/page.tsx:245` | phone + address row, `text-xs` |
+| `src/app/rider/delivery/page.tsx:35` | `PhoneLink`, `text-xs` |
+| `src/app/rider/delivery/page.tsx:140` | destination address, `text-xs` |
+| `src/features/riders/components/run-sheet-card.tsx:27,55,59` | destination, order id, zone |
+| `src/features/orders/components/scan-gate.tsx:178` | the manual-code `Label` |
+
+Riders read these aloud to merchants and recipients, and tap the phone number to
+call. 12px is below the readable minimum outdoors.
+
+**Fix:** `text-sm` (14px) for order id, phone, destination and the manual-code
+label. Also give the address `min-w-0 truncate`/`break-words` — `:245` and
+`delivery/page.tsx:140` have no overflow guard.
+
+### R4 [P1] — the pickup and delivery tables hide their own data
+
+`src/app/rider/pickup/page.tsx:104-199` (7 columns) and
+`src/app/rider/delivery/page.tsx` (9 columns). Only `order` is pinned
+(`pickup/page.tsx:261`) and `actions` is sticky.
+
+On a 320px screen the rider must scroll horizontally to read the merchant,
+address and COD — the information they need *before* deciding to tap the
+primary action.
+
+**Fix:** hide low-priority columns below `sm` with `headClassName`/`cellClassName`
+`"hidden sm:table-cell"` (the pattern already exists at
+`src/features/riders/components/rider-table-columns.tsx:48`), keeping order,
+destination and action. Or collapse to a card list on mobile.
+
+### R5 [P1] — account tabs overflow
+
+`src/features/account/components/account-settings.tsx:398` — a `<TabsList>` with
+five triggers (Profile, Preferences, Security, Two-factor, Sessions) and no
+scroll or wrap handling. At 320px they clip.
+
+**Fix:** `overflow-x-auto` + `flex-nowrap` on the `TabsList`, or a `<Select>`
+below `sm`.
+
+### R6 [P1] — the scan button is 28px
+
+`src/features/orders/components/scan-gate.tsx:133` — `size="sm"` on the button
+that opens the camera. It sits in a `flex items-center justify-between` header
+row competing with the "Scan the parcel label" heading.
+
+This is the rider's critical path. **Fix:** `size="default"`, or full-width
+below the heading on mobile.
+
+### R7 [P1] — the scan gate hides all order context until verified
+
+`src/features/orders/dialogs/out-for-delivery-dialog.tsx:69-98` — when
+`warehouseScanRequired` is on, the body renders *only* the `ScanGate`. The
+recipient, phone and destination are withheld until the scan matches.
+
+A rider whose camera fails, or whose label is damaged, sees no order context at
+all while deciding whether to use manual entry — and manual entry is exactly the
+moment they need to confirm they have the right parcel.
+
+**Fix:** show read-only order context above the gate; keep the confirm step
+withheld until a match (the two-step contract stays), but the *identification*
+should be visible.
+
+### R8 [P1] — support toolbar crowds the top on mobile
+
+`src/features/support/components/support-page-client.tsx:274-281` — four status tabs plus the search
+input plus the filter button. The toolbar is `flex flex-wrap`
+(`src/components/data-table/toolbar.tsx:46`) so it wraps, but at 320px it
+consumes 2–3 rows and pushes the table off-screen.
+
+**Fix:** put the tabs on their own scrollable row below the search.
+
+### R9 [P2] — label actions double up in the queue
+
+`src/features/orders/components/order-label-button.tsx:123-151` renders print
+**and** download as two `size="icon"` buttons. In the rider queue both appear
+per row, contributing to R1.
+
+**Fix:** print-only on rider pages; download stays on the order detail page.
+
+### R10 [P2] — `gap-1` makes 44px hit areas overlap
+
+`src/app/rider/page.tsx:260` — the action cluster uses `gap-1` (4px). Two
+adjacent 28px buttons 4px apart have 44px-tall hit areas that overlap by 4px, so
+a tap near the edge of one can land on the other. `pagination.tsx:72-77`
+documents this exact hazard and uses `gap-3`.
+
+**Fix:** `gap-3` in the rider action clusters.
+
+### R11 [P2] — `min-h-screen` on the rider shell
+
+`src/app/rider/rider-shell.tsx:56` (and `:47`) — `min-h-screen` is `100vh`,
+which on mobile browsers includes the address-bar area, so the footer sits
+behind the URL bar and the page double-scrolls.
+
+**Fix:** `min-h-dvh`.
+
+### R12 [P2] — raw `<button>`s miss `hit-target-44`
+
+The utility is baked into the `Button` cva, so these are under 44px:
+
+| File:line | Element |
+|---|---|
+| `src/app/rider/page.tsx:237,324` | order-id button |
+| `src/app/rider/pickup/page.tsx:108-117`, `delivery/page.tsx:103-112` | order-id button in the table |
+| `src/features/riders/components/run-sheet-card.tsx:84-90` | "Try again" |
+| `src/components/data-table/index.tsx:752-774` | sort header |
+| `src/features/orders/dialogs/delivery-attempt-dialog.tsx:148-173` | Delivered/Failed toggles |
+
+**Fix:** convert to `<Button>`, or add `hit-target-44` plus padding.
+
+### R13 [P2] — small-input and small-text leftovers
+
+- `src/features/orders/dialogs/pickup-confirm-dialog.tsx:148-155` — the weight
+  `<Input type="number">` has no `inputMode="decimal"`, so a rider gets the full
+  keyboard instead of the numeric pad.
+- `src/features/orders/components/scan-gate.tsx:160,169` — mismatch and
+  unreadable messages at `text-xs`.
+- `src/app/rider/cash/page.tsx:128,148,168` — stat-card hints at `text-xs`.
+- `src/features/orders/components/order-details-content.tsx:65` — section label at
+  `text-[11px]`.
+- `src/features/riders/components/run-sheet-card.tsx:49` — `w-5` sequence column
+  is tight past 9 stops.
+
+### R14 [P2] — no rider test runs at a mobile viewport
+
+`src/app/rider/rider.spec.tsx` renders at the jsdom default, and
+`playwright.config.ts:38-43` defines a single desktop `chromium` project. The
+rider specs (`30-rider-vehicle`, `32-rider-cash`, `36-rider-pickup-flow`) never
+set a viewport — so the highest-stakes mobile surface in the app has **zero**
+mobile coverage, and R1–R6 could regress unnoticed.
+
+**Fix:** add a `"mobile"` Playwright project (`devices["Pixel 5"]` or a 320px
+viewport with `hasTouch: true`) and run the rider specs on it.
+
+---
+
+## General — P0 (breaks on a phone)
 
 ### 1. `/rates` forces a 720px-wide matrix
 
@@ -105,7 +292,7 @@ or `break-words`.
 
 ---
 
-## P1 — cramped but usable
+## General — P1 (cramped but usable)
 
 ### 4. Landing page has no nav below `sm`
 
@@ -176,7 +363,7 @@ rather than breaks.
 
 ---
 
-## P2 — hardening and regression guards
+## General — P2 (hardening and regression guards)
 
 ### 10. Hover-only affordances have no touch equivalent
 
@@ -221,11 +408,17 @@ widths. `px-4 sm:px-6` reclaims 16px on a phone for free.
 
 ## Suggested order
 
-1. **P0** — the rates matrix, the dialog grids, the table `nowrap`. These are the
-   only places a phone user is actually blocked.
-2. **P1** — the landing nav and the sort button; then the dropdown item height.
-3. **P2** — add the mobile Playwright project early, so the P0 fixes get a
-   regression guard while the context is fresh.
+1. **R1** — the rider queue action cluster. It is the only finding that makes a
+   core action unusable on a common phone width, and it is on the one surface
+   used outdoors, one-handed.
+2. **R2–R7** — the rest of the rider P1s: action size, 12px critical text, the
+   table columns, the account tabs, the scan button, and the scan gate's missing
+   context. All of these are on the critical path for a delivery.
+3. **General P0** — the rates matrix, the dialog grids, the table `nowrap`.
+4. **R8–R14 and general P1/P2** — tidy-up.
+5. **R14 + general #11** — add the mobile Playwright project early, so the rider
+   fixes get a regression guard while the context is fresh. This one is worth
+   pulling forward: the rider surface currently has no mobile coverage at all.
 
 Everything in this file was verified against the tree at the commit it was
 written from. Re-verify the `file:line` before acting.
