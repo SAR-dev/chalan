@@ -54,6 +54,7 @@ import {
   orderSetExpectedDeliverySchema,
   parseBody,
 } from "@/lib/validation"
+import { flushWebhookDeliveries } from "@/lib/webhooks"
 
 type Session = NonNullable<Awaited<ReturnType<typeof requireSession>>>
 type OrderRow = typeof order.$inferSelect
@@ -1215,6 +1216,10 @@ export async function applyOrderTransition(
   // COD cash figures have to be told.
   if (response.ok) {
     refreshStats(statTag("order"), statTag("rider"))
+    // Not awaited — see `flushWebhookDeliveries`. Delivery used to happen only
+    // on the once-a-minute cron, which is too coarse for a merchant reacting to
+    // a status change.
+    flushWebhookDeliveries()
   }
 
   return response
@@ -1406,6 +1411,10 @@ export async function applyBulkOrderTransition(
   // rejected batch does not throw away a cache entry that is still correct.
   if (response.ok) {
     refreshStats(statTag("order"), statTag("rider"))
+    // Not awaited — see `flushWebhookDeliveries`. Delivery used to happen only
+    // on the once-a-minute cron, which is too coarse for a merchant reacting to
+    // a status change.
+    flushWebhookDeliveries()
   }
 
   return response

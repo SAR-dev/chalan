@@ -254,6 +254,10 @@ function formatOrderError(data: {
 - New tables: `delivery_zone`, `zone_pricing` (N×N pricing matrix), `delivery_city` (with zoneId + warehouseId)
 - Updated: `pickup_location` (cityId instead of warehouseId), `order` (deliveryCityId FK)
 - Queries: **inline in each `route.ts`** — no separate queries file
+  - Exception: `src/lib/maintenance.ts`. The six cron jobs are driven by two
+    schedulers (the per-route endpoints and `/api/cron/maintenance`), so their
+    bodies live in one module both call. A job added there needs a
+    `run*` function *and* a route entry, never a second copy of the query.
 - Use `db` for writes, `dbRead` for reads
 - Table names use `"snake_case"` via Drizzle's `"snake_case"` name mapper
 - Migrations: `pnpm db:generate` then `pnpm db:push`

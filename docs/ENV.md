@@ -118,15 +118,20 @@ HTML is not persisted.
 | `AUDIT_LOG_RETENTION_DAYS`   | No       | `30`    | Days to retain audit logs. Older entries are cleaned daily                                      |
 | `EMAIL_LOG_RETENTION_DAYS`   | No       | `10`    | Days to retain sent email logs. Failed emails are never deleted                                 |
 | `UPLOAD_SWEEP_MIN_AGE_HOURS` | No       | `48`    | Hours an unreferenced upload must age before `/api/cron/cleanup-uploads` may delete it          |
+| `CRON_DRAIN_CADENCE_MS`      | No       | `60000` | How often the two drains are expected to run, in ms. Set to your cron interval (e.g. `86400000`) where it is not per-minute, or `/api/ready` reports them stale |
 | `ERROR_WEBHOOK_URL`          | No       | -       | Where unhandled 500s are POSTed as JSON. Unset = stdout logs only                               |
 
-`/api/cron/cleanup-uploads` is scheduled via
-crontab / the Docker cron container (pg_cron cannot make HTTP calls, so it is
-not in `scripts/setup-pg-cron.sql`), and is **not** in `vercel.json` (same
-free-plan limit as the audit/email jobs — call it manually or from an external
-scheduler there). It supports `?dryRun=1`, which reports what would be deleted
-without deleting anything — run that first, for a while, before enabling
-deletes.
+Scheduling differs per host. `docker/compose.cluster.yml` and
+`docker/compose.monolith.yml` run all six jobs from their in-container crontab
+(`pg_cron` cannot make HTTP calls, so none of them are in
+`scripts/setup-pg-cron.sql`). `vercel.json` registers a single daily
+`/api/cron/maintenance`, which drives all six in turn — Vercel's free tier
+rejects both a longer `crons` array and a sub-daily schedule.
+
+`/api/cron/cleanup-uploads` supports `?dryRun=1`, which reports what would be
+deleted without deleting anything — run that first, for a while, before
+enabling deletes. The combined `maintenance` route never dry-runs; call the
+endpoint directly to preview.
 
 ---
 

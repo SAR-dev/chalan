@@ -151,6 +151,8 @@ describe("neverRanCronJobs", () => {
     const known = knownCronJobs()
     for (const job of [
       "drain-email-outbox",
+      // Was missing entirely, so a dead webhook drain was undetectable.
+      "drain-webhooks",
       "cleanup-sessions",
       "cleanup-audit-logs",
       "cleanup-email-logs",

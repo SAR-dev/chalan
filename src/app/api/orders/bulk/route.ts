@@ -36,6 +36,7 @@ import {
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { generateTrackingToken } from "@/lib/tracking-token"
 import { orderBulkCreateSchema, parseBody } from "@/lib/validation"
+import { flushWebhookDeliveries } from "@/lib/webhooks"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const POST = withErrorHandler(async (req: Request) => {
@@ -503,6 +504,11 @@ export const POST = withErrorHandler(async (req: Request) => {
       return NextResponse.json(existing)
     }
   }
+
+  // After the transaction commits, and not awaited — see
+  // `flushWebhookDeliveries`. A batch can enqueue many deliveries, so the cron
+  // is no longer the only thing draining them.
+  flushWebhookDeliveries()
 
   return NextResponse.json(created, { status: 201 })
 })

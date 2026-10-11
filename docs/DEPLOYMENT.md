@@ -61,9 +61,11 @@ LIMIT 20;
 1. Import the repo into Vercel and set the required env vars (`DATABASE_URL`,
    `BETTER_AUTH_SECRET`, plus any storage/mail vars from `docs/ENV.md`).
 2. Add `CRON_SECRET` to the project's env vars — Vercel Cron injects the
-   `Authorization` header automatically for the jobs defined in
-   [`vercel.json`](./vercel.json) (`drain-email-outbox` and `drain-webhooks`
-   every minute, then the four cleanup jobs daily).
+   `Authorization` header automatically for the job defined in
+   [`vercel.json`](./vercel.json), which is a single daily call to
+   `/api/cron/maintenance`. That route runs all six jobs in order, reports each
+   under its own name to the cron heartbeat, and returns `500` if any one of
+   them failed so the run is not silently partial.
 3. **Migrations run automatically on production deploys.** `vercel.json` has no
    pre-deploy step, so the build uses a `vercel-build` script
    (`scripts/vercel-build.mjs`) that runs `pnpm db:migrate` before
@@ -79,15 +81,25 @@ LIMIT 20;
      database was created by `db:push` or predates the ledger, the first deploy
      fails and tells you to run `pnpm db:migrate --baseline` once. Do that
      against a database whose schema you have confirmed is current.
-4. `vercel.json` no longer needs extra `crons` entries for the cleanup jobs;
-   all six are scheduled there.
-5. Set `BETTER_AUTH_ALLOWED_URLS` in your env to list all preview/staging
+4. **Keep `vercel.json` at exactly one cron entry.** The free tier rejects a
+   `crons` array that exceeds its job allowance, and it rejects sub-daily
+   schedules — either fails the build, so no deploy happens at all. That is why
+   the six jobs are driven through `/api/cron/maintenance` rather than listed
+   individually, and why the schedule is `0 3 * * *`. Do not add the six
+   individual routes back; use `docker/compose.*.yml` if you need per-minute
+   drains, which is what production runs.
+5. Because the drains now run daily rather than per-minute, set
+   `CRON_DRAIN_CADENCE_MS` to your cron interval in milliseconds (default
+   `86400000`). Otherwise `/api/ready` reports both drains as stale on every
+   probe, since the watchdog expects the per-minute cadence the compose crontab
+   uses.
+6. Set `BETTER_AUTH_ALLOWED_URLS` in your env to list all preview/staging
    URLs that Better Auth should trust (comma-separated). Omit for production
    single-instance deployments.
-6. Local disk storage (`STORAGE_PROVIDER=local`) does **not** work on Vercel's
+7. Local disk storage (`STORAGE_PROVIDER=local`) does **not** work on Vercel's
    ephemeral filesystem. Use `STORAGE_PROVIDER=r2`
    instead.
-7. The app uses `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`,
+8. The app uses `pg_trgm`, `unaccent`, `pgcrypto`, `btree_gin`,
    `pg_stat_statements`, and `pg_cron` PostgreSQL extensions — if you're
    using a managed Postgres provider (Neon, Supabase, RDS), enable them
    manually after provisioning (see [SETUP.md](./SETUP.md#postgresql-extensions)).

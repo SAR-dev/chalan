@@ -22,6 +22,14 @@ vi.mock("@/lib/audit", () => ({
   logAuditMany: () => Promise.resolve(),
 }))
 
+// Webhook delivery is not what these specs are about. Left real, the
+// post-commit flush runs `drainWebhooks` against the mocked db above, whose
+// catch-all chain answers every query and so reports a second `update`.
+vi.mock("@/lib/webhooks", () => ({
+  emitWebhookEvent: vi.fn(() => Promise.resolve()),
+  flushWebhookDeliveries: vi.fn(),
+}))
+
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: () => (rateLimited ? ({ status: 429 } as Response) : null),
   rateLimitByIp: () => (rateLimited ? ({ status: 429 } as Response) : null),
