@@ -1,10 +1,18 @@
 # TODO — Mobile responsiveness
 
-> **Status: implemented.** Everything below shipped, except **R7**, which was
-> deliberately not done — it contradicts the R9 two-step decision (see its
-> entry). The list is kept as the record of what was found and fixed, so the
-> `file:line` citations are the ones from the audit rather than current line
-> numbers.
+> **Status: implemented.** All P0s and the rider P1s shipped. Three entries are
+> deliberately not fully done, each marked inline:
+>
+> - **R7** — not done: contradicts the documented R9 two-step decision.
+> - **R8** — addressed by the `TabsList` primitive fix rather than a per-page
+>   restructure; the toolbar still wraps to two rows on a phone, which is
+>   inherent and acceptable.
+> - **General 6** — only the dropdown-item height changed. The checkboxes and
+>   switches are native controls and were left alone.
+> - **General 10** — deferred: every one is decorative, with no action behind it.
+>
+> The list is kept as the record of what was found, so the `file:line`
+> citations are the audit's, not current line numbers.
 
 Findings from an audit of the four role shells (dashboard, warehouse, rider,
 merchant) plus the public pages. Every entry cites a `file:line` that was
@@ -181,14 +189,17 @@ moment they need to confirm they have the right parcel.
 withheld until a match (the two-step contract stays), but the *identification*
 should be visible.
 
-### R8 [P1] — support toolbar crowds the top on mobile
+### R8 [P1] — ADDRESSED IN THE PRIMITIVE: support toolbar crowds the top
 
 `src/features/support/components/support-page-client.tsx:274-281` — four status tabs plus the search
 input plus the filter button. The toolbar is `flex flex-wrap`
 (`src/components/data-table/toolbar.tsx:46`) so it wraps, but at 320px it
 consumes 2–3 rows and pushes the table off-screen.
 
-**Fix:** put the tabs on their own scrollable row below the search.
+**Fix:** done in the primitive instead — `TabsList` now carries
+`max-w-full overflow-x-auto` (`src/components/ui/tabs.tsx`), so the tabs scroll
+rather than clip. The toolbar still wraps to two rows on a 320px screen; that is
+inherent to four tabs plus a search plus a filter and is acceptable.
 
 ### R9 [P2] — label actions double up in the queue
 
@@ -330,7 +341,7 @@ On a phone the column-header sort target is the width of the label text.
 **Fix:** wrap it in `<Button variant="ghost" size="sm">` (which brings the 44px
 hit area and the collision guard with it), or apply `hit-target-44` directly.
 
-### 6. Other controls below the 44px target
+### 6. Other controls below the 44px target — PARTIALLY DONE
 
 | File:line | Element | Size |
 |---|---|---|
@@ -343,8 +354,10 @@ None are `<Button>`, so `hit-target-44` does not apply. Checkboxes and switches
 are hard to enlarge without a wrapper, but the **dropdown item** height is a
 one-line change and matters most — action menus are where a mis-tap is costly.
 
-**Fix:** raise `DropdownMenuItem` padding to a ≥44px row; wrap the checkboxes and
-switch in a labelled container that owns the hit area.
+**Fix:** the `DropdownMenuItem` height is done (`min-h-9`, 36px + padding).
+The checkboxes and the `Switch` were **not** changed — they are native controls
+that need a labelled wrapper to own a larger hit area, and none of them is on a
+rider's critical path.
 
 ### 7. Long values can overflow the tracking detail rows
 
@@ -379,7 +392,7 @@ rather than breaks.
 
 ## General — P2 (hardening and regression guards)
 
-### 10. Hover-only affordances have no touch equivalent
+### 10. Hover-only affordances have no touch equivalent — DEFERRED
 
 | File:line | Pattern |
 |---|---|
@@ -390,8 +403,8 @@ rather than breaks.
 | `src/app/track/[id]/components/timeline.tsx:201` | `hover:scale-105` |
 
 All decorative — none is the sole affordance for an action, so none blocks a
-task. Worth giving a focus/active equivalent only where the hover reveals a
-meaningful state (the sticky-cell row shading is the one that matters).
+task, and this was deliberately left alone rather than churned. If it is picked
+up, the sticky-cell row shading is the only one that carries meaning.
 
 ### 11. No mobile viewport in the Playwright project
 

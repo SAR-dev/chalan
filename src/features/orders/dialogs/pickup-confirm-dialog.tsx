@@ -148,6 +148,9 @@ export function PickupConfirmDialog({
               <Input
                 id="pickup-weight"
                 type="number"
+                // `type="number"` alone still shows the full keyboard on many
+                // Android keyboards; inputMode picks the numeric pad.
+                inputMode="decimal"
                 min="0.1"
                 step="0.1"
                 value={weight}
