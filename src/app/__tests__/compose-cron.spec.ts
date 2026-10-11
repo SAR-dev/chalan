@@ -10,13 +10,25 @@ function read(...parts: string[]): string {
   return readFileSync(join(process.cwd(), ...parts), "utf-8")
 }
 
-/** Every cron route in the tree, discovered rather than hand-listed. */
+/**
+ * Routes that are job *implementations*, not scheduled jobs themselves.
+ *
+ * `maintenance` drives all six jobs in one invocation for hosts whose cron
+ * quota is smaller than the job count (Vercel's free tier allows a single
+ * daily cron). Docker schedules the individual routes instead — putting
+ * `maintenance` in those crontabs as well would run every job twice a day and
+ * gain nothing, since the individual schedules are already finer-grained.
+ */
+const AGGREGATE_ROUTES = new Set(["maintenance"])
+
+/** Every cron *job* route in the tree, discovered rather than hand-listed. */
 function cronRoutes(): string[] {
   return readdirSync(join(process.cwd(), "src", "app", "api", "cron"), {
     withFileTypes: true,
   })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
+    .filter((name) => !AGGREGATE_ROUTES.has(name))
     .sort()
 }
 
@@ -80,6 +92,26 @@ describe("every cron route runs in production", () => {
 
   it("finds the routes it is meant to guard", () => {
     expect(routes.length).toBeGreaterThanOrEqual(5)
+  })
+
+  it("excludes the aggregate route, and docker does not schedule it", () => {
+    // Stated rather than merely excluded: the aggregate exists for a host with
+    // a one-cron budget, and scheduling it alongside the individual routes would
+    // run every job twice.
+    expect(cronRoutes()).not.toContain("maintenance")
+    for (const file of [
+      "docker/compose.cluster.yml",
+      "docker/compose.monolith.yml",
+    ]) {
+      expect(
+        crontabLine(read(...file.split("/")), "maintenance"),
+      ).toBeUndefined()
+    }
+    // It is registered somewhere, though — otherwise the exclusion would be a
+    // way to quietly delete the job.
+    expect(JSON.parse(read("vercel.json")).crons).toEqual([
+      { path: "/api/cron/maintenance", schedule: expect.any(String) },
+    ])
   })
 
   for (const file of [

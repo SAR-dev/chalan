@@ -23,6 +23,24 @@ function safeEqual(a: string, b: string): boolean {
  * operators notice instead of silently skipping cleanup.
  */
 export function isAuthorizedCron(req: Request): boolean {
+  if (!verifyCronAuth(req)) return false
+  // Only an authenticated call counts as the job actually running, so a dead
+  // scheduler — or a leaked secret — cannot make the heartbeat look healthy.
+  // Recorded here rather than in each of the six routes so no route can forget
+  // To report in.
+  noteCronInvocation(req)
+  return true
+}
+
+/**
+ * The same check, with no heartbeat.
+ *
+ * The combined maintenance route authenticates once but drives six jobs, so it
+ * cannot use `isAuthorizedCron`: that records one row named after the URL —
+ * `maintenance` — and would leave the five real job names looking like they had
+ * never run. It verifies here and calls `noteCronInvocation` per job instead.
+ */
+export function verifyCronAuth(req: Request): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) {
     logger.error("CRON_SECRET is not set")
@@ -32,11 +50,7 @@ export function isAuthorizedCron(req: Request): boolean {
   const provided = auth?.startsWith("Bearer ")
     ? auth.slice("Bearer ".length)
     : ""
-  const authorized = safeEqual(secret, provided)
-  // Only an authenticated call counts as the job actually running, so a dead
-  // scheduler — or a leaked secret — cannot make the heartbeat look healthy.
-  // Recorded here rather than in each of the six routes so no route can forget
-  // To report in.
-  if (authorized) noteCronInvocation(req)
-  return authorized
+  return safeEqual(secret, provided)
 }
+
+export { noteCronInvocation }

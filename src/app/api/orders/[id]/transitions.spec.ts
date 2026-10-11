@@ -18,6 +18,7 @@ import {
   businessDayEnd,
   businessDaysBetween,
 } from "@/lib/timezone"
+import { flushWebhookDeliveries } from "@/lib/webhooks"
 import { PATCH as approve } from "./approve/route"
 import { PATCH as assignPickupRider } from "./assign-pickup-rider/route"
 import { PATCH as cancel } from "./cancel/route"
@@ -146,6 +147,9 @@ vi.mock("@/lib/audit", () => ({
 // own work. The enqueue behaviour has its own spec in `webhooks.spec.ts`.
 vi.mock("@/lib/webhooks", () => ({
   emitWebhookEvent: vi.fn(() => Promise.resolve()),
+  // Delivery used to be the cron's job alone. Now every committed transition
+  // nudges it, so the recorded calls are asserted below.
+  flushWebhookDeliveries: vi.fn(),
 }))
 
 // Every transition ends by expiring the dashboard stat tiles.
@@ -409,6 +413,9 @@ describe("PATCH /orders/:id/approve", () => {
       approvedBy: "Admin Amy",
     })
     expect(typeof payload?.approvedAt).toBe("string")
+    // Webhook delivery used to wait for the once-a-minute cron. Every committed
+    // transition now nudges it, so a merchant sees the event in seconds.
+    expect(flushWebhookDeliveries).toHaveBeenCalledTimes(1)
     expect(logAudit).toHaveBeenCalledTimes(1)
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({

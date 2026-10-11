@@ -423,3 +423,28 @@ export async function drainWebhooks({
 
   return { claimed: claimed.length, delivered, failed, disabled }
 }
+
+/**
+ * Start a drain without waiting for it.
+ *
+ * The email outbox has `flushEmailOutbox`, and its callers `await` it. That is
+ * safe there because a drain is DB writes plus an SMTP hand-off — slow, but
+ * bounded by our own infrastructure. This is deliberately not the same:
+ * `drainWebhooks` walks its rows **sequentially**, each with a
+ * `DELIVERY_TIMEOUT_MS` budget against a merchant-controlled endpoint. Awaiting
+ * it on the request path would let one slow merchant's receiver stall the order
+ * API response, so callers fire this and move on.
+ *
+ * What that costs: the drain races the response being returned, so on a
+ * serverless runtime the invocation may freeze before deliveries finish. That
+ * is precisely the gap `/api/cron/drain-webhooks` covers — the cron is now a
+ * backstop for a path that usually succeeds on its own, rather than the only
+ * path that ever delivers.
+ *
+ * Never throws, and never rejects: there is no caller to handle either.
+ */
+export function flushWebhookDeliveries(limit = 10): void {
+  void drainWebhooks({ limit }).catch((err: unknown) => {
+    logger.error("Webhook delivery flush failed", { err })
+  })
+}

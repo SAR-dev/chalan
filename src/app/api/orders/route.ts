@@ -65,6 +65,7 @@ import {
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { generateTrackingToken } from "@/lib/tracking-token"
 import { orderCreateSchema, parseBody } from "@/lib/validation"
+import { flushWebhookDeliveries } from "@/lib/webhooks"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export const GET = withErrorHandler(async (req: Request) => {
@@ -536,6 +537,11 @@ export const POST = withErrorHandler(async (req: Request) => {
     if (existing) return NextResponse.json(existing)
     return badRequest("Duplicate request")
   }
+
+  // After the transaction commits, and not awaited — see
+  // `flushWebhookDeliveries`. This route has its own creation path, so it needs
+  // its own flush or a portal order would wait for the cron like it used to.
+  flushWebhookDeliveries()
 
   return NextResponse.json(created.order, { status: 201 })
 })

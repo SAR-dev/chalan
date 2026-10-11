@@ -104,20 +104,34 @@ primary. Here's how to set it up per provider:
 printf "CRON_SECRET='%s'\n" "$(openssl rand -base64 32)" >> .env.development.local
 ```
 
-Five scheduled endpoints are available, all authenticated via `CRON_SECRET`:
+Six job endpoints are available, all authenticated via `CRON_SECRET`, plus one
+combined entry point:
 
 | Endpoint                       | What it does                             | Schedule             |
 | ------------------------------ | ---------------------------------------- | -------------------- |
 | `/api/cron/drain-email-outbox` | Delivers queued transactional email      | Every minute         |
+| `/api/cron/drain-webhooks`     | Delivers queued merchant webhooks        | Every minute         |
 | `/api/cron/cleanup-sessions`   | Expired sessions + verification tokens   | Immediate (N/A)      |
 | `/api/cron/cleanup-audit-logs` | Old audit log entries                    | 30 days              |
 | `/api/cron/cleanup-email-logs` | Successful email logs (SENT only)        | 10 days              |
 | `/api/cron/cleanup-uploads`    | Orphaned uploads (unreferenced in the DB) | 48 hours (min age)  |
+| `/api/cron/maintenance`        | Runs all six above, in order              | Once daily           |
+
+Pick one style, not both. `docker/compose.cluster.yml` and
+`docker/compose.monolith.yml` schedule the six individually from their
+in-container crontab. Hosts whose cron quota is smaller than the job count —
+Vercel's free tier permits one daily cron — register `maintenance` alone; see
+[`docs/DEPLOYMENT.md`](./DEPLOYMENT.md). Scheduling both would run every job
+twice.
 
 Transactional email (activation, verification, password reset, merchant
 approval) is written to the `email_outbox` table in the same transaction as the
-domain change; `drain-email-outbox` delivers anything a request could not send
-synchronously.
+domain change, and each request flushes the outbox inline, so the cron only
+recovers what a crashed invocation left behind.
+
+Webhooks are enqueued inside the order transaction and drained inline too (not
+awaited — a merchant-controlled endpoint must not stall the order response), so
+they no longer depend on the cron running often. The cron remains the backstop.
 
 Retention is configurable via `AUDIT_LOG_RETENTION_DAYS`,
 `EMAIL_LOG_RETENTION_DAYS`, and `UPLOAD_SWEEP_MIN_AGE_HOURS` env vars. FAILED

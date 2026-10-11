@@ -68,6 +68,10 @@ src/app/
   api/cron/cleanup-sessions/route.ts  DELETE expired sessions (hourly)
   api/cron/cleanup-audit-logs/route.ts  DELETE old audit log entries (daily)
   api/cron/cleanup-email-logs/route.ts  DELETE old sent email logs (daily)
+  api/cron/drain-email-outbox/route.ts  deliver queued transactional email
+  api/cron/drain-webhooks/route.ts  deliver queued merchant webhooks
+  api/cron/cleanup-uploads/route.ts  delete orphaned uploads (supports ?dryRun=1)
+  api/cron/maintenance/route.ts     run all six above in order (one cron entry)
   <role>/<page>/page.tsx             a screen for a role (dashboard|merchant|warehouse|rider)
   landing/                            public landing page
   login/                              login screen
@@ -1551,6 +1555,14 @@ For emails that must survive a crashed/frozen request, persist a row through
 transaction as the domain change, then `flushEmailOutbox()` after commit. The
 drain worker (`POST /api/cron/drain-email-outbox`) delivers rows left behind by
 a crash. A failed outbox row is marked `FAILED` and kept — it is never retried.
+
+Webhooks follow the same shape with one deliberate difference. `emitOrderEvent`
+enqueues the delivery inside the transaction, and the request then calls
+`flushWebhookDeliveries()` from `src/lib/webhooks.ts` — **not awaited**. A drain
+walks its rows sequentially against merchant-controlled endpoints with a 10s
+timeout each, so awaiting it would let one slow receiver stall the order API
+response. The flush therefore only covers the common case; `/api/cron/maintenance`
+(or `/api/cron/drain-webhooks` on Docker) remains the backstop.
 
 Never call nodemailer (or any SMTP client) directly outside `src/lib/mailer.ts`,
 and never insert into `email_log` from anywhere else — `sendMail()` is the only

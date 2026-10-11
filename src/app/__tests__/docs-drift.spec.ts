@@ -115,15 +115,12 @@ describe("retention defaults", () => {
     }
   })
 
-  // The routes must import the constant rather than restate a literal — a
-  // literal is what allowed the two to diverge in the first place.
-  it("both cron routes take their default from src/lib/env.ts", () => {
-    expect(
-      read("src", "app", "api", "cron", "cleanup-audit-logs", "route.ts"),
-    ).toContain('from "@/lib/env"')
-    expect(
-      read("src", "app", "api", "cron", "cleanup-email-logs", "route.ts"),
-    ).toContain('from "@/lib/env"')
+  // The job bodies must import the constant rather than restate a literal — a
+  // literal is what allowed the two to diverge in the first place. They live in
+  // `src/lib/maintenance.ts` now (shared by the per-route endpoints and the
+  // combined `/api/cron/maintenance`), so that is where the import must be.
+  it("both cron jobs take their default from src/lib/env.ts", () => {
+    expect(read("src", "lib", "maintenance.ts")).toContain('from "@/lib/env"')
   })
 })
 

@@ -17,6 +17,8 @@ const API_DIR = fileURLToPath(new URL(".", import.meta.url))
 // - requireSession()            — the standard session + profile lookup
 // - auth.api.getSession          — users/me reads the Better Auth session direct
 // - isAuthorizedCron             — cron routes authenticate via CRON_SECRET
+// - verifyCronAuth                — the combined cron route, which authenticates
+//                                   once and records a heartbeat per job itself
 // - applyOrderTransition/…       — order transition routes delegate auth to
 //                                  @/features/orders/transitions, which calls
 //                                  requireSession() + per-transition authorize
@@ -24,6 +26,7 @@ const AUTH_ENTRY_POINTS: RegExp[] = [
   /requireSession\(/,
   /auth\.api\.getSession/,
   /isAuthorizedCron\(/,
+  /verifyCronAuth\(/,
   /authenticateApiKey\(/,
   /applyOrderTransition\(/,
   /applyBulkOrderTransition\(/,
@@ -111,7 +114,7 @@ describe("API route auth guard", () => {
       throw new Error(
         "API routes without a server-side auth entry point " +
           "(requireSession / auth.api.getSession / isAuthorizedCron / " +
-          "order transition helpers):\n" +
+          "verifyCronAuth / order transition helpers):\n" +
           offenders.map((file) => `  - src/app/api/${file}`).join("\n") +
           "\nAdd the appropriate auth check to the handler. If the route is " +
           "genuinely public, add it to PUBLIC_ALLOWLIST with a justification.",

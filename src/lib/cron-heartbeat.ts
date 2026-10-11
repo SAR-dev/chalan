@@ -29,9 +29,18 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * `docker/compose.cluster.yml` / `vercel.json`. An unknown job is assumed
  * daily — the conservative reading, so a new job is never declared stale
  * merely because nobody added it here.
+ *
+ * The two drains default to per-minute, which is what the compose crontab
+ * schedules. `CRON_DRAIN_CADENCE_MS` overrides them for hosts that collapse all
+ * six jobs into `/api/cron/maintenance` on a coarser schedule — Vercel's free
+ * tier permits only daily crons — where leaving these at 60s would have the
+ * watchdog report both as stale on every readiness probe.
  */
+const drainCadence = Number(process.env.CRON_DRAIN_CADENCE_MS) || 60_000
+
 const CADENCE_MS: Record<string, number> = {
-  "drain-email-outbox": 60_000,
+  "drain-email-outbox": drainCadence,
+  "drain-webhooks": drainCadence,
   "cleanup-sessions": DAY_MS,
   "cleanup-audit-logs": DAY_MS,
   "cleanup-email-logs": DAY_MS,
@@ -56,14 +65,19 @@ function jobFromRequest(req: Request): string | null {
  * Upsert this job's heartbeat. Fire-and-forget: a failure to record must never
  * fail the job it is recording.
  *
+ * `job` overrides the name derived from the URL. The combined maintenance route
+ * drives six jobs through one path, so without this every one of them would
+ * report as `maintenance` — and `staleCronJobs`/`neverRanCronJobs` would go
+ * permanently blind for the five real job names.
+ *
  * Both sync and async failures are swallowed. The sync case is not theoretical
  * — `cleanup-uploads.spec.ts` mocks `db` as `{}`, so `db.insert(...)` throws
  * before any promise exists, and `.catch()` alone would have turned a
  * swallowed heartbeat into a 500 on the route it was watching.
  */
-export function noteCronInvocation(req: Request): void {
-  const job = jobFromRequest(req)
-  if (!job) return
+export function noteCronInvocation(req: Request, job?: string): void {
+  const name = job ?? jobFromRequest(req)
+  if (!name) return
 
   // `ts()` columns are `mode: "string"`, so timestamps travel as ISO strings.
   const nowIso = new Date().toISOString()
@@ -71,7 +85,7 @@ export function noteCronInvocation(req: Request): void {
     void db
       .insert(cronRun)
       .values({
-        job,
+        job: name,
         lastRanAt: nowIso,
         updatedAt: nowIso,
         ok: true,
@@ -82,10 +96,10 @@ export function noteCronInvocation(req: Request): void {
       })
       .then(() => undefined)
       .catch((err: unknown) => {
-        logger.debug("cron heartbeat not recorded", { job, err })
+        logger.debug("cron heartbeat not recorded", { job: name, err })
       })
   } catch (err) {
-    logger.debug("cron heartbeat not recorded", { job, err })
+    logger.debug("cron heartbeat not recorded", { job: name, err })
   }
 }
 
