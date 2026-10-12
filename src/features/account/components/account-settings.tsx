@@ -37,9 +37,6 @@ import {
 } from "@/lib/constants"
 import { toast } from "@/lib/notify"
 import { initials } from "@/lib/utils"
-// Type-only: `src/lib/version.ts` reads `node:fs`, so a value import here would
-// pull that into the browser bundle. The label is formatted below instead.
-import type { AppVersion } from "@/lib/version"
 
 interface Session {
   id: string

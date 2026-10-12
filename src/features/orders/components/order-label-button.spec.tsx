@@ -57,7 +57,8 @@ const pdfmeMocks = vi.hoisted(() => ({
   printOrDownload: vi.fn(),
   downloadPdf: vi.fn(),
   loadLabelFont: vi.fn(async () => ({
-    NotoSansJP: { data: new ArrayBuffer(0) },
+    NotoSansJP: { data: new ArrayBuffer(0), fallback: true },
+    LabelSansBold: { data: new ArrayBuffer(0) },
   })),
   fetchLogoDataUri: vi.fn(async () => "data:image/png;base64,AAA"),
 }))

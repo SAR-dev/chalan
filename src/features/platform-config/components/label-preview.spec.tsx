@@ -29,7 +29,8 @@ const { generateLabelPdfMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/label/fonts", () => ({
   loadLabelFont: vi.fn(async () => ({
-    NotoSansJP: { data: new ArrayBuffer(4) },
+    NotoSansJP: { data: new ArrayBuffer(4), fallback: true },
+    LabelSansBold: { data: new ArrayBuffer(4) },
   })),
 }))
 

@@ -21,27 +21,25 @@ import { SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 // only readable through a parser — hence pdf-lib, per the plan's §9.
 // =============================================================================
 
-const FONT_PATH = join(
-  process.cwd(),
-  "public",
-  "fonts",
-  "NotoSansJP-Regular.woff2",
-)
+// Mirrors `loadLabelFont` in src/lib/label/fonts.ts, minus the fetch: pdfme
+// embeds through fontkit, which cannot read WOFF2, so these are the plain static
+// TTFs shipped in public/fonts. Both keys must be registered — the template's
+// bold fields name `LabelSansBold`, and a missing key throws out of generate().
+const FONT_DIR = join(process.cwd(), "public", "fonts")
+
+function readFont(name: string): ArrayBuffer {
+  const buf = readFileSync(join(FONT_DIR, name))
+  return buf.buffer.slice(
+    buf.byteOffset,
+    buf.byteOffset + buf.byteLength,
+  ) as ArrayBuffer
+}
 
 let cachedFont: Font | null = null
 function testFont(): Font {
-  if (!cachedFont) {
-    const buf = readFileSync(FONT_PATH)
-    cachedFont = {
-      NotoSansJP: {
-        data: buf.buffer.slice(
-          buf.byteOffset,
-          buf.byteOffset + buf.byteLength,
-        ) as ArrayBuffer,
-        fallback: true,
-        subset: true,
-      },
-    }
+  cachedFont ??= {
+    NotoSansJP: { data: readFont("LabelSans-Regular.ttf"), fallback: true },
+    LabelSansBold: { data: readFont("LabelSans-Bold.ttf") },
   }
   return cachedFont
 }
