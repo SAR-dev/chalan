@@ -51,7 +51,7 @@ export function VersionBadge({ version }: { version?: AppVersion }) {
             </DialogDescription>
           </DialogHeader>
 
-          <dl className="flex flex-col gap-2 text-sm">
+          <dl className="flex flex-col gap-2 text-sm pt-2">
             <div className="flex items-baseline justify-between gap-4">
               <dt className="text-muted-foreground">Version</dt>
               <dd className="font-mono" data-testid="version-dialog-version">
@@ -68,7 +68,7 @@ export function VersionBadge({ version }: { version?: AppVersion }) {
             ) : null}
           </dl>
 
-          <p className="text-muted-foreground text-sm pb-2">
+          <p className="text-muted-foreground text-sm py-2">
             If the app looks stale or something will not load, update to clear
             the files cached by your last visit.
           </p>

@@ -43,12 +43,15 @@ vi.mock("@pdfme/ui", () => ({ Designer: FakeDesigner }))
 
 vi.mock("@/lib/label/fonts", () => ({
   loadLabelFont: vi.fn(async () => ({
-    NotoSansJP: { data: new ArrayBuffer(0) },
+    NotoSansJP: { data: new ArrayBuffer(0), fallback: true },
+    LabelSansBold: { data: new ArrayBuffer(0) },
   })),
 }))
 
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))
+
 vi.mock("@/lib/notify", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: toastError, success: vi.fn() },
 }))
 
 describe("PdfmeDesigner", () => {
@@ -82,11 +85,18 @@ describe("PdfmeDesigner", () => {
   it("inserts a bound field element from the palette", async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
+    // The shipped default label already binds every field in the palette, so
+    // the palette is exercised against a template that is missing one — which
+    // is the case it exists for (a merchant's own stripped-down label).
+    const withoutSiteName = JSON.parse(
+      JSON.stringify(DEFAULT_LABEL_TEMPLATE_PDFME),
+    ) as Template
+    withoutSiteName.schemas[0] = withoutSiteName.schemas[0].filter(
+      (s) => s.name !== "siteName",
+    )
+
     await mount(
-      <PdfmeDesigner
-        template={DEFAULT_LABEL_TEMPLATE_PDFME}
-        onChange={onChange}
-      />,
+      <PdfmeDesigner template={withoutSiteName} onChange={onChange} />,
     )
 
     await user.click(screen.getByTestId("pdfme-add-field-siteName"))
@@ -100,6 +110,26 @@ describe("PdfmeDesigner", () => {
     expect(added?.fontSize).toBeGreaterThanOrEqual(9)
     // The canvas instance was handed the same template synchronously.
     expect(instances[0].props.template).toEqual(next)
+  })
+
+  it("warns and changes nothing when the field is already bound", async () => {
+    // The default label binds all ten palette fields, so every button on it
+    // hits this guard. Asserted because "the palette silently did nothing" is
+    // indistinguishable from a broken button.
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    await mount(
+      <PdfmeDesigner
+        template={DEFAULT_LABEL_TEMPLATE_PDFME}
+        onChange={onChange}
+      />,
+    )
+
+    await user.click(screen.getByTestId("pdfme-add-field-siteName"))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled())
+    expect(toastError).toHaveBeenCalledWith(expect.stringContaining("already"))
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it("refuses a second element for an already-bound field", async () => {
