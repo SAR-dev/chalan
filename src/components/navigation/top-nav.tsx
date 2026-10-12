@@ -42,8 +42,9 @@ const navLinkIdle =
  *
  * It absorbs the old `mobile-header.tsx`: on small screens it owns the
  * hamburger + brand and the nav drawer, so a shell never stacks two headers;
- * on md+ the sidebar owns the brand and this bar carries the actions —
- * menu search, announcements, theme, avatar — over the content column.
+ * on md+ the sidebar owns the brand and this bar carries the actions — menu
+ * search, announcements, notifications, version, theme, avatar — over the
+ * content column.
  *
  * The sidebar footer and the mobile drawer footer no longer render identity,
  * theme, or sign out: those live in TopNav's avatar → RightNav panel.
@@ -202,11 +203,13 @@ export function TopNav({
 
         <AnnouncementBell />
 
-        <VersionBadge version={version} />
-
         {/* In-app notifications. Renders null for roles that have no inbox
             (see useHasNotifications), so the bar is unchanged for them. */}
         {currentUser?.role === "MERCHANT" ? <NotificationBell /> : null}
+
+        {/* After the bells: version is metadata, not a feed. It sits with the
+            account menu rather than between two things that share a badge. */}
+        <VersionBadge version={version} />
 
         {/* Icon-only on md+; the RightNav panel carries it on mobile so the
             bar stays uncrowded. */}
