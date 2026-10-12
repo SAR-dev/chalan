@@ -126,7 +126,7 @@ describe("emitNotificationEvent", () => {
     })
 
     expect((state.values as Array<{ href: string }>)[0].href).toBe(
-      "/dashboard/orders/ORD-7",
+      "/merchant/orders/ORD-7",
     )
   })
 
@@ -287,6 +287,41 @@ describe("getNotificationsForUser", () => {
     expect(result.newCount).toBe(1)
   })
 
+  it("recomputes href, so rows written before a routing fix repair themselves", async () => {
+    // ROW carries the href the old `notificationHrefForEvent` stored: an
+    // admin-segment path no merchant can open. Reading the column would keep
+    // every already-written notification broken forever; recomputing from the
+    // `event` + `orderId` on the row heals them with no migration.
+    expect(ROW.href).toBe("/dashboard/orders/ORD-1")
+    const { runner } = makeRunner([ROW])
+    dbMock.select.mockReturnValue(runner.select())
+
+    const result = await getNotificationsForUser(undefined as never, {
+      userId: "usr-1",
+      seenAt: null,
+    })
+
+    expect(result.notifications[0].href).toBe("/merchant/orders/ORD-1")
+  })
+
+  it("heals every event, not just order links", async () => {
+    const rows = [
+      { ...ROW, id: "money", event: "payout.approved", orderId: null },
+      { ...ROW, id: "orphan", orderId: null },
+    ]
+    const { runner } = makeRunner(rows)
+    dbMock.select.mockReturnValue(runner.select())
+
+    const result = await getNotificationsForUser(undefined as never, {
+      userId: "usr-1",
+      seenAt: null,
+    })
+
+    for (const n of result.notifications) {
+      expect(n.href).toMatch(/^\/merchant\//)
+    }
+  })
+
   it("counts only rows newer than the watermark", async () => {
     const rows = [
       { ...ROW, id: "new", createdAt: "2026-01-02T00:00:00.000Z" },
@@ -317,7 +352,10 @@ describe("getNotificationsForUser", () => {
     expect(result.newCount).toBe(1)
   })
 
-  it("hands rows back untouched, since createdAt is already a string", async () => {
+  it("hands createdAt back as the string the driver stored", async () => {
+    // Not a row-identity assertion: `href` is deliberately rewritten on the way
+    // out. The concern here is only that `createdAt` needs no reformatting for
+    // the tray's `new Date(...)` and the watermark comparison.
     const { runner } = makeRunner([ROW])
     dbMock.select.mockReturnValue(runner.select())
 
@@ -325,7 +363,13 @@ describe("getNotificationsForUser", () => {
       userId: "usr-1",
       seenAt: null,
     })
-    expect(result.notifications[0]).toEqual(ROW)
+    expect(result.notifications[0].createdAt).toBe(ROW.createdAt)
+    expect(result.notifications[0]).toMatchObject({
+      id: ROW.id,
+      event: ROW.event,
+      orderId: ROW.orderId,
+      title: ROW.title,
+    })
   })
 })
 

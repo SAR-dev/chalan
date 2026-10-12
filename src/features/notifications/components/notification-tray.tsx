@@ -12,6 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { NotificationEventIcon } from "@/features/notifications/components/notification-event-icon"
 import {
   type AppNotification,
   useNotifications,
@@ -147,14 +148,19 @@ function TrayRow({ notification }: { notification: AppNotification }) {
     <li className="border-sidebar-border border-b last:border-b-0">
       <Link
         href={notification.href}
-        className="hover:bg-sidebar-accent/50 block px-4 py-3 transition-colors"
+        className="hover:bg-sidebar-accent/50 flex items-start gap-3 px-4 py-3 transition-colors"
         data-testid="notification-tray-row"
       >
-        <p className="text-sm font-medium">{notification.title}</p>
-        <p className="text-sidebar-foreground/60 mt-0.5 text-xs">
-          {notification.orderId ? `${notification.orderId} · ` : ""}
-          {relativeTime(notification.createdAt, now)}
-        </p>
+        <NotificationEventIcon event={notification.event} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">
+            {notification.title}
+          </span>
+          <span className="text-sidebar-foreground/60 mt-0.5 block text-xs">
+            {notification.orderId ? `${notification.orderId} · ` : ""}
+            {relativeTime(notification.createdAt, now)}
+          </span>
+        </span>
       </Link>
     </li>
   )

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { NotificationEventIcon } from "@/features/notifications/components/notification-event-icon"
 import { useNotificationFeed } from "@/features/notifications/hooks/use-notifications"
 import { formatDateTime } from "@/lib/format"
 
@@ -62,6 +63,7 @@ export function NotificationInbox({ title, description }: Props) {
                 className="bg-card hover:bg-muted/50 group block w-full rounded-lg border text-left transition-colors"
               >
                 <div className="flex items-start gap-4 px-5 py-4">
+                  <NotificationEventIcon event={n.event} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-4">
                       <p

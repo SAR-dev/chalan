@@ -90,6 +90,37 @@ test.describe("4001. In-app notifications", () => {
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 
+  test("a notification opens the merchant's order, not the admin's", async ({
+    page,
+  }) => {
+    // The bug this pins: `notificationHrefForEvent` built `/dashboard/orders/…`
+    // while notifications are delivered only to MERCHANT profiles. Every
+    // notification link therefore pointed at a route the only possible reader
+    // cannot open, so the role guard bounced them to `/merchant` — which looks
+    // exactly like a notification that goes nowhere.
+    //
+    // Nothing else here could catch it: the tests above assert a row is
+    // *visible* and never follow it.
+    await login(page, CREDS.merchant)
+    await page.goto("/merchant/notifications")
+    await waitForAppReady(page)
+
+    const rows = page.locator(notifications.inboxRowAny)
+    await expect(rows.first()).toBeVisible({ timeout: 15_000 })
+
+    // Prefer an order event: money events legitimately land on /merchant/payouts,
+    // so following one would not prove anything about the branch that was wrong.
+    const orderRow = rows.filter({ hasText: "Order" }).first()
+    const target = (await orderRow.count()) > 0 ? orderRow : rows.first()
+    await target.click()
+
+    // Landing anywhere under /merchant/orders means the link resolved to a real
+    // order page. The failure mode was a bounce to bare /merchant.
+    await page.waitForURL(/\/merchant\/orders\/.+/, { timeout: 15_000 })
+    await waitForAppReady(page)
+    await expect(page).not.toHaveURL(/\/merchant$/)
+  })
+
   test("a role with no inbox is not offered a bell that can never light up", async ({
     page,
   }) => {
