@@ -177,7 +177,7 @@ Files sort in run order, so the log now reads in id order too.
 The summary below is asserted by `src/app/__tests__/docs-drift.spec.ts`, which
 fails on a duplicate id, a prefix that does not match the filename, an
 out-of-sequence index, or stale counts: **currently 83 scenarios across 42 files
-/ 164 tests**.
+/ 165 tests**.
 
 ## Coding Patterns
 

@@ -1,11 +1,15 @@
 import { and, desc, eq, gt, sql } from "drizzle-orm"
 import { db, dbRead } from "@/lib/db"
 import { notification, profile } from "@/lib/db/schema"
+// From the leaf vocabulary module, not `order-events` — that module imports this
+// one, and routing the pure helpers through the cycle loses `isOrderEvent`'s
+// type predicate.
 import {
+  isOrderEvent,
   notificationHrefForEvent,
   notificationTitleForEvent,
   type OrderEvent,
-} from "@/lib/order-events"
+} from "@/lib/order-event"
 import type { WebhookTx } from "@/lib/webhooks"
 
 // =============================================================================
@@ -145,6 +149,12 @@ export interface NotificationFeedResult {
  * `newCount` is computed in the same query as the rows so the badge and the tray
  * can never disagree — a separate count query would race a new insert between
  * the two and briefly show "3 new" above a list of 2.
+ *
+ * `href` is recomputed from `event` + `orderId` on the way out rather than read
+ * from the stored column. Both inputs are on the row, so this is exact — and it
+ * means every notification written before a routing fix repairs itself instead
+ * of staying broken forever. The column keeps being written for anything that
+ * queries the table directly, but the tray never trusts it.
  */
 export async function getNotificationsForUser(
   reader: Reader = dbRead,
@@ -154,16 +164,26 @@ export async function getNotificationsForUser(
     limit = 50,
   }: { userId: string; seenAt: string | null; limit?: number },
 ): Promise<NotificationFeedResult> {
-  const notifications = await reader
+  const rows = await reader
     .select()
     .from(notification)
     .where(eq(notification.userId, userId))
     .orderBy(desc(notification.createdAt))
     .limit(limit)
 
+  const notifications = rows.map((n) => ({
+    ...n,
+    // The column is plain text, so an event written by a newer deploy than this
+    // one is not in the union. Falling back to the stored href beats throwing
+    // away a notification the reader could otherwise still open.
+    href: isOrderEvent(n.event)
+      ? notificationHrefForEvent(n.event, n.orderId)
+      : n.href,
+  }))
+
   const newCount = seenAt
-    ? notifications.filter((n) => n.createdAt > seenAt).length
-    : notifications.length
+    ? rows.filter((n) => n.createdAt > seenAt).length
+    : rows.length
 
   return {
     notifications,

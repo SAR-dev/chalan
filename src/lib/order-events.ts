@@ -2,8 +2,20 @@ import {
   createRecipientResolver,
   emitNotificationEvent,
 } from "@/lib/notifications"
+import { type OrderEvent } from "@/lib/order-event"
 import type { WebhookTx } from "@/lib/webhooks"
 import { emitWebhookEvent } from "@/lib/webhooks"
+
+// The vocabulary itself lives in `order-event.ts` because client components need
+// it and this module cannot be imported from the browser — see the docblock
+// there. Re-exported so the server-side call sites keep importing it from here.
+export {
+  isOrderEvent,
+  notificationHrefForEvent,
+  notificationTitleForEvent,
+  ORDER_EVENTS,
+  type OrderEvent,
+} from "@/lib/order-event"
 
 // =============================================================================
 // The order domain event - one emit, two sinks (webhooks + in-app notifications).
@@ -19,27 +31,6 @@ import { emitWebhookEvent } from "@/lib/webhooks"
 // their own try/catch, so a failing sink cannot fail the transition; see
 // `emitWebhookEvent` for why that trade is deliberate.
 
-// The webhook vocabulary is the canonical list of order facts: a merchant
-// integrating against /api/v1/orders can only ever observe these. Two further
-// facts (cash submitted, payout approved) are platform-side money events with
-// no public counterpart, so they are named separately rather than widening the
-// public contract.
-export const ORDER_EVENTS = [
-  "order.created",
-  "order.approved",
-  "order.dispatched",
-  "order.picked-up",
-  "order.out-for-delivery",
-  "order.delivered",
-  "order.failed",
-  "order.returned",
-  "order.cancelled",
-  "cash.submitted",
-  "payout.approved",
-] as const
-
-export type OrderEvent = (typeof ORDER_EVENTS)[number]
-
 /** The subset that is also a merchant-visible webhook event. */
 const WEBHOOK_EVENTS = new Set<string>([
   "order.created",
@@ -52,28 +43,6 @@ const WEBHOOK_EVENTS = new Set<string>([
   "order.returned",
   "order.cancelled",
 ])
-
-export function isOrderEvent(value: unknown): value is OrderEvent {
-  return (
-    typeof value === "string" &&
-    (ORDER_EVENTS as readonly string[]).includes(value)
-  )
-}
-
-/** Where an in-app notification should land when it is opened. */
-export function notificationHrefForEvent(
-  event: OrderEvent,
-  orderId: string | null,
-): string {
-  // Money events have no order to show, and they belong to the merchant's own
-  // screens rather than a customer tracking page.
-  if (event === "cash.submitted") return "/merchant/payouts"
-  if (event === "payout.approved") return "/merchant/payouts"
-  // Defensive: an order event with no order behind it still has to link
-  // somewhere real, never to a dangling `/dashboard/orders/`.
-  if (!orderId) return "/merchant/orders"
-  return `/dashboard/orders/${orderId}`
-}
 
 export interface OrderEventInput {
   tx: WebhookTx
@@ -138,37 +107,4 @@ export async function emitOrderEvent(input: OrderEventInput): Promise<void> {
     now: timestamp,
     ...(sharedResolver ? { recipients: await sharedResolver(merchantId) } : {}),
   })
-}
-
-/**
- * The one-line summary an inbox row shows.
- *
- * Built here rather than stored per-row so the copy is a pure function of the
- * event and cannot rot against the template that produced it.
- */
-export function notificationTitleForEvent(event: OrderEvent): string {
-  switch (event) {
-    case "order.created":
-      return "New order received"
-    case "order.approved":
-      return "Order approved"
-    case "order.dispatched":
-      return "Order dispatched"
-    case "order.picked-up":
-      return "Rider picked up the parcel"
-    case "order.out-for-delivery":
-      return "Out for delivery"
-    case "order.delivered":
-      return "Order delivered"
-    case "order.failed":
-      return "Delivery attempt failed"
-    case "order.returned":
-      return "Order returned"
-    case "order.cancelled":
-      return "Order cancelled"
-    case "cash.submitted":
-      return "Cash submitted"
-    case "payout.approved":
-      return "Payout approved"
-  }
 }

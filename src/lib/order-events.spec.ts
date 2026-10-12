@@ -96,9 +96,9 @@ describe("order events", () => {
 })
 
 describe("notificationHrefForEvent", () => {
-  it("deep-links an order event to the order", () => {
+  it("deep-links an order event to the merchant's order page", () => {
     expect(notificationHrefForEvent("order.delivered", "ORD-9")).toBe(
-      "/dashboard/orders/ORD-9",
+      "/merchant/orders/ORD-9",
     )
   })
 
@@ -117,6 +117,19 @@ describe("notificationHrefForEvent", () => {
       const href = notificationHrefForEvent(e, null)
       expect(href).not.toMatch(/\/$/)
       expect(href).not.toContain("undefined")
+    }
+  })
+
+  it("stays inside the merchant segment for every event", () => {
+    // Notifications are delivered only to MERCHANT profiles, so a `/dashboard/`
+    // href is a link the only possible reader cannot open — it bounces off the
+    // role guard and drops them on `/merchant`, which is indistinguishable from
+    // the notification being broken. Every branch has to be merchant-scoped,
+    // not just the ones that happen to be today.
+    for (const e of ORDER_EVENTS) {
+      for (const orderId of [null, "ORD-9"]) {
+        expect(notificationHrefForEvent(e, orderId)).toMatch(/^\/merchant\//)
+      }
     }
   })
 })
