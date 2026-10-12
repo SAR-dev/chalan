@@ -193,6 +193,17 @@ export const notification = pgTable(
     index("notification_user_created_idx").on(t.userId, t.createdAt),
     // Backs the retention sweep — the only other query that scans by age.
     index("notification_created_at_idx").on(t.createdAt),
+    // One row per fact per recipient.
+    //
+    // `orderId is not null` is load-bearing, not a micro-optimisation: Postgres
+    // treats NULLs as distinct in a unique index, so an unconditional index would
+    // stop deduplicating exactly the rows that carry no order — the cash and
+    // payout events — while still guarding the order ones. Excluding them is both
+    // correct (two `cash.submitted` rows are genuinely two different facts) and
+    // the only way to get partial-index inference on the conflict target.
+    uniqueIndex("notification_user_event_order_uniq")
+      .on(t.userId, t.event, t.orderId)
+      .where(sql`${t.orderId} is not null`),
   ],
 )
 

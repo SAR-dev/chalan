@@ -14,6 +14,7 @@ function makeRunner<T>(rows: T[]) {
     where?: unknown
     values?: unknown
     updated?: Record<string, unknown>
+    onConflictDoNothing?: boolean
     selects: number
   } = { selects: 0 }
 
@@ -45,7 +46,12 @@ function makeRunner<T>(rows: T[]) {
     insert: () => ({
       values: (v: unknown) => {
         state.values = v
-        return Promise.resolve()
+        return {
+          onConflictDoNothing: () => {
+            state.onConflictDoNothing = true
+            return Promise.resolve()
+          },
+        }
       },
     }),
     update: () => {
@@ -130,6 +136,26 @@ describe("emitNotificationEvent", () => {
     )
   })
 
+  it("tolerates a duplicate rather than aborting the whole batch", async () => {
+    // `notification_user_event_order_uniq` makes a repeated fact an error at the
+    // database. Left unhandled, one recipient who had already seen the event
+    // would abort the entire multi-recipient insert — costing every *other*
+    // recipient their notification — and the throw would be swallowed below, so
+    // the caller would believe it had succeeded.
+    const { tx, state } = seedRecipients()
+
+    await emitNotificationEvent({
+      tx: tx as never,
+      event: "order.created",
+      orderId: "ORD-1",
+      merchantId: "MER-1",
+      actorName: null,
+      now: NOW,
+    })
+
+    expect(state.onConflictDoNothing).toBe(true)
+  })
+
   it("links a money event with no order to payouts, not a broken path", async () => {
     const { tx, state } = seedRecipients()
 
@@ -186,15 +212,20 @@ describe("emitNotificationEvent", () => {
   })
 
   it("swallows an insert failure too", async () => {
+    // The builder call itself rejecting is still swallowed: the transition that
+    // raised the event must not fail because a notification could not be written.
+    const failing = {
+      values: () => ({
+        onConflictDoNothing: () => Promise.reject(new Error("write conflict")),
+      }),
+    }
     const { runner } = makeRunner(RECIPIENTS)
     dbMock.select.mockReturnValue(runner.select())
     const tx = {
       select: () => ({
         from: () => ({ where: () => Promise.resolve(RECIPIENTS) }),
       }),
-      insert: () => ({
-        values: () => Promise.reject(new Error("write conflict")),
-      }),
+      insert: () => failing,
     }
 
     await expect(

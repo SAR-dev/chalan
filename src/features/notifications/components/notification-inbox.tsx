@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function NotificationInbox({ title, description }: Props) {
-  const { notifications, isNew, isLoading } = useNotificationFeed()
+  const { groups, isLoading } = useNotificationFeed()
 
   return (
     <>
@@ -36,7 +36,7 @@ export function NotificationInbox({ title, description }: Props) {
             <Skeleton key={i} />
           ))}
         </div>
-      ) : notifications.length === 0 ? (
+      ) : groups.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <div className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full">
@@ -53,54 +53,64 @@ export function NotificationInbox({ title, description }: Props) {
         </Card>
       ) : (
         <div className="space-y-2">
-          {notifications.map((n) => {
-            const fresh = isNew(n.id)
-            return (
-              <Link
-                key={n.id}
-                href={n.href}
-                data-testid={`notification-row-${n.id}`}
-                className="bg-card hover:bg-muted/50 group block w-full rounded-lg border text-left transition-colors"
-              >
-                <div className="flex items-start gap-4 px-5 py-4">
-                  <NotificationEventIcon event={n.event} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-4">
-                      <p
-                        className={`truncate text-sm ${
-                          fresh
-                            ? "text-foreground font-semibold"
-                            : "text-muted-foreground font-normal"
-                        }`}
-                      >
-                        {n.title}
-                      </p>
-                      <time className="text-muted-foreground shrink-0 text-xs">
-                        {formatDateTime(n.createdAt, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </time>
-                    </div>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {n.orderId ?? "Payout"}
-                      {n.actorName ? ` · by ${n.actorName}` : ""}
-                    </p>
-                  </div>
-
-                  {fresh && (
-                    <Badge
-                      data-testid={`notification-new-${n.id}`}
-                      className="mt-0.5 shrink-0"
+          {groups.map((g) => (
+            <Link
+              key={g.key}
+              href={g.href}
+              data-testid={`notification-row-${g.key}`}
+              className="bg-card hover:bg-muted/50 group block w-full rounded-lg border text-left transition-colors"
+            >
+              <div className="flex items-start gap-4 px-5 py-4">
+                <NotificationEventIcon event={g.event} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p
+                      className={`truncate text-sm ${
+                        g.isNew
+                          ? "text-foreground font-semibold"
+                          : "text-muted-foreground font-normal"
+                      }`}
                     >
-                      NEW
-                    </Badge>
-                  )}
+                      {g.title}
+                    </p>
+                    <time className="text-muted-foreground shrink-0 text-xs">
+                      {formatDateTime(g.createdAt, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </time>
+                  </div>
+                  <p className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                    <span className="truncate">
+                      {g.orderId ?? "Payout"}
+                      {g.actorName ? ` · by ${g.actorName}` : ""}
+                    </span>
+                    {/* How much happened under this row. Hidden at 1, since "1
+                        update" is noise and the title already says one thing
+                        happened. */}
+                    {g.count > 1 && (
+                      <span
+                        data-testid={`notification-count-${g.key}`}
+                        className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
+                      >
+                        {g.count} updates
+                      </span>
+                    )}
+                  </p>
                 </div>
-              </Link>
-            )
-          })}
+
+                {g.isNew && (
+                  <Badge
+                    data-testid={`notification-new-${g.key}`}
+                    className="mt-0.5 shrink-0"
+                  >
+                    NEW
+                  </Badge>
+                )}
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </>

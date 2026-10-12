@@ -20,6 +20,10 @@ vi.mock("@/lib/maintenance", () => ({
   runCleanupSessions: vi.fn(async () => ({ deletedSessions: 3 })),
   runCleanupAuditLogs: vi.fn(async () => ({ deletedAuditLogs: 4 })),
   runCleanupEmailLogs: vi.fn(async () => ({ deletedEmailLogs: 5 })),
+  runCleanupNotifications: vi.fn(async () => ({
+    deletedOrderEvents: 6,
+    deletedMoneyEvents: 1,
+  })),
   runCleanupUploads: vi.fn(async () => ({ deleted: 6 })),
 }))
 
@@ -42,6 +46,7 @@ const JOBS = [
   "cleanup-sessions",
   "cleanup-audit-logs",
   "cleanup-email-logs",
+  "cleanup-notifications",
   "cleanup-uploads",
 ]
 

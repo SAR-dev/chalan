@@ -13,11 +13,9 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { NotificationEventIcon } from "@/features/notifications/components/notification-event-icon"
-import {
-  type AppNotification,
-  useNotifications,
-} from "@/features/notifications/hooks/use-notifications"
+import { useNotifications } from "@/features/notifications/hooks/use-notifications"
 import { formatDateTime } from "@/lib/format"
+import type { NotificationGroup } from "@/lib/notification-group"
 
 // =============================================================================
 // The notification tray — what the TopNav bell opens.
@@ -73,7 +71,7 @@ export function NotificationTray({
   // would pull 50 rows on every merchant page load for a panel most visits never
   // look at; the badge already carries the number on its own endpoint.
   const [hasOpened, setHasOpened] = useState(false)
-  const { notifications, markSeen, isLoading } = useNotifications({
+  const { notifications, groups, markSeen, isLoading } = useNotifications({
     enabled: hasOpened,
   })
 
@@ -128,8 +126,8 @@ export function NotificationTray({
             </div>
           ) : (
             <ul className="flex flex-col">
-              {notifications.map((n) => (
-                <TrayRow key={n.id} notification={n} onNavigate={closeTray} />
+              {groups.map((g) => (
+                <TrayRow key={g.key} group={g} onNavigate={closeTray} />
               ))}
             </ul>
           )}
@@ -155,31 +153,41 @@ export function NotificationTray({
 }
 
 function TrayRow({
-  notification,
+  group,
   onNavigate,
 }: {
-  notification: AppNotification
+  group: NotificationGroup & { isNew?: boolean }
   onNavigate: () => void
 }) {
   const now = Date.now()
   return (
     <li className="border-sidebar-border border-b last:border-b-0">
       <Link
-        href={notification.href}
+        href={group.href}
         className="hover:bg-sidebar-accent/50 flex items-start gap-3 px-4 py-3 transition-colors"
         // Client-side navigation never touches the Sheet's own open state, so
         // without this the panel stays open over the page it just opened.
         onClick={onNavigate}
         data-testid="notification-tray-row"
       >
-        <NotificationEventIcon event={notification.event} />
+        <NotificationEventIcon event={group.event} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">
-            {notification.title}
+            {group.title}
           </span>
-          <span className="text-sidebar-foreground/60 mt-0.5 block text-xs">
-            {notification.orderId ? `${notification.orderId} · ` : ""}
-            {relativeTime(notification.createdAt, now)}
+          <span className="text-sidebar-foreground/60 mt-0.5 flex items-center gap-2 text-xs">
+            <span className="truncate">
+              {group.orderId ? `${group.orderId} · ` : ""}
+              {relativeTime(group.createdAt, now)}
+            </span>
+            {group.count > 1 && (
+              <span
+                data-testid="notification-tray-count"
+                className="bg-sidebar-accent text-sidebar-accent-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
+              >
+                {group.count}
+              </span>
+            )}
           </span>
         </span>
       </Link>

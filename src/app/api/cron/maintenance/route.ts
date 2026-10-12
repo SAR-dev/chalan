@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger"
 import {
   runCleanupAuditLogs,
   runCleanupEmailLogs,
+  runCleanupNotifications,
   runCleanupSessions,
   runCleanupUploads,
   runDrainEmailOutbox,
@@ -59,6 +60,7 @@ const JOBS: Array<{
   { name: "cleanup-sessions", run: runCleanupSessions },
   { name: "cleanup-audit-logs", run: runCleanupAuditLogs },
   { name: "cleanup-email-logs", run: runCleanupEmailLogs },
+  { name: "cleanup-notifications", run: runCleanupNotifications },
   {
     name: "cleanup-uploads",
     run: () => runCleanupUploads({ dryRun: false }),
