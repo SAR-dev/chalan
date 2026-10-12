@@ -90,22 +90,30 @@ test.describe("4001. In-app notifications", () => {
     await expect(page.getByRole("heading").first()).toBeVisible()
   })
 
-  test("a notification opens the merchant's order, not the admin's", async ({
+  test("a notification opens the merchant's order and closes the tray", async ({
     page,
   }) => {
-    // The bug this pins: `notificationHrefForEvent` built `/dashboard/orders/…`
-    // while notifications are delivered only to MERCHANT profiles. Every
-    // notification link therefore pointed at a route the only possible reader
-    // cannot open, so the role guard bounced them to `/merchant` — which looks
-    // exactly like a notification that goes nowhere.
+    // Two bugs in one gesture, which is why they are tested together — this is
+    // exactly what a merchant does: open the tray, click a row.
     //
-    // Nothing else here could catch it: the tests above assert a row is
+    // 1. The link pointed at `/dashboard/orders/…` while notifications are
+    //    delivered only to MERCHANT profiles, so the role guard bounced it to
+    //    `/merchant` — indistinguishable from a notification that goes nowhere.
+    // 2. `next/link` is client-side, so the page never reloads and the Sheet's
+    //    own `open` state is never told to change: the tray stayed open on top
+    //    of the page it had just opened.
+    //
+    // Nothing else here could catch either: the tests above assert a row is
     // *visible* and never follow it.
     await login(page, CREDS.merchant)
-    await page.goto("/merchant/notifications")
+    await page.goto("/merchant/orders")
     await waitForAppReady(page)
 
-    const rows = page.locator(notifications.inboxRowAny)
+    await page.locator(notifications.bell).click()
+    const tray = page.locator(notifications.tray)
+    await expect(tray).toBeVisible()
+
+    const rows = page.locator(notifications.trayRow)
     await expect(rows.first()).toBeVisible({ timeout: 15_000 })
 
     // Prefer an order event: money events legitimately land on /merchant/payouts,
@@ -119,6 +127,10 @@ test.describe("4001. In-app notifications", () => {
     await page.waitForURL(/\/merchant\/orders\/.+/, { timeout: 15_000 })
     await waitForAppReady(page)
     await expect(page).not.toHaveURL(/\/merchant$/)
+
+    // And the panel has to leave with it. Asserted against the real browser
+    // because a portal's unmount timing can differ from jsdom's.
+    await expect(tray).toBeHidden({ timeout: 15_000 })
   })
 
   test("a role with no inbox is not offered a bell that can never light up", async ({
