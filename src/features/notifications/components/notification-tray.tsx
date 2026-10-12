@@ -185,7 +185,10 @@ function TrayRow({
                 data-testid="notification-tray-count"
                 className="bg-sidebar-accent text-sidebar-accent-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
               >
-                {group.count}
+                {/* "2" alone, sitting next to "· 1h ago", reads as a stray
+                    superscript rather than a count. The inbox already spells this
+                    out; two surfaces must not word the same thing differently. */}
+                {group.count} updates
               </span>
             )}
           </span>

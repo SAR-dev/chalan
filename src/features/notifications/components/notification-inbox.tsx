@@ -23,6 +23,27 @@ interface Props {
   description: string
 }
 
+/**
+ * "2:59 AM · Oct 13" inside a week, "Oct 13, 2026" beyond it.
+ *
+ * Notifications cluster: an order placed, approved, dispatched and delivered all
+ * land within minutes of each other. Rendering only the date made an entire busy
+ * day read identically, so the list gave the eye nothing to sort by. The week cut
+ * keeps the column from turning into a wall of timestamps.
+ */
+function formatNotificationTime(iso: string): string {
+  const ageMs = Date.now() - new Date(iso).getTime()
+  const recent = Number.isFinite(ageMs) && ageMs < 7 * 24 * 60 * 60 * 1000
+  if (!recent) {
+    return formatDateTime(iso, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+  return `${formatDateTime(iso, { hour: "numeric", minute: "2-digit" })} · ${formatDateTime(iso, { month: "short", day: "numeric" })}`
+}
+
 export function NotificationInbox({ title, description }: Props) {
   const { groups, isLoading } = useNotificationFeed()
 
@@ -74,11 +95,12 @@ export function NotificationInbox({ title, description }: Props) {
                       {g.title}
                     </p>
                     <time className="text-muted-foreground shrink-0 text-xs">
-                      {formatDateTime(g.createdAt, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                      {/* Date alone left every row reading "Oct 13, 2026" —
+                          which is most of them, because a busy day produces most
+                          of a merchant's notifications. Showing the clock time
+                          below a week out is what makes the list order legible;
+                          older rows keep the date so the column stays narrow. */}
+                      {formatNotificationTime(g.createdAt)}
                     </time>
                   </div>
                   <p className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">

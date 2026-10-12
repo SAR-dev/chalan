@@ -14,7 +14,7 @@ import {
   Weight,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { createContext, useContext, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/features/account/hooks/use-auth"
@@ -41,37 +41,25 @@ import type { Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 /**
- * Icon-chip tints, keyed by field role.
+ * The hue of the section a field sits in, so chips can inherit it.
  *
- * Drawn from `BADGE_TONES` so a field chip agrees with the status badge and the
- * notification icons beside it — one palette, not three. The chip is a filled
- * circle with no border, so the border half of each tone is dropped; the `dark:`
- * overrides are kept, since dropping those would leave, say, green-600 text on
- * a dark background.
+ * Chips were first tinted per icon — User blue, Bike orange, Package blue — which
+ * put five unrelated hues on one page. That is the mistake worth naming: this app
+ * already spends colour on *severity* (green delivered, amber pending, red
+ * failed), so a saturated orange chip beside an amber "Pending" badge reads as
+ * "something is wrong" when nothing is. A rider merely being unassigned is not an
+ * alert, yet its chip was the loudest thing on the page.
+ *
+ * Colour now carries exactly one level of meaning — which group a row is in — and
+ * the section's accent bar and every chip inside it agree. Three hues instead of
+ * five, none competing with the status badge.
  */
+const SectionToneContext = createContext<BadgeTone>("neutral")
+
 type IconComponent = React.ComponentType<{ className?: string }>
 
-// A Map rather than a record literal: `Field` receives either a function or a
-// class component depending on the icon, and TypeScript will not index a record
-// with that union. Component identity is the key either way — never the display
-// name, which is a debugging aid and can be minified away.
-const FIELD_CHIP_TONES = new Map<IconComponent, BadgeTone>([
-  [User, "info"],
-  [Phone, "info"],
-  [Mail, "neutral"],
-  [MapPin, "brand"],
-  [Store, "pending"],
-  [ExternalLink, "violet"],
-  [Weight, "violet"],
-  [Package, "brand"],
-  [Bike, "transit"],
-  [WarehouseIcon, "warehouse"],
-  [CalendarDays, "neutral"],
-])
-
 function chipTint(tone: BadgeTone | undefined): string {
-  const key = tone ?? "neutral"
-  return BADGE_TONES[key]
+  return BADGE_TONES[tone ?? "neutral"]
     .split(" ")
     .filter((c) => !c.includes("border"))
     .join(" ")
@@ -95,9 +83,10 @@ function Field({
    * Same reasoning as `DetailRow` on the public tracking page.
    */
   testId?: string
-  /** Chip tint. Falls back to the icon's own entry, then to neutral. */
+  /** Overrides the surrounding section's hue, for a genuinely distinct row. */
   tone?: BadgeTone
 }) {
+  const sectionTone = useContext(SectionToneContext)
   return (
     <div
       className={cn("flex items-start gap-3", className)}
@@ -106,13 +95,16 @@ function Field({
       <span
         className={cn(
           "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
-          chipTint(tone ?? FIELD_CHIP_TONES.get(Icon)),
+          chipTint(tone ?? sectionTone),
         )}
       >
         <Icon className="size-3.5" />
       </span>
       <div className="min-w-0">
-        <p className="text-muted-foreground mb-0.5 text-[11px] font-medium tracking-wide uppercase">
+        {/* 12px sentence case, not 11px all-caps with wide tracking. At that
+            size and spacing "NOTE FROM MERCHANT" renders as "NO TE FROM
+            MERCHANT" — legible in a mockup, not in a browser. */}
+        <p className="text-muted-foreground mb-1 text-xs font-medium">
           {label}
         </p>
         <p className="text-sm font-medium break-words">{value}</p>
@@ -137,6 +129,19 @@ const SECTION_TONES: Record<string, BadgeTone> = {
   Payment: "brand",
 }
 
+/**
+ * Full-strength colours for the section rule, since a 4px bar carries no
+ * background tint to read against — it needs the solid hue, and it needs one that
+ * exists in both modes.
+ */
+const SOLID_TONES: Partial<Record<BadgeTone, string>> = {
+  info: "bg-chart-1",
+  pending: "bg-chart-3",
+  violet: "bg-violet-500",
+  brand: "bg-primary",
+  neutral: "bg-muted-foreground/40",
+}
+
 function Section({
   title,
   children,
@@ -149,19 +154,24 @@ function Section({
   const tone = SECTION_TONES[title] ?? "neutral"
   return (
     <div className={cn("", className)}>
-      <p className="mb-4 flex items-center gap-2 text-[11px] font-semibold tracking-widest uppercase">
+      {/* The rule is a solid palette colour, not the 15%-alpha badge background.
+          At 3.5px tall and that alpha it was effectively invisible in dark mode —
+          a divider that never renders is worse than none, because it still costs
+          the vertical rhythm it was meant to create. */}
+      <p className="mb-4 flex items-center gap-2 text-xs font-semibold">
         <span
           aria-hidden
           className={cn(
-            "h-3.5 w-1 shrink-0 rounded-full",
-            chipTint(tone)
-              .split(" ")
-              .find((c) => c.startsWith("bg-")),
+            "h-4 w-1 shrink-0 rounded-full",
+            SOLID_TONES[tone] ?? "bg-muted-foreground/40",
           )}
         />
-        <span className="text-muted-foreground">{title}</span>
+        <span className="text-muted-foreground tracking-wide">{title}</span>
       </p>
-      {children}
+      {/* Chips inside inherit this hue, so a section reads as one colour group. */}
+      <SectionToneContext.Provider value={tone}>
+        {children}
+      </SectionToneContext.Provider>
     </div>
   )
 }
@@ -489,7 +499,11 @@ export function OrderDetailsContent({ order }: { order: Order }) {
           <Section title="Notes">
             <div className="space-y-4">
               <div>
-                <p className="text-muted-foreground mb-1 text-[11px] font-medium tracking-wide uppercase">
+                {/* Sentence case at 12px, matching `Field`. The all-caps
+                    11px variant rendered "NOTE FROM MERCHANT" as
+                    "NO TE FROM MERCHANT" — these bypass `Field`, so the earlier
+                    fix did not reach them. */}
+                <p className="text-muted-foreground mb-1 text-xs font-medium">
                   Note from merchant
                 </p>
                 <p className="text-sm leading-relaxed">
@@ -497,7 +511,7 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground mb-1 text-[11px] font-medium tracking-wide uppercase">
+                <p className="text-muted-foreground mb-1 text-xs font-medium">
                   Note from recipient
                 </p>
                 <p className="text-sm leading-relaxed">
