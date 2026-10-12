@@ -1,6 +1,12 @@
 import { and, desc, eq, gt, sql } from "drizzle-orm"
 import { db, dbRead } from "@/lib/db"
 import { notification, profile } from "@/lib/db/schema"
+// Pure, and client-safe — `useNotificationFeed` renders the grouped list, and
+// importing it from here would drag `@/lib/db` into the browser bundle.
+import {
+  groupNotifications,
+  type NotificationGroup,
+} from "@/lib/notification-group"
 // From the leaf vocabulary module, not `order-events` — that module imports this
 // one, and routing the pure helpers through the cycle loses `isOrderEvent`'s
 // type predicate.
@@ -11,6 +17,8 @@ import {
   type OrderEvent,
 } from "@/lib/order-event"
 import type { WebhookTx } from "@/lib/webhooks"
+
+export { groupNotifications, type NotificationGroup }
 
 // =============================================================================
 // In-app notifications — the write sink and the read predicates.
@@ -69,18 +77,26 @@ export async function emitNotificationEvent({
     const title = notificationTitleForEvent(event)
     const href = notificationHrefForEvent(event, orderId)
 
-    await tx.insert(notification).values(
-      recipients.map((userId) => ({
-        userId,
-        event,
-        orderId,
-        merchantId,
-        actorName,
-        title,
-        href,
-        createdAt: now,
-      })),
-    )
+    await tx
+      .insert(notification)
+      .values(
+        recipients.map((userId) => ({
+          userId,
+          event,
+          orderId,
+          merchantId,
+          actorName,
+          title,
+          href,
+          createdAt: now,
+        })),
+      )
+      // `notification_user_event_order_uniq` makes a repeated fact a no-op
+      // rather than an error. Without this a duplicate would abort the whole
+      // multi-recipient insert — one recipient who had already seen it would
+      // cost every other recipient their notification too — and the throw would
+      // be swallowed by the catch below, so it would look like success.
+      .onConflictDoNothing()
   } catch {
     // See the docblock: an in-app row is best-effort by design.
   }

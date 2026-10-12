@@ -23,6 +23,13 @@ import { parseAllowlist } from "@/lib/ip-allowlist"
  */
 export const DEFAULT_AUDIT_LOG_RETENTION_DAYS = 30
 export const DEFAULT_EMAIL_LOG_RETENTION_DAYS = 10
+/**
+ * Notifications are the working set — "what happened in the last few hours",
+ * which is the window the tray and inbox are both built around — so they are
+ * swept sooner than audit logs. Not zero: a merchant scrolling back through a
+ * busy week should still find their deliveries.
+ */
+export const DEFAULT_NOTIFICATION_RETENTION_DAYS = 14
 
 type EnvError = { key: string; message: string }
 
@@ -148,6 +155,22 @@ export function validateEnv(): void {
       if (isNaN(days) || days < 1) {
         e.push({
           key: "EMAIL_LOG_RETENTION_DAYS",
+          message: "Must be a positive integer (days).",
+        })
+      }
+    }
+
+    // Optional — retention period in days for in-app notifications. The default
+    // is DEFAULT_NOTIFICATION_RETENTION_DAYS above (the value actually applied by
+    // /api/cron/cleanup-notifications). A notification is kept whole: an order is
+    // swept only once none of its notifications fall inside the window, so a
+    // long-running order never reverts to an older status in the grouped inbox.
+    // Set in environment to override; validated only when present.
+    if (process.env.NOTIFICATION_RETENTION_DAYS) {
+      const days = parseInt(process.env.NOTIFICATION_RETENTION_DAYS, 10)
+      if (isNaN(days) || days < 1) {
+        e.push({
+          key: "NOTIFICATION_RETENTION_DAYS",
           message: "Must be a positive integer (days).",
         })
       }

@@ -486,6 +486,85 @@ suite("notification", () => {
     ).resolves.toBeDefined()
     track("notification", "id", id)
   })
+
+  it("rejects a second row for the same fact about the same order", async () => {
+    // `notification_user_event_order_uniq` is what stops one order from producing
+    // the same event twice. The dedupe rules in the application — a status guard
+    // per transition — make it unreachable in practice, but the index is the
+    // guarantee rather than the convention.
+    const userId = `itest-ntf3-${RUN}`
+    await client.query(
+      `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
+      [userId, `itest notify3 ${RUN}`, `itest.ntf3.${RUN}@example.com`],
+    )
+    track("user", "id", userId)
+
+    const insert = (id: string) =>
+      client.query(
+        `INSERT INTO notification (id, "userId", event, "orderId", title, href)
+         VALUES ($1, $2, 'order.delivered', $3, 'Order delivered', $4)`,
+        [id, userId, `ORD-${RUN}`, `/merchant/orders/ORD-${RUN}`],
+      )
+
+    await insert(`itest-ntf3-a-${RUN}`)
+    track("notification", "id", `itest-ntf3-a-${RUN}`)
+
+    await expect(insert(`itest-ntf3-b-${RUN}`)).rejects.toThrow(
+      /duplicate key/i,
+    )
+  })
+
+  it("still allows a different event for that same order", async () => {
+    // The unique key is (recipient, event, order) — not (recipient, order). An
+    // order goes through many events, and collapsing them into one row would
+    // throw away the history the grouped inbox counts.
+    const userId = `itest-ntf4-${RUN}`
+    await client.query(
+      `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
+      [userId, `itest notify4 ${RUN}`, `itest.ntf4.${RUN}@example.com`],
+    )
+    track("user", "id", userId)
+
+    for (const event of [
+      "order.created",
+      "order.dispatched",
+      "order.delivered",
+    ]) {
+      const id = `itest-ntf4-${event}-${RUN}`
+      await expect(
+        client.query(
+          `INSERT INTO notification (id, "userId", event, "orderId", title, href)
+           VALUES ($1, $2, $3, $4, $3, $5)`,
+          [id, userId, event, `ORD-${RUN}`, `/merchant/orders/ORD-${RUN}`],
+        ),
+      ).resolves.toBeDefined()
+      track("notification", "id", id)
+    }
+  })
+
+  it("still allows repeated money events, which carry no order", async () => {
+    // The index is partial (`WHERE "orderId" IS NOT NULL`). Two cash submissions
+    // are two different facts, and an unconditional index over a NULL column
+    // would either reject them or, worse, appear to work by accident.
+    const userId = `itest-ntf5-${RUN}`
+    await client.query(
+      `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
+      [userId, `itest notify5 ${RUN}`, `itest.ntf5.${RUN}@example.com`],
+    )
+    track("user", "id", userId)
+
+    for (const n of [1, 2]) {
+      const id = `itest-ntf5-${n}-${RUN}`
+      await expect(
+        client.query(
+          `INSERT INTO notification (id, "userId", event, title, href)
+           VALUES ($1, $2, 'cash.submitted', 'Cash submitted', '/merchant/payouts')`,
+          [id, userId],
+        ),
+      ).resolves.toBeDefined()
+      track("notification", "id", id)
+    }
+  })
 })
 
 suite("advisory lock (P1.2)", () => {

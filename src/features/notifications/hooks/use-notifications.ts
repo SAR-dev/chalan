@@ -1,10 +1,12 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import useSWR, { useSWRConfig } from "swr"
 import { useAuth } from "@/features/account/hooks/use-auth"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
+// Pure leaf: `@/lib/notifications` would drag `@/lib/db` into the browser bundle.
+import { groupNotifications } from "@/lib/notification-group"
 
 const LIST_KEY = "/api/notifications?limit=50"
 const COUNT_KEY = "/api/notifications?count=1"
@@ -119,6 +121,8 @@ export function useNotifications({
 
   return {
     notifications,
+    /** One row per order — see `groupNotifications`. The tray renders these. */
+    groups: useMemo(() => groupNotifications(notifications), [notifications]),
     newCount: data?.newCount ?? 0,
     markSeen,
     isLoading,
@@ -168,7 +172,7 @@ export function useNotificationCount() {
  * new ones are exactly the leading `newCount` rows.
  */
 export function useNotificationFeed() {
-  const { notifications, newCount, markSeen, isLoading, error } =
+  const { notifications, groups, newCount, markSeen, isLoading, error } =
     useNotifications()
 
   const [pinnedNew, setPinnedNew] = useState<ReadonlySet<string> | null>(null)
@@ -197,5 +201,30 @@ export function useNotificationFeed() {
     [pinnedNew],
   )
 
-  return { notifications, isNew, isLoading, error }
+  /**
+   * One row per order.
+   *
+   * Grouping happens here rather than in the query because the tray needs the
+   * flat rows too — `markSeen` stamps from row timestamps, and `newCount` is
+   * counted in rows. So the raw list stays authoritative and the groups are a
+   * view over it. `isNew` is resolved per group from its member ids: a group
+   * counts as new if *any* of the facts under it arrived since the last visit,
+   * which is what makes a single badge pill honest for a collapsed order.
+   */
+  const groupsWithNew = useMemo(
+    () =>
+      groups.map((g) => ({
+        ...g,
+        isNew: pinnedNew ? g.ids.some((id) => pinnedNew.has(id)) : false,
+      })),
+    [groups, pinnedNew],
+  )
+
+  return {
+    notifications,
+    groups: groupsWithNew,
+    isNew,
+    isLoading,
+    error,
+  }
 }

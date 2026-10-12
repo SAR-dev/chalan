@@ -1,10 +1,17 @@
 import { and, eq, lt, sql } from "drizzle-orm"
 import { db, dbRead } from "@/lib/db"
-import { auditLog, emailLog, session, verification } from "@/lib/db/schema"
+import {
+  auditLog,
+  emailLog,
+  notification,
+  session,
+  verification,
+} from "@/lib/db/schema"
 import { drainEmailOutbox } from "@/lib/email-outbox"
 import {
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_EMAIL_LOG_RETENTION_DAYS,
+  DEFAULT_NOTIFICATION_RETENTION_DAYS,
 } from "@/lib/env"
 import { logger } from "@/lib/logger"
 import { deleteFile, listFiles } from "@/lib/storage"
@@ -104,6 +111,72 @@ export async function runCleanupEmailLogs(): Promise<EmailLogCleanupResult> {
     .where(and(eq(emailLog.status, "SENT"), lt(emailLog.createdAt, cutoff)))
     .returning({ id: emailLog.id })
   return { deletedEmailLogs: deleted.length, retentionDays }
+}
+
+export interface NotificationCleanupResult {
+  deletedOrderEvents: number
+  deletedMoneyEvents: number
+  retentionDays: number
+}
+
+/**
+ * Notification rows past the retention window.
+ *
+ * Deletion is **group-aware**, which is the whole subtlety here. The inbox shows
+ * one row per order (see `groupNotifications`), so pruning by age alone is a
+ * correctness bug, not just untidiness: an order that was dispatched 40 days ago
+ * and delivered 5 days ago has its delivered row kept and its dispatched row
+ * dropped, and the group silently reverts to reporting "dispatched". A row is
+ * therefore only eligible when *no* sibling for the same order is still inside the
+ * window — the order has to have gone quiet entirely, not just its newest fact.
+ *
+ * Money events (cash submitted, payout approved) carry no orderId, are never
+ * grouped, and are swept on age alone.
+ */
+export async function runCleanupNotifications(): Promise<NotificationCleanupResult> {
+  const retentionDays = parseInt(
+    process.env.NOTIFICATION_RETENTION_DAYS ||
+      `${DEFAULT_NOTIFICATION_RETENTION_DAYS}`,
+    10,
+  )
+  const cutoff = sql`now() - interval '1 day' * ${retentionDays}`
+
+  // Any notification for this user that is still inside the window. An order is
+  // kept whole if this is non-empty for its order.
+  const recentSibling = sql`exists (
+    select 1 from ${notification} n2
+    where n2."userId" = ${notification.userId}
+      and n2."orderId" = ${notification.orderId}
+      and n2."createdAt" >= ${cutoff}
+  )`
+
+  const [deletedOrderEvents, deletedMoneyEvents] = await Promise.all([
+    db
+      .delete(notification)
+      .where(
+        and(
+          sql`${notification.orderId} is not null`,
+          lt(notification.createdAt, cutoff),
+          sql`not ${recentSibling}`,
+        ),
+      )
+      .returning({ id: notification.id }),
+    db
+      .delete(notification)
+      .where(
+        and(
+          sql`${notification.orderId} is null`,
+          lt(notification.createdAt, cutoff),
+        ),
+      )
+      .returning({ id: notification.id }),
+  ])
+
+  return {
+    deletedOrderEvents: deletedOrderEvents.length,
+    deletedMoneyEvents: deletedMoneyEvents.length,
+    retentionDays,
+  }
 }
 
 function readImageValues({
