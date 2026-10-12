@@ -77,6 +77,17 @@ export function NotificationTray({
     enabled: hasOpened,
   })
 
+  /**
+   * Dismiss the tray when one of its links is followed.
+   *
+   * A `next/link` navigation is client-side, so the browser does not reload and
+   * the Sheet's own `open` state is never told to change — the panel stays open
+   * on top of the page it just opened. Closing on intent is also the right feel:
+   * the user asked to go somewhere, not to keep reading the list. Same fix as
+   * RightNav's links.
+   */
+  const closeTray = () => setOpen(false)
+
   return (
     <Sheet
       open={open}
@@ -118,7 +129,7 @@ export function NotificationTray({
           ) : (
             <ul className="flex flex-col">
               {notifications.map((n) => (
-                <TrayRow key={n.id} notification={n} />
+                <TrayRow key={n.id} notification={n} onNavigate={closeTray} />
               ))}
             </ul>
           )}
@@ -131,6 +142,7 @@ export function NotificationTray({
             className="w-full"
             render={<Link href="/merchant/notifications" />}
             nativeButton={false}
+            onClick={closeTray}
             data-testid="notification-tray-all"
           >
             <Bell className="size-4" aria-hidden />
@@ -142,13 +154,22 @@ export function NotificationTray({
   )
 }
 
-function TrayRow({ notification }: { notification: AppNotification }) {
+function TrayRow({
+  notification,
+  onNavigate,
+}: {
+  notification: AppNotification
+  onNavigate: () => void
+}) {
   const now = Date.now()
   return (
     <li className="border-sidebar-border border-b last:border-b-0">
       <Link
         href={notification.href}
         className="hover:bg-sidebar-accent/50 flex items-start gap-3 px-4 py-3 transition-colors"
+        // Client-side navigation never touches the Sheet's own open state, so
+        // without this the panel stays open over the page it just opened.
+        onClick={onNavigate}
         data-testid="notification-tray-row"
       >
         <NotificationEventIcon event={notification.event} />
