@@ -68,7 +68,7 @@ export function VersionBadge({ version }: { version?: AppVersion }) {
             ) : null}
           </dl>
 
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm pb-2">
             If the app looks stale or something will not load, update to clear
             the files cached by your last visit.
           </p>
