@@ -27,7 +27,12 @@ import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
-import { CURRENCY_SUFFIX, ORDER_DELIVERY_TYPE_LABELS } from "@/lib/constants"
+import {
+  BADGE_TONES,
+  type BadgeTone,
+  CURRENCY_SUFFIX,
+  ORDER_DELIVERY_TYPE_LABELS,
+} from "@/lib/constants"
 import { deliveryOutcome } from "@/lib/delivery-promise"
 import { formatDateTime } from "@/lib/format"
 import { deliveryProgress } from "@/lib/order-timeline"
@@ -35,14 +40,52 @@ import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+/**
+ * Icon-chip tints, keyed by field role.
+ *
+ * Drawn from `BADGE_TONES` so a field chip agrees with the status badge and the
+ * notification icons beside it — one palette, not three. The chip is a filled
+ * circle with no border, so the border half of each tone is dropped; the `dark:`
+ * overrides are kept, since dropping those would leave, say, green-600 text on
+ * a dark background.
+ */
+type IconComponent = React.ComponentType<{ className?: string }>
+
+// A Map rather than a record literal: `Field` receives either a function or a
+// class component depending on the icon, and TypeScript will not index a record
+// with that union. Component identity is the key either way — never the display
+// name, which is a debugging aid and can be minified away.
+const FIELD_CHIP_TONES = new Map<IconComponent, BadgeTone>([
+  [User, "info"],
+  [Phone, "info"],
+  [Mail, "neutral"],
+  [MapPin, "brand"],
+  [Store, "pending"],
+  [ExternalLink, "violet"],
+  [Weight, "violet"],
+  [Package, "brand"],
+  [Bike, "transit"],
+  [WarehouseIcon, "warehouse"],
+  [CalendarDays, "neutral"],
+])
+
+function chipTint(tone: BadgeTone | undefined): string {
+  const key = tone ?? "neutral"
+  return BADGE_TONES[key]
+    .split(" ")
+    .filter((c) => !c.includes("border"))
+    .join(" ")
+}
+
 function Field({
   icon: Icon,
   label,
   value,
   className,
   testId,
+  tone,
 }: {
-  icon: React.ComponentType<{ className?: string }>
+  icon: IconComponent
   label: string
   value: React.ReactNode
   className?: string
@@ -52,14 +95,21 @@ function Field({
    * Same reasoning as `DetailRow` on the public tracking page.
    */
   testId?: string
+  /** Chip tint. Falls back to the icon's own entry, then to neutral. */
+  tone?: BadgeTone
 }) {
   return (
     <div
       className={cn("flex items-start gap-3", className)}
       data-testid={testId}
     >
-      <span className="bg-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md">
-        <Icon className="text-muted-foreground size-3.5" />
+      <span
+        className={cn(
+          "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
+          chipTint(tone ?? FIELD_CHIP_TONES.get(Icon)),
+        )}
+      >
+        <Icon className="size-3.5" />
       </span>
       <div className="min-w-0">
         <p className="text-muted-foreground mb-0.5 text-[11px] font-medium tracking-wide uppercase">
@@ -71,6 +121,22 @@ function Field({
   )
 }
 
+/**
+ * Section heading accents.
+ *
+ * Five cards stacked with a 1px gutter already read as one surface, which left
+ * the eye with no cue for where one group ends and the next begins. A short
+ * tinted rule beside the heading gives that boundary back without adding another
+ * border — and reuses `BADGE_TONES`, so it agrees with the chips inside it.
+ */
+const SECTION_TONES: Record<string, BadgeTone> = {
+  "Recipient & delivery": "info",
+  "Merchant & pickup": "pending",
+  Parcel: "violet",
+  Notes: "neutral",
+  Payment: "brand",
+}
+
 function Section({
   title,
   children,
@@ -80,10 +146,20 @@ function Section({
   children: React.ReactNode
   className?: string
 }) {
+  const tone = SECTION_TONES[title] ?? "neutral"
   return (
     <div className={cn("", className)}>
-      <p className="text-muted-foreground mb-4 text-[11px] font-semibold tracking-widest uppercase">
-        {title}
+      <p className="mb-4 flex items-center gap-2 text-[11px] font-semibold tracking-widest uppercase">
+        <span
+          aria-hidden
+          className={cn(
+            "h-3.5 w-1 shrink-0 rounded-full",
+            chipTint(tone)
+              .split(" ")
+              .find((c) => c.startsWith("bg-")),
+          )}
+        />
+        <span className="text-muted-foreground">{title}</span>
       </p>
       {children}
     </div>

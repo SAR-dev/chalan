@@ -38,3 +38,36 @@ describe("static security headers", () => {
     expect(proxy).toContain("content-security-policy")
   })
 })
+
+describe("CSP directives the app depends on", () => {
+  const directive = (name: string): string | undefined =>
+    proxy.match(new RegExp(`"${name}[^"]*"`))?.[0]
+
+  it("allows blob: frames, or the label designer preview is blocked", () => {
+    // `LabelPreview` renders the generated PDF in an <iframe src="blob:…">.
+    // With no `frame-src`, CSP falls back to `default-src 'self'` and the browser
+    // refuses the frame — which presents as an empty preview with a console
+    // error naming blob:, and nothing else.
+    const frameSrc = directive("frame-src")
+    expect(frameSrc, "no frame-src directive in the CSP").toBeDefined()
+    expect(frameSrc).toContain("blob:")
+    // Scoped to framing, not a blanket loosening.
+    expect(frameSrc).toContain("'self'")
+  })
+
+  it("keeps object-src at 'none', so the print frame must use <iframe>", () => {
+    // The print path frames the PDF rather than embedding it precisely so this
+    // stays true. If someone switches it back to <embed> to "simplify", the PDF
+    // is blocked by the browser and the print dialog silently prints a blank
+    // page while Download — a plain `<a download>` — keeps working.
+    expect(directive("object-src")).toBe("\"object-src 'none'\"")
+  })
+
+  it("does not add blob: to script-src", () => {
+    // blob: is justified for frames and workers because both are documents or
+    // executables we construct from already-trusted data. In script-src it would
+    // let any inline string become an executable script.
+    const scriptSrc = proxy.match(/"script-src[^"]*"/)?.[0] ?? ""
+    expect(scriptSrc).not.toContain("blob:")
+  })
+})

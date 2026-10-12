@@ -50,9 +50,15 @@ function TabsList({
       // `max-w-full overflow-x-auto` so a list with more tabs than fit scrolls
       // instead of overflowing its parent. Triggers are `whitespace-nowrap`, so
       // before this a five-tab list (Account Settings) was clipped on a phone.
+      //
+      // `overflow-y-hidden` is not redundant. Setting only `overflow-x` makes
+      // `overflow-y: visible` compute to `auto` — and the active tab's `after`
+      // indicator sits at `bottom-[-5px]`, outside the list box. That overflow
+      // became a vertical scrollbar: the up/down arrows sitting at the right edge
+      // of every tab strip. Horizontal scrolling is unaffected.
       className={cn(
         tabsListVariants({ variant }),
-        "max-w-full overflow-x-auto",
+        "max-w-full overflow-x-auto overflow-y-hidden",
         className,
       )}
       {...props}

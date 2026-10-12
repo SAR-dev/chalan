@@ -92,3 +92,42 @@ describe("delivery progress in order details", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument()
   })
 })
+
+describe("section and field colour", () => {
+  it("tints field chips from the shared badge palette, not one flat grey", () => {
+    // Guards against a silent regression: if the icon lookup stopped matching,
+    // every chip would quietly fall back to `bg-muted` and the page would look
+    // like it had no colour at all — while every other assertion still passed.
+    const { container } = renderPage(
+      <OrderDetailsContent order={makeOrder()} />,
+    )
+
+    const chips = [...container.querySelectorAll("span.rounded-md")]
+    const classes = chips.map((c) => c.getAttribute("class") ?? "")
+    const tinted = classes.filter((c) => !c.includes("bg-muted"))
+
+    expect(chips.length).toBeGreaterThan(3)
+    expect(tinted.length).toBeGreaterThan(0)
+    // More than one distinct tint, or the map is collapsing to a single tone.
+    expect(new Set(tinted).size).toBeGreaterThan(1)
+  })
+
+  it("keeps the dark-mode half of each tone", () => {
+    // Stripping the badge border classes must not strip the `dark:` overrides
+    // along with them — that would leave, say, violet-600 text on a dark
+    // background. Violet is the tone to check: it is one of the palette entries
+    // that actually carries a dark variant, and a default order renders it.
+    const { container } = renderPage(
+      <OrderDetailsContent order={makeOrder()} />,
+    )
+    const violetChip = [...container.querySelectorAll("span.rounded-md")].find(
+      (c) => (c.getAttribute("class") ?? "").includes("text-violet-600"),
+    )
+
+    expect(violetChip).toBeDefined()
+    const cls = violetChip?.getAttribute("class") ?? ""
+    expect(cls).toContain("dark:text-violet-400")
+    // The border half is still dropped — a 28px rounded chip has no border.
+    expect(cls).not.toContain("border")
+  })
+})

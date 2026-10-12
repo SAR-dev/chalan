@@ -81,6 +81,18 @@ function buildCsp(nonce: string): string {
     // qr-scanner (R9) builds its decode worker from a blob: URL. Workers
     // only — no blob: in script-src, no 'wasm-unsafe-eval' anywhere.
     "worker-src 'self' blob:",
+    // The label designer previews the generated PDF in an iframe, and the print
+    // path frames the same blob. Both are `blob:` documents we created
+    // ourselves, which is why this is scoped to frame-src rather than by
+    // loosening `default-src`.
+    //
+    // Without this, `frame-src` falls back to `default-src 'self'` and the
+    // browser blocks the frame — which presents as an empty designer preview and
+    // a print dialog that prints nothing.
+    //
+    // `object-src` deliberately stays `'none'`: the print frame embeds the PDF in
+    // an <iframe>, not an <embed>, precisely so plugin content is never needed.
+    "frame-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
