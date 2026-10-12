@@ -45,6 +45,16 @@ vi.mock("@/features/account/hooks/use-auth", () => ({
   useAuth: () => ({ currentUser: { id: "usr-1", role: currentRole } }),
 }))
 
+// Only the two TopNav bells render together here; the announcement feed's own
+// fetching is covered by its route spec.
+vi.mock("@/features/announcements/hooks/use-active-announcements", () => ({
+  useActiveAnnouncements: () => ({
+    announcements: [],
+    newCount: 0,
+    isLoading: false,
+  }),
+}))
+
 import { NotificationBell } from "@/features/notifications/components/notification-bell"
 
 const COUNT_KEY = "/api/notifications?count=1"
@@ -160,6 +170,52 @@ describe("NotificationBell", () => {
       "/api/notifications?count=1",
       { newCount: 0 },
       { revalidate: false },
+    )
+  })
+})
+
+/**
+ * The two TopNav bells sit next to each other as icon-only buttons, so the glyph
+ * is the only thing telling them apart for a sighted user. They were both a
+ * generic `Bell`, which is indistinguishable at a glance and read as one broken
+ * control rather than two features.
+ */
+describe("the two TopNav bells are visually distinguishable", () => {
+  it("does not reuse the announcement glyph", async () => {
+    const { AnnouncementBell } = await import(
+      "@/features/announcements/components/announcement-bell"
+    )
+    const bell = render(<NotificationBell />).container
+    const announcement = render(<AnnouncementBell />).container
+
+    const bellGlyph = bell.querySelector("svg")?.getAttribute("class")
+    const announcementGlyph = announcement
+      .querySelector("svg")
+      ?.getAttribute("class")
+
+    expect(bellGlyph).toBeTruthy()
+    expect(announcementGlyph).toBeTruthy()
+    expect(bellGlyph).not.toBe(announcementGlyph)
+    // A generic bell is what collided; pin the intended glyphs so a future
+    // "tidy the imports" pass cannot quietly reintroduce the clash.
+    expect(bellGlyph).toContain("lucide-inbox")
+    expect(announcementGlyph).toContain("lucide-megaphone")
+  })
+
+  it("gives both a native tooltip, since neither shows a text label", async () => {
+    const { AnnouncementBell } = await import(
+      "@/features/announcements/components/announcement-bell"
+    )
+    render(<NotificationBell />)
+    render(<AnnouncementBell />)
+
+    expect(screen.getByTestId("notification-bell")).toHaveAttribute(
+      "title",
+      "Notifications",
+    )
+    expect(screen.getByTestId("announcement-bell")).toHaveAttribute(
+      "title",
+      "Announcements",
     )
   })
 })

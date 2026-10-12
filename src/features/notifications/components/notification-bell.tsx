@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell } from "lucide-react"
+import { Inbox } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { NotificationTray } from "@/features/notifications/components/notification-tray"
 import { useNotificationCount } from "@/features/notifications/hooks/use-notifications"
@@ -28,9 +28,14 @@ export function NotificationBell() {
             newCount > 0 ? `Notifications, ${newCount} new` : "Notifications"
           }
           data-testid="notification-bell"
+          // Icon-only next to the announcement bell, so the glyph carries the
+          // meaning. `Inbox` matches the sidebar's Notifications entry; the two
+          // must not both be a generic `Bell`, which is what they were — the bar
+          // showed two identical icons for two unrelated things.
+          title="Notifications"
           className="relative"
         >
-          <Bell className="size-4" />
+          <Inbox className="size-4" />
           {newCount > 0 && (
             <span
               data-testid="notification-badge"

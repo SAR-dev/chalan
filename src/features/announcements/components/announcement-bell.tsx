@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell } from "lucide-react"
+import { Megaphone } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/account/hooks/use-auth"
@@ -38,9 +38,14 @@ export function AnnouncementBell() {
       data-testid="announcement-bell"
       render={<Link href={href} />}
       nativeButton={false}
+      // Icon-only next to the notification bell, so the glyph carries the
+      // meaning. `Megaphone` matches the sidebar's Announcements entry; the two
+      // must not both be a generic `Bell`, which is what they were — the bar
+      // showed two identical icons for two unrelated things.
+      title="Announcements"
       className="relative"
     >
-      <Bell className="size-4" />
+      <Megaphone className="size-4" />
       {newCount > 0 && (
         <span
           data-testid="announcement-badge"
