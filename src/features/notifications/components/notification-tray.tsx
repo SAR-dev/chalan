@@ -193,22 +193,32 @@ function TrayRow({
             {/* The subject is what makes the list scannable — `ORD-100163` on its
                 own tells a merchant nothing, so twenty of them are twenty
                 identical rows. Rows written before the column existed fall back
-                to the bare code. */}
-            <span className="truncate">
-              {[
-                group.subject,
-                group.orderId,
-                relativeTime(group.createdAt, now),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+                to the bare code.
+
+                The order id used to sit here too. It is not missed: the row
+                links straight to the order, and with a subject present it was
+                the third fact in a line that only fits two — which is exactly
+                how it pushed the timestamp off the end. Recency is what you scan
+                a notification list *for*, so the subject is the part that gives
+                way (`min-w-0`, truncating) and the time never shrinks. */}
+            <span className="min-w-0 flex-1 truncate">
+              {group.subject ?? group.orderId}
+            </span>
+            <span
+              className="shrink-0 tabular-nums"
+              data-testid="notification-tray-time"
+            >
+              {relativeTime(group.createdAt, now)}
             </span>
             {group.count > 1 && (
               <span
                 data-testid="notification-tray-count"
                 className="bg-sidebar-accent text-sidebar-accent-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
               >
-                {group.count} updates
+                <span aria-hidden>×{group.count}</span>
+                <span className="sr-only">
+                  {group.count} updates for this order
+                </span>
               </span>
             )}
           </span>
