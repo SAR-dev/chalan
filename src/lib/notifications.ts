@@ -103,6 +103,32 @@ export async function emitNotificationEvent({
 }
 
 /**
+ * Where a row should open, for a reader who can only see the merchant segment.
+ *
+ * The stored `href` column is not trusted. It was written before the routing fix
+ * and still holds `/dashboard/orders/…` on any database that predates it, so a
+ * row with an unrecognised event — the column is plain text, so a newer deploy
+ * can write one this build does not know — would hand the merchant a link their
+ * role guard bounces straight back to `/merchant`. That presents as a dead
+ * notification and gives no hint why.
+ *
+ * So: a known event is computed, and an unknown one is coerced to the order it
+ * belongs to. Money events carry no order and were always merchant-scoped, so
+ * those still keep their stored href.
+ */
+function notificationHref(row: {
+  event: string
+  orderId: string | null
+  href: string
+}): string {
+  if (isOrderEvent(row.event)) {
+    return notificationHrefForEvent(row.event, row.orderId)
+  }
+  if (row.orderId) return `/merchant/orders/${row.orderId}`
+  return row.href
+}
+
+/**
  * Who should see a fact about this merchant.
  *
  * The merchant owner and their moderators are the audience — they are the ones
@@ -189,12 +215,7 @@ export async function getNotificationsForUser(
 
   const notifications = rows.map((n) => ({
     ...n,
-    // The column is plain text, so an event written by a newer deploy than this
-    // one is not in the union. Falling back to the stored href beats throwing
-    // away a notification the reader could otherwise still open.
-    href: isOrderEvent(n.event)
-      ? notificationHrefForEvent(n.event, n.orderId)
-      : n.href,
+    href: notificationHref(n),
   }))
 
   const newCount = seenAt
