@@ -4,11 +4,13 @@ import { ArrowLeft } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { HelpToc } from "@/components/help-toc"
 import { Markdown } from "@/components/markdown"
 import { PublicFooter } from "@/components/public-footer"
 import { PublicHeader } from "@/components/public-header"
 import { siteConfig } from "@/config/site"
 import { replaceContentKeywords } from "@/lib/content-keywords"
+import { tocFromMarkdown } from "@/lib/help-toc"
 import { helpGuideFor } from "../guides"
 
 interface Props {
@@ -48,6 +50,7 @@ export default async function HelpGuidePage({ params }: Props) {
           <ArrowLeft className="size-4" />
           Help Center
         </Link>
+        <HelpToc entries={tocFromMarkdown(raw)} />
         <Markdown content={replaceContentKeywords(raw)} />
       </div>
       <PublicFooter />

@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Bike,
   CircleHelp,
+  Code2,
   PackageSearch,
   ScrollText,
   Warehouse,
@@ -20,16 +21,34 @@ export const metadata: Metadata = {
   description: `${siteConfig.name} help center — task-by-task guides for merchants, riders, warehouse admins, and super admins.`,
 }
 
-const GUIDE_ICONS: Record<
+/**
+ * One hue per role, so the list reads as a set rather than five identical rows.
+ *
+ * Drawn from the same `BADGE_TONES` vocabulary the order status badges and the
+ * notification icons use. Each icon sits on a tint at 15% alpha — the badge
+ * background half, not the border half, since a rounded square here has no
+ * border to colour.
+ */
+const GUIDE_STYLES: Record<
   string,
-  React.ComponentType<{
-    className?: string
-  }>
+  { icon: React.ComponentType<{ className?: string }>; chip: string }
 > = {
-  merchant: PackageSearch,
-  rider: Bike,
-  "warehouse-admin": Warehouse,
-  admin: ScrollText,
+  merchant: { icon: PackageSearch, chip: "bg-chart-1/15 text-chart-1" },
+  rider: { icon: Bike, chip: "bg-chart-3/15 text-chart-3" },
+  "warehouse-admin": {
+    icon: Warehouse,
+    chip: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+  },
+  admin: {
+    icon: ScrollText,
+    chip: "bg-orange-500/15 text-orange-600 dark:text-orange-400",
+  },
+  // Was missing entirely, so the API guide fell back to a generic question mark
+  // and read as "no icon available" rather than "for developers".
+  api: {
+    icon: Code2,
+    chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  },
 }
 
 export default function HelpPage() {
@@ -42,9 +61,13 @@ export default function HelpPage() {
           description={`Task-by-task guides for every ${siteConfig.name} role, covering accounts, orders, pricing, packages, and payouts.`}
         />
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {HELP_GUIDES.map((guide) => {
-            const Icon = GUIDE_ICONS[guide.slug] ?? CircleHelp
+            const style = GUIDE_STYLES[guide.slug] ?? {
+              icon: CircleHelp,
+              chip: "bg-muted text-muted-foreground",
+            }
+            const Icon = style.icon
             return (
               <Link
                 key={guide.slug}
@@ -53,16 +76,21 @@ export default function HelpPage() {
                 className="group block"
               >
                 <Card className="border-border/60 group-hover:border-primary/40 transition-colors">
-                  <CardContent className="flex items-start gap-4 p-5">
-                    <span className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-lg">
+                  <CardContent className="flex items-center gap-4 p-4">
+                    <span
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${style.chip}`}
+                    >
                       <Icon className="size-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="group-hover:text-primary flex items-center gap-2 font-semibold transition-colors">
-                        {guide.title}
-                        <ArrowRight className="size-4 opacity-0 transition-opacity group-hover:opacity-100" />
+                      <div className="group-hover:text-primary flex items-center gap-1.5 font-semibold transition-colors">
+                        <span className="truncate">{guide.title}</span>
+                        <ArrowRight
+                          className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          aria-hidden
+                        />
                       </div>
-                      <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                      <p className="text-muted-foreground mt-0.5 text-sm leading-relaxed">
                         {guide.description}
                       </p>
                     </div>

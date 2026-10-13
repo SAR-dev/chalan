@@ -37,7 +37,7 @@ Step-by-step tasks for running your deliveries on {{APP_NAME}}. Open the merchan
 2. Search by tracking code, recipient, or city, and filter by date.
 3. Click a row to open the order detail page (`/merchant/orders/<code>`) — it shows the status timeline, assigned riders, and proof photos.
 4. Watch for these statuses: **Pending → Approved → Out for pickup → Picked up → In warehouse → In transit → Out for delivery → Delivered**, with **Failed attempt**, **Returned**, or **Cancelled** as the exception paths.
-5. Cancel your own order from the detail page while it is still **Pending** or **Approved** (a reason is required).
+5. Cancel your own order from the detail page while it is still **Pending**, **Approved**, or **Out for pickup** (a reason is required). Once a rider has picked it up, only a platform admin can cancel it.
 
 ## 5. Share tracking with your customer
 
@@ -63,6 +63,6 @@ Step-by-step tasks for running your deliveries on {{APP_NAME}}. Open the merchan
 
 ## 8. Manage announcements and support
 
-1. Open **Inbox** (`/merchant/announcements`) for platform announcements; unread items also appear as a dismissible banner at the top of the app.
+1. Open **Inbox** (`/merchant/announcements`) for platform announcements. Unread ones raise a count on the **announcements** icon at the right of the top bar, which links straight to the feed; opening the feed clears the count.
 2. Open **Support** (`/merchant/support`) to raise a ticket about an order, a charge, or your account, and to follow the replies on it.
 3. Open **Account** (`/merchant/account`) to update your name and change your password (current password + at least 8 characters).

@@ -70,7 +70,7 @@ How to run your hub on {{APP_NAME}}. Sign in at **{{APP_URL}}/login** and open t
 
 ## 10. Account, announcements, and support
 
-1. Open **Inbox** (`/warehouse/announcements`) for platform announcements (also shown as a banner at the top of the app).
+1. Open **Inbox** (`/warehouse/announcements`) for platform announcements. Unread ones raise a count on the **announcements** icon at the right of the top bar, which links straight to the feed.
 2. Open **Account** (`/warehouse/account`) to update your name, change your password (current password + at least 8 characters), and set up two-factor authentication.
 3. If you are covered by the platform's 2FA policy you are sent to your Account page to enroll at sign-in.
 4. Raise anything you cannot resolve from **Support** (`/warehouse/support`), or email **{{APP_EMAIL}}**.

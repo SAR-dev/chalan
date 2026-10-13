@@ -62,7 +62,7 @@ The first four sit in the sidebar's **Coverage & pricing** section; **Settings**
 
 ## 8. Communications and system logs
 
-1. **Announcements** (`/dashboard/announcements`) — publish targeted announcements; they appear as a banner and in each role's **Inbox**.
+1. **Announcements** (`/dashboard/announcements`) — publish targeted announcements; they reach each role through their **Inbox**, and an unread one raises a count on the announcements icon in the top bar.
 2. **Inbox** (`/dashboard/announcements-inbox`) — the published announcements addressed to your own role, newest first.
 3. **Support** (`/dashboard/support`) — every ticket raised by merchants, riders, and warehouse admins, in one queue.
 4. **Audit Logs** (`/dashboard/audit-logs`) — who did what, across orders, merchants, payouts, and team changes.
