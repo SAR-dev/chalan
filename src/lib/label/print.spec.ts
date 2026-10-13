@@ -42,17 +42,26 @@ describe("printOrDownload", () => {
   it("prints from a same-origin frame rather than navigating one to the PDF", () => {
     // Navigating an iframe straight to a blob PDF hands it to the browser's PDF
     // viewer, in its own origin, where `contentWindow.print()` throws or prints
-    // nothing. The frame must own the document and embed the PDF instead.
+    // nothing. The frame must own the document and frame the PDF itself.
     printOrDownload(PDF)
 
     const frame = document.querySelector("iframe")
     expect(frame).not.toBeNull()
-    expect(frame?.getAttribute("srcdoc")).toContain(
-      '<embed src="blob:label" type="application/pdf">',
-    )
+    expect(frame?.getAttribute("srcdoc")).toContain('<iframe src="blob:label">')
     // A src would be the broken shape: the frame would navigate to the blob.
     expect(frame?.getAttribute("src")).toBeNull()
     expect(openTab).not.toHaveBeenCalled()
+  })
+
+  it("frames the PDF rather than embedding it", () => {
+    // <embed> is plugin content governed by `object-src`, which this app pins to
+    // 'none'. The browser blocks it, the print dialog opens on a blank page, and
+    // Download still works — so the bug looks like "print is broken" rather than
+    // like a policy violation.
+    printOrDownload(PDF)
+
+    const doc = document.querySelector("iframe")?.getAttribute("srcdoc") ?? ""
+    expect(doc).not.toContain("<embed")
   })
 
   it("hides the frame from the page and from assistive tech", () => {

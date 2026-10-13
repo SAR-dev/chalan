@@ -14,7 +14,7 @@ import {
   Weight,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { createContext, useContext, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/features/account/hooks/use-auth"
@@ -27,7 +27,12 @@ import { useDeliveryCities } from "@/features/platform-config/hooks/use-delivery
 import { useZonePricingPublic } from "@/features/platform-config/hooks/use-zone-pricing-public"
 import { useRiders } from "@/features/riders/hooks/use-riders"
 import { useWarehouses } from "@/features/warehouses/hooks/use-warehouses"
-import { CURRENCY_SUFFIX, ORDER_DELIVERY_TYPE_LABELS } from "@/lib/constants"
+import {
+  BADGE_TONES,
+  type BadgeTone,
+  CURRENCY_SUFFIX,
+  ORDER_DELIVERY_TYPE_LABELS,
+} from "@/lib/constants"
 import { deliveryOutcome } from "@/lib/delivery-promise"
 import { formatDateTime } from "@/lib/format"
 import { deliveryProgress } from "@/lib/order-timeline"
@@ -35,14 +40,40 @@ import { formatTk } from "@/lib/pricing"
 import type { Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+/**
+ * The hue of the section a field sits in, so chips can inherit it.
+ *
+ * Chips were first tinted per icon — User blue, Bike orange, Package blue — which
+ * put five unrelated hues on one page. That is the mistake worth naming: this app
+ * already spends colour on *severity* (green delivered, amber pending, red
+ * failed), so a saturated orange chip beside an amber "Pending" badge reads as
+ * "something is wrong" when nothing is. A rider merely being unassigned is not an
+ * alert, yet its chip was the loudest thing on the page.
+ *
+ * Colour now carries exactly one level of meaning — which group a row is in — and
+ * the section's accent bar and every chip inside it agree. Three hues instead of
+ * five, none competing with the status badge.
+ */
+const SectionToneContext = createContext<BadgeTone>("neutral")
+
+type IconComponent = React.ComponentType<{ className?: string }>
+
+function chipTint(tone: BadgeTone | undefined): string {
+  return BADGE_TONES[tone ?? "neutral"]
+    .split(" ")
+    .filter((c) => !c.includes("border"))
+    .join(" ")
+}
+
 function Field({
   icon: Icon,
   label,
   value,
   className,
   testId,
+  tone,
 }: {
-  icon: React.ComponentType<{ className?: string }>
+  icon: IconComponent
   label: string
   value: React.ReactNode
   className?: string
@@ -52,23 +83,63 @@ function Field({
    * Same reasoning as `DetailRow` on the public tracking page.
    */
   testId?: string
+  /** Overrides the surrounding section's hue, for a genuinely distinct row. */
+  tone?: BadgeTone
 }) {
+  const sectionTone = useContext(SectionToneContext)
   return (
     <div
       className={cn("flex items-start gap-3", className)}
       data-testid={testId}
     >
-      <span className="bg-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md">
-        <Icon className="text-muted-foreground size-3.5" />
+      <span
+        className={cn(
+          "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
+          chipTint(tone ?? sectionTone),
+        )}
+      >
+        <Icon className="size-3.5" />
       </span>
       <div className="min-w-0">
-        <p className="text-muted-foreground mb-0.5 text-[11px] font-medium tracking-wide uppercase">
+        {/* 12px sentence case, not 11px all-caps with wide tracking. At that
+            size and spacing "NOTE FROM MERCHANT" renders as "NO TE FROM
+            MERCHANT" — legible in a mockup, not in a browser. */}
+        <p className="text-muted-foreground mb-1 text-xs font-medium">
           {label}
         </p>
         <p className="text-sm font-medium break-words">{value}</p>
       </div>
     </div>
   )
+}
+
+/**
+ * Section heading accents.
+ *
+ * Five cards stacked with a 1px gutter already read as one surface, which left
+ * the eye with no cue for where one group ends and the next begins. A short
+ * tinted rule beside the heading gives that boundary back without adding another
+ * border — and reuses `BADGE_TONES`, so it agrees with the chips inside it.
+ */
+const SECTION_TONES: Record<string, BadgeTone> = {
+  "Recipient & delivery": "info",
+  "Merchant & pickup": "pending",
+  Parcel: "violet",
+  Notes: "neutral",
+  Payment: "brand",
+}
+
+/**
+ * Full-strength colours for the section rule, since a 4px bar carries no
+ * background tint to read against — it needs the solid hue, and it needs one that
+ * exists in both modes.
+ */
+const SOLID_TONES: Partial<Record<BadgeTone, string>> = {
+  info: "bg-chart-1",
+  pending: "bg-chart-3",
+  violet: "bg-violet-500",
+  brand: "bg-primary",
+  neutral: "bg-muted-foreground/40",
 }
 
 function Section({
@@ -80,12 +151,27 @@ function Section({
   children: React.ReactNode
   className?: string
 }) {
+  const tone = SECTION_TONES[title] ?? "neutral"
   return (
     <div className={cn("", className)}>
-      <p className="text-muted-foreground mb-4 text-[11px] font-semibold tracking-widest uppercase">
-        {title}
+      {/* The rule is a solid palette colour, not the 15%-alpha badge background.
+          At 3.5px tall and that alpha it was effectively invisible in dark mode —
+          a divider that never renders is worse than none, because it still costs
+          the vertical rhythm it was meant to create. */}
+      <p className="mb-4 flex items-center gap-2 text-xs font-semibold">
+        <span
+          aria-hidden
+          className={cn(
+            "h-4 w-1 shrink-0 rounded-full",
+            SOLID_TONES[tone] ?? "bg-muted-foreground/40",
+          )}
+        />
+        <span className="text-muted-foreground tracking-wide">{title}</span>
       </p>
-      {children}
+      {/* Chips inside inherit this hue, so a section reads as one colour group. */}
+      <SectionToneContext.Provider value={tone}>
+        {children}
+      </SectionToneContext.Provider>
     </div>
   )
 }
@@ -413,7 +499,11 @@ export function OrderDetailsContent({ order }: { order: Order }) {
           <Section title="Notes">
             <div className="space-y-4">
               <div>
-                <p className="text-muted-foreground mb-1 text-[11px] font-medium tracking-wide uppercase">
+                {/* Sentence case at 12px, matching `Field`. The all-caps
+                    11px variant rendered "NOTE FROM MERCHANT" as
+                    "NO TE FROM MERCHANT" — these bypass `Field`, so the earlier
+                    fix did not reach them. */}
+                <p className="text-muted-foreground mb-1 text-xs font-medium">
                   Note from merchant
                 </p>
                 <p className="text-sm leading-relaxed">
@@ -421,7 +511,7 @@ export function OrderDetailsContent({ order }: { order: Order }) {
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground mb-1 text-[11px] font-medium tracking-wide uppercase">
+                <p className="text-muted-foreground mb-1 text-xs font-medium">
                   Note from recipient
                 </p>
                 <p className="text-sm leading-relaxed">

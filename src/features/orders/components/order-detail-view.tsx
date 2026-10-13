@@ -115,15 +115,20 @@ export function OrderDetailView({
             <ArrowLeft className="size-3.5" />
             Orders
           </Link>
-          {/* Single-label print / reprint: the same renderer the tables use, so
-              a parcel reprinted here carries the published template. */}
-          <OrderLabelButton
-            order={order}
-            merchantName={merchant?.businessName ?? "Unknown"}
-            template={labelTemplate}
-            showLabel
-            variant="outline"
-          />
+          {/* Icon-only, side by side, pinned right. `OrderLabelButton` returns a
+              fragment, so the gap between the two lives here rather than in the
+              component — the same button is used icon-only in list tables, where
+              a gutter between them would misalign every row's action cluster. */}
+          <div className="flex items-center gap-2">
+            {/* Single-label print / reprint: the same renderer the tables use, so
+                a parcel reprinted here carries the published template. */}
+            <OrderLabelButton
+              order={order}
+              merchantName={merchant?.businessName ?? "Unknown"}
+              template={labelTemplate}
+              variant="outline"
+            />
+          </div>
         </div>
       </div>
 
