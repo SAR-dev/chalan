@@ -24,6 +24,10 @@ import {
 } from "@/lib/db/schema"
 import { canPlaceOrders } from "@/lib/merchant-verification"
 import { hasNavPermission } from "@/lib/nav-config"
+import {
+  buildNotificationSubject,
+  createCityNameResolver,
+} from "@/lib/notification-subject"
 import { computeExpectedDeliveryAt } from "@/lib/order-delivery-time"
 import { emitOrderEvent } from "@/lib/order-events"
 import { lockAndResolveMerchantPackageRule } from "@/lib/order-pricing"
@@ -422,6 +426,8 @@ export const POST = withErrorHandler(async (req: Request) => {
 
     // Enqueue the creation event in the same transaction so it can never
     // describe an order that rolled back. No I/O here — just a row.
+    // One resolver for the batch, so 25 parcels across 2 cities cost 2 lookups.
+    const resolveCityName = createCityNameResolver()
     for (const o of insertedOrders) {
       await emitOrderEvent({
         tx,
@@ -429,6 +435,7 @@ export const POST = withErrorHandler(async (req: Request) => {
         orderId: o.id,
         merchantId,
         now: createdAtIso,
+        subject: await buildNotificationSubject(o, resolveCityName),
         data: {
           id: o.id,
           status: o.status,

@@ -40,6 +40,10 @@ import { enumValues } from "@/lib/db-helpers"
 import { canPlaceOrders } from "@/lib/merchant-verification"
 import { hasNavPermission } from "@/lib/nav-config"
 import {
+  buildNotificationSubject,
+  createCityNameResolver,
+} from "@/lib/notification-subject"
+import {
   computeExpectedDeliveryAt,
   resolveRouteDeliveryTime,
 } from "@/lib/order-delivery-time"
@@ -514,6 +518,11 @@ export const POST = withErrorHandler(async (req: Request) => {
       merchantId,
       actorName: me.name,
       now: createdAtIso,
+      // Snapshotted so the inbox can name the parcel after it is gone.
+      subject: await buildNotificationSubject(
+        inserted,
+        createCityNameResolver(),
+      ),
       data: {
         id: inserted.id,
         status: inserted.status,
