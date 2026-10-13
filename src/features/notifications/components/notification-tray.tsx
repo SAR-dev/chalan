@@ -1,9 +1,7 @@
 "use client"
 
-import { Bell, Inbox } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Sheet,
   SheetContent,
@@ -12,50 +10,27 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { NotificationEventIcon } from "@/features/notifications/components/notification-event-icon"
-import { useNotifications } from "@/features/notifications/hooks/use-notifications"
-import { formatDateTime } from "@/lib/format"
-import type { NotificationGroup } from "@/lib/notification-group"
-import { cn } from "@/lib/utils"
+import {
+  type GroupedEvent,
+  NotificationList,
+} from "@/features/notifications/components/notification-list"
+import {
+  useNotificationCount,
+  useNotifications,
+} from "@/features/notifications/hooks/use-notifications"
 
 // =============================================================================
-// The notification tray — what the TopNav bell opens.
+// The notification tray — what the desktop TopNav bell opens.
+//
+// A shell, not a renderer. Rows come from `NotificationList`, which the inbox
+// page and the mobile page also render; the only thing that makes this the tray
+// is the 300px sheet around it and the keyboard handling below.
 //
 // It sits beside the announcement bell rather than replacing it. The bell has
 // always been a link to a board everyone reads; this is addressed mail about
-// specific orders, with an unread badge that drains when you open it. Merging
-// them would give one button two unrelated jobs and two different "unread"
-// meanings.
-//
-// Rendering as a sheet follows `right-nav.tsx`: the codebase has one pattern for
-// a panel opened from the right edge, and inventing a second one here would
-// leave two idioms to learn.
+// specific orders, with an unread badge. Merging them would give one button two
+// unrelated jobs and two different "unread" meanings.
 // =============================================================================
-
-/**
- * "just now" / "12m ago" for the last week, then an absolute date.
- *
- * Relative wording past a week reads as noise ("34d ago"), and the absolute
- * branch goes through `formatDateTime` so it honours BUSINESS_TIMEZONE — the
- * same rule every other timestamp in the app follows.
- */
-function relativeTime(iso: string, now: number): string {
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return ""
-  const seconds = Math.max(0, Math.round((now - then) / 1000))
-  if (seconds < 60) return "just now"
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  if (days < 7) return `${days}d ago`
-  return formatDateTime(iso, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
 
 export function NotificationTray({
   trigger,
@@ -68,13 +43,23 @@ export function NotificationTray({
   trigger: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   // Fetched only once the tray has actually been opened. Mounting it eagerly
   // would pull 50 rows on every merchant page load for a panel most visits never
   // look at; the badge already carries the number on its own endpoint.
   const [hasOpened, setHasOpened] = useState(false)
-  const { notifications, groups, markRead, isLoading } = useNotifications({
-    enabled: hasOpened,
-  })
+  const { notifications, groups, members, markRead, isLoading } =
+    useNotifications({ enabled: hasOpened })
+  const { newCount } = useNotificationCount()
+
+  const toggleExpand = useCallback((key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   /**
    * Dismiss the tray when one of its links is followed.
@@ -99,144 +84,98 @@ export function NotificationTray({
       <SheetTrigger render={<span className="contents" />}>
         {trigger}
       </SheetTrigger>
-      <SheetContent side="right" data-testid="notification-tray">
-        <SheetHeader>
-          <SheetTitle>Notifications</SheetTitle>
-          <SheetDescription>
-            Updates about your orders, deliveries and payouts.
+      <SheetContent
+        side="right"
+        data-testid="notification-tray"
+        className="w-full sm:max-w-[300px] sm:gap-0 sm:px-0"
+      >
+        <SheetHeader className="border-sidebar-border border-b px-4 py-3 text-left">
+          <SheetTitle className="flex items-center gap-2 text-sm">
+            Notifications
+            {newCount > 0 && (
+              <span
+                data-testid="notification-tray-unread-count"
+                className="bg-primary/10 text-primary rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              >
+                {newCount} new
+              </span>
+            )}
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            Updates about your orders, deliveries and payouts. Use the arrow
+            keys to move between rows, Enter to open, E to archive, U to mark
+            read.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto">
+        <TrayLiveRegion count={newCount} />
+
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           {isLoading && notifications.length === 0 ? (
             <p className="text-sidebar-foreground/60 p-4 text-sm">Loading…</p>
-          ) : notifications.length === 0 ? (
-            <div
-              className="text-sidebar-foreground/60 flex flex-col items-center gap-2 p-8 text-center"
-              data-testid="notification-empty"
-            >
-              <Inbox className="size-6" aria-hidden />
-              <p className="text-sm">Nothing yet.</p>
-              <p className="text-xs">
-                You will be notified here when an order moves.
-              </p>
-            </div>
           ) : (
-            <ul className="flex flex-col">
-              {groups.map((g) => (
-                <TrayRow
-                  key={g.key}
-                  group={g}
-                  onNavigate={closeTray}
-                  // Opening a row *is* the read for that row, which the old
-                  // watermark could only express for everything at once.
-                  onRead={markRead}
-                />
-              ))}
-            </ul>
+            <NotificationList
+              groups={groups}
+              members={members}
+              variant="tray"
+              expanded={expanded}
+              onToggleExpand={toggleExpand}
+              onOpen={(g) => {
+                void markRead(g.ids)
+                closeTray()
+              }}
+            />
           )}
         </div>
 
         <div className="border-sidebar-border border-t p-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            render={<Link href="/merchant/notifications" />}
-            nativeButton={false}
+          <Link
+            href="/merchant/notifications"
+            className="hover:bg-sidebar-accent/50 focus-visible:ring-ring flex w-full items-center justify-center rounded-md py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
             onClick={closeTray}
             data-testid="notification-tray-all"
           >
-            <Bell className="size-4" aria-hidden />
             View all
-          </Button>
+          </Link>
         </div>
       </SheetContent>
     </Sheet>
   )
 }
 
-function TrayRow({
-  group,
-  onNavigate,
-  onRead,
-}: {
-  group: NotificationGroup & { unread: boolean }
-  onNavigate: () => void
-  onRead: (ids: string[]) => Promise<unknown>
-}) {
-  const now = Date.now()
-  return (
-    <li className="border-sidebar-border border-b last:border-b-0">
-      <Link
-        href={group.href}
-        className="hover:bg-sidebar-accent/50 flex items-start gap-3 px-4 py-3 transition-colors"
-        // Client-side navigation never touches the Sheet's own open state, so
-        // without this the panel stays open over the page it just opened.
-        onClick={() => {
-          void onRead(group.ids)
-          onNavigate()
-        }}
-        data-testid="notification-tray-row"
-      >
-        <NotificationEventIcon event={group.event} />
-        <span className="min-w-0 flex-1">
-          <span
-            className={cn(
-              "block truncate text-sm",
-              group.unread ? "font-semibold" : "font-medium",
-            )}
-          >
-            {group.title}
-          </span>
-          <span className="text-sidebar-foreground/60 mt-0.5 flex items-center gap-2 text-xs">
-            {/* The subject is what makes the list scannable — `ORD-100163` on its
-                own tells a merchant nothing, so twenty of them are twenty
-                identical rows. Rows written before the column existed fall back
-                to the bare code.
+/**
+ * Announce arriving notifications without moving focus.
+ *
+ * A polite live region rather than a focus change: the reader is somewhere else
+ * in the app and has not asked to be interrupted, but a merchant who has left
+ * the tab open all afternoon should learn that their parcel arrived without
+ * having to go and look.
+ */
+function TrayLiveRegion({ count }: { count: number }) {
+  const previous = useRef(count)
+  const [message, setMessage] = useState("")
 
-                The order id used to sit here too. It is not missed: the row
-                links straight to the order, and with a subject present it was
-                the third fact in a line that only fits two — which is exactly
-                how it pushed the timestamp off the end. Recency is what you scan
-                a notification list *for*, so the subject is the part that gives
-                way (`min-w-0`, truncating) and the time never shrinks. */}
-            <span className="min-w-0 flex-1 truncate">
-              {group.subject ?? group.orderId}
-            </span>
-            <span
-              className="shrink-0 tabular-nums"
-              data-testid="notification-tray-time"
-            >
-              {relativeTime(group.createdAt, now)}
-            </span>
-            {group.count > 1 && (
-              <span
-                data-testid="notification-tray-count"
-                className="bg-sidebar-accent text-sidebar-accent-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
-              >
-                <span aria-hidden>×{group.count}</span>
-                <span className="sr-only">
-                  {group.count} updates for this order
-                </span>
-              </span>
-            )}
-          </span>
-        </span>
-        {group.unread && (
-          // The dot is decorative; the state is announced as text. An
-          // `aria-label` on a bare span has no role to hang it on, so it is
-          // silently dropped by assistive tech.
-          <>
-            <span
-              data-testid="notification-tray-unread"
-              aria-hidden
-              className="bg-primary mt-1.5 size-2 shrink-0 rounded-full"
-            />
-            <span className="sr-only">Unread</span>
-          </>
-        )}
-      </Link>
-    </li>
+  useEffect(() => {
+    if (count > previous.current) {
+      const delta = count - previous.current
+      setMessage(
+        `${delta} new notification${delta === 1 ? "" : "s"}. ${count} unread.`,
+      )
+    }
+    previous.current = count
+  }, [count])
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="sr-only"
+      data-testid="notification-live-region"
+    >
+      {message}
+    </div>
   )
 }
+
+export type { GroupedEvent }

@@ -106,7 +106,12 @@ describe("NotificationBell", () => {
   it("names the unread count for assistive tech", () => {
     swrState.count.data = { newCount: 2 }
     render(<NotificationBell />)
-    expect(screen.getByLabelText("Notifications, 2 new")).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: "Notifications, 2 unread" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Notifications, 2 unread" }),
+    ).toBeInTheDocument()
   })
 
   it("fetches the badge only, deferring the list until the tray opens", () => {
@@ -131,7 +136,9 @@ describe("NotificationBell", () => {
     await waitFor(() =>
       expect(screen.getByTestId("notification-badge")).toBeInTheDocument(),
     )
-    expect(screen.getByLabelText("Notifications, 1 new")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Notifications, 1 unread" }),
+    ).toBeInTheDocument()
   })
 
   it("marks a row read without re-fetching the whole list", async () => {
@@ -183,10 +190,20 @@ describe("NotificationBell", () => {
       expect(res.ok).toBe(true)
     })
 
-    expect(globalMutate).toHaveBeenCalledWith(
-      "/api/notifications?limit=50",
-      undefined,
-      { revalidate: true },
-    )
+    // A predicate, not a literal key: archiving from the inbox also changes what
+    // the tray would show, so every mounted notification key is revalidated.
+    // Rewriting only this hook's own key left the other surface stale until its
+    // own 30s tick.
+    expect(globalMutate).toHaveBeenCalledWith(expect.any(Function), undefined, {
+      revalidate: true,
+    })
+    const calls = globalMutate.mock.calls as unknown as Array<
+      [(key: string) => boolean, unknown, unknown]
+    >
+    const predicate = calls.at(-1)?.[0]
+    expect(typeof predicate).toBe("function")
+    expect(predicate?.("/api/notifications?limit=50")).toBe(true)
+    expect(predicate?.("/api/notifications?count=1")).toBe(true)
+    expect(predicate?.("/api/orders")).toBe(false)
   })
 })

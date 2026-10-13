@@ -43,9 +43,15 @@ export const GET = withErrorHandler(async (req: Request) => {
   const raw = Number(url.searchParams.get("limit"))
   const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, MAX_LIMIT) : 50
 
+  // Additive: `?archived=1` returns dismissed rows instead of live ones. It
+  // exists because archiving was a dead end without it — a row dismissed by
+  // mistake could not be found, inspected or put back, which made "archive"
+  // mean "delete, but slower". Anything that omits it gets exactly the live
+  // inbox it got before, so every existing caller is unaffected.
   const result = await getNotificationsForUser(dbRead, {
     userId: me.userId,
     limit,
+    scope: url.searchParams.get("archived") === "1" ? "archived" : "live",
   })
 
   return NextResponse.json(result)

@@ -103,10 +103,27 @@ export const landing = {
 
 // ─── In-app notifications (merchant) ────────────────────────────────────────
 export const notifications = {
+  // Two controls, one per breakpoint: a link to the full-screen list below `sm`,
+  // the popover above it. Both are mounted; CSS hides one.
   bell: "[data-testid='notification-bell']",
+  bellPage: "[data-testid='notification-bell-page']",
+  badgeMobile: "[data-testid='notification-badge-mobile']",
+  tabUnread: "[data-testid='notification-tab-unread']",
+  tabAll: "[data-testid='notification-tab-all']",
+  tabArchived: "[data-testid='notification-tab-archived']",
+  archiveAllRead: "[data-testid='notification-archive-all-read']",
+  restoreAny: "[data-testid^='notification-restore-']",
+  expandAny: "[data-testid^='notification-expand-']",
+  collapsed: "[data-testid='notification-collapsed']",
+  dayHeader: "[data-testid='notification-day-header']",
+  mobileHeader: "[data-testid='notification-mobile-header']",
+  mobileBack: "[data-testid='notification-mobile-back']",
+  listEmpty: "[data-testid='notification-list-empty']",
   badge: "[data-testid='notification-badge']",
   tray: "[data-testid='notification-tray']",
-  trayRow: "[data-testid='notification-tray-row']",
+  // The tray renders the shared list, so a tray row *is* an inbox row; the
+  // testid carries the group key and can only be matched by prefix.
+  trayRow: "[data-testid^='notification-row-']",
   trayEmpty: "[data-testid='notification-empty']",
   trayAll: "[data-testid='notification-tray-all']",
   // Inbox rows carry the notification id, which the test only learns at runtime.
@@ -120,7 +137,7 @@ export const notifications = {
   // A tray row that is still unread. Used instead of the badge, which caps at
   // "9+" and so reports a display value rather than a count.
   unreadTrayRow:
-    "[data-testid='notification-tray-row']:has([data-testid='notification-tray-unread'])",
+    "[data-testid^='notification-row-']:has([data-testid='notification-unread-dot'])",
 }
 
 // ─── Announcement create/edit pages (replaced the dialogs) ──────────────────
