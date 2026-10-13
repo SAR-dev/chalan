@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { PATCH as ARCHIVE } from "@/app/api/notifications/[id]/archive/route"
+import { POST as READ } from "@/app/api/notifications/read/route"
 import { GET } from "@/app/api/notifications/route"
-import { POST } from "@/app/api/notifications/seen/route"
 
 const {
   requireSessionMock,
@@ -8,7 +9,9 @@ const {
   forbiddenMock,
   getNotificationsForUserMock,
   countUnreadNotificationsMock,
-  markNotificationsSeenMock,
+  markNotificationsReadMock,
+  setNotificationArchivedMock,
+  notFoundMock,
 } = vi.hoisted(() => ({
   requireSessionMock: vi.fn(),
   unauthorizedMock: vi.fn(() =>
@@ -27,20 +30,28 @@ const {
   countUnreadNotificationsMock: vi.fn(
     async (_runner: unknown, _opts: Record<string, unknown>) => 0,
   ),
-  markNotificationsSeenMock: vi.fn(
-    async (_updater: unknown, _opts: Record<string, unknown>) => {},
+  markNotificationsReadMock: vi.fn(
+    async (_updater: unknown, _opts: Record<string, unknown>) => 3,
+  ),
+  setNotificationArchivedMock: vi.fn(
+    async (_updater: unknown, _opts: Record<string, unknown>) => true,
+  ),
+  notFoundMock: vi.fn(() =>
+    Response.json({ error: "Not found" }, { status: 404 }),
   ),
 }))
 
 vi.mock("@/lib/api-auth", () => ({ requireSession: requireSessionMock }))
 vi.mock("@/lib/api-response", () => ({
+  notFound: notFoundMock,
   unauthorized: unauthorizedMock,
   forbidden: forbiddenMock,
 }))
 vi.mock("@/lib/notifications", () => ({
   getNotificationsForUser: getNotificationsForUserMock,
   countUnreadNotifications: countUnreadNotificationsMock,
-  markNotificationsSeen: markNotificationsSeenMock,
+  markNotificationsRead: markNotificationsReadMock,
+  setNotificationArchived: setNotificationArchivedMock,
 }))
 vi.mock("@/lib/db", () => ({ dbRead: {}, db: {} }))
 
@@ -53,6 +64,15 @@ const merchant = {
 
 function req(url: string) {
   return new Request(`http://localhost${url}`)
+}
+
+/** A request carrying a JSON body, for the mutation routes. */
+function jsonReq(url: string, body: unknown, method = "POST") {
+  return new Request(`http://localhost${url}`, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  })
 }
 
 describe("GET /api/notifications", () => {
@@ -118,19 +138,18 @@ describe("GET /api/notifications", () => {
     })
   })
 
-  it("passes the watermark so the server decides what is new", async () => {
-    requireSessionMock.mockResolvedValue({
-      ...merchant,
-      notificationsSeenAt: "2026-01-01T00:00:00.000Z",
-    })
+  it("does not pass a watermark, because read state lives on the rows", async () => {
+    // The whole point of the change: "what is unread" is a property of the
+    // notifications themselves, so the route has nothing of the sort to forward.
+    requireSessionMock.mockResolvedValue(merchant)
     await GET(req("/api/notifications"))
-    expect(getNotificationsForUserMock.mock.calls[0][1]).toMatchObject({
-      seenAt: "2026-01-01T00:00:00.000Z",
-    })
+    expect(getNotificationsForUserMock.mock.calls[0][1]).not.toHaveProperty(
+      "seenAt",
+    )
   })
 })
 
-describe("POST /api/notifications/seen", () => {
+describe("POST /api/notifications/read", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     requireSessionMock.mockResolvedValue(merchant)
@@ -138,22 +157,75 @@ describe("POST /api/notifications/seen", () => {
 
   it("401s without a session", async () => {
     requireSessionMock.mockResolvedValue(null)
-    const res = await POST()
+    const res = await READ(jsonReq("/api/notifications/read", { ids: ["n1"] }))
     expect(res.status).toBe(401)
-    expect(markNotificationsSeenMock).not.toHaveBeenCalled()
+    expect(markNotificationsReadMock).not.toHaveBeenCalled()
   })
 
-  it("stamps the caller's own watermark", async () => {
-    const res = await POST()
+  it("403s for a role with no inbox", async () => {
+    requireSessionMock.mockResolvedValue({ ...merchant, role: "RIDER" })
+    const res = await READ(jsonReq("/api/notifications/read", { ids: ["n1"] }))
+    expect(res.status).toBe(403)
+  })
+
+  it("marks only the caller's own rows", async () => {
+    const res = await READ(jsonReq("/api/notifications/read", { ids: ["n1"] }))
     expect(res.status).toBe(200)
-    expect(markNotificationsSeenMock.mock.calls[0][1]).toMatchObject({
+    expect(markNotificationsReadMock.mock.calls[0][1]).toMatchObject({
+      userId: "usr-1",
+      ids: ["n1"],
+    })
+  })
+
+  it("marks everything when asked to", async () => {
+    await READ(jsonReq("/api/notifications/read", { all: true }))
+    // `ids` must be omitted rather than empty, or the server would scope the
+    // write to nothing and report success.
+    expect(markNotificationsReadMock.mock.calls[0][1].ids).toBeUndefined()
+  })
+
+  it("400s when neither ids nor all is given", async () => {
+    const res = await READ(jsonReq("/api/notifications/read", {}))
+    expect(res.status).toBe(400)
+    expect(markNotificationsReadMock).not.toHaveBeenCalled()
+  })
+})
+
+describe("PATCH /api/notifications/[id]/archive", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    requireSessionMock.mockResolvedValue(merchant)
+  })
+
+  it("archives when the body omits a direction", async () => {
+    const res = await ARCHIVE(
+      new Request("http://test.local", { method: "PATCH" }),
+      { params: Promise.resolve({ id: "n1" }) },
+    )
+    expect(res.status).toBe(200)
+    expect(setNotificationArchivedMock.mock.calls[0][1]).toMatchObject({
+      id: "n1",
+      archived: true,
       userId: "usr-1",
     })
   })
 
-  it("returns the instant it stamped, so the client can show it", async () => {
-    const res = await POST()
-    const body = await res.json()
-    expect(typeof body.seenAt).toBe("string")
+  it("restores when told to", async () => {
+    await ARCHIVE(
+      jsonReq("/api/notifications/n1/archive", { archived: false }),
+      { params: Promise.resolve({ id: "n1" }) },
+    )
+    expect(setNotificationArchivedMock.mock.calls[0][1]).toMatchObject({
+      archived: false,
+    })
+  })
+
+  it("404s for a row the caller does not own", async () => {
+    setNotificationArchivedMock.mockResolvedValue(false)
+    const res = await ARCHIVE(
+      new Request("http://test.local", { method: "PATCH" }),
+      { params: Promise.resolve({ id: "somebody-elses" }) },
+    )
+    expect(res.status).toBe(404)
   })
 })

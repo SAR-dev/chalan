@@ -113,6 +113,14 @@ export const notifications = {
   inboxRowAny: "[data-testid^='notification-row-']",
   newPill: (id: string) => `[data-testid='notification-new-${id}']`,
   navLink: "[data-testid='nav-/merchant/notifications']",
+  markAllRead: "[data-testid='notification-mark-all-read']",
+  // The archive button carries the group's key, which the test only learns at
+  // runtime from the row it belongs to.
+  archiveAny: "[data-testid^='notification-archive-']",
+  // A tray row that is still unread. Used instead of the badge, which caps at
+  // "9+" and so reports a display value rather than a count.
+  unreadTrayRow:
+    "[data-testid='notification-tray-row']:has([data-testid='notification-tray-unread'])",
 }
 
 // ─── Announcement create/edit pages (replaced the dialogs) ──────────────────

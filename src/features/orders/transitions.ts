@@ -32,6 +32,10 @@ import {
   rider,
 } from "@/lib/db/schema"
 import { hasNavPermission } from "@/lib/nav-config"
+import {
+  buildNotificationSubject,
+  createCityNameResolver,
+} from "@/lib/notification-subject"
 import { createRecipientResolver } from "@/lib/notifications"
 import { computeActualDeliveryDays } from "@/lib/order-delivery-time"
 import { emitOrderEvent, type OrderEvent } from "@/lib/order-events"
@@ -845,6 +849,9 @@ async function emitOrderEventForTransition(
   actorName: string,
   now?: string,
   resolveRecipients?: (merchantId: string) => Promise<string[]>,
+  // Shared across the batch, so a hundred transitions to the same city resolve
+  // its name once rather than a hundred times.
+  buildSubject?: (order: OrderRow) => Promise<string | null>,
 ): Promise<void> {
   const event = TRANSITION_EVENT[name]
   if (!event) return
@@ -855,6 +862,7 @@ async function emitOrderEventForTransition(
     merchantId: after.merchantId,
     actorName,
     now,
+    subject: buildSubject ? await buildSubject(after) : null,
     resolveRecipients,
     data: {
       id: after.id,
@@ -1204,6 +1212,8 @@ export async function applyOrderTransition(
       updated,
       me.name,
       ctx.now,
+      undefined,
+      (order) => buildNotificationSubject(order, createCityNameResolver()),
     )
 
     return NextResponse.json(updated)
@@ -1392,6 +1402,11 @@ export async function applyBulkOrderTransition(
     // 3 lookups, not 25. Without this the batch cost grows with batch size,
     // which is exactly what the batch-cost guards pin.
     const resolveRecipients = createRecipientResolver(tx)
+    // Same reasoning as the recipient resolver above: 25 orders across 2 cities
+    // must cost 2 lookups, not 25.
+    const resolveCityName = createCityNameResolver()
+    const buildSubject = (order: OrderRow) =>
+      buildNotificationSubject(order, resolveCityName)
     for (const row of updated) {
       await emitOrderEventForTransition(
         tx,
@@ -1401,6 +1416,7 @@ export async function applyBulkOrderTransition(
         me.name,
         batchNow,
         resolveRecipients,
+        buildSubject,
       )
     }
 

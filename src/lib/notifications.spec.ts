@@ -1,10 +1,13 @@
+import type { SQL } from "drizzle-orm"
+import { PgDialect } from "drizzle-orm/pg-core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   countUnreadNotifications,
   createRecipientResolver,
   emitNotificationEvent,
   getNotificationsForUser,
-  markNotificationsSeen,
+  markNotificationsRead,
+  setNotificationArchived,
 } from "@/lib/notifications"
 
 // A fluent builder that terminates in the rows it was seeded with, so each
@@ -60,12 +63,27 @@ function makeRunner<T>(rows: T[]) {
         state.updated = v
         return chain
       }
-      chain.where = () => Promise.resolve()
+      chain.where = (w: unknown) => {
+        // Captured so a spec can assert the *predicate*, which is where the
+        // ownership and idempotency guarantees actually live.
+        state.where = w
+        return chain
+      }
+      chain.returning = () => Promise.resolve([])
       return chain
     },
   }
   return { runner: runner as unknown as { select: () => unknown }, state }
 }
+
+/**
+ * Render a Drizzle predicate back to SQL. `String(sqlObject)` yields
+ * "[object Object]", so an assertion built on it would say nothing about the
+ * query it meant to check.
+ */
+const dialect = new PgDialect()
+const sqlText = (where: unknown): string =>
+  where ? dialect.sqlToQuery(where as SQL).sql : ""
 
 const { dbMock } = vi.hoisted(() => ({
   dbMock: { select: vi.fn((): unknown => undefined) },
@@ -311,7 +329,6 @@ describe("getNotificationsForUser", () => {
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: null,
     })
 
     expect(result.notifications).toHaveLength(1)
@@ -329,7 +346,6 @@ describe("getNotificationsForUser", () => {
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: null,
     })
 
     expect(result.notifications[0].href).toBe("/merchant/orders/ORD-1")
@@ -354,7 +370,6 @@ describe("getNotificationsForUser", () => {
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: null,
     })
 
     expect(result.notifications[0].href).toBe("/merchant/orders/ORD-1")
@@ -375,7 +390,6 @@ describe("getNotificationsForUser", () => {
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: null,
     })
 
     expect(result.notifications[0].href).toBe("/merchant/payouts")
@@ -391,7 +405,6 @@ describe("getNotificationsForUser", () => {
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: null,
     })
 
     for (const n of result.notifications) {
@@ -399,23 +412,34 @@ describe("getNotificationsForUser", () => {
     }
   })
 
-  it("counts only rows newer than the watermark", async () => {
+  it("counts unread rows, not everything past a watermark", async () => {
     const rows = [
-      { ...ROW, id: "new", createdAt: "2026-01-02T00:00:00.000Z" },
-      { ...ROW, id: "old", createdAt: "2025-12-31T00:00:00.000Z" },
+      { ...ROW, id: "unread", readAt: null },
+      { ...ROW, id: "read", readAt: NOW },
     ]
     const { runner } = makeRunner(rows)
     dbMock.select.mockReturnValue(runner.select())
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: "2026-01-01T00:00:00.000Z",
     })
 
-    // One of two is newer than the watermark — the badge and the list agree
-    // because they come from the same read.
+    // Read state lives on the row, so the count is a property of the rows rather
+    // than a comparison against a timestamp on the profile.
     expect(result.newCount).toBe(1)
     expect(result.notifications).toHaveLength(2)
+  })
+
+  it("counts a row with no readAt as unread", async () => {
+    // `undefined` as well as `null`: an `=== null` check would report this row as
+    // read and drop it from the badge.
+    const { runner } = makeRunner([ROW])
+    dbMock.select.mockReturnValue(runner.select())
+
+    const result = await getNotificationsForUser(undefined as never, {
+      userId: "usr-1",
+    })
+    expect(result.newCount).toBe(1)
   })
 
   it("treats a never-seen reader as having everything new", async () => {
@@ -424,7 +448,6 @@ describe("getNotificationsForUser", () => {
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: null,
     })
     expect(result.newCount).toBe(1)
   })
@@ -438,7 +461,6 @@ describe("getNotificationsForUser", () => {
 
     const result = await getNotificationsForUser(undefined as never, {
       userId: "usr-1",
-      seenAt: null,
     })
     expect(result.notifications[0].createdAt).toBe(ROW.createdAt)
     expect(result.notifications[0]).toMatchObject({
@@ -461,7 +483,6 @@ describe("countUnreadNotifications", () => {
 
     const n = await countUnreadNotifications(runner as never, {
       userId: "usr-1",
-      seenAt: "2026-01-01T00:00:00.000Z",
     })
     expect(n).toBe(5)
   })
@@ -472,22 +493,74 @@ describe("countUnreadNotifications", () => {
 
     const n = await countUnreadNotifications(runner as never, {
       userId: "usr-1",
-      seenAt: null,
     })
     expect(n).toBe(0)
   })
 })
 
-describe("markNotificationsSeen", () => {
-  it("advances the watermark monotonically", async () => {
+describe("markNotificationsRead", () => {
+  it("scopes by userId as well as by id, so a crafted id cannot reach another inbox", async () => {
     const { runner, state } = makeRunner([])
-    await markNotificationsSeen(runner as never, {
+    await markNotificationsRead(runner as never, {
       userId: "usr-1",
+      ids: ["someone-elses"],
       now: NOW,
     })
 
-    // GREATEST with the stored value is what makes a stale client harmless.
-    expect(state.updated).toHaveProperty("notificationsSeenAt")
-    expect(state.updated?.notificationsSeenAt).toBeDefined()
+    const where = sqlText(state.where)
+    expect(where).toContain('"userId"')
+    expect(where).toContain('"readAt"')
+  })
+
+  it("only writes rows that are still unread, so a double-submit is inert", async () => {
+    const { runner, state } = makeRunner([])
+    await markNotificationsRead(runner as never, {
+      userId: "usr-1",
+      ids: ["n1"],
+      now: NOW,
+    })
+
+    // `readAt IS NULL` is what makes marking idempotent: without it a repeat
+    // request moves the timestamp, and "read before this row" ordering would
+    // quietly depend on request order.
+    expect(sqlText(state.where)).toMatch(/"readAt" is null/)
+  })
+
+  it("leaves archived rows alone", async () => {
+    const { runner, state } = makeRunner([])
+    await markNotificationsRead(runner as never, {
+      userId: "usr-1",
+      ids: ["n1"],
+      now: NOW,
+    })
+    // Archiving is the stronger statement. A bulk "mark all read" that also undid
+    // a dismissal would collapse the two into one indistinguishable state.
+    expect(sqlText(state.where)).toMatch(/"archivedAt" is null/)
+  })
+})
+
+describe("setNotificationArchived", () => {
+  it("stamps archivedAt on archive", async () => {
+    const { runner, state } = makeRunner([])
+    await setNotificationArchived(runner as never, {
+      userId: "usr-1",
+      id: "n1",
+      archived: true,
+      now: NOW,
+    })
+    expect(state.updated).toEqual({ archivedAt: NOW })
+  })
+
+  it("clears archivedAt on restore and nothing else", async () => {
+    const { runner, state } = makeRunner([])
+    await setNotificationArchived(runner as never, {
+      userId: "usr-1",
+      id: "n1",
+      archived: false,
+      now: NOW,
+    })
+    // Restoring must not clear `readAt`: the row has to come back exactly as it
+    // was, and collapsing archive into read would lose that distinction.
+    expect(state.updated).toEqual({ archivedAt: null })
   })
 })

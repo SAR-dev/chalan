@@ -16,6 +16,7 @@ import { NotificationEventIcon } from "@/features/notifications/components/notif
 import { useNotifications } from "@/features/notifications/hooks/use-notifications"
 import { formatDateTime } from "@/lib/format"
 import type { NotificationGroup } from "@/lib/notification-group"
+import { cn } from "@/lib/utils"
 
 // =============================================================================
 // The notification tray — what the TopNav bell opens.
@@ -71,7 +72,7 @@ export function NotificationTray({
   // would pull 50 rows on every merchant page load for a panel most visits never
   // look at; the badge already carries the number on its own endpoint.
   const [hasOpened, setHasOpened] = useState(false)
-  const { notifications, groups, markSeen, isLoading } = useNotifications({
+  const { notifications, groups, markRead, isLoading } = useNotifications({
     enabled: hasOpened,
   })
 
@@ -93,10 +94,6 @@ export function NotificationTray({
         setOpen(next)
         if (!next) return
         setHasOpened(true)
-        // Opening the tray *is* the read: one watermark write drains the badge,
-        // rather than a read receipt per row. Failing to stamp leaves the badge
-        // showing, which is the honest state, so it is not a toast.
-        void markSeen()
       }}
     >
       <SheetTrigger render={<span className="contents" />}>
@@ -127,7 +124,14 @@ export function NotificationTray({
           ) : (
             <ul className="flex flex-col">
               {groups.map((g) => (
-                <TrayRow key={g.key} group={g} onNavigate={closeTray} />
+                <TrayRow
+                  key={g.key}
+                  group={g}
+                  onNavigate={closeTray}
+                  // Opening a row *is* the read for that row, which the old
+                  // watermark could only express for everything at once.
+                  onRead={markRead}
+                />
               ))}
             </ul>
           )}
@@ -155,9 +159,11 @@ export function NotificationTray({
 function TrayRow({
   group,
   onNavigate,
+  onRead,
 }: {
-  group: NotificationGroup & { isNew?: boolean }
+  group: NotificationGroup & { unread: boolean }
   onNavigate: () => void
+  onRead: (ids: string[]) => Promise<unknown>
 }) {
   const now = Date.now()
   return (
@@ -167,32 +173,59 @@ function TrayRow({
         className="hover:bg-sidebar-accent/50 flex items-start gap-3 px-4 py-3 transition-colors"
         // Client-side navigation never touches the Sheet's own open state, so
         // without this the panel stays open over the page it just opened.
-        onClick={onNavigate}
+        onClick={() => {
+          void onRead(group.ids)
+          onNavigate()
+        }}
         data-testid="notification-tray-row"
       >
         <NotificationEventIcon event={group.event} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">
+          <span
+            className={cn(
+              "block truncate text-sm",
+              group.unread ? "font-semibold" : "font-medium",
+            )}
+          >
             {group.title}
           </span>
           <span className="text-sidebar-foreground/60 mt-0.5 flex items-center gap-2 text-xs">
+            {/* The subject is what makes the list scannable — `ORD-100163` on its
+                own tells a merchant nothing, so twenty of them are twenty
+                identical rows. Rows written before the column existed fall back
+                to the bare code. */}
             <span className="truncate">
-              {group.orderId ? `${group.orderId} · ` : ""}
-              {relativeTime(group.createdAt, now)}
+              {[
+                group.subject,
+                group.orderId,
+                relativeTime(group.createdAt, now),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
             {group.count > 1 && (
               <span
                 data-testid="notification-tray-count"
                 className="bg-sidebar-accent text-sidebar-accent-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
               >
-                {/* "2" alone, sitting next to "· 1h ago", reads as a stray
-                    superscript rather than a count. The inbox already spells this
-                    out; two surfaces must not word the same thing differently. */}
                 {group.count} updates
               </span>
             )}
           </span>
         </span>
+        {group.unread && (
+          // The dot is decorative; the state is announced as text. An
+          // `aria-label` on a bare span has no role to hang it on, so it is
+          // silently dropped by assistive tech.
+          <>
+            <span
+              data-testid="notification-tray-unread"
+              aria-hidden
+              className="bg-primary mt-1.5 size-2 shrink-0 rounded-full"
+            />
+            <span className="sr-only">Unread</span>
+          </>
+        )}
       </Link>
     </li>
   )

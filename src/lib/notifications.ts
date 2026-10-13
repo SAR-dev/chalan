@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { db, dbRead } from "@/lib/db"
 import { notification, profile } from "@/lib/db/schema"
 // Pure, and client-safe — `useNotificationFeed` renders the grouped list, and
@@ -51,6 +51,7 @@ export async function emitNotificationEvent({
   merchantId,
   actorName,
   now,
+  subject,
   recipients: preResolved,
 }: {
   tx: WebhookTx
@@ -59,6 +60,15 @@ export async function emitNotificationEvent({
   merchantId: string
   actorName: string | null
   now: string
+  /**
+   * "Notify Recipient → Barisal", snapshotted now.
+   *
+   * Denormalised because `orderId` has no foreign key: a notification outlives
+   * its order, so without this the row has nothing left to identify the parcel
+   * it was about. Rows written before the column existed fall back to the bare
+   * order code in the UI.
+   */
+  subject?: string | null
   /**
    * Recipients already looked up by the caller.
    *
@@ -88,6 +98,7 @@ export async function emitNotificationEvent({
           actorName,
           title,
           href,
+          subject: subject ?? null,
           createdAt: now,
         })),
       )
@@ -200,16 +211,17 @@ export interface NotificationFeedResult {
  */
 export async function getNotificationsForUser(
   reader: Reader = dbRead,
-  {
-    userId,
-    seenAt,
-    limit = 50,
-  }: { userId: string; seenAt: string | null; limit?: number },
+  { userId, limit = 50 }: { userId: string; limit?: number },
 ): Promise<NotificationFeedResult> {
   const rows = await reader
     .select()
     .from(notification)
-    .where(eq(notification.userId, userId))
+    .where(
+      // Archived rows are filtered in SQL, not in the mapper: the tray polls
+      // every 30s and shipping dismissed rows over the wire only to drop them
+      // would make the read scale with everything the reader ever dismissed.
+      and(eq(notification.userId, userId), isNull(notification.archivedAt)),
+    )
     .orderBy(desc(notification.createdAt))
     .limit(limit)
 
@@ -218,56 +230,105 @@ export async function getNotificationsForUser(
     href: notificationHref(n),
   }))
 
-  const newCount = seenAt
-    ? rows.filter((n) => n.createdAt > seenAt).length
-    : rows.length
+  // Derived from `readAt` rather than a watermark, so the badge and the list
+  // are two readings of the same rows and cannot disagree about a moment.
+  // `!n.readAt` rather than `=== null`: a row that has not been through the
+  // mapper can carry `undefined`, and `undefined === null` is false — which
+  // would report an unread row as read and hide it from the badge.
+  const newCount = rows.filter((n) => !n.readAt).length
 
-  return {
-    notifications,
-    newCount,
-  }
+  return { notifications, newCount }
 }
 
 /**
  * Count unread notifications without loading the list.
  *
  * A separate endpoint from the list because the badge polls: counting rows
- * against `notification_user_created_idx` is far cheaper than shipping 50 rows
+ * against `notification_user_unread_idx` is far cheaper than shipping 50 rows
  * every tick for a tray nobody opened.
+ *
+ * Archived rows are excluded rather than counted-as-read, so dismissing noise
+ * clears the badge the same way reading it would.
  */
 export async function countUnreadNotifications(
   reader: Reader = dbRead,
-  { userId, seenAt }: { userId: string; seenAt: string | null },
+  { userId }: { userId: string },
 ): Promise<number> {
   const [row] = await reader
     .select({ n: sql<number>`count(*)::int` })
     .from(notification)
     .where(
-      seenAt
-        ? and(
-            eq(notification.userId, userId),
-            gt(notification.createdAt, seenAt),
-          )
-        : eq(notification.userId, userId),
+      and(
+        eq(notification.userId, userId),
+        isNull(notification.readAt),
+        isNull(notification.archivedAt),
+      ),
     )
   return row?.n ?? 0
 }
 
 /**
- * Stamp the reader's watermark.
+ * Mark notifications read.
  *
- * Monotonic by construction: `GREATEST` with the stored value means a client
- * whose clock is behind, or that double-submits, cannot re-badge notifications
- * it has already seen. Mirrors `POST /api/announcements/seen`.
+ * Scoped to the caller's own rows by `userId` as well as by id, so a crafted id
+ * cannot reach another account's notifications.
+ *
+ * Archived rows are left alone: archiving is a stronger statement than reading,
+ * and a bulk "mark all read" that also undid a dismissal would make the two
+ * states impossible to keep apart.
+ *
+ * Idempotent — `readAt` is only written where it is still null, so a
+ * double-submit does not move the timestamp and "read at" ordering stays
+ * meaningful.
  */
-export async function markNotificationsSeen(
+export async function markNotificationsRead(
   updater: Pick<typeof db, "update"> = db,
-  { userId, now }: { userId: string; now: string },
-): Promise<void> {
-  await updater
-    .update(profile)
-    .set({
-      notificationsSeenAt: sql`GREATEST(COALESCE(${profile.notificationsSeenAt}, ${now}::timestamptz), ${now}::timestamptz)`,
-    })
-    .where(eq(profile.userId, userId))
+  { userId, ids, now }: { userId: string; ids?: string[]; now: string },
+): Promise<number> {
+  const scoped =
+    ids && ids.length > 0 ? and(inArray(notification.id, ids)) : undefined
+
+  const rows = await updater
+    .update(notification)
+    .set({ readAt: now })
+    .where(
+      and(
+        eq(notification.userId, userId),
+        isNull(notification.readAt),
+        isNull(notification.archivedAt),
+        scoped,
+      ),
+    )
+    .returning({ id: notification.id })
+
+  return rows.length
+}
+
+/**
+ * Dismiss or restore a notification.
+ *
+ * Archiving clears nothing else: it is a view filter, and restoring a row must
+ * hand back exactly what it had before.
+ */
+export async function setNotificationArchived(
+  updater: Pick<typeof db, "update"> = db,
+  {
+    userId,
+    id,
+    archived,
+    now,
+  }: {
+    userId: string
+    id: string
+    archived: boolean
+    now: string
+  },
+): Promise<boolean> {
+  const rows = await updater
+    .update(notification)
+    .set({ archivedAt: archived ? now : null })
+    .where(and(eq(notification.id, id), eq(notification.userId, userId)))
+    .returning({ id: notification.id })
+
+  return rows.length > 0
 }

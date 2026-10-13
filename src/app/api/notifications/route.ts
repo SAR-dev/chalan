@@ -15,7 +15,7 @@ import { withErrorHandler } from "@/lib/with-error-handler"
 // else's. `limit` is clamped because the tray renders a fixed-height list — an
 // unbounded inbox would be a cheap way for one account to pull the whole table.
 //
-// `?count=1` returns only the unread badge number. It is a separate shape rather
+// `?count=1` returns only the unread badge number, counted from `readAt`. It is a separate shape rather
 // than a flag on the list response so the badge poll stays a small row-count
 // query instead of dragging 50 rows across the network every few seconds.
 
@@ -36,7 +36,6 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (countOnly) {
     const newCount = await countUnreadNotifications(dbRead, {
       userId: me.userId,
-      seenAt: me.notificationsSeenAt ?? null,
     })
     return NextResponse.json({ newCount })
   }
@@ -46,7 +45,6 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const result = await getNotificationsForUser(dbRead, {
     userId: me.userId,
-    seenAt: me.notificationsSeenAt ?? null,
     limit,
   })
 

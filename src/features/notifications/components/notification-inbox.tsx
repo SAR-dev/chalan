@@ -1,27 +1,14 @@
 "use client"
 
-import { Inbox } from "lucide-react"
+import { Archive, CheckCheck, Inbox } from "lucide-react"
 import Link from "next/link"
 import { PageHeader } from "@/components/page-header"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { NotificationEventIcon } from "@/features/notifications/components/notification-event-icon"
 import { useNotificationFeed } from "@/features/notifications/hooks/use-notifications"
 import { formatDateTime } from "@/lib/format"
-
-/**
- * The full notification inbox — the destination the tray's "View all" links to.
- *
- * Newest first and never paginated past 50: a merchant's working set is what
- * happened in the last few hours, and the tray exists for the same window. A
- * NEW pill marks rows that arrived since the last visit, cleared by the single
- * watermark write this page makes on mount.
- */
-interface Props {
-  title: string
-  description: string
-}
 
 /**
  * "2:59 AM · Oct 13" inside a week, "Oct 13, 2026" beyond it.
@@ -44,12 +31,32 @@ function formatNotificationTime(iso: string): string {
   return `${formatDateTime(iso, { hour: "numeric", minute: "2-digit" })} · ${formatDateTime(iso, { month: "short", day: "numeric" })}`
 }
 
-export function NotificationInbox({ title, description }: Props) {
-  const { groups, isLoading } = useNotificationFeed()
+export function NotificationInbox({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  const { groups, unreadCount, markAllRead, setArchived, isLoading } =
+    useNotificationFeed()
 
   return (
     <>
-      <PageHeader title={title} description={description} />
+      <PageHeader title={title} description={description}>
+        {unreadCount > 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => void markAllRead()}
+            data-testid="notification-mark-all-read"
+          >
+            <CheckCheck className="size-4" />
+            Mark all read
+          </Button>
+        ) : null}
+      </PageHeader>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -75,42 +82,52 @@ export function NotificationInbox({ title, description }: Props) {
       ) : (
         <div className="space-y-2">
           {groups.map((g) => (
-            <Link
+            <div
               key={g.key}
-              href={g.href}
               data-testid={`notification-row-${g.key}`}
-              className="bg-card hover:bg-muted/50 group block w-full rounded-lg border text-left transition-colors"
+              // Unread rows carry a left rule and a tinted ground so they read as
+              // a queue to work through, not as a wall of identical cards. The
+              // old model could not do this — every row was either all-new or
+              // all-seen at once, because read state was one watermark.
+              className={
+                g.unread
+                  ? "bg-primary/[0.04] border-primary/25 group relative flex items-start gap-4 rounded-lg border border-l-[3px] px-5 py-4 transition-colors hover:bg-muted/50"
+                  : "bg-card group relative flex items-start gap-4 rounded-lg border px-5 py-4 transition-colors hover:bg-muted/50"
+              }
             >
-              <div className="flex items-start gap-4 px-5 py-4">
+              <Link
+                href={g.href}
+                className="flex min-w-0 flex-1 items-start gap-4"
+              >
                 <NotificationEventIcon event={g.event} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-4">
                     <p
-                      className={`truncate text-sm ${
-                        g.isNew
-                          ? "text-foreground font-semibold"
-                          : "text-muted-foreground font-normal"
-                      }`}
+                      className={
+                        g.unread
+                          ? "text-foreground truncate text-sm font-semibold"
+                          : "text-muted-foreground truncate text-sm font-normal"
+                      }
                     >
                       {g.title}
                     </p>
                     <time className="text-muted-foreground shrink-0 text-xs">
-                      {/* Date alone left every row reading "Oct 13, 2026" —
-                          which is most of them, because a busy day produces most
-                          of a merchant's notifications. Showing the clock time
-                          below a week out is what makes the list order legible;
-                          older rows keep the date so the column stays narrow. */}
                       {formatNotificationTime(g.createdAt)}
                     </time>
                   </div>
                   <p className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                    {/* The subject is the reason this list is usable: `ORD-100163`
+                        on its own identifies nothing, so twenty rows were twenty
+                        identical lines. Old rows fall back to the bare code. */}
                     <span className="truncate">
-                      {g.orderId ?? "Payout"}
-                      {g.actorName ? ` · by ${g.actorName}` : ""}
+                      {[
+                        g.subject ?? "Payout",
+                        g.orderId,
+                        g.actorName ? `by ${g.actorName}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
-                    {/* How much happened under this row. Hidden at 1, since "1
-                        update" is noise and the title already says one thing
-                        happened. */}
                     {g.count > 1 && (
                       <span
                         data-testid={`notification-count-${g.key}`}
@@ -121,17 +138,22 @@ export function NotificationInbox({ title, description }: Props) {
                     )}
                   </p>
                 </div>
+              </Link>
 
-                {g.isNew && (
-                  <Badge
-                    data-testid={`notification-new-${g.key}`}
-                    className="mt-0.5 shrink-0"
-                  >
-                    NEW
-                  </Badge>
-                )}
-              </div>
-            </Link>
+              {/* Dismissal is per row and separate from reading: an ops-heavy
+                  merchant archives routine dispatch noise while still needing to
+                  prove they saw a payout. */}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="text-muted-foreground hover:text-foreground shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                aria-label={`Archive notification about ${g.title}`}
+                data-testid={`notification-archive-${g.key}`}
+                onClick={() => void setArchived(g.ids[0], true)}
+              >
+                <Archive className="size-3.5" />
+              </Button>
+            </div>
           ))}
         </div>
       )}

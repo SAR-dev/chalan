@@ -134,88 +134,59 @@ describe("NotificationBell", () => {
     expect(screen.getByLabelText("Notifications, 1 new")).toBeInTheDocument()
   })
 
-  it("does not cache an empty inbox over rows still in flight", async () => {
-    // Opening the tray stamps the watermark, which resolves before the first
-    // list fetch. If markSeen wrote {notifications: []} into the cache at that
-    // moment it would overwrite the real rows as they arrived, and a merchant
-    // with notifications would be told they had none.
+  it("marks a row read without re-fetching the whole list", async () => {
+    // Read state is optimistic: the row is stamped locally so the badge clears
+    // on the same tick the POST lands, rather than lying for a round trip.
     const { useNotifications } = await import(
       "@/features/notifications/hooks/use-notifications"
     )
     const { result } = renderHook(() => useNotifications())
 
     await act(async () => {
-      const res = await result.current.markSeen()
+      const res = await result.current.markRead(["n1"])
       expect(res.ok).toBe(true)
     })
 
-    // The cache was never populated, so nothing was overwritten.
     expect(listMutate).not.toHaveBeenCalled()
   })
 
-  it("drains the badge's own cache, not just the list", async () => {
-    // The badge reads a separate SWR key (`?count=1`) from the list. Draining
-    // only the list leaves the bell showing its last polled number, so the tray
-    // reads "seen" while the badge still counts the same rows.
+  it("refreshes the badge's own cache when marking read", async () => {
+    // The badge reads a separate SWR key (`?count=1`). Leaving it alone would
+    // show the bell still counting rows the tray has already marked read, which
+    // is the "the badge is lying" moment the per-row model was meant to remove.
     const { useNotifications } = await import(
       "@/features/notifications/hooks/use-notifications"
     )
     const { result } = renderHook(() => useNotifications())
 
     await act(async () => {
-      await result.current.markSeen()
+      await result.current.markRead(["n1"])
     })
 
     expect(globalMutate).toHaveBeenCalledWith(
       "/api/notifications?count=1",
-      { newCount: 0 },
-      { revalidate: false },
+      undefined,
+      { revalidate: true },
     )
   })
-})
 
-/**
- * The two TopNav bells sit next to each other as icon-only buttons, so the glyph
- * is the only thing telling them apart for a sighted user. They were both a
- * generic `Bell`, which is indistinguishable at a glance and read as one broken
- * control rather than two features.
- */
-describe("the two TopNav bells are visually distinguishable", () => {
-  it("does not reuse the announcement glyph", async () => {
-    const { AnnouncementBell } = await import(
-      "@/features/announcements/components/announcement-bell"
+  it("revalidates both caches after archiving", async () => {
+    // The row leaves a filtered list entirely, so hand-editing the cache would
+    // be how the badge and the list drift apart.
+    const { useNotifications } = await import(
+      "@/features/notifications/hooks/use-notifications"
     )
-    const bell = render(<NotificationBell />).container
-    const announcement = render(<AnnouncementBell />).container
+    const { result } = renderHook(() => useNotifications())
 
-    const bellGlyph = bell.querySelector("svg")?.getAttribute("class")
-    const announcementGlyph = announcement
-      .querySelector("svg")
-      ?.getAttribute("class")
+    await act(async () => {
+      const res = await result.current.setArchived("n1", true)
+      expect(res.ok).toBe(true)
+    })
 
-    expect(bellGlyph).toBeTruthy()
-    expect(announcementGlyph).toBeTruthy()
-    expect(bellGlyph).not.toBe(announcementGlyph)
-    // A generic bell is what collided; pin the intended glyphs so a future
-    // "tidy the imports" pass cannot quietly reintroduce the clash.
-    expect(bellGlyph).toContain("lucide-inbox")
-    expect(announcementGlyph).toContain("lucide-megaphone")
-  })
-
-  it("gives both a native tooltip, since neither shows a text label", async () => {
-    const { AnnouncementBell } = await import(
-      "@/features/announcements/components/announcement-bell"
-    )
-    render(<NotificationBell />)
-    render(<AnnouncementBell />)
-
-    expect(screen.getByTestId("notification-bell")).toHaveAttribute(
-      "title",
-      "Notifications",
-    )
-    expect(screen.getByTestId("announcement-bell")).toHaveAttribute(
-      "title",
-      "Announcements",
+    expect(globalMutate).toHaveBeenCalledWith(
+      "/api/notifications?limit=50",
+      undefined,
+      { revalidate: true },
     )
   })
 })

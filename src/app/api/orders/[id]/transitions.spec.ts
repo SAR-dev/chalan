@@ -2133,17 +2133,23 @@ describe("bulk transition batch cost", () => {
 
   it("reads each merchant in the batch exactly once", async () => {
     // 1 batch lock + 2 merchant reads + 4 reads for the one shared lane
-    // + 1 notification-recipient read per *distinct* merchant.
+    // + 1 notification-recipient read per *distinct* merchant
+    // + 1 notification-subject city read for the single shared city.
     // Without the memo this was one merchant read *per order* — 4, and it grew
     // with the batch rather than with the number of distinct merchants. The
     // recipient lookup is memoised the same way, so it is 2 here (not 4) and 1
     // in the single-merchant case: it tracks distinct merchants, not rows.
+    //
+    // The subject's city lookup is the same bargain: one extra read per
+    // *distinct city*, so it stays at 1 in both cases below rather than growing
+    // to 4 with the batch. That the number is 10 and 8 — and not 12 and 9 — is
+    // what shows the memo holds.
     expect(
       await approveBatch(fourOrdersOn(["city_1"], ["merch_1", "merch_2"])),
-    ).toMatchObject({ selects: 9, updates: 1 })
+    ).toMatchObject({ selects: 10, updates: 1 })
     expect(
       await approveBatch(fourOrdersOn(["city_1"], ["merch_1"])),
-    ).toMatchObject({ selects: 7, updates: 1 })
+    ).toMatchObject({ selects: 8, updates: 1 })
   })
 
   it("resolves each lane in the batch exactly once", async () => {
@@ -2151,7 +2157,8 @@ describe("bulk transition batch cost", () => {
     // *warehouse* is the clean way to get a second key: both origins price out
     // through the same fixture rows.
     //
-    // 1 lock + 1 merchant + 2 lanes x 4 reads + 1 recipient read = 11, and the
+    // 1 lock + 1 merchant + 2 lanes x 4 reads + 1 recipient read
+    // + 1 subject city read (both warehouses still serve city_1) = 12, and the
     // queue drains exactly. Without the memo each of the 4 orders resolved its
     // own lane: 22 statements. This also pins the memo's contract — it must
     // store a settled value, not the re-runnable query builder, or every cache
@@ -2164,7 +2171,7 @@ describe("bulk transition batch cost", () => {
       (o, i): BatchOrder => ({ ...o, warehouseId: i % 2 ? "wh_2" : "wh_1" }),
     )
     expect(await approveBatch(orders)).toMatchObject({
-      selects: 11,
+      selects: 12,
       updates: 1,
     })
   })
