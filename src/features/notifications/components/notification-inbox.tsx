@@ -105,13 +105,17 @@ export function NotificationInbox({
   const handleArchive = useCallback(
     async (group: NotificationGroup) => {
       const ids = group.ids
-      const result = await setArchived(ids[0], true)
-      if (!result.ok) {
-        toast.error(result.error ?? "Could not archive that notification.")
-        return
+      // Every member, not just the newest. Archiving only the representative
+      // left the group in the inbox with its remaining events, so the row did
+      // not go away — which read as a failed dismissal — and the undo below
+      // would have restored more than had been archived.
+      for (const id of ids) {
+        const result = await setArchived(id, true)
+        if (!result.ok) {
+          toast.error(result.error ?? "Could not archive that notification.")
+          return
+        }
       }
-      // Undo is per group, not per row: a grouped row archives every event it
-      // collapsed, so restoring only the newest would leave the rest lost.
       toast("Archived", {
         description: group.title,
         duration: UNDO_MS,

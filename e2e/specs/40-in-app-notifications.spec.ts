@@ -134,13 +134,29 @@ test.describe("4001. In-app notifications", () => {
 
     const rows = page.locator(notifications.inboxRowAny)
     await expect(rows.first()).toBeVisible({ timeout: 15_000 })
-    const before = await rows.count()
 
-    await rows.first().hover()
+    // Assert on *that row leaving*, not on an exact count delta.
+    //
+    // The delta looked stricter and was strictly worse: this is a shared demo
+    // database that resets to seeded data on a timer, so a background reset
+    // during the run drops rows the test never touched. A run failed here with
+    // 39 → 36 while the server log showed exactly one notification archived —
+    // the other two rows had been reseeded out from under the assertion.
+    //
+    // The row's own testid carries its group key, so it can be named precisely.
+    const target = rows.first()
+    const key = await target.getAttribute("data-testid")
+    expect(key).toBeTruthy()
+
+    await target.hover()
     await page.locator(notifications.archiveAny).first().click()
 
-    // Dismissal is a view filter, not a delete: the row leaves the inbox…
-    await expect(rows).toHaveCount(before - 1, { timeout: 15_000 })
+    // Dismissal is a view filter, not a delete. Every event the group collapsed
+    // goes with it — archiving only the newest left the group visible with its
+    // remaining events, which read as a dismissal that had silently failed.
+    await expect(page.locator(`[data-testid="${key}"]`)).toHaveCount(0, {
+      timeout: 15_000,
+    })
     // …and it stops counting towards the badge, whether it had been read or not.
     await expect(page.locator(notifications.badge)).toHaveCount(0, {
       timeout: 15_000,

@@ -133,7 +133,12 @@ export const notifications = {
   markAllRead: "[data-testid='notification-mark-all-read']",
   // The archive button carries the group's key, which the test only learns at
   // runtime from the row it belongs to.
-  archiveAny: "[data-testid^='notification-archive-']",
+  //
+  // Scoped to a row on purpose. The header's bulk button is also named
+  // `notification-archive-all-read`, so an unscoped prefix match put it first in
+  // DOM order and `.first()` archived the whole read inbox instead of one row —
+  // which then left the next test an empty tray to fail against.
+  archiveAny: "li [data-testid^='notification-archive-']",
   // A tray row that is still unread. Used instead of the badge, which caps at
   // "9+" and so reports a display value rather than a count.
   unreadTrayRow:
