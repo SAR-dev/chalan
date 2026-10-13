@@ -59,7 +59,7 @@ How to work your pickup and delivery queues on {{APP_NAME}}. Sign in at **{{APP_
 
 ## 8. Account, announcements, and support
 
-1. Open **Inbox** (`/rider/announcements`) for platform announcements (also shown as a banner at the top of the app).
+1. Open **Inbox** (`/rider/announcements`) for platform announcements. Unread ones raise a count on the **announcements** icon at the right of the top bar, which links straight to the feed.
 2. Open **Support** (`/rider/support`) to raise a ticket and follow the replies — the fastest route for a wrong cash total or a parcel that will not resolve.
 3. Open **Account** (`/rider/account`) to update your name and change your password (current password + at least 8 characters).
 4. Task type (pickup, delivery, or both) and your home warehouse are set by a Super Admin when your application is approved — ask the platform team if they look wrong.

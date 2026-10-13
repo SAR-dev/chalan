@@ -335,6 +335,52 @@ describe("getNotificationsForUser", () => {
     expect(result.notifications[0].href).toBe("/merchant/orders/ORD-1")
   })
 
+  it("coerces an unrecognised event to the merchant's own order page", async () => {
+    // The column is plain text, so a row written by a newer deploy can name an
+    // event this build does not know. Falling back to the stored href is what
+    // let an admin-segment link reach a merchant and bounce to `/merchant`; the
+    // fallback is now the order itself, which is merchant-scoped by
+    // construction.
+    const rows = [
+      {
+        ...ROW,
+        id: "unknown",
+        event: "order.in-transit",
+        href: "/dashboard/orders/ORD-1",
+      },
+    ]
+    const { runner } = makeRunner(rows)
+    dbMock.select.mockReturnValue(runner.select())
+
+    const result = await getNotificationsForUser(undefined as never, {
+      userId: "usr-1",
+      seenAt: null,
+    })
+
+    expect(result.notifications[0].href).toBe("/merchant/orders/ORD-1")
+  })
+
+  it("keeps a money event's own href, having no order to coerce it to", async () => {
+    const rows = [
+      {
+        ...ROW,
+        id: "money",
+        event: "payout.settled",
+        orderId: null,
+        href: "/merchant/payouts",
+      },
+    ]
+    const { runner } = makeRunner(rows)
+    dbMock.select.mockReturnValue(runner.select())
+
+    const result = await getNotificationsForUser(undefined as never, {
+      userId: "usr-1",
+      seenAt: null,
+    })
+
+    expect(result.notifications[0].href).toBe("/merchant/payouts")
+  })
+
   it("heals every event, not just order links", async () => {
     const rows = [
       { ...ROW, id: "money", event: "payout.approved", orderId: null },
