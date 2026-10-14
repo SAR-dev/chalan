@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { ReactElement, useCallback, useEffect, useRef, useState } from "react"
 import {
   Popover,
   PopoverContent,
@@ -78,9 +78,7 @@ export function NotificationTray({
         setHasOpened(true)
       }}
     >
-      <PopoverTrigger render={<span className="contents" />}>
-        {trigger}
-      </PopoverTrigger>
+      <PopoverTrigger render={trigger as ReactElement} />
       <PopoverContent
         align="end"
         sideOffset={8}
