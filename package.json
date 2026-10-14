@@ -56,6 +56,7 @@
     "@codemirror/view": "^6.43.13",
     "@paralleldrive/cuid2": "^3.3.0",
     "@pdfme/common": "^6.2.4",
+    "@pdfme/converter": "^6.2.4",
     "@pdfme/generator": "^6.2.4",
     "@pdfme/schemas": "^6.2.4",
     "@pdfme/ui": "^6.2.4",
