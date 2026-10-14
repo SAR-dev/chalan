@@ -27,7 +27,6 @@ CREATE TABLE "profile" (
 	"isActive" boolean DEFAULT true NOT NULL,
 	"tableRowsPerPage" integer DEFAULT 20 NOT NULL,
 	"announcementsSeenAt" timestamp with time zone,
-	"notificationsSeenAt" timestamp with time zone,
 	"warehouseId" text,
 	"merchantId" text,
 	"riderId" text,
@@ -504,6 +503,9 @@ CREATE TABLE "notification" (
 	"actorName" text,
 	"title" text NOT NULL,
 	"href" text NOT NULL,
+	"subject" text,
+	"readAt" timestamp with time zone,
+	"archivedAt" timestamp with time zone,
 	"createdAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -724,8 +726,11 @@ CREATE INDEX "email_log_subject_trgm_idx" ON "email_log" USING gin ("subject" gi
 CREATE INDEX "email_outbox_status_next_attempt_idx" ON "email_outbox" USING btree ("status","nextAttemptAt");--> statement-breakpoint
 CREATE INDEX "email_outbox_created_at_idx" ON "email_outbox" USING btree ("createdAt");--> statement-breakpoint
 CREATE UNIQUE INDEX "mail_config_one_active_uniq" ON "mail_config" USING btree ("isActive") WHERE "mail_config"."isActive" = true;--> statement-breakpoint
-CREATE INDEX "notification_user_created_idx" ON "notification" USING btree ("userId","createdAt");--> statement-breakpoint
+CREATE INDEX "notification_user_live_created_idx" ON "notification" USING btree ("userId","createdAt") WHERE "notification"."archivedAt" is null;--> statement-breakpoint
+CREATE INDEX "notification_user_unread_idx" ON "notification" USING btree ("userId","createdAt") WHERE "notification"."archivedAt" is null AND "notification"."readAt" is null;--> statement-breakpoint
+CREATE INDEX "notification_user_order_created_idx" ON "notification" USING btree ("userId","orderId","createdAt");--> statement-breakpoint
 CREATE INDEX "notification_created_at_idx" ON "notification" USING btree ("createdAt");--> statement-breakpoint
+CREATE UNIQUE INDEX "notification_user_event_order_uniq" ON "notification" USING btree ("userId","event","orderId") WHERE "notification"."orderId" is not null;--> statement-breakpoint
 CREATE INDEX "support_ticket_status_created_at_idx" ON "support_ticket" USING btree ("status","createdAt");--> statement-breakpoint
 CREATE INDEX "support_ticket_user_id_idx" ON "support_ticket" USING btree ("userId");--> statement-breakpoint
 CREATE INDEX "support_ticket_subject_trgm_idx" ON "support_ticket" USING gin ("subject" gin_trgm_ops);--> statement-breakpoint
