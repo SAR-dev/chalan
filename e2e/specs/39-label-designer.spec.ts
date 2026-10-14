@@ -59,15 +59,26 @@ test.describe("3901. Label designer", () => {
     // The template name is what history will remember this edit by.
     await page.locator(labelDesigner.name).fill("Canvas parcel label")
 
-    // The preview tab renders through the PDF engine — the same generator the
-    // print action uses — not through the DOM renderer.
+    // The preview tab rasterises the same vector PDF the print action emits,
+    // rather than describing the label a second time in the DOM. Asserted on
+    // the image itself, not its wrapper: the wrapper holds a grey placeholder
+    // from the first paint, so counting children would pass before anything had
+    // rendered and would not notice if rasterising broke entirely.
     await page.locator(labelDesigner.tabPreview).click()
-    const preview = page.locator(labelDesigner.previewRenderer)
-    await expect(preview).toBeVisible()
+    await expect(page.locator(labelDesigner.previewRenderer)).toBeVisible()
+
+    const previewImage = page.locator(labelDesigner.previewImage)
+    await expect(previewImage).toBeVisible({ timeout: 30_000 })
+
+    // A decoded bitmap, not a broken blob URL: `complete` is true for a failed
+    // image too, so the intrinsic size is what proves pixels actually arrived.
     await expect
-      .poll(() => preview.evaluate((el) => el.childElementCount), {
-        timeout: 20_000,
-      })
+      .poll(
+        () => previewImage.evaluate((el: HTMLImageElement) => el.naturalWidth),
+        {
+          timeout: 30_000,
+        },
+      )
       .toBeGreaterThan(0)
 
     // Publish persists the draft first — its payload *is* the canvas state —

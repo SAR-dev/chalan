@@ -272,6 +272,11 @@ export const labelDesigner = {
   addStaticText: "[data-testid='pdfme-add-static-text']",
   addQr: "[data-testid='pdfme-add-qrcode']",
   previewRenderer: "[data-testid='label-preview']",
+  // The rendered label itself. Asserting only the wrapper is worthless now that
+  // the preview is an image: the wrapper holds a grey placeholder from the
+  // first paint, so `childElementCount > 0` passes before anything has
+  // rendered and never fails when rasterising does.
+  previewImage: "[data-testid='label-preview-image']",
   versionRow: (version: number) => `[data-testid='label-version-${version}']`,
   loadVersion: (version: number) =>
     `[data-testid='label-version-load-${version}']`,

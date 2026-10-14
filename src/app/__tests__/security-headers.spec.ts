@@ -43,11 +43,21 @@ describe("CSP directives the app depends on", () => {
   const directive = (name: string): string | undefined =>
     proxy.match(new RegExp(`"${name}[^"]*"`))?.[0]
 
-  it("allows blob: frames, or the label designer preview is blocked", () => {
-    // `LabelPreview` renders the generated PDF in an <iframe src="blob:…">.
-    // With no `frame-src`, CSP falls back to `default-src 'self'` and the browser
-    // refuses the frame — which presents as an empty preview with a console
-    // error naming blob:, and nothing else.
+  it("allows blob: images, or the label designer preview is blocked", () => {
+    // `LabelPreview` renders the rasterised label in an `<img src="blob:…">`.
+    // Without `blob:` in `img-src` the browser refuses the image — which
+    // presents as an empty preview with a console error naming blob:, and
+    // nothing else.
+    const imgSrc = directive("img-src")
+    expect(imgSrc, "no img-src directive in the CSP").toBeDefined()
+    expect(imgSrc).toContain("blob:")
+    expect(imgSrc).toContain("'self'")
+  })
+
+  it("allows blob: frames, for the print path", () => {
+    // The print action frames the generated PDF in an `<iframe src="blob:…">`
+    // because `object-src` stays `'none'`. The designer preview no longer needs
+    // this — it renders an image — but the print frame does.
     const frameSrc = directive("frame-src")
     expect(frameSrc, "no frame-src directive in the CSP").toBeDefined()
     expect(frameSrc).toContain("blob:")

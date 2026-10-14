@@ -40,6 +40,9 @@ importers:
       '@pdfme/common':
         specifier: ^6.2.4
         version: 6.2.4
+      '@pdfme/converter':
+        specifier: ^6.2.4
+        version: 6.2.4(supports-color@7.2.0)
       '@pdfme/generator':
         specifier: ^6.2.4
         version: 6.2.4(@pdfme/common@6.2.4)(@pdfme/schemas@6.2.4(@pdfme/common@6.2.4))

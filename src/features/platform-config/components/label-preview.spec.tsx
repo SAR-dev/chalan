@@ -10,20 +10,21 @@ import { SAMPLE_LABEL_DATA } from "@/lib/label-layout"
 // =============================================================================
 // LabelPreview — the designer's plain preview.
 //
-// It renders the *actual* generated PDF in a frame rather than an approximation
-// drawn in the DOM, so the test asserts the wiring: the PDF comes from the real
-// generator, it is handed over as a blob URL, and that URL is revoked when the
-// component unmounts so blob memory does not accumulate while a template is
-// being dragged around.
+// It renders a raster of the *actual* generated PDF rather than an
+// approximation drawn in the DOM, so the test asserts the wiring: the label comes
+// from the real generator, it is handed over as a blob URL, and that URL is
+// revoked when the component unmounts so blob memory does not accumulate while a
+// template is being dragged around.
 // =============================================================================
 
-const { generateLabelPdfMock } = vi.hoisted(() => ({
-  generateLabelPdfMock: vi.fn(
+const { generateLabelImageMock } = vi.hoisted(() => ({
+  generateLabelImageMock: vi.fn(
     async (
       _template: unknown,
       _inputs: Record<string, string>[],
       _font: unknown,
-    ): Promise<Uint8Array> => new Uint8Array([37, 80, 68, 70, 45]),
+    ): Promise<Blob> =>
+      new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }),
   ),
 }))
 
@@ -34,8 +35,8 @@ vi.mock("@/lib/label/fonts", () => ({
   })),
 }))
 
-vi.mock("@/lib/label/generate-pdf", () => ({
-  generateLabelPdf: generateLabelPdfMock,
+vi.mock("@/lib/label/generate-image", () => ({
+  generateLabelImage: generateLabelImageMock,
 }))
 
 // jsdom has no object-URL store; a map records what was created and revoked.
@@ -44,11 +45,11 @@ const revoked: string[] = []
 beforeEach(() => {
   created.length = 0
   revoked.length = 0
-  generateLabelPdfMock.mockClear()
+  generateLabelImageMock.mockClear()
   ;(URL as any).createObjectURL = vi.fn((blob: Blob) => {
     const url = `blob:fake/${created.length}`
     created.push(url)
-    expect(blob.type).toBe("application/pdf")
+    expect(blob.type).toBe("image/png")
     return url
   })
   ;(URL as any).revokeObjectURL = vi.fn((url: string) => revoked.push(url))
@@ -69,26 +70,42 @@ function renderPreview() {
 }
 
 describe("LabelPreview", () => {
-  it("renders the generated PDF in a frame with the label's aspect ratio", async () => {
+  it("renders the label as an image with the label's aspect ratio", async () => {
     renderPreview()
 
-    const frame = await waitFor(() => {
-      const el = screen.getByTitle("Label preview")
-      expect(el.tagName).toBe("IFRAME")
+    const img = await waitFor(() => {
+      const el = screen.getByTestId("label-preview-image")
+      // An <img>, not an <iframe>: the browser draws its own chrome around a
+      // framed PDF, which is what put scrollbars and a grey viewer background
+      // inside the card the preview sits in.
+      expect(el.tagName).toBe("IMG")
       expect(el.getAttribute("src")).toMatch(/^blob:/)
-      return el as HTMLIFrameElement
+      return el as HTMLImageElement
     })
 
     // 100 x 150 mm at 96 dpi, capped at 560px on the long edge.
-    expect(frame.style.height).toBe("560px")
-    expect(frame.style.width).toBe("373px")
+    expect(img.style.height).toBe("560px")
+    expect(img.style.width).toBe("373px")
+  })
+
+  it("describes the label for assistive tech", async () => {
+    renderPreview()
+
+    // A preview image with no alt text is announced as "image" — the one thing
+    // it must not do is announce nothing at all.
+    await waitFor(() =>
+      expect(screen.getByTestId("label-preview-image")).toHaveAttribute(
+        "alt",
+        "Label preview: 100 by 150 millimetres",
+      ),
+    )
   })
 
   it("uses the real print generator, so the preview cannot drift from it", async () => {
     renderPreview()
 
-    await waitFor(() => expect(generateLabelPdfMock).toHaveBeenCalledTimes(1))
-    const [template, inputs, font] = generateLabelPdfMock.mock.calls[0]
+    await waitFor(() => expect(generateLabelImageMock).toHaveBeenCalledTimes(1))
+    const [template, inputs, font] = generateLabelImageMock.mock.calls[0]
     expect(template).toBe(DEFAULT_LABEL_TEMPLATE_PDFME)
     expect(inputs[0]).toMatchObject({
       recipientName: SAMPLE_LABEL_DATA.recipientName,
@@ -121,10 +138,10 @@ describe("LabelPreview", () => {
       />,
     )
     // A change arrived inside the debounce window, so nothing has been built yet.
-    expect(generateLabelPdfMock).not.toHaveBeenCalled()
+    expect(generateLabelImageMock).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(400)
-    expect(generateLabelPdfMock).toHaveBeenCalled()
+    expect(generateLabelImageMock).toHaveBeenCalled()
   })
 
   it("revokes the object URL on unmount", async () => {
@@ -157,7 +174,7 @@ describe("LabelPreview", () => {
   })
 
   it("reports a failure instead of showing an empty frame", async () => {
-    generateLabelPdfMock.mockRejectedValueOnce(new Error("font broke"))
+    generateLabelImageMock.mockRejectedValueOnce(new Error("font broke"))
 
     renderPreview()
 
@@ -181,9 +198,9 @@ describe("LabelPreview", () => {
       />,
     )
 
-    const frame = await waitFor(() => screen.getByTitle("Label preview"))
+    const img = await waitFor(() => screen.getByTestId("label-preview-image"))
     // 50mm square is under the cap, so it renders at physical size.
-    expect(frame.style.width).toBe("189px")
-    expect(frame.style.height).toBe("189px")
+    expect(img.style.width).toBe("189px")
+    expect(img.style.height).toBe("189px")
   })
 })
