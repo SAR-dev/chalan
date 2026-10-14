@@ -2,7 +2,7 @@
 
 import { BellOff, Megaphone } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { ReactElement, useState } from "react"
 import { Markdown } from "@/components/markdown"
 import {
   Popover,
@@ -67,9 +67,7 @@ export function AnnouncementPopover({ trigger }: { trigger: React.ReactNode }) {
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger render={<span className="contents" />}>
-        {trigger}
-      </PopoverTrigger>
+      <PopoverTrigger render={trigger as ReactElement} />
       <PopoverContent
         align="end"
         sideOffset={8}
