@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 /**
- * The tray is a Sheet whose `open` state is local React state. A `next/link`
+ * The tray is a Popover whose `open` state is local React state. A `next/link`
  * navigation is client-side, so the browser never reloads and nothing tells that
  * state to change — every link in the tray used to navigate *and leave the panel
  * open on top of the destination*.
@@ -68,6 +68,22 @@ beforeEach(() => {
 /** The panel is unmounted when closed, so its absence is the assertion. */
 const trayVisible = () => screen.queryByTestId("notification-tray") !== null
 
+/**
+ * The first row's link.
+ *
+ * The testid carries the group key, so it can only be matched by prefix. The
+ * *link* is the thing to click, not the `<li>` — the click handler lives on it.
+ */
+async function firstRowLink(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const link = document.querySelector<HTMLElement>(
+      "[data-notification-row-link]",
+    )
+    if (!link) throw new Error("no notification row rendered yet")
+    return link
+  })
+}
+
 describe("NotificationTray", () => {
   it("closes when a notification is followed", async () => {
     renderTray()
@@ -75,7 +91,7 @@ describe("NotificationTray", () => {
     await waitFor(() => expect(trayVisible()).toBe(true))
 
     // The list is fetched on first open, so the row appears a beat later.
-    const row = await screen.findByTestId("notification-tray-row")
+    const row = await firstRowLink()
     await userEvent.click(row)
 
     // The router navigates either way. What this pins is the panel going away —
@@ -98,9 +114,7 @@ describe("NotificationTray", () => {
     renderTray()
     await userEvent.click(screen.getByTestId("tray-trigger"))
     await waitFor(() => expect(trayVisible()).toBe(true))
-    expect(
-      await screen.findByTestId("notification-tray-row"),
-    ).toBeInTheDocument()
+    expect(await firstRowLink()).toBeInTheDocument()
     expect(trayVisible()).toBe(true)
   })
 })

@@ -53,7 +53,7 @@ test.describe("4001. In-app notifications", () => {
     await expect(tray.getByText("New order received").first()).toBeVisible()
   })
 
-  test("opening the tray drains the badge and the inbox keeps the row", async ({
+  test("following a row marks that row read, and leaves the rest alone", async ({
     page,
   }) => {
     await login(page, CREDS.merchant)
@@ -63,16 +63,102 @@ test.describe("4001. In-app notifications", () => {
     await page.locator(notifications.bell).click()
     await expect(page.locator(notifications.tray)).toBeVisible()
 
-    // Opening is the read — one watermark write, not a receipt per row.
-    await expect(page.locator(notifications.badge)).toHaveCount(0, {
+    // Rows carrying the unread marker, so the test can prove a *specific* row
+    // changed state rather than that a number moved.
+    //
+    // The badge is deliberately not the assertion: it caps at "9+", which is a
+    // display value, not a count, and parsing it proves nothing.
+    const unread = page.locator(notifications.unreadTrayRow)
+    await expect(unread.first()).toBeVisible({ timeout: 15_000 })
+    const before = await unread.count()
+
+    await unread.first().click()
+    await page.waitForURL(/\/merchant\/orders\/.+/, { timeout: 15_000 })
+
+    await page.goto("/merchant/orders")
+    await waitForAppReady(page)
+    await page.locator(notifications.bell).click()
+    await expect(page.locator(notifications.tray)).toBeVisible()
+
+    // Exactly one fewer unread row: reading is per row now, so the others must
+    // still be waiting. Under the old watermark model opening the tray would
+    // have cleared every row at once.
+    await expect(unread).toHaveCount(before - 1, { timeout: 15_000 })
+
+    // And the row is still *there* — read is not archived.
+    await expect(page.locator(notifications.trayRow).first()).toBeVisible()
+  })
+
+  test("the inbox marks everything read in one click", async ({ page }) => {
+    await login(page, CREDS.merchant)
+    await page.goto("/merchant/notifications")
+    await waitForAppReady(page)
+
+    // Place a parcel so there is something to read, then return to the inbox.
+    await page.goto("/merchant/orders/new")
+    await waitForAppReady(page)
+    const card = page.locator(orderForm.card).first()
+    await card.locator(orderForm.pickupLocation).click()
+    await page.getByRole("option").first().click()
+    await card.locator(orderForm.recipientName).fill("Mark All Recipient")
+    await card.locator(orderForm.recipientPhone).fill("01712345678")
+    await card.locator(orderForm.deliveryCity).click()
+    await page.getByRole("option").first().click()
+    await card.locator(orderForm.deliveryAddress).fill("9 Mark All Road, Dhaka")
+    await card.locator(orderForm.parcelWeight).fill("1")
+    await card.locator(orderForm.productCost).fill("500")
+    await page.locator(orderForm.submitOrder).click()
+    await page.waitForURL(/\/merchant\/orders/)
+    await waitForAppReady(page)
+
+    await page.goto("/merchant/notifications")
+    await waitForAppReady(page)
+    await expect(page.locator(notifications.inboxRowAny).first()).toBeVisible({
       timeout: 15_000,
     })
 
-    // "View all" reaches the same rows without the badge having been a lie.
-    await page.locator(notifications.trayAll).click()
-    await page.waitForURL(/\/merchant\/notifications/)
+    await page.locator(notifications.markAllRead).click()
+    await expect(page.locator(notifications.badge)).toHaveCount(0, {
+      timeout: 15_000,
+    })
+    // The rows stay: read is not archived.
+    await expect(page.locator(notifications.inboxRowAny).first()).toBeVisible()
+  })
+
+  test("a notification can be archived without being read", async ({
+    page,
+  }) => {
+    await login(page, CREDS.merchant)
+    await page.goto("/merchant/notifications")
     await waitForAppReady(page)
-    await expect(page.locator(notifications.inboxRowAny).first()).toBeVisible({
+
+    const rows = page.locator(notifications.inboxRowAny)
+    await expect(rows.first()).toBeVisible({ timeout: 15_000 })
+
+    // Assert on *that row leaving*, not on an exact count delta.
+    //
+    // The delta looked stricter and was strictly worse: this is a shared demo
+    // database that resets to seeded data on a timer, so a background reset
+    // during the run drops rows the test never touched. A run failed here with
+    // 39 → 36 while the server log showed exactly one notification archived —
+    // the other two rows had been reseeded out from under the assertion.
+    //
+    // The row's own testid carries its group key, so it can be named precisely.
+    const target = rows.first()
+    const key = await target.getAttribute("data-testid")
+    expect(key).toBeTruthy()
+
+    await target.hover()
+    await page.locator(notifications.archiveAny).first().click()
+
+    // Dismissal is a view filter, not a delete. Every event the group collapsed
+    // goes with it — archiving only the newest left the group visible with its
+    // remaining events, which read as a dismissal that had silently failed.
+    await expect(page.locator(`[data-testid="${key}"]`)).toHaveCount(0, {
+      timeout: 15_000,
+    })
+    // …and it stops counting towards the badge, whether it had been read or not.
+    await expect(page.locator(notifications.badge)).toHaveCount(0, {
       timeout: 15_000,
     })
   })

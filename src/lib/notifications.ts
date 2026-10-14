@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm"
 import { db, dbRead } from "@/lib/db"
 import { notification, profile } from "@/lib/db/schema"
 // Pure, and client-safe — `useNotificationFeed` renders the grouped list, and
@@ -51,6 +51,7 @@ export async function emitNotificationEvent({
   merchantId,
   actorName,
   now,
+  subject,
   recipients: preResolved,
 }: {
   tx: WebhookTx
@@ -59,6 +60,15 @@ export async function emitNotificationEvent({
   merchantId: string
   actorName: string | null
   now: string
+  /**
+   * "Notify Recipient → Barisal", snapshotted now.
+   *
+   * Denormalised because `orderId` has no foreign key: a notification outlives
+   * its order, so without this the row has nothing left to identify the parcel
+   * it was about. Rows written before the column existed fall back to the bare
+   * order code in the UI.
+   */
+  subject?: string | null
   /**
    * Recipients already looked up by the caller.
    *
@@ -88,6 +98,7 @@ export async function emitNotificationEvent({
           actorName,
           title,
           href,
+          subject: subject ?? null,
           createdAt: now,
         })),
       )
@@ -181,9 +192,21 @@ export type NotificationRow = typeof notification.$inferSelect
 
 export interface NotificationFeedResult {
   notifications: NotificationRow[]
-  /** How many of the returned rows are newer than the reader's watermark. */
+  /** How many of the returned rows are unread. */
   newCount: number
 }
+
+/**
+ * Which slice of the inbox a reader is asking for.
+ *
+ * `live` is the default and the only one the tray needs. `archived` exists
+ * because dismissal was a dead end without it: a row archived by mistake could
+ * not be found, inspected or undone, so "archive" meant "delete, but slower".
+ * A separate `all` is deliberately absent — an unread-only slice (`liveUnread`)
+ * is what the Unread tab needs and is cheaper to express as a client-side
+ * predicate over `live`, since it is a subset of what is already loaded.
+ */
+export type NotificationScope = "live" | "archived"
 
 /**
  * The reader's inbox, newest first.
@@ -197,19 +220,34 @@ export interface NotificationFeedResult {
  * means every notification written before a routing fix repairs itself instead
  * of staying broken forever. The column keeps being written for anything that
  * queries the table directly, but the tray never trusts it.
+ *
+ * `newCount` in the `archived` scope means unread-and-archived, which is not
+ * what the badge shows and is not used for the badge — the badge always reads
+ * `live`. It is returned so the Archived tab can label itself, not so the two
+ * can be confused.
  */
 export async function getNotificationsForUser(
   reader: Reader = dbRead,
   {
     userId,
-    seenAt,
     limit = 50,
-  }: { userId: string; seenAt: string | null; limit?: number },
+    scope = "live",
+  }: { userId: string; limit?: number; scope?: NotificationScope },
 ): Promise<NotificationFeedResult> {
   const rows = await reader
     .select()
     .from(notification)
-    .where(eq(notification.userId, userId))
+    .where(
+      // Scope is filtered in SQL, not in the mapper: the tray polls every 30s
+      // and shipping rows only to drop them would make the read scale with
+      // everything the reader ever dismissed.
+      and(
+        eq(notification.userId, userId),
+        scope === "archived"
+          ? isNotNull(notification.archivedAt)
+          : isNull(notification.archivedAt),
+      ),
+    )
     .orderBy(desc(notification.createdAt))
     .limit(limit)
 
@@ -218,56 +256,169 @@ export async function getNotificationsForUser(
     href: notificationHref(n),
   }))
 
-  const newCount = seenAt
-    ? rows.filter((n) => n.createdAt > seenAt).length
-    : rows.length
+  // Derived from `readAt` rather than a watermark, so the badge and the list
+  // are two readings of the same rows and cannot disagree about a moment.
+  // `!n.readAt` rather than `=== null`: a row that has not been through the
+  // mapper can carry `undefined`, and `undefined === null` is false — which
+  // would report an unread row as read and hide it from the badge.
+  const newCount = rows.filter((n) => !n.readAt).length
 
-  return {
-    notifications,
-    newCount,
-  }
+  return { notifications, newCount }
 }
 
 /**
  * Count unread notifications without loading the list.
  *
  * A separate endpoint from the list because the badge polls: counting rows
- * against `notification_user_created_idx` is far cheaper than shipping 50 rows
+ * against `notification_user_unread_idx` is far cheaper than shipping 50 rows
  * every tick for a tray nobody opened.
+ *
+ * Archived rows are excluded rather than counted-as-read, so dismissing noise
+ * clears the badge the same way reading it would.
  */
 export async function countUnreadNotifications(
   reader: Reader = dbRead,
-  { userId, seenAt }: { userId: string; seenAt: string | null },
+  { userId }: { userId: string },
 ): Promise<number> {
   const [row] = await reader
     .select({ n: sql<number>`count(*)::int` })
     .from(notification)
     .where(
-      seenAt
-        ? and(
-            eq(notification.userId, userId),
-            gt(notification.createdAt, seenAt),
-          )
-        : eq(notification.userId, userId),
+      and(
+        eq(notification.userId, userId),
+        isNull(notification.readAt),
+        isNull(notification.archivedAt),
+      ),
     )
   return row?.n ?? 0
 }
 
 /**
- * Stamp the reader's watermark.
+ * Mark notifications read.
  *
- * Monotonic by construction: `GREATEST` with the stored value means a client
- * whose clock is behind, or that double-submits, cannot re-badge notifications
- * it has already seen. Mirrors `POST /api/announcements/seen`.
+ * Scoped to the caller's own rows by `userId` as well as by id, so a crafted id
+ * cannot reach another account's notifications.
+ *
+ * Archived rows are left alone: archiving is a stronger statement than reading,
+ * and a bulk "mark all read" that also undid a dismissal would make the two
+ * states impossible to keep apart.
+ *
+ * Idempotent — `readAt` is only written where it is still null, so a
+ * double-submit does not move the timestamp and "read at" ordering stays
+ * meaningful.
  */
-export async function markNotificationsSeen(
+export async function markNotificationsRead(
+  updater: Pick<typeof db, "update"> = db,
+  { userId, ids, now }: { userId: string; ids?: string[]; now: string },
+): Promise<number> {
+  const scoped =
+    ids && ids.length > 0 ? and(inArray(notification.id, ids)) : undefined
+
+  const rows = await updater
+    .update(notification)
+    .set({ readAt: now })
+    .where(
+      and(
+        eq(notification.userId, userId),
+        isNull(notification.readAt),
+        isNull(notification.archivedAt),
+        scoped,
+      ),
+    )
+    .returning({ id: notification.id })
+
+  return rows.length
+}
+
+/**
+ * Dismiss or restore a notification.
+ *
+ * Archiving clears nothing else: it is a view filter, and restoring a row must
+ * hand back exactly what it had before.
+ */
+export async function setNotificationArchived(
+  updater: Pick<typeof db, "update"> = db,
+  {
+    userId,
+    id,
+    archived,
+    now,
+  }: {
+    userId: string
+    id: string
+    archived: boolean
+    now: string
+  },
+): Promise<boolean> {
+  const rows = await updater
+    .update(notification)
+    .set({ archivedAt: archived ? now : null })
+    .where(and(eq(notification.id, id), eq(notification.userId, userId)))
+    .returning({ id: notification.id })
+
+  return rows.length > 0
+}
+
+/**
+ * Dismiss everything the reader has already read, in one statement.
+ *
+ * Scoped to `readAt IS NOT NULL` on purpose: "archive all read" is the button you
+ * press once the backlog is done, and taking unread rows with it would silently
+ * drop the parcels you had not looked at yet. The unread guard is therefore part
+ * of the WHERE clause rather than something the caller has to get right.
+ *
+ * Returns the ids dismissed, so the caller can offer an undo that names what came
+ * back. Scoped by `userId` as well as by predicate, so the same guard as the
+ * per-row route applies.
+ */
+export async function archiveReadNotifications(
   updater: Pick<typeof db, "update"> = db,
   { userId, now }: { userId: string; now: string },
-): Promise<void> {
-  await updater
-    .update(profile)
-    .set({
-      notificationsSeenAt: sql`GREATEST(COALESCE(${profile.notificationsSeenAt}, ${now}::timestamptz), ${now}::timestamptz)`,
-    })
-    .where(eq(profile.userId, userId))
+): Promise<string[]> {
+  const rows = await updater
+    .update(notification)
+    .set({ archivedAt: now })
+    .where(
+      and(
+        eq(notification.userId, userId),
+        isNotNull(notification.readAt),
+        isNull(notification.archivedAt),
+      ),
+    )
+    .returning({ id: notification.id })
+
+  return rows.map((r) => r.id)
+}
+
+/**
+ * Undo a bulk dismissal.
+ *
+ * Bulk on purpose: undo fires from a toast that expires in five seconds, and
+ * walking back sixty rows one HTTP request each is exactly the kind of thing
+ * that looks fine and fails halfway. One statement, one round trip, and the whole
+ * set returns together.
+ *
+ * Scoped by `userId` as well as by id, so a crafted payload cannot reach another
+ * account's rows — same guard as every other mutation here. Restoring clears
+ * `archivedAt` and nothing else, so a row comes back with the read state it had.
+ */
+export async function restoreNotifications(
+  updater: Pick<typeof db, "update"> = db,
+  { userId, ids }: { userId: string; ids: string[] },
+): Promise<number> {
+  if (ids.length === 0) return 0
+
+  const rows = await updater
+    .update(notification)
+    .set({ archivedAt: null })
+    .where(
+      and(
+        eq(notification.userId, userId),
+        inArray(notification.id, ids),
+        isNotNull(notification.archivedAt),
+      ),
+    )
+    .returning({ id: notification.id })
+
+  return rows.length
 }

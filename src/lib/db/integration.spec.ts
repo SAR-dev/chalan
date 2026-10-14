@@ -419,10 +419,12 @@ suite("announcement watermark (profile)", () => {
     expect(rows[0].seenAt).toBeNull()
   })
 
-  it("a profile can be created without setting notificationsSeenAt", async () => {
-    // Same contract as the announcement watermark: the in-app notification
-    // badge counts rows newer than this, and Better Auth / signup know nothing
-    // about the column. NOT NULL without a default would break every signup.
+  it("a profile carries no notification watermark any more", async () => {
+    // Read state moved onto the notification rows themselves (`readAt`), so the
+    // profile no longer has a `notificationsSeenAt` column. Pinned because that
+    // column was nullable *and* written by a route, and re-adding it is easy to
+    // do by reflex: a second source of "what is unread" would let the badge and
+    // the inbox disagree about the same moment.
     const userId = `itest-nwm-${RUN}`
     await client.query(
       `INSERT INTO "user" (id, name, email) VALUES ($1, $2, $3)`,
@@ -435,12 +437,13 @@ suite("announcement watermark (profile)", () => {
     )
     track("profile", "userId", userId)
 
-    const { rows } = await client.query<{ seenAt: string | null }>(
-      `SELECT "notificationsSeenAt"::text AS "seenAt" FROM profile WHERE "userId" = $1`,
-      [userId],
+    const { rows } = await client.query<{ has: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'profile' AND column_name = 'notificationsSeenAt'
+       ) AS has`,
     )
-    expect(rows).toHaveLength(1)
-    expect(rows[0].seenAt).toBeNull()
+    expect(rows[0].has).toBe(false)
   })
 })
 

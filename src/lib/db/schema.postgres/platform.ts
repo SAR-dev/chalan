@@ -185,12 +185,62 @@ export const notification = pgTable(
     title: text("title").notNull(),
     // Deep link, resolved by `notificationHrefForEvent` at read time.
     href: text("href").notNull(),
+    /**
+     * Who the parcel is for and where it is going, snapshotted at event time.
+     *
+     * Denormalised on purpose. `orderId` carries no foreign key — notifications
+     * deliberately outlive deleted orders — so this is the only record of what
+     * the parcel was when the event fired, which is the right answer for a
+     * historical record. Resolving it by joining back would also make the
+     * 30-second tray poll carry a join it does not need.
+     *
+     * Nullable because rows written before this column existed have none; the
+     * UI falls back to the bare `orderId` for those rather than hiding the row.
+     */
+    subject: text("subject"),
+    /**
+     * When *this* notification was read, rather than when the reader last opened
+     * the inbox.
+     *
+     * Replaces the single `notificationsSeenAt` watermark on the profile, which
+     * could only express "everything before this instant". Anything arriving
+     * while a merchant had the inbox open was swept into the same stamp, and one
+     * row could not be marked without marking the rest.
+     *
+     * Null means unread. NOT NULL would need a sentinel and would make "never
+     * read" indistinguishable from "read at epoch".
+     */
+    readAt: ts("readAt"),
+    /**
+     * Dismissed by the reader — kept, but out of the inbox and the badge.
+     *
+     * Deliberately separate from `readAt`: an ops-heavy merchant archives routine
+     * dispatch noise while still needing to prove they saw a payout. Two flags
+     * over one concept is how a retention bug gets written.
+     */
+    archivedAt: ts("archivedAt"),
     createdAt: ts("createdAt").notNull().defaultNow(),
   },
   (t) => [
-    // The inbox query: "my notifications, newest first". Without this it is a
-    // seq scan per poll, and the tray polls.
-    index("notification_user_created_idx").on(t.userId, t.createdAt),
+    // The inbox query: "my live notifications, newest first". Partial on
+    // archived so dismissing a row does not push it into another index's range
+    // on every poll.
+    index("notification_user_live_created_idx")
+      .on(t.userId, t.createdAt)
+      .where(sql`${t.archivedAt} is null`),
+    // The badge poll, every 30s per open tab. Counting only unread, live rows
+    // lets the planner satisfy it from the index alone.
+    index("notification_user_unread_idx")
+      .on(t.userId, t.createdAt)
+      .where(sql`${t.archivedAt} is null AND ${t.readAt} is null`),
+    // Backs the retention sweep's sibling check, which asks "does this order
+    // have anything newer than the cutoff?". The unique index cannot serve it:
+    // `orderId` is its third column, so every probe is a filtered scan.
+    index("notification_user_order_created_idx").on(
+      t.userId,
+      t.orderId,
+      t.createdAt,
+    ),
     // Backs the retention sweep — the only other query that scans by age.
     index("notification_created_at_idx").on(t.createdAt),
     // One row per fact per recipient.

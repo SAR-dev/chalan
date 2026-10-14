@@ -58,6 +58,8 @@ export interface OrderEventInput {
    */
   actorName?: string | null
   now?: string
+  /** See `subject` on `emitNotificationEvent`. */
+  subject?: string | null
   /**
    * Shared recipient resolver for a batch.
    *
@@ -83,6 +85,7 @@ export async function emitOrderEvent(input: OrderEventInput): Promise<void> {
     data,
     actorName,
     now,
+    subject,
     resolveRecipients: sharedResolver,
   } = input
   const timestamp = now ?? new Date().toISOString()
@@ -105,6 +108,7 @@ export async function emitOrderEvent(input: OrderEventInput): Promise<void> {
     merchantId,
     actorName: actorName ?? null,
     now: timestamp,
+    subject: subject ?? null,
     ...(sharedResolver ? { recipients: await sharedResolver(merchantId) } : {}),
   })
 }

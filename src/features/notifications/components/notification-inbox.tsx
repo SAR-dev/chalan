@@ -1,140 +1,285 @@
 "use client"
 
-import { Inbox } from "lucide-react"
-import Link from "next/link"
-import { PageHeader } from "@/components/page-header"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
+import { Archive, CheckCheck, Inbox, MailOpen, Undo2 } from "lucide-react"
+import { useCallback, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { NotificationEventIcon } from "@/features/notifications/components/notification-event-icon"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  NotificationList,
+  useNotificationKeyboard,
+} from "@/features/notifications/components/notification-list"
 import { useNotificationFeed } from "@/features/notifications/hooks/use-notifications"
-import { formatDateTime } from "@/lib/format"
+import type { NotificationGroup } from "@/lib/notification-group"
+import { toast } from "@/lib/notify"
 
-/**
- * The full notification inbox — the destination the tray's "View all" links to.
- *
- * Newest first and never paginated past 50: a merchant's working set is what
- * happened in the last few hours, and the tray exists for the same window. A
- * NEW pill marks rows that arrived since the last visit, cleared by the single
- * watermark write this page makes on mount.
- */
-interface Props {
+// =============================================================================
+// The notification inbox — a page on desktop, the full-screen list on mobile.
+//
+// One component for both. The viewport decides the container around the list; the
+// rows, grouping, unread treatment and timestamps are `NotificationList`'s, so
+// the two cannot drift the way the tray and inbox rows did.
+// =============================================================================
+
+type Tab = "unread" | "all" | "archived"
+
+/** Long enough to find the button, short enough not to become a queue. */
+const UNDO_MS = 5_000
+
+export function NotificationInbox({
+  title,
+  description,
+}: {
   title: string
   description: string
-}
+}) {
+  const [tab, setTab] = useState<Tab>("all")
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const listRef = useRef<HTMLDivElement>(null)
 
-/**
- * "2:59 AM · Oct 13" inside a week, "Oct 13, 2026" beyond it.
- *
- * Notifications cluster: an order placed, approved, dispatched and delivered all
- * land within minutes of each other. Rendering only the date made an entire busy
- * day read identically, so the list gave the eye nothing to sort by. The week cut
- * keeps the column from turning into a wall of timestamps.
- */
-function formatNotificationTime(iso: string): string {
-  const ageMs = Date.now() - new Date(iso).getTime()
-  const recent = Number.isFinite(ageMs) && ageMs < 7 * 24 * 60 * 60 * 1000
-  if (!recent) {
-    return formatDateTime(iso, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+  const isArchived = tab === "archived"
+  const {
+    groups,
+    members,
+    unreadCount,
+    markAllRead,
+    markRead,
+    setArchived,
+    restoreMany,
+    archiveAllRead,
+    isLoading,
+  } = useNotificationFeed({ scope: isArchived ? "archived" : "live" })
+
+  /**
+   * The Unread tab is a client-side predicate over the live list rather than a
+   * third server query.
+   *
+   * It is a strict subset of what `live` already returned, so a second request
+   * would spend a round trip to re-derive rows the response is holding. The
+   * filter runs after fetching, not instead of it, which is also what keeps the
+   * tab count honest — it is computed from the same rows the tab shows.
+   */
+  // Archived rows are already absent from the live list — the server filters
+  // them out of the query — so `unread` alone is the correct predicate here.
+  const visible = useMemo(
+    () => (tab === "unread" ? groups.filter((g) => g.unread) : groups),
+    [groups, tab],
+  )
+
+  const toggleExpand = useCallback((key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
     })
-  }
-  return `${formatDateTime(iso, { hour: "numeric", minute: "2-digit" })} · ${formatDateTime(iso, { month: "short", day: "numeric" })}`
-}
+  }, [])
 
-export function NotificationInbox({ title, description }: Props) {
-  const { groups, isLoading } = useNotificationFeed()
+  const groupFor = useCallback(
+    (key: string) => visible.find((g) => g.key === key),
+    [visible],
+  )
+
+  // Scoped to the list container: `e` and `u` are typing keys, and a global
+  // listener would archive a row while the reader typed into a search box.
+  useNotificationKeyboard({
+    containerRef: listRef,
+    onArchive: (key) => {
+      const g = groupFor(key)
+      if (g) void handleArchive(g)
+    },
+    onToggleRead: (key) => {
+      const g = groupFor(key)
+      if (g) void markRead(g.ids)
+    },
+  })
+
+  /**
+   * Archive a group, with an undo that outlives the row.
+   *
+   * Archiving used to be one-way, which made it a deletion wearing a softer name:
+   * a mis-tap was unrecoverable and invisible, because the reader had no way to
+   * see what had been dismissed. The toast closes that: five seconds to notice a
+   * mistake, and `Archived` as the safety net behind it.
+   */
+  const handleArchive = useCallback(
+    async (group: NotificationGroup) => {
+      const ids = group.ids
+      // Every member, not just the newest. Archiving only the representative
+      // left the group in the inbox with its remaining events, so the row did
+      // not go away — which read as a failed dismissal — and the undo below
+      // would have restored more than had been archived.
+      for (const id of ids) {
+        const result = await setArchived(id, true)
+        if (!result.ok) {
+          toast.error(result.error ?? "Could not archive that notification.")
+          return
+        }
+      }
+      toast("Archived", {
+        description: group.title,
+        duration: UNDO_MS,
+        action: {
+          label: "Undo",
+          onClick: () => void restoreMany(ids),
+        },
+      })
+    },
+    [restoreMany, setArchived],
+  )
+
+  const handleArchiveAllRead = useCallback(async () => {
+    const result = await archiveAllRead()
+    if (!result.ok) {
+      toast.error(result.error ?? "Could not archive your read notifications.")
+      return
+    }
+    if (result.ids.length === 0) {
+      toast("Nothing to archive", {
+        description: "You have no read notifications yet.",
+      })
+      return
+    }
+    toast(
+      `Archived ${result.ids.length} read notification${result.ids.length === 1 ? "" : "s"}`,
+      {
+        duration: UNDO_MS,
+        action: {
+          label: "Undo",
+          onClick: () => void restoreMany(result.ids),
+        },
+      },
+    )
+  }, [archiveAllRead, restoreMany])
 
   return (
-    <>
-      <PageHeader title={title} description={description} />
-
-      {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} />
-          ))}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        {/* Hidden on mobile, where the sticky bar above already carries the
+            title and the unread count — two headings saying "Notifications" one
+            under the other, and the second one is the one that scrolls away. */}
+        <div className="hidden min-w-0 sm:block">
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            {title}
+            {unreadCount > 0 && !isArchived && (
+              <span
+                data-testid="notification-inbox-unread-count"
+                className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+              >
+                {unreadCount} unread
+              </span>
+            )}
+          </h1>
+          <p className="text-muted-foreground text-sm">{description}</p>
         </div>
-      ) : groups.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <div className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full">
-              <Inbox className="size-6" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium">No notifications yet</p>
-              <p className="text-muted-foreground text-sm">
-                When an order is placed, dispatched or delivered, it shows up
-                here.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {groups.map((g) => (
-            <Link
-              key={g.key}
-              href={g.href}
-              data-testid={`notification-row-${g.key}`}
-              className="bg-card hover:bg-muted/50 group block w-full rounded-lg border text-left transition-colors"
+
+        {/* The mobile heading, so the page still has one on the small screen. */}
+        <h1 className="sr-only sm:hidden">{title}</h1>
+
+        {/* Header actions. Both are hidden rather than disabled when they would
+            do nothing, so the header does not carry dead controls. */}
+        {!isArchived && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void handleArchiveAllRead()}
+              data-testid="notification-archive-all-read"
             >
-              <div className="flex items-start gap-4 px-5 py-4">
-                <NotificationEventIcon event={g.event} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-4">
-                    <p
-                      className={`truncate text-sm ${
-                        g.isNew
-                          ? "text-foreground font-semibold"
-                          : "text-muted-foreground font-normal"
-                      }`}
-                    >
-                      {g.title}
-                    </p>
-                    <time className="text-muted-foreground shrink-0 text-xs">
-                      {/* Date alone left every row reading "Oct 13, 2026" —
-                          which is most of them, because a busy day produces most
-                          of a merchant's notifications. Showing the clock time
-                          below a week out is what makes the list order legible;
-                          older rows keep the date so the column stays narrow. */}
-                      {formatNotificationTime(g.createdAt)}
-                    </time>
-                  </div>
-                  <p className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
-                    <span className="truncate">
-                      {g.orderId ?? "Payout"}
-                      {g.actorName ? ` · by ${g.actorName}` : ""}
-                    </span>
-                    {/* How much happened under this row. Hidden at 1, since "1
-                        update" is noise and the title already says one thing
-                        happened. */}
-                    {g.count > 1 && (
-                      <span
-                        data-testid={`notification-count-${g.key}`}
-                        className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
-                      >
-                        {g.count} updates
-                      </span>
-                    )}
-                  </p>
-                </div>
+              <Archive className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Archive read</span>
+              <span className="sm:hidden">Archive</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void markAllRead()}
+              disabled={unreadCount === 0}
+              data-testid="notification-mark-all-read"
+            >
+              <CheckCheck className="size-4" aria-hidden />
+              Mark all read
+            </Button>
+          </div>
+        )}
+      </div>
 
-                {g.isNew && (
-                  <Badge
-                    data-testid={`notification-new-${g.key}`}
-                    className="mt-0.5 shrink-0"
-                  >
-                    NEW
-                  </Badge>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+        <TabsList>
+          <TabsTrigger value="unread" data-testid="notification-tab-unread">
+            <MailOpen className="size-4" aria-hidden />
+            Unread
+          </TabsTrigger>
+          <TabsTrigger value="all" data-testid="notification-tab-all">
+            <Inbox className="size-4" aria-hidden />
+            All
+          </TabsTrigger>
+          <TabsTrigger value="archived" data-testid="notification-tab-archived">
+            <Archive className="size-4" aria-hidden />
+            Archived
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div ref={listRef}>
+        {isLoading && groups.length === 0 ? (
+          <div className="mx-auto max-w-4xl space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          <div className="mx-auto max-w-4xl">
+            <NotificationList
+              groups={visible}
+              members={members}
+              variant="page"
+              expanded={expanded}
+              stickyHeaders
+              onToggleExpand={toggleExpand}
+              archived={isArchived}
+              onOpen={(g) => {
+                // Read on open, not on mount. The old watermark had to sweep
+                // everything the moment the page loaded; per-row state does not,
+                // and marking all of it here is how a reader loses the unread
+                // rows they never actually looked at.
+                void markRead(g.ids)
+              }}
+              onArchive={(g) => void handleArchive(g)}
+              onRestore={(g) => void setArchived(g.ids[0], false)}
+              emptyState={
+                isArchived ? (
+                  <>
+                    <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full">
+                      <Undo2 className="size-5" aria-hidden />
+                    </div>
+                    <p className="text-foreground text-sm font-medium">
+                      Nothing archived
+                    </p>
+                    <p className="max-w-56 text-xs">
+                      Dismissed notifications land here, and can be restored.
+                    </p>
+                  </>
+                ) : tab === "unread" ? (
+                  <>
+                    <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full">
+                      <CheckCheck className="size-5" aria-hidden />
+                    </div>
+                    <p className="text-foreground text-sm font-medium">
+                      You&apos;re all caught up
+                    </p>
+                    <p className="max-w-56 text-xs">
+                      Every notification here has been read.
+                    </p>
+                  </>
+                ) : undefined
+              }
+            />
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

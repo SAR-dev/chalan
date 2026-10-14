@@ -1,199 +1,175 @@
 "use client"
 
-import { Bell, Inbox } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import { NotificationEventIcon } from "@/features/notifications/components/notification-event-icon"
-import { useNotifications } from "@/features/notifications/hooks/use-notifications"
-import { formatDateTime } from "@/lib/format"
-import type { NotificationGroup } from "@/lib/notification-group"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  type GroupedEvent,
+  NotificationList,
+} from "@/features/notifications/components/notification-list"
+import {
+  useNotificationCount,
+  useNotifications,
+} from "@/features/notifications/hooks/use-notifications"
 
 // =============================================================================
-// The notification tray — what the TopNav bell opens.
+// The notification tray — what the desktop TopNav bell opens.
 //
-// It sits beside the announcement bell rather than replacing it. The bell has
-// always been a link to a board everyone reads; this is addressed mail about
-// specific orders, with an unread badge that drains when you open it. Merging
-// them would give one button two unrelated jobs and two different "unread"
-// meanings.
+// A shell, not a renderer. Rows come from `NotificationList`, which the inbox
+// page and the mobile page also render; the only thing that makes this the
+// tray is the 360px anchored popover around it and the keyboard handling.
 //
-// Rendering as a sheet follows `right-nav.tsx`: the codebase has one pattern for
-// a panel opened from the right edge, and inventing a second one here would
-// leave two idioms to learn.
+// It sits beside the announcement bell rather than replacing it. The bell
+// opens its own panel of board posts; this is addressed mail about specific
+// orders, with an unread badge. Merging them would give one button two
+// unrelated jobs and two different "unread" meanings.
 // =============================================================================
-
-/**
- * "just now" / "12m ago" for the last week, then an absolute date.
- *
- * Relative wording past a week reads as noise ("34d ago"), and the absolute
- * branch goes through `formatDateTime` so it honours BUSINESS_TIMEZONE — the
- * same rule every other timestamp in the app follows.
- */
-function relativeTime(iso: string, now: number): string {
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return ""
-  const seconds = Math.max(0, Math.round((now - then) / 1000))
-  if (seconds < 60) return "just now"
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  if (days < 7) return `${days}d ago`
-  return formatDateTime(iso, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
 
 export function NotificationTray({
   trigger,
 }: {
   /**
-   * The control that opens the tray. Wrapped in a `SheetTrigger`, so a plain
-   * button is enough — Base UI's dialog only toggles from its own trigger, and
-   * a bare child would render but never open.
+   * The control that opens the tray. Wrapped in a `PopoverTrigger`, so a
+   * plain button is enough — Base UI's popover only toggles from its own
+   * trigger, and a bare child would render but never open.
    */
   trigger: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   // Fetched only once the tray has actually been opened. Mounting it eagerly
   // would pull 50 rows on every merchant page load for a panel most visits never
   // look at; the badge already carries the number on its own endpoint.
   const [hasOpened, setHasOpened] = useState(false)
-  const { notifications, groups, markSeen, isLoading } = useNotifications({
-    enabled: hasOpened,
-  })
+  const { notifications, groups, members, markRead, isLoading } =
+    useNotifications({ enabled: hasOpened })
+  const { newCount } = useNotificationCount()
+
+  const toggleExpand = useCallback((key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   /**
    * Dismiss the tray when one of its links is followed.
    *
    * A `next/link` navigation is client-side, so the browser does not reload and
-   * the Sheet's own `open` state is never told to change — the panel stays open
-   * on top of the page it just opened. Closing on intent is also the right feel:
-   * the user asked to go somewhere, not to keep reading the list. Same fix as
-   * RightNav's links.
+   * the popover's own `open` state is never told to change — the panel stays
+   * open on top of the page it just opened. Closing on intent is also the
+   * right feel: the user asked to go somewhere, not to keep reading the list.
+   * Same fix as RightNav's links.
    */
   const closeTray = () => setOpen(false)
 
   return (
-    <Sheet
+    <Popover
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
         if (!next) return
         setHasOpened(true)
-        // Opening the tray *is* the read: one watermark write drains the badge,
-        // rather than a read receipt per row. Failing to stamp leaves the badge
-        // showing, which is the honest state, so it is not a toast.
-        void markSeen()
       }}
     >
-      <SheetTrigger render={<span className="contents" />}>
+      <PopoverTrigger render={<span className="contents" />}>
         {trigger}
-      </SheetTrigger>
-      <SheetContent side="right" data-testid="notification-tray">
-        <SheetHeader>
-          <SheetTitle>Notifications</SheetTitle>
-          <SheetDescription>
-            Updates about your orders, deliveries and payouts.
-          </SheetDescription>
-        </SheetHeader>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        data-testid="notification-tray"
+        aria-label="Notifications"
+        className="w-[360px] p-0"
+      >
+        <div className="border-sidebar-border flex items-center gap-2 border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">
+            Notifications
+            {newCount > 0 && (
+              <span
+                data-testid="notification-tray-unread-count"
+                className="bg-primary/10 text-primary ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+              >
+                {newCount} new
+              </span>
+            )}
+          </h2>
+        </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <TrayLiveRegion count={newCount} />
+
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           {isLoading && notifications.length === 0 ? (
-            <p className="text-sidebar-foreground/60 p-4 text-sm">Loading…</p>
-          ) : notifications.length === 0 ? (
-            <div
-              className="text-sidebar-foreground/60 flex flex-col items-center gap-2 p-8 text-center"
-              data-testid="notification-empty"
-            >
-              <Inbox className="size-6" aria-hidden />
-              <p className="text-sm">Nothing yet.</p>
-              <p className="text-xs">
-                You will be notified here when an order moves.
-              </p>
-            </div>
+            <p className="text-muted-foreground p-4 text-sm">Loading…</p>
           ) : (
-            <ul className="flex flex-col">
-              {groups.map((g) => (
-                <TrayRow key={g.key} group={g} onNavigate={closeTray} />
-              ))}
-            </ul>
+            <NotificationList
+              groups={groups}
+              members={members}
+              variant="tray"
+              expanded={expanded}
+              onToggleExpand={toggleExpand}
+              onOpen={(g) => {
+                void markRead(g.ids)
+                closeTray()
+              }}
+            />
           )}
         </div>
 
         <div className="border-sidebar-border border-t p-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            render={<Link href="/merchant/notifications" />}
-            nativeButton={false}
+          <Link
+            href="/merchant/notifications"
+            className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring flex w-full items-center justify-center rounded-md py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
             onClick={closeTray}
             data-testid="notification-tray-all"
           >
-            <Bell className="size-4" aria-hidden />
             View all
-          </Button>
+          </Link>
         </div>
-      </SheetContent>
-    </Sheet>
+      </PopoverContent>
+    </Popover>
   )
 }
 
-function TrayRow({
-  group,
-  onNavigate,
-}: {
-  group: NotificationGroup & { isNew?: boolean }
-  onNavigate: () => void
-}) {
-  const now = Date.now()
+/**
+ * Announce arriving notifications without moving focus.
+ *
+ * A polite live region rather than a focus change: the reader is somewhere else
+ * in the app and has not asked to be interrupted, but a merchant who has left
+ * the tab open all afternoon should learn that their parcel arrived without
+ * having to go and look.
+ */
+function TrayLiveRegion({ count }: { count: number }) {
+  const previous = useRef(count)
+  const [message, setMessage] = useState("")
+
+  useEffect(() => {
+    if (count > previous.current) {
+      const delta = count - previous.current
+      setMessage(
+        `${delta} new notification${delta === 1 ? "" : "s"}. ${count} unread.`,
+      )
+    }
+    previous.current = count
+  }, [count])
+
   return (
-    <li className="border-sidebar-border border-b last:border-b-0">
-      <Link
-        href={group.href}
-        className="hover:bg-sidebar-accent/50 flex items-start gap-3 px-4 py-3 transition-colors"
-        // Client-side navigation never touches the Sheet's own open state, so
-        // without this the panel stays open over the page it just opened.
-        onClick={onNavigate}
-        data-testid="notification-tray-row"
-      >
-        <NotificationEventIcon event={group.event} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">
-            {group.title}
-          </span>
-          <span className="text-sidebar-foreground/60 mt-0.5 flex items-center gap-2 text-xs">
-            <span className="truncate">
-              {group.orderId ? `${group.orderId} · ` : ""}
-              {relativeTime(group.createdAt, now)}
-            </span>
-            {group.count > 1 && (
-              <span
-                data-testid="notification-tray-count"
-                className="bg-sidebar-accent text-sidebar-accent-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
-              >
-                {/* "2" alone, sitting next to "· 1h ago", reads as a stray
-                    superscript rather than a count. The inbox already spells this
-                    out; two surfaces must not word the same thing differently. */}
-                {group.count} updates
-              </span>
-            )}
-          </span>
-        </span>
-      </Link>
-    </li>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="sr-only"
+      data-testid="notification-live-region"
+    >
+      {message}
+    </div>
   )
 }
+
+export type { GroupedEvent }

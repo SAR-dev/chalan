@@ -22,6 +22,12 @@ export interface GroupableNotification {
   href: string
   createdAt: string
   actorName: string | null
+  /** "Notify Recipient → Barisal", snapshotted at event time. Null on old rows. */
+  subject?: string | null
+  /** Null while unread. */
+  readAt?: string | null
+  /** Set once dismissed. */
+  archivedAt?: string | null
 }
 
 /**
@@ -52,6 +58,14 @@ export interface NotificationGroup {
   /** Every row id in the group, so a reader can tell whether any member is new. */
   ids: string[]
   actorName: string | null
+  /**
+   * The order's snapshot. Taken from the newest member, which is the same row
+   * the title and href come from — an older event's wording would contradict
+   * the status shown beside it.
+   */
+  subject: string | null
+  /** True while any member is unread. */
+  unread: boolean
 }
 
 /**
@@ -81,6 +95,8 @@ export function groupNotifications(
         count: 1,
         ids: [row.id],
         actorName: row.actorName,
+        subject: row.subject ?? null,
+        unread: !row.readAt,
       })
       continue
     }
@@ -97,17 +113,19 @@ export function groupNotifications(
         count: 1,
         ids: [row.id],
         actorName: row.actorName,
+        subject: row.subject ?? null,
+        unread: !row.readAt,
       }
       byOrder.set(row.orderId, group)
       groups.push(group)
       continue
     }
 
-    // The representative row is already the newest; only the tally moves. The
-    // actor and href follow the newest fact too, and `existing` is that newest
-    // row, so there is nothing to update here beyond the count and the ids.
+    // The representative row is already the newest, so its subject and href
+    // stay; only the tally and the unread flag move.
     existing.count += 1
     existing.ids.push(row.id)
+    existing.unread ||= !row.readAt
   }
 
   return groups

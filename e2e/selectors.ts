@@ -82,10 +82,24 @@ export const topnav = {
   versionUpdate: "[data-testid='account-build-update']",
 }
 
-// ─── Announcements (bell link + feed + detail page) ──────────────────────────
+// ─── Announcements (bell + popover + feed + detail page) ──────────────────────
 export const announcements = {
+  // Two controls, one per breakpoint: a link to the full feed below `sm`, the
+  // reading popover above it. Both are mounted; CSS hides one.
   bell: "[data-testid='announcement-bell']",
+  bellPage: "[data-testid='announcement-bell-page']",
   badge: "[data-testid='announcement-badge']",
+  badgeMobile: "[data-testid='announcement-badge-mobile']",
+  // The desktop popover: full markdown per post, stamps the watermark on open.
+  popover: "[data-testid='announcement-popover']",
+  popoverAll: "[data-testid='announcement-popover-all']",
+  popoverEmpty: "[data-testid='announcement-popover-empty']",
+  popoverItemAny: "[data-testid^='announcement-popover-item-']",
+  popoverItem: (id: string) =>
+    `[data-testid='announcement-popover-item-${id}']`,
+  popoverNew: (id: string) => `[data-testid='announcement-popover-new-${id}']`,
+  sectionNew: "[data-testid='announcement-popover-section-new']",
+  sectionEarlier: "[data-testid='announcement-popover-section-earlier']",
   // Feed rows + the "published since your last visit" pill.
   inboxRow: (id: string) => `[data-testid='inbox-row-${id}']`,
   newPill: (id: string) => `[data-testid='inbox-new-${id}']`,
@@ -103,16 +117,46 @@ export const landing = {
 
 // ─── In-app notifications (merchant) ────────────────────────────────────────
 export const notifications = {
+  // Two controls, one per breakpoint: a link to the full-screen list below `sm`,
+  // the popover above it. Both are mounted; CSS hides one.
   bell: "[data-testid='notification-bell']",
+  bellPage: "[data-testid='notification-bell-page']",
+  badgeMobile: "[data-testid='notification-badge-mobile']",
+  tabUnread: "[data-testid='notification-tab-unread']",
+  tabAll: "[data-testid='notification-tab-all']",
+  tabArchived: "[data-testid='notification-tab-archived']",
+  archiveAllRead: "[data-testid='notification-archive-all-read']",
+  restoreAny: "[data-testid^='notification-restore-']",
+  expandAny: "[data-testid^='notification-expand-']",
+  collapsed: "[data-testid='notification-collapsed']",
+  dayHeader: "[data-testid='notification-day-header']",
+  mobileHeader: "[data-testid='notification-mobile-header']",
+  mobileBack: "[data-testid='notification-mobile-back']",
+  listEmpty: "[data-testid='notification-list-empty']",
   badge: "[data-testid='notification-badge']",
   tray: "[data-testid='notification-tray']",
-  trayRow: "[data-testid='notification-tray-row']",
+  // The tray renders the shared list, so a tray row *is* an inbox row; the
+  // testid carries the group key and can only be matched by prefix.
+  trayRow: "[data-testid^='notification-row-']",
   trayEmpty: "[data-testid='notification-empty']",
   trayAll: "[data-testid='notification-tray-all']",
   // Inbox rows carry the notification id, which the test only learns at runtime.
   inboxRowAny: "[data-testid^='notification-row-']",
   newPill: (id: string) => `[data-testid='notification-new-${id}']`,
   navLink: "[data-testid='nav-/merchant/notifications']",
+  markAllRead: "[data-testid='notification-mark-all-read']",
+  // The archive button carries the group's key, which the test only learns at
+  // runtime from the row it belongs to.
+  //
+  // Scoped to a row on purpose. The header's bulk button is also named
+  // `notification-archive-all-read`, so an unscoped prefix match put it first in
+  // DOM order and `.first()` archived the whole read inbox instead of one row —
+  // which then left the next test an empty tray to fail against.
+  archiveAny: "li [data-testid^='notification-archive-']",
+  // A tray row that is still unread. Used instead of the badge, which caps at
+  // "9+" and so reports a display value rather than a count.
+  unreadTrayRow:
+    "[data-testid^='notification-row-']:has([data-testid='notification-unread-dot'])",
 }
 
 // ─── Announcement create/edit pages (replaced the dialogs) ──────────────────

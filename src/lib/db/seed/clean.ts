@@ -16,6 +16,12 @@ export const SEED_CLEAN_TABLES = [
   "payout_request",
   "balance_transaction",
   "merchant_balance",
+  // FK user, so it must be truncated *before* it. Absent until read state moved
+  // onto the rows: without this a reseed preserved every notification and its
+  // `readAt`, so the next e2e run started with a merchant who had already read
+  // their whole inbox and left no badge to assert against. Read state is
+  // per-reader and meaningless across a reseed, for the same reason orders are.
+  "notification",
   "profile",
   "verification",
   "session",

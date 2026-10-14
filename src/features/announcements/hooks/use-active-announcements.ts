@@ -82,48 +82,75 @@ export function useActiveAnnouncements({
 }
 
 /**
- * The announcements *feed* (the one page that represents the board): captures
- * which rows were new on arrival, then stamps the watermark once so the
- * TopNav badge drains.
+ * The shared "new since the watermark" logic behind the NEW pill — one
+ * definition for both surfaces that show it: the feed (which stamps on mount)
+ * and the TopNav announcement popover (which stamps when opened). Two copies
+ * of this would be two ways for the pill and the badge to disagree.
  *
- * The snapshot matters: stamping flips `isNew` to false everywhere, and
- * without pinning the NEW pills would vanish before the reader could use them
- * — they survive for this visit (and rows published while you sit on the
- * feed still arrive with isNew=true and pill normally).
+ * `stamp()` snapshots every currently-new id into a pinned set, then advances
+ * the watermark. The snapshot matters: stamping flips `isNew` to false
+ * everywhere, and without pinning the NEW pills would vanish before the reader
+ * could use them — pinned ids survive for the visit, while rows published
+ * afterwards still arrive live-new and pill on their own.
+ *
+ * A call with nothing new is a no-op: no snapshot, no write. The server
+ * watermark is monotonic (`GREATEST`), so a redundant call would be harmless —
+ * the guard just spares an already-seen reader the request.
+ */
+export function useAnnouncementNewness({
+  announcements,
+  markSeen,
+}: {
+  announcements: ActiveAnnouncement[]
+  markSeen: () => Promise<MutationResult>
+}) {
+  const [pinnedNew, setPinnedNew] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+
+  const stamp = useCallback(() => {
+    const fresh = announcements.filter((a) => a.isNew).map((a) => a.id)
+    if (fresh.length === 0) return
+    setPinnedNew((prev) => new Set([...prev, ...fresh]))
+    void markSeen()
+  }, [announcements, markSeen])
+
+  /** Pill predicate: pinned-new survives the stamp, live isNew covers rows
+   * published after the snapshot. */
+  const isNew = useCallback(
+    (id: string) =>
+      pinnedNew.has(id) ||
+      announcements.find((a) => a.id === id)?.isNew === true,
+    [pinnedNew, announcements],
+  )
+
+  return { isNew, stamp }
+}
+
+/**
+ * The announcements *feed* (the one page that represents the board): stamps
+ * the watermark once, on first non-empty data, so the TopNav badge drains.
+ *
+ * Passive hydration, so failures are not surfaced as toasts: the pills and
+ * badge simply stay until the next visit, which is the honest state anyway.
+ * An already-seen feed issues no write at all.
  */
 export function useAnnouncementFeed(options?: {
   initialData?: ActiveAnnouncement[]
 }) {
   const { announcements, markSeen, isLoading, error } =
     useActiveAnnouncements(options)
+  const { isNew, stamp } = useAnnouncementNewness({
+    announcements,
+    markSeen,
+  })
 
-  const [pinnedNew, setPinnedNew] = useState<ReadonlySet<string> | null>(null)
   const stampedRef = useRef(false)
-
-  // Pin once, on first non-empty data.
   useEffect(() => {
-    if (pinnedNew !== null || isLoading || announcements.length === 0) return
-    setPinnedNew(new Set(announcements.filter((a) => a.isNew).map((a) => a.id)))
-  }, [announcements, isLoading, pinnedNew])
-
-  // Stamp once per mount, and only when there was actually something new —
-  // an already-seen feed needs no write. Passive hydration, so failures are
-  // not surfaced as toasts: the pills and badge simply stay until the next
-  // visit, which is the honest state anyway.
-  useEffect(() => {
-    if (stampedRef.current || pinnedNew === null || pinnedNew.size === 0) return
+    if (stampedRef.current || isLoading || announcements.length === 0) return
     stampedRef.current = true
-    void markSeen()
-  }, [pinnedNew, markSeen])
-
-  /** Pill predicate: pinned-new survives the stamp, live isNew covers rows
-   * published while this feed is open. */
-  const isNew = useCallback(
-    (id: string) =>
-      Boolean(pinnedNew?.has(id)) ||
-      announcements.find((a) => a.id === id)?.isNew === true,
-    [pinnedNew, announcements],
-  )
+    stamp()
+  }, [isLoading, announcements, stamp])
 
   return {
     announcements,

@@ -194,7 +194,6 @@ export const profile = pgTable(
     // looked", not per-item read receipts. Null = never looked, so everything
     // counts as new. Stamped with `GREATEST` so a stale client cannot re-badge
     // notifications it has already seen.
-    notificationsSeenAt: ts("notificationsSeenAt"),
     // Domain entity references. Only the field matching the user's role is
     // expected to be populated. FKs with `ON DELETE SET NULL` so removing the
     // domain row unlinks the account instead of leaving a dangling id

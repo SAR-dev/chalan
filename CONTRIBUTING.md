@@ -996,10 +996,14 @@ and the `AnnouncementDetailModal`.
 <AnnouncementBell />
 ```
 
-**Announcements are a board, not a notification feed.** The bell is a plain
-link to the feed — no dropdown tray, no per-item list, no "mark all read":
-those are notification mechanics and they belong to R4.1, which will host its
-tray when real notifications exist.
+**Announcements are a board, not a notification feed.** The bell has two
+controls, one per breakpoint (the same shape as `NotificationBell`): below
+`sm` it is a plain `Link` to the feed; at `sm` and above it opens
+`AnnouncementPopover` — a Facebook-style anchored panel that renders every
+post's **full markdown body, never truncated**. It has no mark-all-read and no
+per-item read state: those are notification mechanics, and in-app
+notifications keep their own bell and tray beside it
+(`src/features/notifications/`) — the two bells never merge.
 
 Behaviour:
 
@@ -1011,11 +1015,23 @@ Behaviour:
   watermark column — **never** per-item read rows, never localStorage; the
   `announcement_read` table and the mark-read endpoints were built and removed
   (tombstone in `schema.postgres/platform.ts`).
-- Clicking navigates to the reader's feed
-  (`announcementsPathForRole(role)` in `src/lib/nav-config.ts`).
+- **Opening the popover stamps the watermark** (`useAnnouncementNewness`,
+  shared with the feed) — reading the full text in the panel *is* reading the
+  board, so the badge drains on open; a call with nothing new writes nothing.
+  The pinned NEW-pill snapshot keeps items marked for the visit, exactly as
+  the feed does.
+- Clicking a post title opens `/announcements/[id]`; the footer's "See all
+  announcements" goes to the reader's feed
+  (`announcementsPathForRole(role)` in `src/lib/nav-config.ts`); below `sm`
+  the bell itself is that feed link.
 - The **feed** (`useAnnouncementFeed`) stamps the watermark on mount, which
-  drains the badge; rows published since the last visit carry a NEW pill for
-  that visit only. The bell itself never writes.
+  drains the badge for anyone who lands there; rows published since the last
+  visit carry a NEW pill for that visit only. The bell itself never writes
+  until one of its two reading surfaces is opened.
+- Both stamp paths go through `useAnnouncementNewness`
+  (`src/features/announcements/hooks/use-active-announcements.ts`) — one
+  definition of "pin the pills, advance the watermark", so the pill and the
+  badge cannot disagree between the popover and the feed.
 
 Rules:
 
@@ -1023,22 +1039,25 @@ Rules:
   screen within a role (and on `/announcements/[id]`) without per-page wiring.
 - Do not add a second `useActiveAnnouncements()` call in page components; the
   TopNav already triggers the SWR fetch and caches it for the whole session.
-- The sidebar Announcements link, the bell, and both feed pages share the same
-  hook and the same watermark — visiting the feed anywhere drains the badge
-  everywhere on the next mutate.
+- The sidebar Announcements link, the bell (both controls), the popover and
+  both feed pages share the same hook and the same watermark — opening the
+  popover or visiting the feed anywhere drains the badge everywhere on the
+  next mutate.
 - The detail page (`/announcements/[id]`) writes **nothing** on open: viewing
   one announcement must not advance the watermark (it would mark everything
-  else as seen too). Only visiting the feed stamps.
-- The tray belongs to notifications, not announcements. The bell stays a plain
-  link; in-app notifications have their own bell and tray beside it
-  (`src/features/notifications/`) — see §3.76.
+  else as seen too). Only opening the popover or visiting the feed stamps.
+- The notification tray belongs to notifications, not announcements. The
+  announcement popover renders full text only — a `truncate`/`line-clamp` in
+  it defeats the point of reading the board without leaving the page; and the
+  two bells stay separate controls with their own badges.
 - Detail rendering is `<Markdown>` (react-markdown + remark-gfm, same as
   `/terms`): announcements are authored as markdown on the create/edit pages
   (`markdown-editor.tsx` — Write pane is CodeMirror 6 with a formatting
   toolbar and Ctrl/Cmd+B·I, Preview renders through the app's `Markdown`, so
   preview == what readers get) and listed with `stripMarkdown()` excerpts
-  (`src/lib/markdown.ts`). Never show raw markdown source in a one-line
-  preview, and never render announcement HTML directly.
+  (`src/lib/markdown.ts`) on the feed. The popover renders the full
+  `<Markdown>` body; never show raw markdown source, and never render
+  announcement HTML directly.
 
 ## 3.76. Parcel labels (`src/lib/label/`)
 
@@ -2709,10 +2728,10 @@ e2e/
     04-tracking-identity.spec.ts   # merchant sidebar identity + tracking token
     05-two-factor.spec.ts       # 2FA enrollment + TOTP login for admins
     06-support.spec.ts          # support ticket create → admin reply
-    …                              # 07–37 continue in the same shape
+    …                              # 07–43 continue in the same shape
 ```
 
-**149 tests total** across 37 spec files. Every `test.describe` carries a unique
+**171 tests total** across 43 spec files. Every `test.describe` carries a unique
 scenario id in `<file number><index>. <Name>` format — `2901.` is the first
 scenario in `29-sign-out.spec.ts`. Ids are scoped to their file, so a deletion
 renumbers that one file and leaves no gap.

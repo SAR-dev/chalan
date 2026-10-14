@@ -1,5 +1,5 @@
 {
-  "id": "d26fe10f-2c51-4e80-bffc-9c6d535a495c",
+  "id": "dbbd9d34-cfa5-4c6e-b4c6-a9bf62f9213a",
   "prevId": "63ac0b4a-c601-4b43-928e-2c106106bda4",
   "version": "7",
   "dialect": "postgresql",
@@ -166,12 +166,6 @@
         },
         "announcementsSeenAt": {
           "name": "announcementsSeenAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notificationsSeenAt": {
-          "name": "notificationsSeenAt",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -5257,6 +5251,24 @@
           "primaryKey": false,
           "notNull": true
         },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "readAt": {
+          "name": "readAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archivedAt": {
+          "name": "archivedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp with time zone",
@@ -5266,11 +5278,61 @@
         }
       },
       "indexes": {
-        "notification_user_created_idx": {
-          "name": "notification_user_created_idx",
+        "notification_user_live_created_idx": {
+          "name": "notification_user_live_created_idx",
           "columns": [
             {
               "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"notification\".\"archivedAt\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notification_user_unread_idx": {
+          "name": "notification_user_unread_idx",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"notification\".\"archivedAt\" is null AND \"notification\".\"readAt\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notification_user_order_created_idx": {
+          "name": "notification_user_order_created_idx",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "orderId",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5298,6 +5360,34 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notification_user_event_order_uniq": {
+          "name": "notification_user_event_order_uniq",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "orderId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"notification\".\"orderId\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

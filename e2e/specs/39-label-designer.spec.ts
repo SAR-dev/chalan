@@ -41,14 +41,19 @@ test.describe("3901. Label designer", () => {
     await page.locator(labelDesigner.addQr).click()
     await expect(toast(page, /already on the label/)).toBeVisible()
 
-    // …while a field that isn't on the label yet is added — and is then
-    // refused too, which proves the first click landed in the form's
-    // template rather than only in the canvas internals.
+    // …and a duplicate palette field is refused against the *form's* template
+    // state, not just pdfme's canvas internals — the check has to read what is
+    // already on the label. The default template carries every palette field
+    // (brand, QR, order id, …), so the first click may already be the refusal:
+    // assert on the first matching toast rather than the count, which keeps the
+    // add-then-refuse sequence working on any template missing the field.
+    // The add-it-and-it-appears half of the proof lives in the component spec
+    // (pdfme-designer.spec.tsx), which loads a template without the field.
     const siteName = page.locator(labelDesigner.addField("siteName"))
     await siteName.click()
     await siteName.click()
     await expect(
-      toast(page, /"Brand name" is already on the label/),
+      toast(page, /"Brand name" is already on the label/).first(),
     ).toBeVisible()
 
     // The template name is what history will remember this edit by.

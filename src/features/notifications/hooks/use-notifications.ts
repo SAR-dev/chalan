@@ -1,15 +1,11 @@
 "use client"
 
-import { usePathname } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo } from "react"
 import useSWR, { useSWRConfig } from "swr"
 import { useAuth } from "@/features/account/hooks/use-auth"
+import type { GroupedEvent } from "@/features/notifications/components/notification-list"
 import { jsonFetcher, swrOptions } from "@/lib/hooks/fetcher"
-// Pure leaf: `@/lib/notifications` would drag `@/lib/db` into the browser bundle.
 import { groupNotifications } from "@/lib/notification-group"
-
-const LIST_KEY = "/api/notifications?limit=50"
-const COUNT_KEY = "/api/notifications?count=1"
 
 /**
  * How often the badge re-checks.
@@ -17,7 +13,8 @@ const COUNT_KEY = "/api/notifications?count=1"
  * The badge has to stay live while the shell sits idle, or a merchant finds out
  * their parcel was delivered only on their next navigation. 30s is frequent
  * enough to feel immediate and cheap enough to sit behind every merchant tab
- * all day.
+ * all day — and SWR pauses it on a hidden tab by default, so a backgrounded
+ * browser stops asking entirely.
  */
 const POLL_INTERVAL_MS = 30_000
 
@@ -30,6 +27,12 @@ export interface AppNotification {
   title: string
   href: string
   createdAt: string
+  /** "Notify Recipient → Barisal", snapshotted at event time. */
+  subject?: string | null
+  /** Null while unread. */
+  readAt?: string | null
+  /** Set once dismissed. Present only in the archived scope. */
+  archivedAt?: string | null
 }
 
 export interface NotificationFeed {
@@ -38,6 +41,23 @@ export interface NotificationFeed {
 }
 
 type MutationResult = { ok: boolean; error?: string }
+
+/**
+ * Which inbox this hook is reading.
+ *
+ * `live` is the default. `archived` is a separate request rather than a filter
+ * over the live one because the server keeps archived rows out of the default
+ * query entirely — they exist to be *findable*, and a list that omitted them
+ * would be a list you can never undo from.
+ */
+export type NotificationScope = "live" | "archived"
+
+const listKey = (scope: NotificationScope) =>
+  scope === "archived"
+    ? "/api/notifications?limit=50&archived=1"
+    : "/api/notifications?limit=50"
+
+const COUNT_KEY = "/api/notifications?count=1"
 
 /**
  * Whether this reader has an inbox at all.
@@ -62,168 +82,292 @@ export function useHasNotifications(): boolean {
  */
 export function useNotifications({
   enabled: override,
+  scope = "live",
 }: {
   enabled?: boolean
+  scope?: NotificationScope
 } = {}) {
   const hasInbox = useHasNotifications()
   const enabled = override ?? hasInbox
   const { mutate: globalMutate } = useSWRConfig()
+  const key = listKey(scope)
 
-  const { data, isLoading, error, mutate } = useSWR<NotificationFeed>(
-    enabled ? LIST_KEY : null,
+  const { data, isLoading, error } = useSWR<NotificationFeed>(
+    enabled ? key : null,
     jsonFetcher,
     swrOptions,
   )
 
   const notifications = data?.notifications ?? []
 
-  // Tracks whether a list has ever loaded, so `markSeen` can tell "drain the
-  // badge" apart from "overwrite an inbox that has not arrived yet".
-  const cacheRef = useRef(false)
-  useEffect(() => {
-    if (data) cacheRef.current = true
-  }, [data])
+  // One revalidation pass across every mounted key. A dismissal issued from the
+  // inbox also changes what the tray would show, and revalidating only the key
+  // this hook happens to be mounted with leaves the other surface stale until its
+  // own 30s tick.
+  const revalidateAll = useCallback(async () => {
+    await globalMutate<NotificationFeed>(
+      (k) => typeof k === "string" && k.startsWith("/api/notifications"),
+      undefined,
+      { revalidate: true },
+    )
+  }, [globalMutate])
 
   /**
-   * Drains the badge in one write rather than tracking per-item read receipts,
-   * and optimistically zeroes the count so the badge clears on the same tick the
-   * POST lands. The server derives the same result from the new watermark, so
-   * there is nothing to revalidate.
+   * Mark specific notifications read.
+   *
+   * Optimistic, because the alternative is the badge lying for a round trip on
+   * every row click — which is the exact moment the old watermark model was
+   * papering over. Safe here because read state is monotonic and idempotent: the
+   * server never *unreads* a row, so a failed request can leave the badge
+   * briefly over-counted but never under.
    */
-  const markSeen = useCallback(async (): Promise<MutationResult> => {
-    try {
-      const res = await fetch("/api/notifications/seen", { method: "POST" })
-      if (!res.ok) return { ok: false, error: "Failed to open your inbox." }
-      // Zero the badge's own cache too. The badge reads a *separate* SWR key
-      // (`?count=1`) from this list, so draining only the list leaves the
-      // badge showing its last polled number until the next tick — the tray
-      // would read "seen" while the bell still counted the same rows.
-      await globalMutate(COUNT_KEY, { newCount: 0 }, { revalidate: false })
-      // Only rewrite the cache if a list is actually loaded. On the tray's
-      // first open the fetch may not have resolved yet, and writing
-      // `{notifications: []}` there would cache an empty inbox over the rows
-      // that are on their way — the tray would show "nothing yet" for a
-      // merchant who has notifications.
-      if (cacheRef.current) {
-        await mutate(
-          (prev?: NotificationFeed) => ({
-            notifications: prev?.notifications ?? [],
-            newCount: 0,
-          }),
-          { revalidate: false },
-        )
+  const markRead = useCallback(
+    async (ids: string[]): Promise<MutationResult> => {
+      if (ids.length === 0) return { ok: true }
+      const previous = data
+      const now = new Date().toISOString()
+      const idSet = new Set(ids)
+
+      await globalMutate<NotificationFeed>(
+        key,
+        (current) =>
+          current
+            ? {
+                ...current,
+                notifications: current.notifications.map((n) =>
+                  idSet.has(n.id) && !n.readAt ? { ...n, readAt: now } : n,
+                ),
+                newCount: current.notifications.filter(
+                  (n) => idSet.has(n.id) && !n.readAt,
+                ).length,
+              }
+            : current,
+        { revalidate: false },
+      )
+      await globalMutate(COUNT_KEY, undefined, { revalidate: true })
+
+      try {
+        const res = await fetch("/api/notifications/read", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids }),
+        })
+        if (!res.ok) {
+          // Roll back rather than leave a badge the server disagrees with.
+          await globalMutate(key, previous, { revalidate: false })
+          await globalMutate(COUNT_KEY, undefined, { revalidate: true })
+          return { ok: false, error: "Could not mark those as read." }
+        }
+        return { ok: true }
+      } catch {
+        await globalMutate(key, previous, { revalidate: false })
+        await globalMutate(COUNT_KEY, undefined, { revalidate: true })
+        return { ok: false, error: "Could not mark those as read." }
       }
+    },
+    [data, globalMutate, key],
+  )
+
+  /** Mark everything unread and unarchived as read. */
+  const markAllRead = useCallback(async (): Promise<MutationResult> => {
+    try {
+      const res = await fetch("/api/notifications/read", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      })
+      if (!res.ok)
+        return { ok: false, error: "Could not mark your inbox read." }
+      await revalidateAll()
       return { ok: true }
     } catch {
-      return { ok: false, error: "Failed to open your inbox." }
+      return { ok: false, error: "Could not mark your inbox read." }
     }
-  }, [mutate])
+  }, [revalidateAll])
+
+  /**
+   * Dismiss or restore a row.
+   *
+   * Revalidates rather than patching the cache: the row leaves a filtered list
+   * entirely on archive, and hand-editing two caches to make it disappear is how
+   * the badge and the list drift apart.
+   */
+  const setArchived = useCallback(
+    async (id: string, archived: boolean): Promise<MutationResult> => {
+      try {
+        const res = await fetch(`/api/notifications/${id}/archive`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ archived }),
+        })
+        if (!res.ok) {
+          return { ok: false, error: "Could not update that notification." }
+        }
+        await revalidateAll()
+        return { ok: true }
+      } catch {
+        return { ok: false, error: "Could not update that notification." }
+      }
+    },
+    [revalidateAll],
+  )
+
+  /**
+   * Put a set of dismissed rows back.
+   *
+   * One request, not one per id: the undo lives in a toast that expires after
+   * five seconds, and restoring sixty rows individually is how half of them come
+   * back and half do not, with nothing to tell the reader which is which.
+   */
+  const restoreMany = useCallback(
+    async (ids: string[]): Promise<MutationResult> => {
+      if (ids.length === 0) return { ok: true }
+      try {
+        const res = await fetch("/api/notifications/restore", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids }),
+        })
+        if (!res.ok)
+          return { ok: false, error: "Could not restore those notifications." }
+        await revalidateAll()
+        return { ok: true }
+      } catch {
+        return { ok: false, error: "Could not restore those notifications." }
+      }
+    },
+    [revalidateAll],
+  )
+
+  /**
+   * Dismiss everything already read.
+   *
+   * Returns the ids it archived so the caller can offer an undo naming exactly
+   * what came back, instead of a blanket restore that would also resurrect rows
+   * dismissed deliberately last week.
+   */
+  const archiveAllRead = useCallback(async (): Promise<
+    MutationResult & { ids: string[] }
+  > => {
+    try {
+      const res = await fetch("/api/notifications/archive", { method: "POST" })
+      const body = (await res.json().catch(() => null)) as {
+        ids?: string[]
+      } | null
+      if (!res.ok)
+        return {
+          ok: false,
+          error: "Could not archive your read notifications.",
+          ids: [],
+        }
+      await revalidateAll()
+      return { ok: true, ids: body?.ids ?? [] }
+    } catch {
+      return {
+        ok: false,
+        error: "Could not archive your read notifications.",
+        ids: [],
+      }
+    }
+  }, [revalidateAll])
 
   return {
     notifications,
-    /** One row per order — see `groupNotifications`. The tray renders these. */
+    /** One row per order — see `groupNotifications`. */
     groups: useMemo(() => groupNotifications(notifications), [notifications]),
+    /**
+     * The rows behind each group, for expanding `×N`.
+     *
+     * A group carries only ids and a count, which is enough to mark it read but
+     * not to tell the reader what the count covers. Without this an expanded
+     * group would render three empty lines — technically responsive, useless.
+     */
+    members: useMemo(() => groupMembers(notifications), [notifications]),
     newCount: data?.newCount ?? 0,
-    markSeen,
+    markRead,
+    markAllRead,
+    setArchived,
+    restoreMany,
+    archiveAllRead,
     isLoading,
     error,
   }
 }
 
+/** Group key → its rows, newest first. Mirrors `groupNotifications`' ordering. */
+function groupMembers(
+  notifications: AppNotification[],
+): Map<string, GroupedEvent[]> {
+  const map = new Map<string, GroupedEvent[]>()
+  for (const n of notifications) {
+    if (!n.orderId) continue
+    const list = map.get(n.orderId)
+    const member: GroupedEvent = {
+      id: n.id,
+      event: n.event,
+      title: n.title,
+      createdAt: n.createdAt,
+      actorName: n.actorName,
+      readAt: n.readAt ?? null,
+    }
+    if (list) list.push(member)
+    else map.set(n.orderId, [member])
+  }
+  return map
+}
+
 /**
  * The TopNav badge number alone.
  *
- * Deliberately separate from `useNotifications`: polling the badge must not drag
- * 50 rows across the network every 30 seconds for a merchant who never opens the
- * tray. The tray fetches its own list when it opens, so the two never invalidate
- * each other.
+ * A separate key from the list so the 30s tick is a `count(*)` rather than
+ * fifty rows over the wire for a tray nobody has opened.
  */
 export function useNotificationCount() {
-  const enabled = useHasNotifications()
-  const pathname = usePathname()
-
-  const { data, isLoading, mutate } = useSWR<{ newCount: number }>(
-    enabled ? COUNT_KEY : null,
+  const hasInbox = useHasNotifications()
+  const { data, isLoading } = useSWR<{ newCount: number }>(
+    hasInbox ? COUNT_KEY : null,
     jsonFetcher,
     { ...swrOptions, refreshInterval: POLL_INTERVAL_MS },
   )
-
-  // Re-check on every navigation, not just on the poll tick.
-  //
-  // The action that raises a notification is nearly always followed by a route
-  // change — place an order, land on the list; approve a payout, land on the
-  // queue — so the badge would otherwise stay stale for up to a full poll
-  // interval on exactly the screens where it matters most.
-  useEffect(() => {
-    if (!enabled) return
-    void mutate()
-  }, [pathname, enabled, mutate])
 
   return { newCount: data?.newCount ?? 0, isLoading }
 }
 
 /**
- * The inbox page: pin which rows were new on arrival, then stamp the watermark
- * once so the badge drains.
+ * The inbox page.
  *
- * The pin is what keeps the "new" pills on screen. Stamping drops `newCount` to
- * zero — without the snapshot the pills would vanish before the reader could use
- * them. The server returns rows newest-first and counts the unread ones, so the
- * new ones are exactly the leading `newCount` rows.
+ * No pinning and no watermark write: read state now lives on the row, so opening
+ * the inbox marks what is on screen as read and the pills reflect the server's
+ * own answer. The client-side snapshot this replaces existed only because the
+ * old model could not express "I have read this row".
  */
-export function useNotificationFeed() {
-  const { notifications, groups, newCount, markSeen, isLoading, error } =
-    useNotifications()
-
-  const [pinnedNew, setPinnedNew] = useState<ReadonlySet<string> | null>(null)
-  const stampedRef = useRef(false)
-
-  useEffect(() => {
-    if (pinnedNew !== null || isLoading || notifications.length === 0) return
-    setPinnedNew(new Set(notifications.slice(0, newCount).map((n) => n.id)))
-  }, [notifications, isLoading, pinnedNew, newCount])
-
-  // One write per mount, and only when there was something new to drain — an
-  // already-seen inbox needs no write. Passive: a failure leaves the badge
-  // showing, which is the honest state, so it is deliberately not a toast.
-  useEffect(() => {
-    if (stampedRef.current || pinnedNew === null || pinnedNew.size === 0) return
-    stampedRef.current = true
-    void markSeen()
-  }, [pinnedNew, markSeen])
-
-  /**
-   * Pinned-new survives the stamp for this visit. Rows that arrive while the
-   * page is open are not in the pin, so they fall through to the live count.
-   */
-  const isNew = useCallback(
-    (id: string) => Boolean(pinnedNew?.has(id)),
-    [pinnedNew],
-  )
-
-  /**
-   * One row per order.
-   *
-   * Grouping happens here rather than in the query because the tray needs the
-   * flat rows too — `markSeen` stamps from row timestamps, and `newCount` is
-   * counted in rows. So the raw list stays authoritative and the groups are a
-   * view over it. `isNew` is resolved per group from its member ids: a group
-   * counts as new if *any* of the facts under it arrived since the last visit,
-   * which is what makes a single badge pill honest for a collapsed order.
-   */
-  const groupsWithNew = useMemo(
-    () =>
-      groups.map((g) => ({
-        ...g,
-        isNew: pinnedNew ? g.ids.some((id) => pinnedNew.has(id)) : false,
-      })),
-    [groups, pinnedNew],
-  )
+export function useNotificationFeed({
+  scope = "live",
+}: {
+  scope?: NotificationScope
+} = {}) {
+  const {
+    groups,
+    members,
+    newCount,
+    markAllRead,
+    setArchived,
+    restoreMany,
+    archiveAllRead,
+    markRead,
+    isLoading,
+    error,
+  } = useNotifications({ scope })
 
   return {
-    notifications,
-    groups: groupsWithNew,
-    isNew,
+    groups,
+    members,
+    unreadCount: newCount,
+    markAllRead,
+    markRead,
+    setArchived,
+    restoreMany,
+    archiveAllRead,
     isLoading,
     error,
   }

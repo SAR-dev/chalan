@@ -12,15 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1791670474810,
-      "tag": "0001_mighty_vulture",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1791817301375,
-      "tag": "0002_wet_betty_ross",
+      "when": 1791942397546,
+      "tag": "0001_faithful_crystal",
       "breakpoints": true
     }
   ]
