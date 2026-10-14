@@ -139,16 +139,17 @@ test.describe("3401. TopNav & RightNav", () => {
   })
 })
 
-// ─── 3402. Announcements (badge, feed, detail page, markdown) ─────────────────
+// ─── 3402. Announcements (badge, popover, feed, detail page, markdown) ────────
 //
 // Announcements are a board, not a notification feed: the badge counts
-// announcements published since `profile.announcementsSeenAt`, visiting the
-// feed stamps that watermark, and nothing is ever hidden by having "seen" it.
-// The reload assertions are the cross-device proof — server state, not a
-// per-browser localStorage key.
+// announcements published since `profile.announcementsSeenAt`, and that
+// watermark is stamped by *reading the board* — on the desktop by opening the
+// popover, anywhere by visiting the feed — and nothing is ever hidden by
+// having "seen" it. The reload assertions are the cross-device proof —
+// server state, not a per-browser localStorage key.
 
 test.describe("3402. Announcements", () => {
-  test("visiting the feed drains the badge, and it stays drained across a reload", async ({
+  test("opening the bell drains the badge, and it stays drained across a reload", async ({
     page,
   }) => {
     await login(page, CREDS.superAdmin)
@@ -179,12 +180,21 @@ test.describe("3402. Announcements", () => {
     // The only post-watermark row is the one just created → badge reads 1.
     await expect(page.locator(announcements.badge)).toHaveText("1")
 
-    // The bell is a plain link to the feed (no tray) — and the feed stamps
-    // the watermark on mount, so the badge drains while we watch it.
+    // The bell opens the reading popover — full text, no truncation — and
+    // opening it stamps the watermark, so the badge drains while we watch.
     await bell.click()
+    const popover = page.locator(announcements.popover)
+    await expect(popover).toBeVisible()
+    await expect(popover.getByText("E2E new-post proof")).toBeVisible()
+    await expect(popover.getByText(/badge counts posts since/)).toBeVisible()
+    await expect(page.locator(announcements.badge)).toHaveCount(0, {
+      timeout: 10_000,
+    })
+
+    // The footer carries the reader from the glance panel to the full feed.
+    await page.locator(announcements.popoverAll).click()
     await page.waitForURL(/\/dashboard\/announcements-inbox/)
     await expect(page.locator(announcements.inboxRow(ann.id))).toBeVisible()
-    await expect(page.locator(announcements.badge)).toHaveCount(0)
 
     // Cross-reload: with localStorage this reset on a new browser profile;
     // the watermark lives on the profile row, so it must stay drained.

@@ -82,10 +82,24 @@ export const topnav = {
   versionUpdate: "[data-testid='account-build-update']",
 }
 
-// ─── Announcements (bell link + feed + detail page) ──────────────────────────
+// ─── Announcements (bell + popover + feed + detail page) ──────────────────────
 export const announcements = {
+  // Two controls, one per breakpoint: a link to the full feed below `sm`, the
+  // reading popover above it. Both are mounted; CSS hides one.
   bell: "[data-testid='announcement-bell']",
+  bellPage: "[data-testid='announcement-bell-page']",
   badge: "[data-testid='announcement-badge']",
+  badgeMobile: "[data-testid='announcement-badge-mobile']",
+  // The desktop popover: full markdown per post, stamps the watermark on open.
+  popover: "[data-testid='announcement-popover']",
+  popoverAll: "[data-testid='announcement-popover-all']",
+  popoverEmpty: "[data-testid='announcement-popover-empty']",
+  popoverItemAny: "[data-testid^='announcement-popover-item-']",
+  popoverItem: (id: string) =>
+    `[data-testid='announcement-popover-item-${id}']`,
+  popoverNew: (id: string) => `[data-testid='announcement-popover-new-${id}']`,
+  sectionNew: "[data-testid='announcement-popover-section-new']",
+  sectionEarlier: "[data-testid='announcement-popover-section-earlier']",
   // Feed rows + the "published since your last visit" pill.
   inboxRow: (id: string) => `[data-testid='inbox-row-${id}']`,
   newPill: (id: string) => `[data-testid='inbox-new-${id}']`,

@@ -169,15 +169,15 @@ must match text, scope it to a tagged container (e.g.
 
 **Suite naming:** every `test.describe` is prefixed with a scenario id **scoped
 to its file** — `<file number><index in that file>`, both two digits, so `2901.`
-is the first scenario in `29-sign-out.spec.ts`. File prefixes run `01`…`42` and
+is the first scenario in `29-sign-out.spec.ts`. File prefixes run `01`…`43` and
 must be unique, so ids never collide. Adding or removing a scenario renumbers
 **that one file only** — renumber it; there are no gaps to preserve any more.
 Files sort in run order, so the log now reads in id order too.
 
 The summary below is asserted by `src/app/__tests__/docs-drift.spec.ts`, which
 fails on a duplicate id, a prefix that does not match the filename, an
-out-of-sequence index, or stale counts: **currently 83 scenarios across 42 files
-/ 167 tests**.
+out-of-sequence index, or stale counts: **currently 86 scenarios across 43 files
+/ 171 tests**.
 
 ## Coding Patterns
 

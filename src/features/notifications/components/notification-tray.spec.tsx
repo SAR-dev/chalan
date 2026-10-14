@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 /**
- * The tray is a Sheet whose `open` state is local React state. A `next/link`
+ * The tray is a Popover whose `open` state is local React state. A `next/link`
  * navigation is client-side, so the browser never reloads and nothing tells that
  * state to change — every link in the tray used to navigate *and leave the panel
  * open on top of the destination*.

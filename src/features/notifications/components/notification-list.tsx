@@ -28,9 +28,9 @@ import { cn } from "@/lib/utils"
 // The notification list — one component, three surfaces.
 //
 // The tray, the inbox page and the mobile page render *this*. They differ only
-// in the container around it: a 300px sheet, a page with a header, a full-screen
-// sheet. Rows, grouping, unread treatment, expansion and timestamps are decided
-// once, here.
+// in the container around it: a 360px popover, a page with a header, a
+// full-screen sheet. Rows, grouping, unread treatment, expansion and
+// timestamps are decided once, here.
 //
 // That constraint is the whole point. The previous arrangement had a tray row and
 // an inbox row written separately, which is how they drifted: the tray showed a
@@ -61,8 +61,10 @@ export interface NotificationListProps {
   /** Members of each group, newest first. Optional: expansion is hidden without. */
   members?: Map<string, GroupedEvent[]>
   /**
-   * `tray` is the 300px sheet: tighter rows, no day headers, archive hidden.
-   * `page` is a full-width list: sticky headers, room for actions.
+   * `tray` is the TopNav popover: tighter rows, no day headers, archive
+   * hidden, and title/subject wrap instead of truncating — a reading panel
+   * shows the whole line. `page` is a full-width list: sticky headers, room
+   * for actions, single-line cells for scanning.
    */
   variant: "tray" | "page"
   /** Keys whose collapsed events are on screen. */
@@ -265,7 +267,10 @@ export function NotificationList({
                   <span
                     data-testid="notification-row-title"
                     className={cn(
-                      "truncate text-sm",
+                      // The popover is a reading surface: its title wraps to
+                      // its full text. The page keeps the single line — a
+                      // dense table trades completeness for scanability.
+                      isTray ? "text-sm break-words" : "truncate text-sm",
                       group.unread && !archived
                         ? "text-foreground font-semibold"
                         : "text-foreground font-normal",
@@ -276,7 +281,7 @@ export function NotificationList({
                 </span>
 
                 <span className="flex min-w-0 items-center gap-2">
-                  <SubjectLine group={group} />
+                  <SubjectLine group={group} wrap={isTray} />
                   {/* The chip lives on the meta line, not beside the title, on
                       every surface. Beside the title it squeezed "Rider picked up
                       the parcel" down to "Rider picked up the pa…" at both 300px
@@ -386,8 +391,11 @@ function CaughtUpEmpty() {
 
 function SubjectLine({
   group,
+  wrap,
 }: {
   group: Pick<NotificationGroup, "subject" | "orderId" | "event" | "actorName">
+  /** Tray (popover): show the full line. Page: one line, tooltip for more. */
+  wrap?: boolean
 }) {
   const { text, degraded } = describeSubject(group)
   const withActor = group.actorName ? `${text} · ${group.actorName}` : text
@@ -401,7 +409,8 @@ function SubjectLine({
       // lives in the tooltip and behind the copy button instead.
       title={group.orderId ? `Order ${group.orderId}` : undefined}
       className={cn(
-        "min-w-0 flex-1 truncate text-xs",
+        "min-w-0 flex-1 text-xs",
+        wrap ? "break-words" : "truncate",
         degraded ? "text-muted-foreground italic" : "text-muted-foreground",
       )}
     >

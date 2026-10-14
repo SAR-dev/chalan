@@ -16,8 +16,8 @@ import { useNotificationCount } from "@/features/notifications/hooks/use-notific
  * Two controls, one per breakpoint, rather than one control that changes
  * behaviour on resize:
  *
- * - Below `sm` this is a `Link` to the full-screen list. A 300px sheet on a 390px
- *   phone leaves 90px of the page visible beside it and gives every row two lines
+ * - Below `sm` this is a `Link` to the full-screen list. A 360px popover on a
+ *   390px phone leaves the page a sliver beside it and gives every row two lines
  *   and a thumb-sized target in a column that was never designed for one.
  * - At `sm` and above it is the popover, which has room to be a popover.
  *

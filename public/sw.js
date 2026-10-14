@@ -36,7 +36,7 @@
  * already written by an earlier build gets dropped.
  */
 
-const VERSION = "1.0.0"
+const VERSION = "1.1.0"
 const SHELL_CACHE = `chalan-shell-${VERSION}`
 const STATIC_CACHE = `chalan-static-${VERSION}`
 
